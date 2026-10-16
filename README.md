@@ -81,7 +81,7 @@ docker compose exec backend alembic upgrade head
 1. Base do projeto ✅
 2. Contas de usuário (cadastro, login, 2FA, recuperação de senha) ✅
 3. Núcleo do orçamento (renda, contas, parcelas, categorias, metas, histórico) ✅
-4. Análises (score, 50/30/20, comparar meses, projeção, simulador, investimentos)
+4. Análises (score, 50/30/20, comparar meses, projeção, simulador, investimentos) ✅
 5. Importação/exportação (JSON do app antigo, extratos, CSV/Excel/PDF)
 6. Deploy na Oracle Cloud (Docker, Caddy/HTTPS, backups)
 7. Produto público (LGPD, termos, rate limiting, e-mails)

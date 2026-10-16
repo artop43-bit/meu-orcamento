@@ -141,7 +141,7 @@ def _materialize(db: Session, item: RecurringItem, month: date) -> None:
         )
 
 
-def _active_in(item: RecurringItem, month: date) -> bool:
+def active_in(item: RecurringItem, month: date) -> bool:
     return item.start_month <= month and (item.end_month is None or month <= item.end_month)
 
 
@@ -154,7 +154,7 @@ def ensure_month(db: Session, user: User, month: date) -> None:
         return
     db.add(BudgetMonth(user_id=user.id, month=month))
     for item in db.scalars(select(RecurringItem).where(RecurringItem.user_id == user.id)):
-        if _active_in(item, month):
+        if active_in(item, month):
             _materialize(db, item, month)
     db.commit()
 
@@ -191,7 +191,7 @@ def create_recurring(db: Session, user: User, data: dict[str, Any]) -> Recurring
     for (month,) in db.execute(
         select(BudgetMonth.month).where(BudgetMonth.user_id == user.id, BudgetMonth.month >= start)
     ):
-        if _active_in(item, month):
+        if active_in(item, month):
             _materialize(db, item, month)
     db.commit()
     return item
