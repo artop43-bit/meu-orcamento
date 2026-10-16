@@ -41,6 +41,8 @@ class Category(Base):
     name: Mapped[str] = mapped_column(String(60))
     is_essential: Mapped[bool] = mapped_column(default=False)
     color: Mapped[str | None] = mapped_column(String(7))
+    # Quanto o usuário quer gastar no máximo por mês nesta categoria (opcional).
+    monthly_limit: Mapped[Decimal | None] = mapped_column(Money)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
 
 

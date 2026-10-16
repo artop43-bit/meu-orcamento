@@ -6,6 +6,7 @@ import { budgetApi, keys, useBudgetMutation, type Goal } from "../api/budget";
 import { errorMessage } from "../api/client";
 import { Bar, FormActions, MoneyInput, requireMoney } from "../components/budget";
 import { Alert, Button, PageHeader, Sheet } from "../components/ui";
+import { useUndo } from "../components/undo";
 import { money, moneyInput, percent, shortDate } from "../lib/format";
 
 function monthsUntil(isoDate: string): number {
@@ -63,7 +64,7 @@ function GoalCard({ goal }: { goal: Goal }) {
   const [amount, setAmount] = useState("");
   const [error, setError] = useState("");
   const contribute = useBudgetMutation((value: string) => budgetApi.contribute(goal.id, value));
-  const remove = useBudgetMutation(() => budgetApi.deleteGoal(goal.id));
+  const undo = useUndo();
 
   const missing = Number(goal.target_amount) - Number(goal.current_amount);
   const months = goal.target_date ? monthsUntil(goal.target_date) : null;
@@ -101,7 +102,9 @@ function GoalCard({ goal }: { goal: Goal }) {
             className="icon-btn"
             aria-label={`Excluir meta ${goal.name}`}
             title="Excluir"
-            onClick={() => window.confirm(`Excluir a meta "${goal.name}"?`) && remove.mutate(undefined)}
+            onClick={() =>
+              undo.remove({ ids: [goal.id], message: `Meta "${goal.name}" excluída`, commit: () => budgetApi.deleteGoal(goal.id) })
+            }
           >
             <Trash2 size={16} />
           </button>
@@ -141,6 +144,7 @@ export default function Goals() {
   const goals = useQuery({ queryKey: keys.goals, queryFn: budgetApi.goals });
   const [adding, setAdding] = useState(false);
   const list = goals.data ?? [];
+  const undo = useUndo();
   const saved = list.reduce((s, g) => s + Number(g.current_amount), 0);
   const target = list.reduce((s, g) => s + Number(g.target_amount), 0);
 
@@ -165,7 +169,9 @@ export default function Goals() {
         </section>
       )}
       <div className="grid-cards">
-        {list.map((goal) => (
+        {list
+          .filter((goal) => !undo.isHidden(goal.id))
+          .map((goal) => (
           <GoalCard key={goal.id} goal={goal} />
         ))}
       </div>

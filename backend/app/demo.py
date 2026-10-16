@@ -1,4 +1,7 @@
-"""Conta de demonstração com dados de exemplo, para testar o app (Codespaces, local).
+"""Conta de demonstração para testar o app (Codespaces, local).
+
+Por padrão a conta nasce vazia (só as categorias padrão), para testar como um usuário novo.
+Com `with_data=True` ela vem preenchida com 6 meses de exemplo.
 
 Nunca roda em produção. A senha é aleatória a cada execução e só é mostrada no terminal
 (e gravada num arquivo local fora do Git, se pedido).
@@ -41,13 +44,22 @@ def _category(db: Session, user: User, name: str) -> Category:
     return category
 
 
-def seed_demo(db: Session, email: str = DEMO_EMAIL) -> tuple[str, bool]:
-    """Cria (ou redefine a senha de) a conta de demonstração. Retorna (senha, criada_agora)."""
+def seed_demo(
+    db: Session, email: str = DEMO_EMAIL, *, with_data: bool = False, reset: bool = False
+) -> tuple[str, bool]:
+    """Cria (ou redefine a senha de) a conta de demonstração. Retorna (senha, criada_agora).
+
+    `reset` apaga a conta existente e todos os dados dela antes de criar de novo.
+    """
     if get_settings().is_production:
         raise DemoNotAllowed("A conta de demonstração não pode ser criada em produção.")
 
     password = secrets.token_urlsafe(12)
     user = db.scalar(select(User).where(User.email == email))
+    if user is not None and reset:
+        db.delete(user)  # as demais tabelas apagam junto (ON DELETE CASCADE)
+        db.commit()
+        user = None
     if user is not None:
         user.password_hash = security.hash_password(password)
         user.failed_login_attempts = 0
@@ -67,7 +79,8 @@ def seed_demo(db: Session, email: str = DEMO_EMAIL) -> tuple[str, bool]:
     db.flush()
     budget.create_default_categories(db, user)
     db.flush()
-    _fill(db, user)
+    if with_data:
+        _fill(db, user)
     db.commit()
     return password, True
 

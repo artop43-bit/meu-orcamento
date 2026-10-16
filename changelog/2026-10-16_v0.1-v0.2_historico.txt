@@ -1,0 +1,19 @@
+MEU ORÇAMENTO · UPDATE LOG
+Versões 0.1 e 0.2 (registro do que veio antes do changelog)
+Data: 16/10/2026
+
+v0.1 · Plataforma (PRs #1 a #8)
+- [x] Contas de usuário: cadastro, confirmação por e-mail, login, recuperação de senha
+- [x] Segurança: 2FA (app autenticador + códigos de recuperação), sessões, atividade, LGPD, exclusão de conta
+- [x] Orçamento: rendas, contas, parcelas, contas fixas, categorias, metas e histórico
+- [x] Análises: score, regra 50/30/20, comparar meses, projeção, simulador e investimentos (Selic, CDI, IPCA)
+- [x] Dados: importar app antigo (JSON) e extratos (OFX/CSV); exportar CSV, Excel, PDF e backup
+- [x] Produção: Docker, HTTPS, backup criptografado, deploy automático e testes no CI
+- [x] Codespaces com conta de demonstração
+
+v0.2 · Design e experiência (PRs #9 e #10)
+- [x] Layouts nativos: menu lateral no desktop; abas, botão + e janelas que sobem no celular
+- [x] Gestos: deslizar entre abas, puxar para atualizar, arrastar janela para fechar
+- [x] Fluidez: "paga" instantâneo, transições, esqueleto de carregamento, meses pré-carregados
+- [x] Acessibilidade: pular para o conteúdo, foco e avisos para leitores de tela, toque de 44 px, alto contraste
+- [x] Correção: descrição das contas sumia em notebooks de 1024 a 1279 px

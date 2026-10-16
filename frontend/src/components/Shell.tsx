@@ -22,14 +22,15 @@ import { announce, prefersReducedMotion } from "../lib/announce";
 import { neighbor } from "../lib/gestures";
 import { haptic } from "../lib/haptics";
 import { Brand, Sheet } from "./ui";
+import { UndoProvider } from "./undo";
 import { resetSwipe, useMobileGestures } from "./useMobileGestures";
 
-type NavItem = { to: string; label: string; icon: ReactNode };
+type NavItem = { to: string; label: string; icon: ReactNode; short?: string };
 
 const MAIN: NavItem[] = [
   { to: "/orcamento", label: "Orçamento", icon: <Wallet size={20} /> },
   { to: "/metas", label: "Metas", icon: <Target size={20} /> },
-  { to: "/analises", label: "Análises", icon: <ChartPie size={20} /> },
+  { to: "/analises", label: "Análise financeira", short: "Análises", icon: <ChartPie size={20} /> },
   { to: "/investimentos", label: "Investimentos", icon: <Landmark size={20} /> },
   { to: "/historico", label: "Histórico", icon: <History size={20} /> },
 ];
@@ -48,6 +49,23 @@ const MORE = [...MAIN.slice(4), ...SETTINGS];
 const ALL = [...MAIN, ...SETTINGS];
 const TITLES: Record<string, string> = Object.fromEntries(ALL.map((item) => [item.to, item.label]));
 const TAB_PATHS = TABS.map((item) => item.to);
+const LATER_KEY = "2fa-lembrar-depois";
+
+function readSession(key: string): boolean {
+  try {
+    return sessionStorage.getItem(key) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function writeSession(key: string) {
+  try {
+    sessionStorage.setItem(key, "1");
+  } catch {
+    // Navegação privada sem armazenamento: o aviso some só nesta tela.
+  }
+}
 
 /**
  * Estrutura do app logado.
@@ -67,7 +85,9 @@ export function Shell() {
 
   const section = "/" + (location.pathname.split("/")[1] ?? "");
   const title = TITLES[section] ?? "Meu Orçamento";
-  const showTwoFactorBanner = user && !user.totp_enabled && location.pathname !== "/seguranca";
+  const [twoFactorLater, setTwoFactorLater] = useState(() => readSession(LATER_KEY));
+  const showTwoFactorBanner =
+    user && !user.totp_enabled && !user.twofa_prompt_dismissed && !twoFactorLater && location.pathname !== "/seguranca";
   const tabIndex = TAB_PATHS.indexOf(section);
   const inMore = MORE.some((item) => item.to === section);
 
@@ -109,6 +129,19 @@ export function Shell() {
     },
   });
 
+  // "Agora não": some até fechar o navegador. "Não mostrar mais": fica salvo na conta
+  // (dá para ativar a qualquer momento em Segurança).
+  function remindLater() {
+    writeSession(LATER_KEY);
+    setTwoFactorLater(true);
+  }
+
+  async function dismissTwoFactor() {
+    if (user) queryClient.setQueryData(ME_KEY, { ...user, twofa_prompt_dismissed: true });
+    announce("Tudo bem. Você pode ativar quando quiser em Segurança.");
+    await authApi.setTwoFactorPrompt(true).catch(() => undefined);
+  }
+
   async function logout() {
     await authApi.logout().catch(() => undefined);
     queryClient.setQueryData(ME_KEY, null);
@@ -124,6 +157,7 @@ export function Shell() {
   }
 
   return (
+    <UndoProvider>
     <div className="shell">
       <a href="#conteudo" className="skip-link">
         Pular para o conteúdo
@@ -178,10 +212,18 @@ export function Shell() {
         <main ref={contentRef} id="conteudo" className="content" tabIndex={-1}>
           <div ref={pageRef} key={section} className="page">
             {showTwoFactorBanner && (
-              <div className="banner no-print">
+              <div className="banner no-print" role="region" aria-label="Sugestão de segurança">
                 <ShieldAlert size={18} />
                 <span>
-                  Proteja seus dados financeiros: <Link to="/seguranca">ative a verificação em duas etapas</Link>.
+                  Recomendado: <Link to="/seguranca">ative a verificação em duas etapas</Link> para proteger sua conta.
+                </span>
+                <span className="banner__actions">
+                  <button type="button" onClick={remindLater}>
+                    Agora não
+                  </button>
+                  <button type="button" onClick={dismissTwoFactor}>
+                    Não mostrar mais
+                  </button>
                 </span>
               </div>
             )}
@@ -194,7 +236,7 @@ export function Shell() {
         {TABS.map((item) => (
           <NavLink key={item.to} to={item.to} onClick={(e) => onNavClick(e, item.to)}>
             {item.icon}
-            {item.label}
+            {item.short ?? item.label}
           </NavLink>
         ))}
         <button
@@ -233,5 +275,6 @@ export function Shell() {
 
       <div id="sr-announcer" className="sr-only" role="status" aria-live="polite" />
     </div>
+    </UndoProvider>
   );
 }

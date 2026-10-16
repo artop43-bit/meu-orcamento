@@ -152,6 +152,10 @@ svg {
 .tone--error {
   color: var(--error);
 }
+
+.tone--warn {
+  color: var(--warn);
+}
 .num {
   font-variant-numeric: tabular-nums;
 }
@@ -2170,4 +2174,422 @@ body:has(dialog[open]) {
 .shell__main {
   overflow-x: clip;
   min-width: 0;
+}
+
+/* ---------------------------------------------------------- análise financeira (v0.3) */
+
+/* Consultor: cor e ícone acompanham o "humor" do mês. */
+.consultant {
+  border-left: 4px solid var(--mood, var(--accent));
+}
+
+.mood--great {
+  --mood: var(--ok);
+  --mood-bg: var(--ok-bg);
+}
+
+.mood--good {
+  --mood: var(--accent);
+  --mood-bg: var(--accent-soft);
+}
+
+.mood--attention {
+  --mood: var(--warn);
+  --mood-bg: var(--warn-bg);
+}
+
+.mood--concern {
+  --mood: var(--error);
+  --mood-bg: var(--error-bg);
+}
+
+.mood--empty {
+  --mood: var(--info);
+  --mood-bg: var(--info-bg);
+}
+
+.consultant__head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.consultant__icon {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  background: var(--mood-bg, var(--accent-soft));
+  color: var(--mood, var(--accent));
+}
+
+.consultant__eyebrow {
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.consultant h2 {
+  margin: 2px 0 0;
+  font-size: 1.35rem;
+}
+
+.consultant__summary {
+  margin: 14px 0 0;
+  font-size: 1.02rem;
+  line-height: 1.6;
+}
+
+/* Lista de observações e alertas. */
+.insights {
+  list-style: none;
+  margin: 16px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.card > h2 + .insights {
+  margin-top: 0;
+}
+
+.insight {
+  display: flex;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  background: var(--tone-bg);
+}
+
+.insight__icon {
+  color: var(--tone);
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.insight__title {
+  display: block;
+  font-weight: 650;
+}
+
+.insight__text {
+  display: block;
+  color: var(--muted);
+  font-size: 0.92rem;
+  margin-top: 2px;
+}
+
+.insight--praise {
+  --tone: var(--ok);
+  --tone-bg: var(--ok-bg);
+}
+
+.insight--info {
+  --tone: var(--info);
+  --tone-bg: var(--info-bg);
+}
+
+.insight--warning {
+  --tone: var(--warn);
+  --tone-bg: var(--warn-bg);
+}
+
+.insight--danger {
+  --tone: var(--error);
+  --tone-bg: var(--error-bg);
+}
+
+/* Atalho do consultor na tela do Orçamento. */
+.teaser {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--mood);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  color: var(--fg);
+  text-decoration: none;
+}
+
+.teaser .consultant__icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+}
+
+.teaser__text {
+  display: block;
+  font-size: 0.88rem;
+  color: var(--muted);
+}
+
+.teaser:hover {
+  border-color: var(--border-strong);
+}
+
+/* Passos do "como começar". */
+.steps {
+  margin: 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Barras (renda × gastos e categorias empilhadas). */
+.bars-chart {
+  margin: 0;
+}
+
+.bars-chart__plot {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 6px;
+  height: 220px;
+}
+
+@media (min-width: 1024px) {
+  .bars-chart__plot {
+    gap: 12px;
+    height: 260px;
+  }
+}
+
+.bars-chart__col {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.bars-chart__bars {
+  flex: 1;
+  display: flex;
+  gap: 2px;
+  align-items: flex-end;
+  border-bottom: 1px solid var(--border);
+}
+
+.bars-chart__bar {
+  flex: 1;
+  border-radius: 4px 4px 0 0;
+  min-height: 2px;
+}
+
+.bars-chart__stack {
+  flex: 1;
+  display: flex;
+  flex-direction: column-reverse;
+  border-radius: 4px 4px 0 0;
+  overflow: hidden;
+  min-height: 2px;
+}
+
+.bars-chart__stack > span {
+  flex-basis: 0;
+  min-height: 1px;
+}
+
+.bars-chart__balance {
+  font-size: 0.64rem;
+  font-weight: 650;
+  text-align: center;
+  margin-top: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: clip;
+}
+
+.bars-chart__label {
+  font-size: 0.68rem;
+  text-align: center;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.bars-chart .legend {
+  margin-top: 12px;
+}
+
+/* Tabela recolhida com os dados do gráfico. */
+.chart-data summary {
+  cursor: pointer;
+  color: var(--accent);
+  font-size: 0.88rem;
+  font-weight: 600;
+  width: fit-content;
+}
+
+.chart-data[open] summary {
+  margin-bottom: 8px;
+}
+
+/* Rosca. */
+.donut {
+  margin: 0;
+  display: grid;
+  gap: 18px;
+  align-items: center;
+}
+
+@media (min-width: 560px) {
+  .donut {
+    grid-template-columns: 180px minmax(0, 1fr);
+  }
+}
+
+.donut svg {
+  width: 180px;
+  max-width: 100%;
+  justify-self: center;
+}
+
+.donut__label {
+  font-size: 3px;
+  fill: var(--muted);
+}
+
+.donut__center {
+  font-size: 4.2px;
+  font-weight: 700;
+  fill: var(--fg);
+}
+
+.donut__legend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.donut__legend li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.92rem;
+}
+
+.donut__pct {
+  width: 3ch;
+  text-align: right;
+}
+
+/* Limite da categoria na tela de categorias. */
+.limit-input {
+  max-width: 160px;
+}
+
+/* Aviso do 2FA: botões de dispensar. */
+.banner__actions {
+  display: flex;
+  gap: 4px;
+  margin-left: auto;
+  flex-wrap: wrap;
+}
+
+.banner__actions button {
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 4px 8px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.banner__actions button:hover {
+  background: color-mix(in srgb, currentColor 10%, transparent);
+}
+
+/* Aviso com "Desfazer" (toast). */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--tabbar-h) + 18px + env(safe-area-inset-bottom));
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  max-width: min(520px, calc(100vw - 32px));
+  padding: 10px 10px 10px 16px;
+  border-radius: var(--radius);
+  background: var(--fg);
+  color: var(--bg);
+  box-shadow: var(--shadow-lg);
+  transform: translateX(-50%);
+  animation: toast-in 0.2s ease-out;
+}
+
+@media (min-width: 1024px) {
+  .toast {
+    bottom: 24px;
+  }
+}
+
+.toast button {
+  font: inherit;
+  font-weight: 700;
+  padding: 6px 10px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--accent-hover);
+  cursor: pointer;
+}
+
+@media (prefers-color-scheme: dark) {
+  .toast button {
+    color: var(--accent-fg);
+    background: var(--accent);
+  }
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 12px);
+  }
+}
+
+/* Estado vazio com orientação. */
+.empty-hint {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  padding: 18px;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.empty-hint h2 {
+  margin: 0 0 4px;
+  font-size: 1.05rem;
+}
+
+.empty-hint p {
+  margin: 0;
+  color: var(--muted);
+}
+
+/* Celular: o gráfico de renda × gastos mostra só os 6 meses mais recentes (12 colunas não cabem
+   com os valores embaixo). A tabela "Ver dados" continua com todos. */
+@media (max-width: 599px) {
+  .bars-chart--recent .bars-chart__col:nth-last-child(n + 7) {
+    display: none;
+  }
 }

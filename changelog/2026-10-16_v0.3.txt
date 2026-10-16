@@ -1,0 +1,45 @@
+MEU ORÇAMENTO · UPDATE LOG
+Versão 0.3 · Análise financeira e consultor
+Data: 16/10/2026
+
+2FA sem pressão
+- [x] Faixa do topo com "Agora não" (some até fechar o navegador) e "Não mostrar mais" (salvo na conta)
+- [x] Convite discreto: só em Segurança e como última dica do consultor (some se dispensado)
+
+Usabilidade
+- [x] Excluir com "Desfazer" (contas, rendas, metas, investimentos); sem janelas de confirmação
+- [x] Conta avulsa exclui direto; parcelada/fixa pergunta "só esta" ou "as próximas"
+- [x] "Já está paga" ao lançar (marcado sozinho para compras com data de hoje ou anterior)
+- [x] Estados vazios com orientação ("Comece pela sua renda", "Como começar")
+- [x] Ícone do site na aba do navegador
+
+Análises → "Análise financeira"
+- [x] Nova aba "Painel": consultor, alertas, indicadores, gráficos, score, 50/30/20, patrimônio e metas
+- [x] Gráficos: renda × gastos × sobra (12 meses), para onde foi o dinheiro (rosca), categorias em 6 meses
+- [x] Comparações: média de 3 meses, mês anterior e mesmo mês do ano passado
+- [x] Todos os gráficos com "Ver dados em tabela" (acessibilidade)
+
+Consultor financeiro
+- [x] Tom por situação: elogio (guardou 20%+), bom mês, mês no limite, mês no vermelho
+- [x] Mês em andamento descrito como "até agora"
+- [x] Elogios: gastou menos que a média, meses seguidos no azul, reserva completa, meta alcançada
+- [x] Alertas: limite de categoria (80% e estourado), categoria acima da média, orçamento quase estourado,
+      contas em atraso, vencendo em 7 dias, próximo mês no vermelho, meta fora do ritmo
+- [x] Limite mensal por categoria (em Categorias) e barra de uso no Orçamento
+- [x] Resumo do consultor na tela do Orçamento, com atalho para a análise
+- [x] Regras no backend com 24 testes novos (132 no total)
+
+Conta de demonstração
+- [x] Começa vazia (só categorias padrão); Codespace zera a conta antiga uma única vez
+
+QA em massa (pela interface, Edge + Playwright)
+- [x] Persona: Carla, 34, BH; salário R$ 3.200 → 3.350; 9 meses de dados reais de consumo
+- [x] 21 de 21 etapas OK: lançamentos, fixas, parcelas, aumento de salário, pagar, editar, desfazer,
+      metas, investimentos, consultor mês a mês, painel, comparar, projeção, simulador, histórico,
+      relatório, CSV/Excel/backup, extrato OFX (sem duplicar), 2FA completo, faixa do 2FA, celular
+- [x] Encontrado e corrigido no QA:
+      · compras lançadas depois de pagas apareciam como "em atraso" → opção "Já está paga"
+      · mês atual chamado de "excelente" com o mês pela metade → tom "até agora"
+      · reserva em meses diferente entre consultor e score → mesma base de cálculo
+      · gráfico de 12 meses apertado no celular → mostra os 6 mais recentes
+      · erro 404 do ícone do site → ícone adicionado

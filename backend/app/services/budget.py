@@ -303,10 +303,13 @@ def delete_income(db: Session, user: User, income_id: uuid.UUID, scope: str) -> 
 
 def create_expense(db: Session, user: User, month: date, data: dict[str, Any]) -> list[Expense]:
     installments = data.pop("installments", None)
+    paid = data.pop("paid", False)
     _check_category(db, user, data.get("category_id"))
 
     if not installments:
-        expense = Expense(user_id=user.id, month=month, **data)
+        expense = Expense(
+            user_id=user.id, month=month, paid=paid, paid_at=utcnow() if paid else None, **data
+        )
         db.add(expense)
         db.commit()
         return [expense]
@@ -323,6 +326,8 @@ def create_expense(db: Session, user: User, month: date, data: dict[str, Any]) -
             installment_group_id=group,
             installment_number=index + 1,
             installment_total=installments,
+            paid=paid and index == 0,
+            paid_at=utcnow() if paid and index == 0 else None,
             **data,
         )
         db.add(expense)
@@ -419,6 +424,12 @@ def get_month(db: Session, user: User, month: date) -> MonthData:
                 "name": category.name if category else "Sem categoria",
                 "is_essential": essential,
                 "total": total,
+                "limit": category.monthly_limit if category else None,
+                "limit_pct": (
+                    _pct(total, category.monthly_limit)
+                    if category and category.monthly_limit
+                    else None
+                ),
             }
         )
     category_totals.sort(key=lambda c: c["total"], reverse=True)

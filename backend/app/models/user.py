@@ -30,12 +30,19 @@ class User(Base):
     terms_accepted_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
     terms_version: Mapped[str | None] = mapped_column(String(20))
 
+    # O usuário pediu para não ver mais o convite para ativar a verificação em duas etapas.
+    twofa_prompt_dismissed_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, onupdate=utcnow)
 
     @property
     def email_verified(self) -> bool:
         return self.email_verified_at is not None
+
+    @property
+    def twofa_prompt_dismissed(self) -> bool:
+        return self.twofa_prompt_dismissed_at is not None
 
 
 class UserSession(Base):

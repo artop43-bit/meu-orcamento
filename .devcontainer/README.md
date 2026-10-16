@@ -13,9 +13,9 @@ inteiro no navegador. O endereço é **privado**: só abre com você logado no G
 
 ## Entrar
 
-A conta de demonstração já vem **confirmada** e com **6 meses de dados de exemplo**
-(contas fixas, parcelas, metas, investimentos). O e-mail e a senha aparecem no terminal
-quando o Codespace liga. Para ver de novo, no terminal:
+A conta de demonstração já vem **confirmada** e **vazia** (só as categorias padrão), para
+testar como um usuário novo. O que você lançar fica guardado entre um uso e outro. O e-mail
+e a senha aparecem no terminal quando o Codespace liga. Para ver de novo, no terminal:
 
 ```bash
 cat .devcontainer/credenciais.txt
@@ -45,3 +45,9 @@ grep -o 'http[^ ]*verificar-email[^ ]*' /tmp/api.log | tail -1
 Contas pessoais do GitHub têm **120 horas grátis por mês** (em máquina de 2 núcleos).
 O Codespace **desliga sozinho após 30 minutos parado**. Para não gastar à toa, desligue
 em github.com/codespaces → **⋯ → Stop codespace** quando terminar.
+
+Para apagar tudo e começar do zero de novo:
+
+```bash
+rm .devcontainer/.demo-vazia && bash .devcontainer/start.sh
+```

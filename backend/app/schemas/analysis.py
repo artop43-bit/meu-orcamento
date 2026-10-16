@@ -91,6 +91,81 @@ class ProjectionPoint(BaseModel):
         return format_month(value)
 
 
+# ---------------------------------------------------------------- consultor e tendências
+
+Tone = Literal["praise", "info", "warning", "danger"]
+
+
+class InsightMessage(BaseModel):
+    tone: Tone
+    title: str
+    text: str
+    category_id: uuid.UUID | None = None
+
+
+class InsightsOut(BaseModel):
+    month: str
+    mood: Literal["great", "good", "attention", "concern", "empty"]
+    headline: str
+    summary: str
+    savings_pct: float | None
+    in_progress: bool
+    messages: list[InsightMessage]
+    alerts: list[InsightMessage]
+
+
+class TrendPoint(BaseModel):
+    month: date
+    income: Decimal
+    expenses: Decimal
+    balance: Decimal
+    savings_pct: float | None = None
+    has_data: bool
+
+    @field_serializer("month")
+    def _serialize_month(self, value: date) -> str:
+        return format_month(value)
+
+
+class TrendCategory(BaseModel):
+    category_id: uuid.UUID | None
+    name: str
+    color: str | None
+    totals: list[Decimal]
+
+
+class TrendAverages(BaseModel):
+    income_3m: Decimal | None
+    expenses_3m: Decimal | None
+    balance_3m: Decimal | None
+    income_6m: Decimal | None
+    expenses_6m: Decimal | None
+    balance_6m: Decimal | None
+
+
+class Wealth(BaseModel):
+    invested: Decimal
+    current: Decimal
+    return_value: Decimal
+    reserve: Decimal
+
+
+class GoalsTotal(BaseModel):
+    count: int
+    target: Decimal
+    saved: Decimal
+
+
+class TrendsOut(BaseModel):
+    months: list[TrendPoint]
+    categories: list[TrendCategory]
+    averages: TrendAverages
+    current: TrendPoint
+    same_month_last_year: TrendPoint
+    wealth: Wealth
+    goals: GoalsTotal
+
+
 # ---------------------------------------------------------------- investimentos
 
 InvestmentKind = Literal[

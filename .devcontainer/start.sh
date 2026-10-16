@@ -35,7 +35,14 @@ fi
 
 cd "$ROOT/backend"
 uv run alembic upgrade head > /tmp/migrations.log 2>&1
-uv run python -m app.cli seed-demo --credentials-file "$ROOT/.devcontainer/credenciais.txt" > /tmp/seed.log 2>&1
+# v0.3: a conta de demonstração passa a começar vazia. Na primeira vez com esta versão
+# os dados antigos de exemplo são apagados; depois disso, o que você lançar fica guardado.
+RESET=""
+if [ ! -f "$ROOT/.devcontainer/.demo-vazia" ]; then
+  RESET="--reset"
+fi
+uv run python -m app.cli seed-demo $RESET --credentials-file "$ROOT/.devcontainer/credenciais.txt" > /tmp/seed.log 2>&1
+touch "$ROOT/.devcontainer/.demo-vazia"
 chmod 600 "$ROOT/.devcontainer/credenciais.txt"
 
 # setsid: os processos continuam rodando depois que este script termina.
