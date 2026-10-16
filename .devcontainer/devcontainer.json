@@ -18,6 +18,8 @@
     "5173": { "label": "Meu Orçamento", "onAutoForward": "openBrowser" },
     "8000": { "label": "API", "onAutoForward": "silent" }
   },
+  // Portas internas do editor não aparecem nem abrem sozinhas (evita abrir a errada).
+  "otherPortsAttributes": { "onAutoForward": "ignore" },
   "customizations": {
     "codespaces": {
       "openFiles": [".devcontainer/README.md"]
