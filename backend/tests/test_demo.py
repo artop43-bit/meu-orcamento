@@ -10,8 +10,26 @@ from app.demo import DEMO_EMAIL, DemoNotAllowed, seed_demo
 from tests.conftest import login
 
 
-def test_demo_account_is_ready_to_use(client: TestClient, db: Session) -> None:
+def test_demo_account_starts_empty(client: TestClient, db: Session) -> None:
     password, created = seed_demo(db)
+    assert created
+    assert login(client, DEMO_EMAIL, password).json()["status"] == "ok"
+    month = client.get(f"/api/months/{format_month(current_month())}").json()
+    assert month["expenses"] == [] and month["incomes"] == []
+    assert len(client.get("/api/categories").json()) == 8
+    assert client.get("/api/goals").json() == []
+
+
+def test_reset_erases_the_demo_data(client: TestClient, db: Session) -> None:
+    seed_demo(db, with_data=True)
+    password, created = seed_demo(db, reset=True)
+    assert created
+    login(client, DEMO_EMAIL, password)
+    assert client.get("/api/investments").json() == []
+
+
+def test_demo_account_with_sample_data(client: TestClient, db: Session) -> None:
+    password, created = seed_demo(db, with_data=True)
     assert created
 
     # Já confirmada: entra direto, sem e-mail.
@@ -38,8 +56,8 @@ def test_demo_account_is_ready_to_use(client: TestClient, db: Session) -> None:
 
 
 def test_running_again_only_resets_password(client: TestClient, db: Session) -> None:
-    first, _ = seed_demo(db)
-    second, created = seed_demo(db)
+    first, _ = seed_demo(db, with_data=True)
+    second, created = seed_demo(db, with_data=True)
     assert not created
     assert first != second
     assert login(client, DEMO_EMAIL, first).status_code == 401

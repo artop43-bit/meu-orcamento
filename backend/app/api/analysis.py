@@ -9,6 +9,7 @@ from app.core.months import current_month, format_month, parse_month
 from app.schemas.analysis import (
     CompareOut,
     IndicatorsOut,
+    InsightsOut,
     InvestmentIn,
     InvestmentOut,
     InvestmentPatch,
@@ -16,8 +17,9 @@ from app.schemas.analysis import (
     ProjectionPoint,
     RuleOut,
     ScoreOut,
+    TrendsOut,
 )
-from app.services import analysis, indicators, investments
+from app.services import analysis, indicators, insights, investments
 
 router = APIRouter(tags=["análises"])
 
@@ -54,6 +56,25 @@ def projection(
 ) -> list[ProjectionPoint]:
     first = parse_month(start) if start else current_month()
     return [ProjectionPoint.model_validate(p) for p in analysis.projection(db, user, first, months)]
+
+
+@router.get("/analysis/insights")
+def get_insights(user: CurrentUser, db: DbSession, month: str | None = None) -> InsightsOut:
+    """Leitura do mês pelo "consultor": resumo, elogios, alertas e próximos passos."""
+    target = parse_month(month) if month else current_month()
+    return InsightsOut.model_validate(insights.consultant(db, user, target))
+
+
+@router.get("/analysis/trends")
+def get_trends(
+    user: CurrentUser,
+    db: DbSession,
+    until: str | None = None,
+    months: Annotated[int, Query(ge=3, le=24)] = 12,
+) -> TrendsOut:
+    """Evolução de renda, gastos e categorias, médias e comparação com o ano anterior."""
+    last = parse_month(until) if until else current_month()
+    return TrendsOut.model_validate(insights.trends(db, user, last, months))
 
 
 # ---------------------------------------------------------------- investimentos

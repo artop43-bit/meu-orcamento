@@ -33,3 +33,7 @@ age-key.txt
 .devcontainer/credenciais.txt
 backend/codespace.db
 .devcontainer/.deps-hash
+.devcontainer/.demo-vazia
+
+# Banco e credenciais de teste local
+backend/local-dev*

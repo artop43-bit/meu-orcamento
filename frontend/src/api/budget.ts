@@ -2,7 +2,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tansta
 
 import { api } from "./client";
 
-export type Category = { id: string; name: string; is_essential: boolean; color: string | null };
+export type Category = { id: string; name: string; is_essential: boolean; color: string | null; monthly_limit: string | null };
 
 export type Income = {
   id: string;
@@ -29,6 +29,8 @@ export type Expense = {
 };
 
 export type CategoryTotal = {
+  limit?: string | null;
+  limit_pct?: number | null;
   category_id: string | null;
   name: string;
   is_essential: boolean;
@@ -93,6 +95,7 @@ export type ExpenseInput = {
   due_date?: string | null;
   notes?: string | null;
   installments?: number | null;
+  paid?: boolean;
 };
 
 export type RecurringInput = {

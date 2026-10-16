@@ -3,16 +3,18 @@ import { Plus, Trash2 } from "lucide-react";
 
 import { budgetApi, useBudgetMutation, useCategories, type Category } from "../api/budget";
 import { errorMessage } from "../api/client";
-import { FormActions } from "../components/budget";
+import { FormActions, MoneyInput, requireMoney } from "../components/budget";
 import { Alert, Button, PageHeader } from "../components/ui";
+import { money, moneyInput } from "../lib/format";
 
 function CategoryForm({ category, onDone }: { category?: Category; onDone: () => void }) {
   const [name, setName] = useState(category?.name ?? "");
   const [essential, setEssential] = useState(category?.is_essential ?? false);
   const [color, setColor] = useState(category?.color ?? "#4e79a7");
+  const [limit, setLimit] = useState(category?.monthly_limit ? moneyInput(category.monthly_limit) : "");
   const [error, setError] = useState("");
   const save = useBudgetMutation(async () => {
-    const data = { name, is_essential: essential, color };
+    const data = { name, is_essential: essential, color, monthly_limit: limit.trim() ? requireMoney(limit) : null };
     if (category) await budgetApi.updateCategory(category.id, data);
     else await budgetApi.createCategory(data);
   });
@@ -39,6 +41,13 @@ function CategoryForm({ category, onDone }: { category?: Category; onDone: () =>
         <input type="checkbox" checked={essential} onChange={(e) => setEssential(e.target.checked)} />
         Gasto essencial (moradia, alimentação, saúde…)
       </label>
+      <label>
+        Limite por mês (opcional)
+        <span className="limit-input">
+          <MoneyInput value={limit} onChange={setLimit} />
+        </span>
+        <small className="muted">Você recebe um alerta ao chegar em 80% e ao passar do limite.</small>
+      </label>
       <FormActions loading={save.isPending} onCancel={onDone} />
     </form>
   );
@@ -61,7 +70,10 @@ function CategoryRow({ category }: { category: Category }) {
         <span className="item__title">
           <span className="dot" style={{ background: category.color ?? undefined }} aria-hidden /> {category.name}
         </span>
-        <span className="item__meta">{category.is_essential ? "Essencial" : "Não essencial"}</span>
+        <span className="item__meta">
+          {category.is_essential ? "Essencial" : "Não essencial"}
+          {category.monthly_limit && ` · limite de ${money(category.monthly_limit)} por mês`}
+        </span>
       </button>
       <button
         type="button"
@@ -87,7 +99,7 @@ export default function Categories() {
     <div className="stack">
       <PageHeader
         title="Categorias"
-        subtitle="Essenciais contam como necessidades na regra 50/30/20."
+        subtitle="Essenciais contam como necessidades na regra 50/30/20. Defina limites para receber alertas antes de estourar."
         actions={
           !adding && (
             <Button type="button" onClick={() => setAdding(true)}>

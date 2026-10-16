@@ -31,7 +31,7 @@ def _pct(part: Decimal, whole: Decimal) -> float | None:
 # ---------------------------------------------------------------- score
 
 
-def _average_expenses(history: list[dict[str, Any]], fallback: Decimal) -> Decimal:
+def average_expenses(history: list[dict[str, Any]], fallback: Decimal) -> Decimal:
     """Média de gastos dos últimos 3 meses com lançamentos (base para a reserva)."""
     recent = [p["expenses"] for p in history if p["has_data"] and p["expenses"] > 0][-3:]
     if not recent:
@@ -102,7 +102,7 @@ def score(db: Session, user: User, month: date) -> dict[str, Any]:
 
     # 3. Reserva de emergência (25): 6 meses de gastos guardados vale tudo.
     reserve = investments.emergency_reserve_total(db, user)
-    average = _average_expenses(history, expenses)
+    average = average_expenses(history, expenses)
     if average > 0:
         reserve_months = _f(reserve / average)
         points = min(25.0, reserve_months / RESERVE_TARGET_MONTHS * 25)

@@ -381,3 +381,15 @@ def test_users_cannot_see_or_change_each_others_data(client: TestClient, outbox:
 def test_budget_requires_login(client: TestClient) -> None:
     assert client.get(f"/api/months/{MONTH}").status_code == 401
     assert client.get("/api/goals").status_code == 401
+
+
+def test_expense_can_be_created_already_paid(user: TestClient) -> None:
+    url = f"/api/months/{MONTH}/expenses"
+    single = user.post(url, json={"description": "Mercado", "amount": "80", "paid": True}).json()
+    assert single[0]["paid"] is True
+    assert single[0]["paid_at"] is not None
+
+    # Parcelada: só a primeira parcela já está paga.
+    body = {"description": "TV", "amount": "100", "installments": 3, "paid": True}
+    parcels = user.post(url, json=body).json()
+    assert [p["paid"] for p in parcels] == [True, False, False]

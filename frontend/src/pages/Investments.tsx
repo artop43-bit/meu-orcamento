@@ -12,6 +12,7 @@ import { useBudgetMutation } from "../api/budget";
 import { errorMessage } from "../api/client";
 import { Badge, Bar, FormActions, MoneyInput, requireMoney } from "../components/budget";
 import { Alert, Button, Kpi, PageHeader, Sheet } from "../components/ui";
+import { useUndo } from "../components/undo";
 import { money, moneyInput, parseMoney, percent } from "../lib/format";
 
 const KEY = ["budget", "investments"] as const;
@@ -142,7 +143,7 @@ function InvestmentForm({ investment, onDone }: { investment?: Investment; onDon
 
 function InvestmentRow({ investment }: { investment: Investment }) {
   const [editing, setEditing] = useState(false);
-  const remove = useBudgetMutation(() => analysisApi.deleteInvestment(investment.id));
+  const undo = useUndo();
   const ret = Number(investment.return_amount);
 
   return (
@@ -180,7 +181,13 @@ function InvestmentRow({ investment }: { investment: Investment }) {
         className="icon-btn"
         aria-label="Excluir"
         title="Excluir"
-        onClick={() => window.confirm(`Excluir "${investment.name}"?`) && remove.mutate(undefined)}
+        onClick={() =>
+          undo.remove({
+            ids: [investment.id],
+            message: `"${investment.name}" excluído`,
+            commit: () => analysisApi.deleteInvestment(investment.id),
+          })
+        }
       >
         <Trash2 size={17} />
       </button>
@@ -192,6 +199,7 @@ export default function Investments() {
   const list = useQuery({ queryKey: KEY, queryFn: analysisApi.investments });
   const [adding, setAdding] = useState(false);
   const items = list.data ?? [];
+  const undo = useUndo();
 
   const invested = items.reduce((s, i) => s + Number(i.invested_amount), 0);
   const current = items.reduce((s, i) => s + Number(i.current_value), 0);
@@ -245,7 +253,9 @@ export default function Investments() {
               </p>
             )}
             <ul className="items">
-              {items.map((i) => (
+              {items
+                .filter((i) => !undo.isHidden(i.id))
+                .map((i) => (
                 <InvestmentRow key={i.id} investment={i} />
               ))}
             </ul>

@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, Header, Response, status
 from app.api.deps import CurrentUser, DbSession, MailerDep, SessionToken, session_cookie_name
 from app.core.config import get_settings
 from app.core.rate_limit import rate_limit
+from app.db.types import utcnow
 from app.schemas.auth import (
     ChangePasswordIn,
     CodeIn,
@@ -22,6 +23,7 @@ from app.schemas.auth import (
     SecurityEventOut,
     SessionOut,
     TokenIn,
+    TwoFactorPromptIn,
     TwoFactorSetupOut,
     TwoFactorStatusOut,
     UserOut,
@@ -170,6 +172,13 @@ def two_factor_disable(
     body: Disable2faIn, user: CurrentUser, db: DbSession, mail: MailerDep
 ) -> None:
     auth_service.disable_2fa(db, user, body.password, body.code, mail)
+
+
+@router.post("/2fa/prompt", status_code=status.HTTP_204_NO_CONTENT)
+def two_factor_prompt(body: TwoFactorPromptIn, user: CurrentUser, db: DbSession) -> None:
+    """Esconde (ou volta a mostrar) o convite para ativar a verificação em duas etapas."""
+    user.twofa_prompt_dismissed_at = utcnow() if body.dismissed else None
+    db.commit()
 
 
 @router.post("/2fa/recovery-codes")

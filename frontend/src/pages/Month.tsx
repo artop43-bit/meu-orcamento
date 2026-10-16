@@ -12,6 +12,8 @@ import {
   Receipt,
   Scale,
   Trash2,
+  Repeat,
+  Sparkles,
   Wallet,
 } from "lucide-react";
 import { Link, useParams } from "react-router";
@@ -33,7 +35,9 @@ import { errorMessage } from "../api/client";
 import { announce } from "../lib/announce";
 import { haptic } from "../lib/haptics";
 import { Badge, Bar, CategorySelect, FormActions, MoneyInput, requireMoney } from "../components/budget";
+import { ConsultantTeaser } from "../components/consultant";
 import { Alert, Button, Kpi, LoadingRegion, PageHeader, Sheet, Skeleton } from "../components/ui";
+import { useUndo } from "../components/undo";
 import { addMonths, money, moneyInput, monthLabel, percent, shortDate, thisMonth, todayISO } from "../lib/format";
 
 type Editing =
@@ -178,6 +182,7 @@ function ExpensesCard({
   categories: Category[];
   setEditing: (e: Editing) => void;
 }) {
+  const undo = useUndo();
   const byId = new Map(categories.map((c) => [c.id, c]));
   return (
     <section className="card stack">
@@ -208,15 +213,22 @@ function ExpensesCard({
             <span style={{ textAlign: "right" }}>Valor</span>
             <span />
           </li>
-          {data.expenses.map((expense) => (
-            <LedgerRow
-              key={expense.id}
-              expense={expense}
-              category={expense.category_id ? byId.get(expense.category_id) : undefined}
-              onEdit={() => setEditing({ type: "expense", expense })}
-              onDelete={() => setEditing({ type: "delete-expense", expense })}
-            />
-          ))}
+          {data.expenses
+            .filter((expense) => !undo.isHidden(expense.id))
+            .map((expense) => (
+              <LedgerRow
+                key={expense.id}
+                expense={expense}
+                category={expense.category_id ? byId.get(expense.category_id) : undefined}
+                onEdit={() => setEditing({ type: "expense", expense })}
+                onDelete={() =>
+                  // Conta avulsa: exclui na hora (com Desfazer). Parcelada ou fixa: pergunta o alcance.
+                  expense.installment_group_id || expense.recurring_id
+                    ? setEditing({ type: "delete-expense", expense })
+                    : removeExpense(undo, expense, "one")
+                }
+              />
+            ))}
         </ul>
       )}
     </section>
@@ -240,6 +252,7 @@ function EmptyState({ icon, text, action }: { icon: React.ReactNode; text: strin
 // ---------------------------------------------------------------- renda e categorias (coluna lateral)
 
 function IncomesCard({ data, setEditing }: { data: MonthData; setEditing: (e: Editing) => void }) {
+  const undo = useUndo();
   return (
     <section className="card stack">
       <div className="section-header">
@@ -256,7 +269,9 @@ function IncomesCard({ data, setEditing }: { data: MonthData; setEditing: (e: Ed
         </p>
       ) : (
         <ul className="items">
-          {data.incomes.map((income) => (
+          {data.incomes
+            .filter((income) => !undo.isHidden(income.id))
+            .map((income) => (
             <li key={income.id} className="item">
               <button type="button" className="item__main" onClick={() => setEditing({ type: "income", income })} title="Editar">
                 <span className="item__title">{income.description}</span>
@@ -309,7 +324,19 @@ function BreakdownCard({ data, categories }: { data: MonthData; categories: Cate
                 <span className="muted small">{percent(Math.round((Number(c.total) / total) * 1000) / 10)}</span>
               </span>
             </div>
-            <Bar pct={(Number(c.total) / total) * 100} color={c.category_id ? colors.get(c.category_id) : undefined} />
+            {c.limit && c.limit_pct != null ? (
+              <>
+                <Bar
+                  pct={Math.min(c.limit_pct, 100)}
+                  color={c.limit_pct >= 100 ? "var(--error)" : c.limit_pct >= 80 ? "var(--warn)" : colors.get(c.category_id ?? "")}
+                />
+                <span className={`small ${c.limit_pct >= 100 ? "tone--error" : c.limit_pct >= 80 ? "tone--warn" : "muted"}`}>
+                  {percent(c.limit_pct)} do limite de {money(c.limit)}
+                </span>
+              </>
+            ) : (
+              <Bar pct={(Number(c.total) / total) * 100} color={c.category_id ? colors.get(c.category_id) : undefined} />
+            )}
           </li>
         ))}
       </ul>
@@ -339,6 +366,11 @@ function ExpenseForm({
   const [kind, setKind] = useState<ExpenseKind>("single");
   const [installments, setInstallments] = useState("2");
   const [error, setError] = useState("");
+  // "Já está paga": compras do dia a dia costumam ser lançadas depois de pagas. Sugere marcado
+  // para conta avulsa sem data ou com data de hoje/passada, até a pessoa mexer na caixa.
+  const [paidChoice, setPaidChoice] = useState<boolean | null>(null);
+  const suggestedPaid = kind === "single" && (!dueDate || dueDate <= todayISO());
+  const paid = kind === "recurring" ? false : (paidChoice ?? suggestedPaid);
 
   const save = useBudgetMutation(async () => {
     const value = requireMoney(amount);
@@ -358,7 +390,7 @@ function ExpenseForm({
       });
       return;
     }
-    const data: ExpenseInput = { description, amount: value, category_id, due_date: dueDate || null };
+    const data: ExpenseInput = { description, amount: value, category_id, due_date: dueDate || null, paid };
     if (kind === "installments") data.installments = Number(installments);
     await budgetApi.createExpense(month, data);
   });
@@ -423,6 +455,12 @@ function ExpenseForm({
           <input type="number" min={2} max={120} value={installments} onChange={(e) => setInstallments(e.target.value)} required />
         </label>
       )}
+      {!expense && kind !== "recurring" && (
+        <label className="check">
+          <input type="checkbox" checked={paid} onChange={(e) => setPaidChoice(e.target.checked)} />
+          {kind === "installments" ? "A 1ª parcela já está paga" : "Já está paga"}
+        </label>
+      )}
       <FormActions loading={save.isPending} onCancel={onDone} label={expense ? "Salvar" : "Adicionar conta"} />
     </form>
   );
@@ -439,7 +477,7 @@ function IncomeForm({ month, income, onDone }: { month: string; income?: Income;
     else if (everyMonth) await budgetApi.createRecurring({ kind: "income", description, amount: value, start_month: month });
     else await budgetApi.createIncome(month, { description, amount: value });
   });
-  const remove = useBudgetMutation((scope: DeleteScope) => budgetApi.deleteIncome(income!.id, scope));
+  const undo = useUndo();
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -452,14 +490,14 @@ function IncomeForm({ month, income, onDone }: { month: string; income?: Income;
     }
   }
 
-  async function del(scope: DeleteScope) {
-    setError("");
-    try {
-      await remove.mutateAsync(scope);
-      onDone();
-    } catch (err) {
-      setError(errorMessage(err));
-    }
+  function del(scope: DeleteScope) {
+    const target = income!;
+    undo.remove({
+      ids: [target.id],
+      message: `"${target.description}" excluída`,
+      commit: () => budgetApi.deleteIncome(target.id, scope),
+    });
+    onDone();
   }
 
   return (
@@ -482,11 +520,11 @@ function IncomeForm({ month, income, onDone }: { month: string; income?: Income;
       <FormActions loading={save.isPending} onCancel={onDone} label={income ? "Salvar" : "Adicionar renda"} />
       {income && (
         <div className="stack stack--tight" style={{ borderTop: "1px solid var(--border)", paddingTop: 16 }}>
-          <Button type="button" variant="danger" onClick={() => del("one")} loading={remove.isPending}>
+          <Button type="button" variant="danger" onClick={() => del("one")}>
             <Trash2 size={16} /> {income.recurring_id ? "Excluir só deste mês" : "Excluir"}
           </Button>
           {income.recurring_id && (
-            <Button type="button" variant="danger" onClick={() => del("following")} disabled={remove.isPending}>
+            <Button type="button" variant="danger" onClick={() => del("following")}>
               Excluir deste mês em diante
             </Button>
           )}
@@ -496,24 +534,22 @@ function IncomeForm({ month, income, onDone }: { month: string; income?: Income;
   );
 }
 
+function removeExpense(undo: ReturnType<typeof useUndo>, expense: Expense, scope: DeleteScope) {
+  const what = scope === "following" ? `"${expense.description}" e as próximas excluídas` : `"${expense.description}" excluída`;
+  undo.remove({ ids: [expense.id], message: what, commit: () => budgetApi.deleteExpense(expense.id, scope) });
+}
+
 function DeleteExpense({ expense, onDone }: { expense: Expense; onDone: () => void }) {
-  const [error, setError] = useState("");
-  const remove = useBudgetMutation((scope: DeleteScope) => budgetApi.deleteExpense(expense.id, scope));
+  const undo = useUndo();
   const repeats = expense.installment_group_id !== null || expense.recurring_id !== null;
 
-  async function del(scope: DeleteScope) {
-    setError("");
-    try {
-      await remove.mutateAsync(scope);
-      onDone();
-    } catch (err) {
-      setError(errorMessage(err));
-    }
+  function del(scope: DeleteScope) {
+    removeExpense(undo, expense, scope);
+    onDone();
   }
 
   return (
     <div className="stack">
-      <Alert tone="error">{error}</Alert>
       <p style={{ margin: 0 }}>
         <strong>{expense.description}</strong> · {money(expense.amount)}
         {expense.installment_total && ` · parcela ${expense.installment_number}/${expense.installment_total}`}
@@ -528,11 +564,11 @@ function DeleteExpense({ expense, onDone }: { expense: Expense; onDone: () => vo
           Cancelar
         </Button>
         {repeats && (
-          <Button type="button" variant="danger" onClick={() => del("following")} disabled={remove.isPending}>
+          <Button type="button" variant="danger" onClick={() => del("following")}>
             {expense.installment_group_id ? "Esta e as próximas parcelas" : "Deste mês em diante"}
           </Button>
         )}
-        <Button type="button" variant="danger" onClick={() => del("one")} loading={remove.isPending}>
+        <Button type="button" variant="danger" onClick={() => del("one")}>
           <Trash2 size={16} /> {repeats ? "Só esta" : "Excluir"}
         </Button>
       </div>
@@ -634,7 +670,33 @@ export default function MonthPage() {
           style={{ gap: 20 }}
           aria-busy={data.isPlaceholderData || undefined}
         >
-          <Kpis data={data.data} />
+          {data.data.incomes.length === 0 && data.data.expenses.length === 0 ? (
+            <div className="empty-hint">
+              <span className="kpi__icon" aria-hidden>
+                <Sparkles size={18} />
+              </span>
+              <div>
+                <h2>Comece pela sua renda</h2>
+                <p>
+                  Lance quanto você recebe e depois as contas do mês. O que se repete todo mês (salário, aluguel,
+                  internet) pode ir em <Link to="/fixas">Contas fixas</Link>: aí ele aparece sozinho nos próximos meses.
+                </p>
+                <div className="row" style={{ marginTop: 12 }}>
+                  <Button type="button" onClick={() => setEditing({ type: "new-income" })}>
+                    <Wallet size={16} /> Lançar renda
+                  </Button>
+                  <Link className="btn btn--secondary" to="/fixas">
+                    <Repeat size={16} /> Contas fixas
+                  </Link>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <>
+              <Kpis data={data.data} />
+              <ConsultantTeaser month={month} />
+            </>
+          )}
           <div className="layout-main-side">
             <ExpensesCard data={data.data} categories={cats} setEditing={setEditing} />
             <div className="stack" style={{ gap: 20 }}>

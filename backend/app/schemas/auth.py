@@ -16,6 +16,7 @@ class UserOut(BaseModel):
     email: str
     email_verified: bool
     totp_enabled: bool
+    twofa_prompt_dismissed: bool
     created_at: datetime
 
 
@@ -109,3 +110,7 @@ class SecurityEventOut(BaseModel):
 class DeleteAccountIn(BaseModel):
     password: Annotated[str, Field(min_length=1, max_length=128)]
     code: Annotated[str, Field(max_length=32)] | None = None
+
+
+class TwoFactorPromptIn(BaseModel):
+    dismissed: bool

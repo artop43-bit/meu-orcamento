@@ -7,6 +7,7 @@ export type User = {
   email: string;
   email_verified: boolean;
   totp_enabled: boolean;
+  twofa_prompt_dismissed: boolean;
   created_at: string;
 };
 
@@ -34,6 +35,7 @@ export type SecurityEvent = {
 
 export const authApi = {
   me: () => api.get<User>("/auth/me"),
+  setTwoFactorPrompt: (dismissed: boolean) => api.post<void>("/auth/2fa/prompt", { dismissed }),
   register: (email: string, password: string, accept_terms: boolean) =>
     api.post<Message>("/auth/register", { email, password, accept_terms }),
   verifyEmail: (token: string) => api.post<Message>("/auth/verify-email", { token }),

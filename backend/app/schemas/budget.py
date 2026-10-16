@@ -36,12 +36,14 @@ class CategoryIn(BaseModel):
     name: CategoryName
     is_essential: bool = False
     color: Color | None = None
+    monthly_limit: Money | None = None
 
 
 class CategoryPatch(BaseModel):
     name: CategoryName | None = None
     is_essential: bool | None = None
     color: Color | None = None
+    monthly_limit: Money | None = None
 
 
 class CategoryOut(_Out):
@@ -49,6 +51,7 @@ class CategoryOut(_Out):
     name: str
     is_essential: bool
     color: str | None
+    monthly_limit: Decimal | None
 
 
 # ---------------------------------------------------------------- rendas
@@ -80,6 +83,8 @@ class ExpenseIn(BaseModel):
     category_id: uuid.UUID | None = None
     due_date: date | None = None
     notes: Notes | None = None
+    # Já paga ao lançar (compras do dia a dia). Na parcelada, vale para a 1ª parcela.
+    paid: bool = False
     # Compra parcelada: cria uma conta por mês, começando no mês informado.
     installments: Annotated[int, Field(ge=2, le=120)] | None = None
 
@@ -155,6 +160,8 @@ class CategoryTotal(BaseModel):
     name: str
     is_essential: bool
     total: Decimal
+    limit: Decimal | None = None
+    limit_pct: float | None = None
 
 
 class MonthSummary(BaseModel):

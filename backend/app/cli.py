@@ -2,7 +2,7 @@
 
 python -m app.cli cleanup    roda a limpeza uma vez
 python -m app.cli schedule   roda a limpeza agora e depois uma vez por dia (produção)
-python -m app.cli seed-demo  cria a conta de demonstração com dados (nunca em produção)
+python -m app.cli seed-demo  cria a conta de demonstração vazia (nunca em produção)
 """
 
 import argparse
@@ -57,17 +57,18 @@ def schedule(interval: timedelta = timedelta(hours=24)) -> None:
         time.sleep(interval.total_seconds())
 
 
-def run_seed_demo(credentials_file: str | None) -> None:
+def run_seed_demo(credentials_file: str | None, *, with_data: bool, reset: bool) -> None:
     from app.db.session import SessionLocal
     from app.demo import DEMO_EMAIL, seed_demo
 
     with SessionLocal() as db:
-        password, created = seed_demo(db)
+        password, created = seed_demo(db, with_data=with_data, reset=reset)
     text = f"E-mail: {DEMO_EMAIL}\nSenha:  {password}\n"
     if credentials_file:
         with open(credentials_file, "w", encoding="utf-8") as f:
             f.write(text)
-    status = "criada com dados de exemplo" if created else "já existia; senha redefinida"
+    content = "com dados de exemplo" if with_data else "vazia"
+    status = f"criada ({content})" if created else "já existia; senha redefinida"
     print(f"Conta de demonstração {status}.\n{text}", flush=True)
 
 
@@ -77,6 +78,12 @@ def main() -> None:
     parser.add_argument(
         "--credentials-file", help="seed-demo: também grava e-mail e senha neste arquivo"
     )
+    parser.add_argument(
+        "--with-data", action="store_true", help="seed-demo: preenche 6 meses de exemplo"
+    )
+    parser.add_argument(
+        "--reset", action="store_true", help="seed-demo: apaga a conta e os dados antes de criar"
+    )
     args = parser.parse_args()
 
     if args.command == "cleanup":
@@ -84,7 +91,7 @@ def main() -> None:
     elif args.command == "schedule":
         schedule()
     else:
-        run_seed_demo(args.credentials_file)
+        run_seed_demo(args.credentials_file, with_data=args.with_data, reset=args.reset)
 
 
 if __name__ == "__main__":
