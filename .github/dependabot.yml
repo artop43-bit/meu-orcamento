@@ -1,6 +1,11 @@
 # Abre PRs quando sai atualização das dependências (o CI testa cada uma antes do merge).
-# Atualizações de segurança chegam assim que publicadas; as demais, uma vez por semana,
-# agrupadas para não virar uma enxurrada de PRs.
+# Atualizações de segurança chegam assim que publicadas; as demais são agrupadas
+# (um PR por área) para não virar uma enxurrada de PRs.
+#
+# Versões "major" das peças centrais ficam de fora e são atualizadas à mão, com teste:
+# - postgres: a imagem de backup precisa ter a MESMA versão do banco de produção;
+# - python, node: seguimos as versões de suporte longo usadas no CI e no deploy;
+# - typescript, vite, @vitejs/plugin-react, vitest, @types/node: mudam o ferramental do frontend.
 version: 2
 updates:
   - package-ecosystem: uv
@@ -20,11 +25,25 @@ updates:
     groups:
       frontend:
         update-types: [minor, patch]
+    ignore:
+      - dependency-name: typescript
+        update-types: [version-update:semver-major]
+      - dependency-name: vite
+        update-types: [version-update:semver-major]
+      - dependency-name: "@vitejs/plugin-react"
+        update-types: [version-update:semver-major]
+      - dependency-name: vitest
+        update-types: [version-update:semver-major]
+      - dependency-name: "@types/node"
+        update-types: [version-update:semver-major]
 
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: monthly
+    groups:
+      actions:
+        patterns: ["*"]
 
   - package-ecosystem: docker
     directories:
@@ -33,3 +52,13 @@ updates:
       - /deploy/caddy
     schedule:
       interval: monthly
+    groups:
+      docker:
+        patterns: ["*"]
+    ignore:
+      - dependency-name: postgres
+        update-types: [version-update:semver-major]
+      - dependency-name: python
+        update-types: [version-update:semver-major, version-update:semver-minor]
+      - dependency-name: node
+        update-types: [version-update:semver-major]

@@ -1,0 +1,18 @@
+MEU ORÇAMENTO · UPDATE LOG
+Versão 0.4.1 · Manutenção de dependências
+Data: 16/10/2026 às 15:45 (horário de Brasília)
+
+Atualizações aplicadas (CI verde)
+- [x] GitHub Actions: checkout 7, setup-buildx 4, setup-qemu 4, setup-uv 7, setup-node 7
+- [x] Caddy (servidor web/HTTPS) 2.8 → 2.11
+
+Atualizações recusadas (com motivo)
+- [x] Postgres 18 na imagem de backup: precisa ser a mesma versão do banco de produção (17); quebrou o teste de produção
+- [x] Vite 8 + plugin-react 6: quebraram o build; upgrade grande, fica para uma atualização planejada
+- [x] Python 3.14: os testes rodam em 3.12; produção e testes precisam usar a mesma versão
+- [x] TypeScript 7: troca o compilador inteiro; fica para uma atualização planejada
+- [x] @types/node 26 e Node 25: seguimos o Node 22 (versão de suporte longo)
+
+Dependabot
+- [x] Atualizações agrupadas: um PR por área (backend, frontend, Actions, Docker)
+- [x] Versões major das peças centrais ficam de fora e serão atualizadas à mão, com teste
