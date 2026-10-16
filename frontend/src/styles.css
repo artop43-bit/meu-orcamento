@@ -705,3 +705,146 @@ input.color {
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
+
+/* ---------- análises */
+
+.tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.tab {
+  font: inherit;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 8px 12px;
+  color: var(--muted);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.tab--active {
+  color: var(--fg);
+  border-bottom-color: var(--accent);
+  font-weight: 600;
+}
+
+.month-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.month-picker input,
+.slider input[type="number"] {
+  font: inherit;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--fg);
+  max-width: 220px;
+}
+
+.score {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.score__num {
+  font-size: 2.6rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.tips {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.stacked-bar {
+  display: flex;
+  height: 14px;
+  border-radius: 99px;
+  overflow: hidden;
+  background: var(--border);
+}
+
+.seg--needs {
+  background: #4e79a7;
+}
+
+.seg--wants {
+  background: #d98c3f;
+}
+
+.seg--savings {
+  background: var(--accent);
+}
+
+.rule-lines {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.9rem;
+}
+
+.table__group {
+  padding-top: 16px !important;
+}
+
+.slider {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.9rem;
+}
+
+.slider input[type="range"] {
+  accent-color: var(--accent);
+  width: 100%;
+}
+
+.line-chart {
+  margin: 0;
+}
+
+.line-chart svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.line-chart__zero {
+  stroke: var(--border);
+  stroke-width: 1;
+}
+
+.line-chart__label {
+  fill: var(--muted);
+  font-size: 11px;
+}
+
+.line-chart .legend {
+  margin-top: 8px;
+}
+
+/* ---------- investimentos */
+
+.item__value {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}

@@ -3,10 +3,12 @@ import { BrowserRouter, Link, Navigate, NavLink, Outlet, Route, Routes, useLocat
 
 import { authApi, ME_KEY, useMe } from "./api/auth";
 import { errorMessage } from "./api/client";
+import Analysis from "./pages/Analysis";
 import Categories from "./pages/Categories";
 import ForgotPassword from "./pages/ForgotPassword";
 import Goals from "./pages/Goals";
 import History from "./pages/History";
+import Investments from "./pages/Investments";
 import Login from "./pages/Login";
 import MonthPage from "./pages/Month";
 import RecurringPage from "./pages/Recurring";
@@ -62,6 +64,8 @@ function AppLayout() {
           <NavLink to="/orcamento">Orçamento</NavLink>
           <NavLink to="/metas">Metas</NavLink>
           <NavLink to="/historico">Histórico</NavLink>
+          <NavLink to="/analises">Análises</NavLink>
+          <NavLink to="/investimentos">Investimentos</NavLink>
           <NavLink to="/fixas">Fixas</NavLink>
           <NavLink to="/categorias">Categorias</NavLink>
           <NavLink to="/seguranca">Segurança</NavLink>
@@ -99,6 +103,8 @@ export default function App() {
           <Route path="/orcamento/:month?" element={<MonthPage />} />
           <Route path="/metas" element={<Goals />} />
           <Route path="/historico" element={<History />} />
+          <Route path="/analises" element={<Analysis />} />
+          <Route path="/investimentos" element={<Investments />} />
           <Route path="/fixas" element={<RecurringPage />} />
           <Route path="/categorias" element={<Categories />} />
           <Route path="/seguranca" element={<Security />} />

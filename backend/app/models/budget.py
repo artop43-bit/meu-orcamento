@@ -127,3 +127,22 @@ class Goal(Base):
     target_date: Mapped[date | None] = mapped_column(Date)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, onupdate=utcnow)
+
+
+class Investment(Base):
+    """Posição na carteira. O valor atual é informado pelo usuário."""
+
+    __tablename__ = "investments"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = _user_fk()
+    name: Mapped[str] = mapped_column(String(80))
+    kind: Mapped[str] = mapped_column(String(20))
+    institution: Mapped[str | None] = mapped_column(String(80))
+    invested_amount: Mapped[Decimal] = mapped_column(Money)
+    current_value: Mapped[Decimal] = mapped_column(Money)
+    # Conta como reserva de emergência no score financeiro.
+    is_emergency_reserve: Mapped[bool] = mapped_column(default=False)
+    notes: Mapped[str | None] = mapped_column(String(500))
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, onupdate=utcnow)
