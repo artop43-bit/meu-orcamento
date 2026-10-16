@@ -9,6 +9,7 @@ from sqlalchemy import (
     Numeric,
     SmallInteger,
     String,
+    Text,
     UniqueConstraint,
     Uuid,
 )
@@ -151,5 +152,21 @@ class Investment(Base):
     # Conta como reserva de emergência no score financeiro.
     is_emergency_reserve: Mapped[bool] = mapped_column(default=False)
     notes: Mapped[str | None] = mapped_column(String(500))
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, onupdate=utcnow)
+
+
+class SavedAnalysis(Base):
+    """Análise montada pelo usuário ("Minhas análises"); a configuração fica em JSON."""
+
+    __tablename__ = "saved_analyses"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = _user_fk()
+    name: Mapped[str] = mapped_column(String(60))
+    config: Mapped[str] = mapped_column(Text)
+    # Fixada no Resumo da Análise financeira.
+    pinned: Mapped[bool] = mapped_column(default=False)
+    position: Mapped[int] = mapped_column(SmallInteger, default=0)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, onupdate=utcnow)

@@ -2593,3 +2593,814 @@ body:has(dialog[open]) {
     display: none;
   }
 }
+
+/* Versão do app no fim do menu. */
+.app-version {
+  display: block;
+  font-size: 0.72rem;
+  color: var(--subtle);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------------------------------------------------------- gráficos (v0.4) */
+
+.chart2 {
+  position: relative;
+}
+
+.chart2__scroll {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+}
+
+.chart2__svg {
+  display: block;
+  max-width: none;
+  outline: none;
+  touch-action: pan-y;
+}
+
+.chart2__svg:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+  border-radius: var(--radius-sm);
+}
+
+.chart2__scroll.is-scrollable .chart2__svg {
+  touch-action: pan-x pan-y;
+}
+
+.chart2__grid {
+  stroke: var(--border);
+  stroke-dasharray: 2 4;
+}
+
+.chart2__zero {
+  stroke: var(--border-strong);
+}
+
+.chart2__axis {
+  fill: var(--muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.chart2__axis.is-active {
+  fill: var(--fg);
+  font-weight: 700;
+}
+
+.chart2__hover {
+  fill: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
+.chart2__bar {
+  transform-box: fill-box;
+  transform-origin: bottom;
+  animation: bar-grow 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.chart2__line {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: line-draw 0.7s ease-out forwards;
+}
+
+.chart2__area {
+  opacity: 0.16;
+  animation: fade-in 0.6s ease-out;
+}
+
+.chart2__compare path,
+.chart2__compare circle {
+  stroke: var(--fg);
+  fill: none;
+  opacity: 0.55;
+}
+
+.chart2__compare circle {
+  fill: var(--fg);
+  stroke: none;
+}
+
+@keyframes bar-grow {
+  from {
+    transform: scaleY(0);
+  }
+}
+
+@keyframes line-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* Dica com os valores do ponto. */
+.chart2__tip {
+  position: absolute;
+  top: 0;
+  z-index: 5;
+  transform: translate(-50%, -8px);
+  min-width: 170px;
+  max-width: 260px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-lg);
+  font-size: 0.82rem;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.chart2__tip-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+}
+
+.chart2__tip-row b {
+  margin-left: auto;
+  color: var(--fg);
+  font-variant-numeric: tabular-nums;
+}
+
+.chart2__tip-row i {
+  width: 9px;
+  height: 9px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.chart2__tip-row i.is-compare {
+  border: 2px dashed var(--fg);
+  opacity: 0.6;
+}
+
+.chart2__tip-total {
+  border-top: 1px solid var(--border);
+  padding-top: 4px;
+}
+
+.chart2__legend {
+  margin-top: 10px;
+}
+
+.swatch--dashed {
+  background: none !important;
+  border: 2px dashed var(--fg);
+  opacity: 0.6;
+}
+
+.swatch--mark {
+  width: 3px !important;
+  background: var(--fg) !important;
+}
+
+/* Ranking (barras horizontais). */
+.hbars {
+  margin: 0;
+}
+
+.hbars__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.hbars__row {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "name value"
+    "track track"
+    "delta delta";
+  gap: 4px 12px;
+  padding: 8px 6px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+}
+
+.hbars__row:not(:disabled) {
+  cursor: pointer;
+}
+
+.hbars__row:not(:disabled):hover {
+  background: var(--surface-2);
+}
+
+.hbars__name {
+  grid-area: name;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-weight: 550;
+}
+
+.hbars__value {
+  grid-area: value;
+  font-variant-numeric: tabular-nums;
+  font-weight: 650;
+}
+
+.hbars__track {
+  grid-area: track;
+  position: relative;
+  height: 10px;
+  border-radius: 99px;
+  background: var(--surface-2);
+  overflow: visible;
+}
+
+.hbars__fill {
+  display: block;
+  height: 100%;
+  border-radius: 99px;
+  transform-origin: left;
+  animation: hbar-grow 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.hbars__mark {
+  position: absolute;
+  top: -3px;
+  width: 3px;
+  height: 16px;
+  border-radius: 2px;
+  background: var(--fg);
+  opacity: 0.7;
+  transform: translateX(-50%);
+}
+
+.hbars__delta {
+  grid-area: delta;
+}
+
+@keyframes hbar-grow {
+  from {
+    transform: scaleX(0);
+  }
+}
+
+.donut__slice {
+  transition: stroke-width 0.15s;
+  cursor: pointer;
+}
+
+.donut--interactive .donut__legend li {
+  border-radius: 6px;
+  padding: 2px 4px;
+}
+
+.donut--interactive .donut__legend li.is-active {
+  background: var(--surface-2);
+}
+
+/* ---------------------------------------------------------- análise financeira em seções */
+
+.analysis {
+  display: grid;
+  gap: 20px;
+}
+
+.analysis__nav {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  margin: 0 -16px;
+  padding: 2px 16px 4px;
+  scroll-snap-type: x proximity;
+}
+
+.analysis__nav::-webkit-scrollbar {
+  display: none;
+}
+
+.analysis__nav a {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 99px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+  scroll-snap-align: start;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.analysis__nav a[aria-current="page"] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-fg);
+}
+
+.analysis__nav-group {
+  display: none;
+}
+
+/* Celular: seletor de seções grudado embaixo da barra do topo. */
+@media (max-width: 1023px) {
+  .analysis__nav {
+    position: sticky;
+    top: 56px;
+    z-index: 15;
+    padding-top: 10px;
+    padding-bottom: 10px;
+    background: color-mix(in srgb, var(--bg) 92%, transparent);
+    backdrop-filter: blur(12px);
+  }
+}
+
+/* Desktop: menu de seções na lateral da página. */
+@media (min-width: 1024px) {
+  .analysis {
+    grid-template-columns: 220px minmax(0, 1fr);
+    align-items: start;
+    gap: 28px;
+  }
+
+  .analysis__nav {
+    position: sticky;
+    top: 24px;
+    flex-direction: column;
+    gap: 2px;
+    margin: 0;
+    padding: 0;
+    overflow: visible;
+  }
+
+  .analysis__nav a {
+    border: none;
+    background: none;
+    border-radius: var(--radius-sm);
+    padding: 9px 12px;
+  }
+
+  .analysis__nav a:hover {
+    background: var(--surface-2);
+    color: var(--fg);
+  }
+
+  .analysis__nav a[aria-current="page"] {
+    background: var(--accent-soft);
+    color: var(--accent);
+  }
+
+  .analysis__nav-group {
+    display: block;
+    margin: 14px 12px 4px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--subtle);
+  }
+
+  .analysis__nav-group:first-child {
+    margin-top: 0;
+  }
+}
+
+.analysis__body {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+}
+
+.section-title {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.section-title h2 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.section-title p {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+/* ---------------------------------------------------------- construtor */
+
+.builder {
+  display: grid;
+  gap: 16px;
+}
+
+@media (min-width: 1024px) {
+  .builder {
+    grid-template-columns: 300px minmax(0, 1fr);
+    align-items: start;
+    gap: 20px;
+  }
+
+  .builder__panel {
+    position: sticky;
+    top: 24px;
+  }
+}
+
+.builder__panel {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.control {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border: none;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+
+.control > legend,
+.control__label {
+  padding: 0;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.choice {
+  position: relative;
+}
+
+.choice input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.choice span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: 99px;
+  background: var(--surface);
+  font-size: 0.88rem;
+  font-weight: 550;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.choice input:checked + span {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.choice input:focus-visible + span {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.choice input:disabled + span {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* Tipo de gráfico: ícones. */
+.chart-types {
+  display: flex;
+  gap: 4px;
+  padding: 3px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  width: fit-content;
+}
+
+.chart-types label {
+  position: relative;
+}
+
+.chart-types input {
+  position: absolute;
+  opacity: 0;
+}
+
+.chart-types span {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 34px;
+  border-radius: 6px;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.chart-types input:checked + span {
+  background: var(--surface);
+  color: var(--accent);
+  box-shadow: var(--shadow-sm);
+}
+
+.chart-types input:focus-visible + span {
+  outline: 2px solid var(--accent);
+}
+
+.builder__result-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.builder__title {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.builder__total {
+  font-size: 1.6rem;
+  font-weight: 750;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Celular: resumo dos filtros em chips que abrem uma janela. */
+.filter-chips {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  margin: 0 -16px;
+  padding: 0 16px 2px;
+}
+
+.filter-chips::-webkit-scrollbar {
+  display: none;
+}
+
+.filter-chip {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 38px;
+  padding: 6px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: 99px;
+  background: var(--surface);
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--fg);
+  cursor: pointer;
+}
+
+.filter-chip small {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+@media (min-width: 1024px) {
+  .filter-chips {
+    display: none;
+  }
+}
+
+@media (max-width: 1023px) {
+  .builder__panel--desktop {
+    display: none;
+  }
+}
+
+/* Sugestões e análises salvas. */
+.presets {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr));
+}
+
+.preset {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  font: inherit;
+  color: var(--fg);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s, transform 0.12s;
+}
+
+.preset:hover {
+  border-color: var(--accent);
+}
+
+.preset:active {
+  transform: scale(0.98);
+}
+
+.preset strong {
+  display: block;
+  font-size: 0.95rem;
+}
+
+.preset small {
+  color: var(--muted);
+}
+
+.saved-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 360px), 1fr));
+}
+
+/* ---------------------------------------------------------- tablet (768–1023 px): layout próprio */
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  .content {
+    padding-left: 28px;
+    padding-right: 28px;
+  }
+
+  .kpis {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .layout-2 {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .grid-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  /* Abas como no iPad: ícone ao lado do nome. */
+  .tabbar a,
+  .tabbar button {
+    flex-direction: row;
+    gap: 8px;
+    font-size: 0.82rem;
+  }
+
+  /* Janelas como "form sheet" centralizada, não ocupando a largura toda. */
+  .sheet {
+    width: min(600px, calc(100vw - 64px));
+    margin: auto;
+    border-radius: var(--radius-lg);
+    animation: pop 0.18s ease-out;
+  }
+
+  .sheet__handle {
+    display: none;
+  }
+
+  .analysis__nav {
+    margin: 0 -28px;
+    padding-left: 28px;
+    padding-right: 28px;
+  }
+
+  .filter-chips {
+    margin: 0 -28px;
+    padding: 0 28px 2px;
+  }
+}
+
+/* ---------------------------------------------------------- celular deitado */
+
+@media (max-width: 1023px) and (orientation: landscape) and (max-height: 520px) {
+  :root {
+    --tabbar-h: 50px;
+  }
+
+  .mobile-bar {
+    height: 46px;
+  }
+
+  .tabbar a,
+  .tabbar button {
+    flex-direction: row;
+    gap: 6px;
+  }
+
+  .analysis__nav {
+    top: 46px;
+  }
+
+  .content {
+    padding-left: max(16px, env(safe-area-inset-left));
+    padding-right: max(16px, env(safe-area-inset-right));
+  }
+
+  .sheet {
+    max-height: 96vh;
+  }
+}
+
+/* Régua fixa quando o gráfico rola de lado. */
+.chart2__yaxis {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.chart2__yaxis-bg {
+  fill: var(--surface);
+}
+
+/* Celular: sugestões em carrossel lateral, sem empurrar o construtor para baixo. */
+@media (max-width: 767px) {
+  .presets {
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+    margin: 0 -16px;
+    padding: 2px 16px 4px;
+  }
+
+  .presets::-webkit-scrollbar {
+    display: none;
+  }
+
+  .preset {
+    flex: 0 0 78%;
+    scroll-snap-align: start;
+  }
+}
+
+/* Título grande: a barra do celular mostra o título só depois de rolar. */
+.mobile-bar strong {
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity 0.2s, transform 0.2s;
+}
+
+.mobile-bar.is-condensed strong {
+  opacity: 1;
+  transform: none;
+}
+
+/* Celular deitado: cabeçalho compacto para sobrar altura para o conteúdo. */
+@media (max-width: 1023px) and (orientation: landscape) and (max-height: 520px) {
+  .page-header h1,
+  .page-header .month-nav h1 {
+    font-size: 1.3rem;
+  }
+
+  .page-header__sub {
+    display: none;
+  }
+
+  .page-header {
+    margin-bottom: 4px;
+  }
+}
+
+/* Monitores grandes: aproveita a largura. */
+@media (min-width: 1600px) {
+  .content {
+    max-width: 1520px;
+  }
+}

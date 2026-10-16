@@ -6,6 +6,7 @@ from app.models.budget import (
     Income,
     Investment,
     RecurringItem,
+    SavedAnalysis,
 )
 from app.models.user import AuthToken, RecoveryCode, SecurityEvent, User, UserSession
 
@@ -19,6 +20,7 @@ __all__ = [
     "Investment",
     "RecoveryCode",
     "RecurringItem",
+    "SavedAnalysis",
     "SecurityEvent",
     "User",
     "UserSession",

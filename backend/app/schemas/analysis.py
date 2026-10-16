@@ -1,3 +1,4 @@
+import json
 import uuid
 from datetime import date, datetime
 from decimal import Decimal
@@ -10,6 +11,8 @@ from pydantic import (
     StringConstraints,
     computed_field,
     field_serializer,
+    field_validator,
+    model_validator,
 )
 
 from app.core.months import format_month
@@ -234,3 +237,91 @@ class IndicatorsOut(BaseModel):
     cdi: Indicator | None
     ipca_12m: Indicator | None
     fetched_at: datetime
+
+
+# ---------------------------------------------------------------- monte sua análise
+
+MonthKey = Annotated[str, StringConstraints(pattern=r"^\d{4}-(0[1-9]|1[0-2])$")]
+
+
+class AnalysisConfig(BaseModel):
+    metric: Literal["expenses", "income", "balance", "savings_rate", "investments"]
+    period: Literal["3m", "6m", "12m", "24m", "custom"] = "6m"
+    start: MonthKey | None = None
+    end: MonthKey | None = None
+    group: Literal["month", "month_category", "month_type", "category", "type", "kind"] = "month"
+    categories: list[uuid.UUID] = Field(default_factory=list, max_length=30)
+    compare: Literal["none", "previous", "last_year", "average"] = "none"
+    chart: Literal["bar", "stacked", "line", "area", "donut", "hbar", "table"] = "bar"
+
+    @model_validator(mode="after")
+    def _check(self) -> "AnalysisConfig":
+        if self.period == "custom" and (not self.start or not self.end):
+            raise ValueError("Período personalizado precisa de início e fim.")
+        if self.metric == "investments" and self.group != "kind":
+            raise ValueError("Patrimônio é agrupado por tipo de investimento.")
+        if self.metric != "investments" and self.group == "kind":
+            raise ValueError("Agrupar por tipo de investimento só vale para patrimônio.")
+        if self.metric not in ("expenses", "investments") and self.group != "month":
+            raise ValueError("Renda, sobra e poupança só podem ser vistas por mês.")
+        return self
+
+
+class SeriesLabel(BaseModel):
+    key: str
+    label: str
+    color: str | None = None
+
+
+class SeriesLine(BaseModel):
+    key: str
+    name: str
+    color: str | None
+    values: list[float | None]
+
+
+class SeriesCompare(BaseModel):
+    name: str
+    values: list[float | None]
+
+
+class SeriesOut(BaseModel):
+    labels: list[SeriesLabel]
+    series: list[SeriesLine]
+    compare: SeriesCompare | None
+    unit: Literal["money", "percent"]
+    total: float | None
+    compare_total: float | None
+    start: str
+    end: str
+
+
+SavedName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=60)]
+
+
+class SavedAnalysisIn(BaseModel):
+    name: SavedName
+    config: AnalysisConfig
+    pinned: bool = False
+
+
+class SavedAnalysisPatch(BaseModel):
+    name: SavedName | None = None
+    config: AnalysisConfig | None = None
+    pinned: bool | None = None
+    position: Annotated[int, Field(ge=0, le=100)] | None = None
+
+
+class SavedAnalysisOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    name: str
+    config: AnalysisConfig
+    pinned: bool
+    position: int
+
+    @field_validator("config", mode="before")
+    @classmethod
+    def _parse(cls, value: object) -> object:
+        return json.loads(value) if isinstance(value, str) else value
