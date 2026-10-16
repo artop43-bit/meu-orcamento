@@ -470,9 +470,11 @@ svg {
   }
 }
 
-@media (min-width: 1024px) and (max-width: 1240px) {
+/* Desktop estreito (notebooks 1024–1279 px): a coluna lateral desce para baixo da principal,
+   senão a tabela de contas fica sem espaço para a descrição. */
+@media (min-width: 1024px) and (max-width: 1279px) {
   .layout-main-side {
-    grid-template-columns: minmax(0, 1fr) 300px;
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
@@ -1873,4 +1875,299 @@ input[type="range"]:focus-visible {
     max-height: 420px;
     overflow-y: auto;
   }
+}
+
+/* ---------------------------------------------------------- fluidez: gestos, transições e toque */
+
+/* Troca de página: a nova entra pelo lado de onde veio (celular) ou aparece suave (desktop). */
+.page[data-enter] {
+  animation: page-fade 0.18s ease-out;
+}
+
+@media (max-width: 1023px) {
+  .page[data-enter="1"] {
+    animation: page-in-next 0.26s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+
+  .page[data-enter="-1"] {
+    animation: page-in-prev 0.26s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+
+  /* Rolagem vertical e zoom continuam com o navegador; o arrasto lateral fica com o app. */
+  .content {
+    touch-action: pan-y pinch-zoom;
+  }
+
+  /* Evita o "recarregar a página" nativo do Chrome, que conflita com o puxar para atualizar. */
+  html,
+  body {
+    overscroll-behavior-y: none;
+  }
+}
+
+@keyframes page-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes page-in-next {
+  from {
+    opacity: 0;
+    transform: translateX(32%);
+  }
+}
+
+@keyframes page-in-prev {
+  from {
+    opacity: 0;
+    transform: translateX(-32%);
+  }
+}
+
+/* Indicador do "puxar para atualizar". */
+.pull {
+  position: fixed;
+  top: 64px;
+  left: 50%;
+  z-index: 22;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--accent);
+  box-shadow: var(--shadow);
+  opacity: 0;
+  transform: translate(-50%, -48px);
+  pointer-events: none;
+}
+
+.pull svg {
+  transform: rotate(var(--pull-rotate, 0deg));
+}
+
+.pull.is-refreshing svg {
+  animation: spin 0.8s linear infinite;
+}
+
+@media (min-width: 1024px) {
+  .pull {
+    display: none;
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Janela: anima também ao fechar. */
+.sheet.is-closing,
+.sheet.is-closing::backdrop {
+  animation: fade-out 0.18s ease-in forwards;
+}
+
+@media (max-width: 1023px) {
+  .sheet.is-closing {
+    animation: slide-down 0.18s ease-in forwards;
+  }
+
+  /* Área de arrasto da alça, maior que a alça em si (fácil de pegar com o dedo). */
+  .sheet__grab,
+  .sheet__header {
+    touch-action: none;
+  }
+
+  .sheet__grab {
+    padding: 4px 0 2px;
+    cursor: grab;
+  }
+}
+
+.sheet::backdrop {
+  animation: fade-in 0.2s ease-out;
+}
+
+@keyframes slide-down {
+  to {
+    transform: translateY(100%);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes fade-out {
+  to {
+    opacity: 0;
+  }
+}
+
+/* Com uma janela aberta, a página de trás não rola. */
+body:has(dialog[open]) {
+  overflow: hidden;
+}
+
+/* Resposta visual ao toque: o botão "afunda" de leve. */
+.btn,
+.icon-btn,
+.fab,
+.tabbar a,
+.tabbar button,
+.menu-list a,
+.menu-list button,
+.ledger__open,
+.sidebar__link {
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.12s ease, background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.btn:active:not(:disabled),
+.icon-btn:active,
+.fab:active,
+.tabbar a:active,
+.tabbar button:active {
+  transform: scale(0.95);
+}
+
+.menu-list a:active,
+.menu-list button:active,
+.ledger__open:active {
+  background: var(--surface-2);
+}
+
+.tabbar button.active {
+  color: var(--accent);
+}
+
+.sidebar__logout {
+  border: none;
+  background: none;
+  font: inherit;
+  cursor: pointer;
+  padding: 8px 0;
+}
+
+/* Mês anterior na tela enquanto o novo carrega. */
+.is-stale {
+  opacity: 0.6;
+  transition: opacity 0.2s;
+}
+
+/* Esqueleto de carregamento. */
+.skeleton {
+  display: block;
+  width: 100%;
+  border-radius: 6px;
+  background: linear-gradient(90deg, var(--border) 0%, var(--surface-2) 50%, var(--border) 100%);
+  background-size: 200% 100%;
+  animation: shimmer 1.2s ease-in-out infinite;
+}
+
+.kpi .skeleton + .skeleton {
+  margin-top: 10px;
+}
+
+@keyframes shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}
+
+/* ---------------------------------------------------------- acessibilidade (complementos) */
+
+/* "Pular para o conteúdo": aparece só ao navegar pelo teclado. */
+.skip-link {
+  position: fixed;
+  top: 8px;
+  left: 8px;
+  z-index: 100;
+  padding: 10px 16px;
+  border-radius: var(--radius-sm);
+  background: var(--accent);
+  color: var(--accent-fg);
+  font-weight: 650;
+  text-decoration: none;
+  transform: translateY(-200%);
+}
+
+.skip-link:focus {
+  transform: none;
+}
+
+/* Foco visível em tudo que é interativo, não só nos componentes listados acima. */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Foco levado pelo app (título ao trocar de página): sem contorno, só para o leitor de tela. */
+[tabindex="-1"]:focus {
+  outline: none;
+}
+
+/* Alto contraste pedido no sistema: textos secundários e bordas mais fortes. */
+@media (prefers-contrast: more) {
+  :root {
+    --muted: var(--fg);
+    --subtle: var(--fg);
+    --border: var(--border-strong);
+  }
+
+  .badge,
+  .card,
+  .kpi {
+    border: 1px solid currentColor;
+  }
+}
+
+/* Modo de cores forçadas do Windows: mantém contornos e o estado ativo das abas. */
+@media (forced-colors: active) {
+  .tabbar a.active,
+  .tabbar button.active,
+  .sidebar__link.active {
+    outline: 2px solid CanvasText;
+  }
+
+  .skeleton {
+    background: GrayText;
+  }
+}
+
+/* Área de toque da caixa "paga": 44 px, como recomendam as diretrizes do iOS e Android. */
+.ledger__check {
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+@media (max-width: 1023px) {
+  .ledger__row > .ledger__check {
+    width: 44px;
+    height: 44px;
+    margin: -8px;
+    align-self: center;
+  }
+
+  .ledger__check .item__check {
+    width: 22px;
+    height: 22px;
+  }
+}
+
+/* Durante o arrasto e a animação de entrada a página passa da largura da tela:
+   corta o excesso para a tela não "escorregar" para o lado. (clip não cria rolagem,
+   então a barra do topo continua grudada.) */
+.shell__main {
+  overflow-x: clip;
+  min-width: 0;
 }

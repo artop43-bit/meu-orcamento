@@ -43,12 +43,22 @@ setsid nohup uv run uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload \
   > /tmp/api.log 2>&1 < /dev/null &
 
 cd "$ROOT/frontend"
-API_PROXY_TARGET="http://127.0.0.1:8000" setsid nohup npm run dev > /tmp/web.log 2>&1 < /dev/null &
+API_PROXY_TARGET="http://127.0.0.1:8000" setsid nohup npm run dev -- --clearScreen false > /tmp/web.log 2>&1 < /dev/null &
+
+# Espera o site responder (até 60 s) para não mostrar o link antes da hora.
+for _ in $(seq 1 60); do
+  curl -fsS -o /dev/null http://127.0.0.1:5173/ 2> /dev/null && break
+  sleep 1
+done
+if ! curl -fsS -o /dev/null http://127.0.0.1:5173/ 2> /dev/null; then
+  echo "O site não subiu. Veja o erro com: tail -n 30 /tmp/web.log /tmp/api.log" >&2
+  exit 1
+fi
 
 cat <<EOF
 
 =====================================================================
- Meu Orçamento está subindo (leva uns 10 segundos).
+ Meu Orçamento está no ar!
 
  Abra a aba "PORTS" (Portas) e clique no globo da porta 5173,
  ou acesse: $FRONTEND_URL
