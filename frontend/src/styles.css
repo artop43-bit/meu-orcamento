@@ -848,3 +848,109 @@ input.color {
   flex-direction: column;
   align-items: flex-end;
 }
+
+/* ---------- importar e exportar */
+
+h3 {
+  font-size: 0.95rem;
+  margin: 0 0 6px;
+}
+
+.row--end {
+  align-items: flex-end;
+}
+
+label.btn input[type="file"] {
+  display: none;
+}
+
+.btn.is-loading {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.item--skipped .item__title,
+.item--skipped .item__amount {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+
+.table--compact th,
+.table--compact td {
+  padding: 6px 4px;
+}
+
+.table--compact select {
+  font: inherit;
+  font-size: 0.85rem;
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--fg);
+  max-width: 160px;
+}
+
+.table td.wrap {
+  white-space: normal;
+  min-width: 160px;
+}
+
+/* ---------- relatório para impressão */
+
+.report__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  border-bottom: 2px solid var(--accent);
+  padding-bottom: 12px;
+}
+
+.report__header .muted {
+  text-align: right;
+  margin: 0;
+}
+
+.report__section h2 {
+  margin-bottom: 8px;
+}
+
+.report .table tfoot td {
+  border-bottom: none;
+  padding-top: 10px;
+}
+
+@media print {
+  :root {
+    --bg: #ffffff;
+    --fg: #000000;
+    --muted: #555555;
+    --card: #ffffff;
+    --border: #cccccc;
+    --accent: #1f6f5c;
+    color-scheme: light;
+  }
+
+  body {
+    background: #ffffff;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  .container {
+    max-width: none;
+    padding: 0;
+  }
+
+  .report__section {
+    break-inside: avoid;
+  }
+
+  .table th,
+  .table td {
+    white-space: normal;
+  }
+}

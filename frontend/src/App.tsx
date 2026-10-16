@@ -5,6 +5,7 @@ import { authApi, ME_KEY, useMe } from "./api/auth";
 import { errorMessage } from "./api/client";
 import Analysis from "./pages/Analysis";
 import Categories from "./pages/Categories";
+import DataPage from "./pages/Data";
 import ForgotPassword from "./pages/ForgotPassword";
 import Goals from "./pages/Goals";
 import History from "./pages/History";
@@ -12,6 +13,7 @@ import Investments from "./pages/Investments";
 import Login from "./pages/Login";
 import MonthPage from "./pages/Month";
 import RecurringPage from "./pages/Recurring";
+import Report from "./pages/Report";
 import Register from "./pages/Register";
 import ResetPassword from "./pages/ResetPassword";
 import Security from "./pages/Security";
@@ -56,7 +58,7 @@ function AppLayout() {
 
   return (
     <>
-      <header className="topbar">
+      <header className="topbar no-print">
         <Link to="/" className="brand">
           Meu Orçamento
         </Link>
@@ -68,6 +70,7 @@ function AppLayout() {
           <NavLink to="/investimentos">Investimentos</NavLink>
           <NavLink to="/fixas">Fixas</NavLink>
           <NavLink to="/categorias">Categorias</NavLink>
+          <NavLink to="/dados">Dados</NavLink>
           <NavLink to="/seguranca">Segurança</NavLink>
           <button type="button" className="link" onClick={logout}>
             Sair
@@ -76,7 +79,7 @@ function AppLayout() {
       </header>
       <main className="container">
         {user && !user.totp_enabled && location.pathname !== "/seguranca" && (
-          <div className="banner">
+          <div className="banner no-print">
             Proteja seus dados financeiros: <Link to="/seguranca">ative a verificação em duas etapas</Link>.
           </div>
         )}
@@ -107,6 +110,8 @@ export default function App() {
           <Route path="/investimentos" element={<Investments />} />
           <Route path="/fixas" element={<RecurringPage />} />
           <Route path="/categorias" element={<Categories />} />
+          <Route path="/dados" element={<DataPage />} />
+          <Route path="/relatorio/:month?" element={<Report />} />
           <Route path="/seguranca" element={<Security />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
