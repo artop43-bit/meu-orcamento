@@ -33,7 +33,6 @@ import { AnalysisResult, Builder, PRESETS, SavedCard, useSaved } from "../compon
 import { Bar } from "../components/budget";
 import { Chart } from "../components/chart/Chart";
 import { AlertsCard, ConsultantCard, useInsights } from "../components/consultant";
-import { useSwipeOverride } from "../components/swipe";
 import { Alert, Button, Kpi, LoadingRegion, PageHeader, Skeleton } from "../components/ui";
 import { useUndo } from "../components/undo";
 import { prefersReducedMotion } from "../lib/announce";
@@ -939,12 +938,6 @@ export default function Analysis() {
     setParams({ secao: next }, { replace: true });
     window.scrollTo({ top: 0 });
   }
-
-  // Celular: deslizar troca de seção (nas pontas, volta a trocar as abas do app).
-  useSwipeOverride({
-    canGo: (dir) => index + dir >= 0 && index + dir < SECTIONS.length,
-    go: (dir) => goTo(SECTIONS[index + dir].key),
-  });
 
   // Mantém a seção ativa visível no seletor do celular.
   useEffect(() => {

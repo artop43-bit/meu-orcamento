@@ -138,7 +138,7 @@ jobs:
         run: |
           cd backend
           uv run alembic upgrade head
-          uv run python -m app.cli seed-demo --credentials-file "$QA_CREDENTIALS"
+          uv run python -m app.cli seed-demo --vazia --credentials-file "$QA_CREDENTIALS"
           nohup uv run uvicorn app.main:app --port 8000 > /tmp/api.log 2>&1 &
           cd ../frontend
           API_PROXY_TARGET=http://127.0.0.1:8000 nohup npm run dev -- --clearScreen false > /tmp/web.log 2>&1 &

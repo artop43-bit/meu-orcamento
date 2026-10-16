@@ -24,7 +24,6 @@ import { haptic } from "../lib/haptics";
 import { releaseLabel } from "../release";
 import { Brand, LoadingRegion, Sheet, Skeleton } from "./ui";
 import { UndoProvider } from "./undo";
-import { SwipeProvider, type SwipeHandler } from "./swipe";
 import { ErrorBoundary } from "./ErrorBoundary";
 import { preloadPages } from "../pages/lazy";
 import { resetSwipe, useMobileGestures } from "./useMobileGestures";
@@ -163,16 +162,10 @@ export function Shell() {
     }
   }, [section]);
 
-  // Páginas podem assumir o deslizar (ex.: seções da Análise financeira); nas pontas, troca de aba.
-  const swipeHandler = useRef<SwipeHandler | null>(null);
+  // Deslizar sempre troca as abas principais (as seções dentro de cada tela são por toque).
   useMobileGestures(contentRef, pullRef, {
-    canGo: (dir) => Boolean(swipeHandler.current?.canGo(dir)) || neighbor(TAB_PATHS, tabIndex, dir) !== null,
+    canGo: (dir) => neighbor(TAB_PATHS, tabIndex, dir) !== null,
     go: (dir) => {
-      if (swipeHandler.current?.canGo(dir)) {
-        swipeHandler.current.go(dir);
-        resetSwipe(contentRef.current);
-        return;
-      }
       const to = neighbor(TAB_PATHS, tabIndex, dir);
       if (to) navigate(to);
     },
@@ -284,13 +277,11 @@ export function Shell() {
                 </span>
               </div>
             )}
-            <SwipeProvider handler={swipeHandler}>
-              <ErrorBoundary key={location.pathname}>
-                <Suspense fallback={<PageLoading />}>
-                  <Outlet />
-                </Suspense>
-              </ErrorBoundary>
-            </SwipeProvider>
+            <ErrorBoundary key={location.pathname}>
+              <Suspense fallback={<PageLoading />}>
+                <Outlet />
+              </Suspense>
+            </ErrorBoundary>
           </div>
         </main>
       </div>

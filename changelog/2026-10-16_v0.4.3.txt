@@ -1,0 +1,25 @@
+MEU ORÇAMENTO · UPDATE LOG
+Versão 0.4.3 · Ajustes de navegação e demonstração
+Data: 16/10/2026 às 16:55 (horário de Brasília)
+
+Deslizar no celular
+- [x] Deslizar sempre troca as abas principais (Orçamento, Metas, Análises, Investimentos), em qualquer tela
+- [x] Seções da Análise financeira seguem selecionáveis pelos botões do topo, sem o gesto
+- [x] Corrigido: em telas curtas (ex.: Metas) o gesto só funcionava onde havia conteúdo;
+      agora vale na tela inteira
+
+Conta de demonstração preenchida
+- [x] 6 meses de exemplo: salário e freelas, contas fixas, notebook parcelado, gastos do dia a dia,
+      farmácia, um mês no vermelho (viagem do feriado), bônus, limites de Lazer e Alimentação,
+      duas metas, três investimentos (com reserva) e uma análise fixada no Resumo
+- [x] Consultor com elogios e alertas reais (ex.: Lazer perto do limite, meses seguidos no azul)
+- [x] No Codespace a conta é refeita uma única vez com esses dados; depois o que você lançar fica guardado
+- [x] QA automático segue com conta vazia própria (seed-demo --vazia): testa o caminho de quem começa do zero
+
+QA
+- [x] Persona 26/26 (novo teste: deslizar troca só abas principais e funciona no fim de telas curtas)
+- [x] Acessibilidade: 0 problemas
+- [x] Corrigido no roteiro: leitura do backup baixado ficava confusa com outros arquivos da pasta
+
+Documentação
+- [x] Changelog e versão 0.4.3 no menu
