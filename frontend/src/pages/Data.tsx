@@ -334,6 +334,7 @@ function StatementImport() {
                     <td>
                       {t.kind === "expense" ? (
                         <CategorySelect
+                          label={`Categoria de ${t.description}`}
                           categories={categories.data ?? []}
                           value={categoryOf[t.ref] ?? ""}
                           onChange={(v) => setCategoryOf((c) => ({ ...c, [t.ref]: v }))}

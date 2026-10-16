@@ -120,7 +120,7 @@ function GoalCard({ goal }: { goal: Goal }) {
       <Alert tone="error">{error}</Alert>
       <div className="row">
         <div className="grow">
-          <MoneyInput value={amount} onChange={setAmount} placeholder="Valor" />
+          <MoneyInput value={amount} onChange={setAmount} placeholder="Valor" label="Valor a guardar ou retirar da meta" />
         </div>
         <Button type="button" onClick={() => move(1)} loading={contribute.isPending}>
           Guardar

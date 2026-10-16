@@ -2,13 +2,14 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useSearchParams } from "react-router";
 
-import { analysisApi, type ProjectionPoint, type Rule, type Score } from "../api/analysis";
+import { analysisApi, type Rule, type Score } from "../api/analysis";
 import { useMonth } from "../api/budget";
 import { errorMessage } from "../api/client";
 import { Bar } from "../components/budget";
 import { LineChart } from "../components/charts";
 import { Alert, Button } from "../components/ui";
 import { addMonths, money, monthLabel, percent, thisMonth } from "../lib/format";
+import { cumulativeBalance, simulate, ZERO_SIM, type Sim } from "../lib/simulate";
 
 type Tab = "geral" | "comparar" | "projecao" | "simulador";
 const TABS: [Tab, string][] = [
@@ -315,9 +316,6 @@ function ProjectionTab() {
 
 // ---------------------------------------------------------------- simulador
 
-type Sim = { incomePct: number; expensePct: number; cutWantsPct: number; extra: number };
-const ZERO_SIM: Sim = { incomePct: 0, expensePct: 0, cutWantsPct: 0, extra: 0 };
-
 function Slider({ label, value, min, max, onChange }: { label: string; value: number; min: number; max: number; onChange: (v: number) => void }) {
   return (
     <label className="slider">
@@ -328,13 +326,6 @@ function Slider({ label, value, min, max, onChange }: { label: string; value: nu
       <input type="range" min={min} max={max} step={1} value={value} onChange={(e) => onChange(Number(e.target.value))} />
     </label>
   );
-}
-
-function simulate(point: { income: number; expenses: number }, wants: number, sim: Sim) {
-  const income = point.income * (1 + sim.incomePct / 100);
-  const cut = wants * (sim.cutWantsPct / 100);
-  const expenses = Math.max(0, (point.expenses - cut) * (1 + sim.expensePct / 100) + sim.extra);
-  return { income, expenses, balance: income - expenses };
 }
 
 function SimulatorTab() {
@@ -357,17 +348,14 @@ function SimulatorTab() {
   const committed = simulated.income > 0 ? (simulated.expenses / simulated.income) * 100 : null;
 
   // Aplica o mesmo cenário em cada mês da projeção, com os gastos não essenciais de cada mês.
-  const cumulative = (points: ProjectionPoint[], scenario: Sim) => {
-    let total = 0;
-    return points.map((p) => {
-      const point = { income: Number(p.income), expenses: Number(p.expenses) };
-      total += simulate(point, Number(p.non_essential), scenario).balance;
-      return total;
-    });
-  };
+  const months = projection.data.map((p) => ({
+    income: Number(p.income),
+    expenses: Number(p.expenses),
+    nonEssential: Number(p.non_essential),
+  }));
   const labels = projection.data.map((p) => monthLabel(p.month, true));
-  const base = cumulative(projection.data, ZERO_SIM);
-  const scenario = cumulative(projection.data, sim);
+  const base = cumulativeBalance(months, ZERO_SIM);
+  const scenario = cumulativeBalance(months, sim);
 
   return (
     <div className="stack">

@@ -33,14 +33,17 @@ export function CategorySelect({
   value,
   onChange,
   id,
+  label,
 }: {
   categories: Category[];
   value: string;
   onChange: (value: string) => void;
   id?: string;
+  /** Nome para leitores de tela quando não há <label> visível. */
+  label?: string;
 }) {
   return (
-    <select id={id} value={value} onChange={(e) => onChange(e.target.value)}>
+    <select id={id} value={value} onChange={(e) => onChange(e.target.value)} aria-label={label}>
       <option value="">Sem categoria</option>
       {categories.map((c) => (
         <option key={c.id} value={c.id}>
@@ -57,15 +60,19 @@ export function MoneyInput({
   onChange,
   id,
   placeholder = "0,00",
+  label,
 }: {
   value: string;
   onChange: (value: string) => void;
   id?: string;
   placeholder?: string;
+  /** Nome para leitores de tela quando não há <label> visível. */
+  label?: string;
 }) {
   return (
     <input
       id={id}
+      aria-label={label}
       inputMode="decimal"
       placeholder={placeholder}
       value={value}
