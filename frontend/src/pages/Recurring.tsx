@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { Trash2 } from "lucide-react";
 
 import { budgetApi, keys, useBudgetMutation, useCategories, type Category, type Recurring } from "../api/budget";
 import { errorMessage } from "../api/client";
 import { CategorySelect, FormActions, MoneyInput, requireMoney } from "../components/budget";
-import { Alert } from "../components/ui";
+import { Alert, PageHeader } from "../components/ui";
 import { money, moneyInput, monthLabel } from "../lib/format";
 
 function RecurringEdit({ item, categories, onDone }: { item: Recurring; categories: Category[]; onDone: () => void }) {
@@ -110,7 +111,7 @@ function RecurringRow({ item, categories }: { item: Recurring; categories: Categ
           ) && remove.mutate(undefined)
         }
       >
-        ✕
+        <Trash2 size={17} />
       </button>
     </li>
   );
@@ -125,15 +126,14 @@ export default function RecurringPage() {
 
   return (
     <div className="stack">
-      <h1>Contas e rendas fixas</h1>
-      <p className="muted">
-        Lançadas automaticamente todo mês. Para criar uma, marque "Todo mês" ao adicionar uma conta ou renda
-        no orçamento.
-      </p>
+      <PageHeader
+        title="Contas e rendas fixas"
+        subtitle={`Lançadas automaticamente todo mês. Para criar uma, marque "Todo mês" ao lançar no orçamento.`}
+      />
       {items.isPending && <p className="muted">Carregando…</p>}
       {items.isError && <Alert tone="error">{errorMessage(items.error)}</Alert>}
       {items.data && (
-        <>
+        <div className="layout-2">
           <section className="card stack">
             <h2>Rendas fixas</h2>
             {incomes.length === 0 && <p className="muted">Nenhuma.</p>}
@@ -152,7 +152,7 @@ export default function RecurringPage() {
               ))}
             </ul>
           </section>
-        </>
+        </div>
       )}
     </div>
   );

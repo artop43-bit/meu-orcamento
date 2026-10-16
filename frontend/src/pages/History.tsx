@@ -3,7 +3,7 @@ import { Link } from "react-router";
 
 import { budgetApi, keys } from "../api/budget";
 import { errorMessage } from "../api/client";
-import { Alert } from "../components/ui";
+import { Alert, PageHeader } from "../components/ui";
 import { money, monthLabel, percent } from "../lib/format";
 
 export default function History() {
@@ -18,7 +18,7 @@ export default function History() {
 
   return (
     <div className="stack">
-      <h1>Histórico</h1>
+      <PageHeader title="Histórico" subtitle="Renda, contas e saldo dos últimos 12 meses." />
       {history.isPending && <p className="muted">Carregando…</p>}
       {history.isError && <Alert tone="error">{errorMessage(history.error)}</Alert>}
 

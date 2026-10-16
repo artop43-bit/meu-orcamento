@@ -1,9 +1,10 @@
 import { useState, type FormEvent } from "react";
+import { Plus, Trash2 } from "lucide-react";
 
 import { budgetApi, useBudgetMutation, useCategories, type Category } from "../api/budget";
 import { errorMessage } from "../api/client";
 import { FormActions } from "../components/budget";
-import { Alert, Button } from "../components/ui";
+import { Alert, Button, PageHeader } from "../components/ui";
 
 function CategoryForm({ category, onDone }: { category?: Category; onDone: () => void }) {
   const [name, setName] = useState(category?.name ?? "");
@@ -72,7 +73,7 @@ function CategoryRow({ category }: { category: Category }) {
           remove.mutate(undefined)
         }
       >
-        ✕
+        <Trash2 size={17} />
       </button>
     </li>
   );
@@ -84,14 +85,17 @@ export default function Categories() {
 
   return (
     <div className="stack">
-      <div className="section-header">
-        <h1>Categorias</h1>
-        {!adding && (
-          <Button type="button" onClick={() => setAdding(true)}>
-            + Categoria
-          </Button>
-        )}
-      </div>
+      <PageHeader
+        title="Categorias"
+        subtitle="Essenciais contam como necessidades na regra 50/30/20."
+        actions={
+          !adding && (
+            <Button type="button" onClick={() => setAdding(true)}>
+              <Plus size={16} /> Nova categoria
+            </Button>
+          )
+        }
+      />
       {categories.isError && <Alert tone="error">{errorMessage(categories.error)}</Alert>}
       <section className="card stack">
         {adding && <CategoryForm onDone={() => setAdding(false)} />}

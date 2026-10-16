@@ -7,7 +7,7 @@ import { useMonth } from "../api/budget";
 import { errorMessage } from "../api/client";
 import { Bar } from "../components/budget";
 import { LineChart } from "../components/charts";
-import { Alert, Button } from "../components/ui";
+import { Alert, Button, PageHeader } from "../components/ui";
 import { addMonths, money, monthLabel, percent, thisMonth } from "../lib/format";
 import { cumulativeBalance, simulate, ZERO_SIM, type Sim } from "../lib/simulate";
 
@@ -134,8 +134,10 @@ function OverviewTab({ month, setMonth }: { month: string; setMonth: (m: string)
       {overview.isError && <Alert tone="error">{errorMessage(overview.error)}</Alert>}
       {overview.data && (
         <>
-          <ScoreCard score={overview.data.score} />
-          <RuleCard rule={overview.data.rule} />
+          <div className="layout-2">
+            <ScoreCard score={overview.data.score} />
+            <RuleCard rule={overview.data.rule} />
+          </div>
         </>
       )}
     </div>
@@ -440,7 +442,7 @@ export default function Analysis() {
 
   return (
     <div className="stack">
-      <h1>Análises</h1>
+      <PageHeader title="Análises" subtitle="Score, regra 50/30/20, comparação, projeção e simulador." />
       <div className="tabs" role="tablist">
         {TABS.map(([key, label]) => (
           <button
