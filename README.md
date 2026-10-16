@@ -45,6 +45,30 @@ npm install
 npm run dev
 ```
 
+### E-mails em desenvolvimento
+
+Com `EMAIL_BACKEND=console`, os e-mails (confirmação de cadastro, redefinição de senha)
+são impressos no log da API em vez de enviados. Para ver os links:
+
+```bash
+docker compose logs -f backend
+```
+
+## Autenticação
+
+- Sessão em cookie `httpOnly` (`SameSite=Lax`, `Secure` em produção), guardada no banco
+  como hash e revogável (logout, troca/redefinição de senha).
+- Senhas com Argon2; mínimo de 10 caracteres.
+- Proteção CSRF: toda requisição que altera dados precisa do cabeçalho `X-Requested-With: fetch`.
+- Bloqueio de 15 min após 5 tentativas erradas (senha ou código 2FA).
+- Links de e-mail de uso único com validade (24 h para confirmação, 1 h para redefinição).
+- 2FA por TOTP com segredo criptografado no banco, proteção contra reuso de código
+  e 10 códigos de recuperação.
+- Cadastro e "esqueci a senha" não revelam se um e-mail está cadastrado.
+
+> A `SECRET_KEY` também deriva a chave que criptografa os segredos de 2FA.
+> Trocá-la invalida o 2FA de todos os usuários.
+
 ## Migrações do banco
 
 ```bash
@@ -55,7 +79,7 @@ docker compose exec backend alembic upgrade head
 ## Roadmap
 
 1. Base do projeto ✅
-2. Contas de usuário (cadastro, login, 2FA, recuperação de senha)
+2. Contas de usuário (cadastro, login, 2FA, recuperação de senha) ✅
 3. Núcleo do orçamento (renda, contas, parcelas, categorias, metas, histórico)
 4. Análises (score, 50/30/20, comparar meses, projeção, simulador, investimentos)
 5. Importação/exportação (JSON do app antigo, extratos, CSV/Excel/PDF)

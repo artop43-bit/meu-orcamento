@@ -1,0 +1,86 @@
+import uuid
+from datetime import datetime
+from typing import Annotated, Literal
+
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
+
+Password = Annotated[str, Field(min_length=10, max_length=128)]
+Code = Annotated[str, Field(min_length=6, max_length=32)]
+Token = Annotated[str, Field(min_length=10, max_length=200)]
+
+
+class UserOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    email: str
+    email_verified: bool
+    totp_enabled: bool
+    created_at: datetime
+
+
+class RegisterIn(BaseModel):
+    email: EmailStr
+    password: Password
+
+
+class EmailIn(BaseModel):
+    email: EmailStr
+
+
+class TokenIn(BaseModel):
+    token: Token
+
+
+class LoginIn(BaseModel):
+    email: EmailStr
+    # Sem mínimo no login: senhas antigas não devem ser barradas pela regra atual.
+    password: Annotated[str, Field(min_length=1, max_length=128)]
+
+
+class LoginOut(BaseModel):
+    status: Literal["ok", "2fa_required"]
+    user: UserOut | None = None
+    challenge: str | None = None
+
+
+class Login2faIn(BaseModel):
+    challenge: Token
+    code: Code
+
+
+class ResetPasswordIn(BaseModel):
+    token: Token
+    password: Password
+
+
+class ChangePasswordIn(BaseModel):
+    current_password: Annotated[str, Field(min_length=1, max_length=128)]
+    new_password: Password
+
+
+class TwoFactorSetupOut(BaseModel):
+    secret: str
+    otpauth_uri: str
+
+
+class CodeIn(BaseModel):
+    code: Code
+
+
+class Disable2faIn(BaseModel):
+    password: Annotated[str, Field(min_length=1, max_length=128)]
+    code: Code
+
+
+class RecoveryCodesOut(BaseModel):
+    recovery_codes: list[str]
+
+
+class TwoFactorStatusOut(BaseModel):
+    enabled: bool
+    recovery_codes_remaining: int
+
+
+class MessageOut(BaseModel):
+    message: str
