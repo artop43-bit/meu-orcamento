@@ -24,6 +24,15 @@ export FRONTEND_URL
 pkill -f "uvicorn app.main:app" 2> /dev/null || true
 pkill -f "vite" 2> /dev/null || true
 
+# Dependências mudaram (ex.: trocou de branch)? Reinstala antes de subir.
+DEPS_HASH="$(cat "$ROOT/backend/uv.lock" "$ROOT/frontend/package-lock.json" | sha256sum | cut -d' ' -f1)"
+if [ "$(cat "$ROOT/.devcontainer/.deps-hash" 2> /dev/null)" != "$DEPS_HASH" ] \
+  || [ ! -d "$ROOT/frontend/node_modules" ] || [ ! -d "$ROOT/backend/.venv" ]; then
+  echo "Dependências novas: instalando (1–2 minutos)…"
+  bash "$ROOT/.devcontainer/setup.sh"
+  echo "$DEPS_HASH" > "$ROOT/.devcontainer/.deps-hash"
+fi
+
 cd "$ROOT/backend"
 uv run alembic upgrade head > /tmp/migrations.log 2>&1
 uv run python -m app.cli seed-demo --credentials-file "$ROOT/.devcontainer/credenciais.txt" > /tmp/seed.log 2>&1
