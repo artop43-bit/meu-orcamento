@@ -954,3 +954,57 @@ label.btn input[type="file"] {
     white-space: normal;
   }
 }
+
+/* ---------- LGPD e conta */
+
+.footer {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  padding: 24px 16px 32px;
+  font-size: 0.85rem;
+}
+
+.footer a {
+  color: var(--muted);
+}
+
+.auth {
+  grid-template-rows: 1fr auto;
+}
+
+.card--danger {
+  border-color: var(--error);
+}
+
+.legal {
+  max-width: 760px;
+  line-height: 1.65;
+}
+
+.legal h2 {
+  margin-top: 28px;
+}
+
+.legal ul {
+  padding-left: 20px;
+}
+
+.legal li + li {
+  margin-top: 6px;
+}
+
+.check span a {
+  color: var(--accent);
+}
+
+.check {
+  display: flex;
+  align-items: flex-start;
+}
+
+.check input[type="checkbox"],
+.check input[type="radio"] {
+  margin-top: 0.2em;
+  flex-shrink: 0;
+}

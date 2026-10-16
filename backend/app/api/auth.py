@@ -1,12 +1,15 @@
+import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Header, Response, status
+from fastapi import APIRouter, Depends, Header, Response, status
 
 from app.api.deps import CurrentUser, DbSession, MailerDep, SessionToken, session_cookie_name
 from app.core.config import get_settings
+from app.core.rate_limit import rate_limit
 from app.schemas.auth import (
     ChangePasswordIn,
     CodeIn,
+    DeleteAccountIn,
     Disable2faIn,
     EmailIn,
     Login2faIn,
@@ -16,6 +19,8 @@ from app.schemas.auth import (
     RecoveryCodesOut,
     RegisterIn,
     ResetPasswordIn,
+    SecurityEventOut,
+    SessionOut,
     TokenIn,
     TwoFactorSetupOut,
     TwoFactorStatusOut,
@@ -27,6 +32,14 @@ from app.services.auth import LoginResult
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 UserAgent = Annotated[str | None, Header()]
+
+# Limites por IP (requisições, janela em segundos).
+LIMIT_LOGIN = [Depends(rate_limit("login", 20, 15 * 60))]
+LIMIT_2FA = [Depends(rate_limit("login_2fa", 20, 15 * 60))]
+LIMIT_SIGNUP = [Depends(rate_limit("signup", 10, 3600))]
+LIMIT_EMAIL = [Depends(rate_limit("email", 10, 3600))]
+LIMIT_TOKEN = [Depends(rate_limit("token", 30, 3600))]
+LIMIT_SENSITIVE = [Depends(rate_limit("sensitive", 10, 15 * 60))]
 
 CHECK_INBOX = "Se o e-mail puder ser usado, você receberá uma mensagem com os próximos passos."
 
@@ -55,19 +68,19 @@ def _login_response(response: Response, result: LoginResult) -> LoginOut:
 # ---------------------------------------------------------------- cadastro
 
 
-@router.post("/register", status_code=status.HTTP_202_ACCEPTED)
+@router.post("/register", status_code=status.HTTP_202_ACCEPTED, dependencies=LIMIT_SIGNUP)
 def register(body: RegisterIn, db: DbSession, mail: MailerDep) -> MessageOut:
     auth_service.register(db, body.email, body.password, mail)
     return MessageOut(message=CHECK_INBOX)
 
 
-@router.post("/verify-email")
+@router.post("/verify-email", dependencies=LIMIT_TOKEN)
 def verify_email(body: TokenIn, db: DbSession) -> MessageOut:
     auth_service.verify_email(db, body.token)
     return MessageOut(message="E-mail confirmado. Você já pode entrar.")
 
 
-@router.post("/resend-verification", status_code=status.HTTP_202_ACCEPTED)
+@router.post("/resend-verification", status_code=status.HTTP_202_ACCEPTED, dependencies=LIMIT_EMAIL)
 def resend_verification(body: EmailIn, db: DbSession, mail: MailerDep) -> MessageOut:
     auth_service.resend_verification(db, body.email, mail)
     return MessageOut(message=CHECK_INBOX)
@@ -76,7 +89,7 @@ def resend_verification(body: EmailIn, db: DbSession, mail: MailerDep) -> Messag
 # ---------------------------------------------------------------- login
 
 
-@router.post("/login")
+@router.post("/login", dependencies=LIMIT_LOGIN)
 def login(
     body: LoginIn, response: Response, db: DbSession, user_agent: UserAgent = None
 ) -> LoginOut:
@@ -84,7 +97,7 @@ def login(
     return _login_response(response, result)
 
 
-@router.post("/login/2fa")
+@router.post("/login/2fa", dependencies=LIMIT_2FA)
 def login_2fa(
     body: Login2faIn, response: Response, db: DbSession, user_agent: UserAgent = None
 ) -> LoginOut:
@@ -106,19 +119,21 @@ def me(user: CurrentUser) -> UserOut:
 # ---------------------------------------------------------------- senha
 
 
-@router.post("/forgot-password", status_code=status.HTTP_202_ACCEPTED)
+@router.post("/forgot-password", status_code=status.HTTP_202_ACCEPTED, dependencies=LIMIT_EMAIL)
 def forgot_password(body: EmailIn, db: DbSession, mail: MailerDep) -> MessageOut:
     auth_service.forgot_password(db, body.email, mail)
     return MessageOut(message=CHECK_INBOX)
 
 
-@router.post("/reset-password")
+@router.post("/reset-password", dependencies=LIMIT_TOKEN)
 def reset_password(body: ResetPasswordIn, db: DbSession, mail: MailerDep) -> MessageOut:
     auth_service.reset_password(db, body.token, body.password, mail)
     return MessageOut(message="Senha redefinida. Entre com a nova senha.")
 
 
-@router.post("/change-password", status_code=status.HTTP_204_NO_CONTENT)
+@router.post(
+    "/change-password", status_code=status.HTTP_204_NO_CONTENT, dependencies=LIMIT_SENSITIVE
+)
 def change_password(
     body: ChangePasswordIn, user: CurrentUser, db: DbSession, token: SessionToken, mail: MailerDep
 ) -> None:
@@ -150,7 +165,7 @@ def two_factor_enable(
     return RecoveryCodesOut(recovery_codes=codes)
 
 
-@router.post("/2fa/disable", status_code=status.HTTP_204_NO_CONTENT)
+@router.post("/2fa/disable", status_code=status.HTTP_204_NO_CONTENT, dependencies=LIMIT_SENSITIVE)
 def two_factor_disable(
     body: Disable2faIn, user: CurrentUser, db: DbSession, mail: MailerDep
 ) -> None:
@@ -161,3 +176,41 @@ def two_factor_disable(
 def regenerate_recovery_codes(body: CodeIn, user: CurrentUser, db: DbSession) -> RecoveryCodesOut:
     codes = auth_service.regenerate_recovery_codes(db, user, body.code)
     return RecoveryCodesOut(recovery_codes=codes)
+
+
+# ---------------------------------------------------------------- sessões e atividade
+
+
+@router.get("/sessions")
+def list_sessions(user: CurrentUser, db: DbSession, token: SessionToken) -> list[SessionOut]:
+    return [SessionOut.model_validate(s) for s in auth_service.list_sessions(db, user, token)]
+
+
+@router.delete("/sessions/{session_id}", status_code=status.HTTP_204_NO_CONTENT)
+def revoke_session(
+    session_id: uuid.UUID, user: CurrentUser, db: DbSession, token: SessionToken
+) -> None:
+    auth_service.revoke_session(db, user, session_id, token)
+
+
+@router.post("/sessions/revoke-others", status_code=status.HTTP_204_NO_CONTENT)
+def revoke_other_sessions(user: CurrentUser, db: DbSession, token: SessionToken) -> None:
+    auth_service.revoke_other_sessions(db, user, token)
+
+
+@router.get("/events")
+def list_events(user: CurrentUser, db: DbSession) -> list[SecurityEventOut]:
+    return [SecurityEventOut.model_validate(e) for e in auth_service.list_events(db, user)]
+
+
+# ---------------------------------------------------------------- exclusão de conta
+
+
+@router.post(
+    "/delete-account", status_code=status.HTTP_204_NO_CONTENT, dependencies=LIMIT_SENSITIVE
+)
+def delete_account(
+    body: DeleteAccountIn, response: Response, user: CurrentUser, db: DbSession, mail: MailerDep
+) -> None:
+    auth_service.delete_account(db, user, body.password, body.code, mail)
+    response.delete_cookie(session_cookie_name(), path="/")

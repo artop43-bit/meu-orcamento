@@ -11,6 +11,7 @@ export default function Register() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
+  const [accepted, setAccepted] = useState(false);
   const [error, setError] = useState("");
   const [done, setDone] = useState("");
   const [loading, setLoading] = useState(false);
@@ -22,9 +23,13 @@ export default function Register() {
       setError("As senhas não conferem.");
       return;
     }
+    if (!accepted) {
+      setError("Para criar a conta, aceite os Termos de uso e a Política de privacidade.");
+      return;
+    }
     setLoading(true);
     try {
-      const result = await authApi.register(email, password);
+      const result = await authApi.register(email, password, accepted);
       setDone(result.message);
     } catch (err) {
       setError(errorMessage(err));
@@ -81,6 +86,20 @@ export default function Register() {
           value={confirm}
           onChange={(e) => setConfirm(e.target.value)}
         />
+        <label className="check small">
+          <input type="checkbox" checked={accepted} onChange={(e) => setAccepted(e.target.checked)} required />
+          <span>
+            Li e aceito os{" "}
+            <Link to="/termos" target="_blank">
+              Termos de uso
+            </Link>{" "}
+            e a{" "}
+            <Link to="/privacidade" target="_blank">
+              Política de privacidade
+            </Link>
+            .
+          </span>
+        </label>
         <Button type="submit" loading={loading}>
           Criar conta
         </Button>

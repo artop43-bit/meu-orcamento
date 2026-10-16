@@ -2,8 +2,9 @@ import { useState, type FormEvent } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { QRCodeSVG } from "qrcode.react";
 
-import { authApi, ME_KEY } from "../api/auth";
+import { authApi, ME_KEY, useMe } from "../api/auth";
 import { errorMessage } from "../api/client";
+import { ActivitySection, DeleteAccountSection, SessionsSection } from "../components/account";
 import { Alert, Button, Field } from "../components/ui";
 import { MIN_PASSWORD } from "./Register";
 
@@ -276,6 +277,7 @@ function ChangePasswordSection() {
 }
 
 export default function Security() {
+  const { data: user } = useMe();
   return (
     <div className="stack">
       <h1>Segurança da conta</h1>
@@ -287,6 +289,20 @@ export default function Security() {
         <h2>Alterar senha</h2>
         <ChangePasswordSection />
       </section>
+      <section className="card">
+        <h2>Sessões ativas</h2>
+        <SessionsSection />
+      </section>
+      <section className="card">
+        <h2>Atividade recente</h2>
+        <ActivitySection />
+      </section>
+      {user && (
+        <section className="card card--danger">
+          <h2>Excluir conta</h2>
+          <DeleteAccountSection user={user} />
+        </section>
+      )}
     </div>
   );
 }

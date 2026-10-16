@@ -22,6 +22,7 @@ from sqlalchemy.pool import StaticPool  # noqa: E402
 
 import app.models  # noqa: E402, F401
 from app.core import email  # noqa: E402
+from app.core.rate_limit import limiter  # noqa: E402
 from app.db.base import Base  # noqa: E402
 from app.db.session import get_db  # noqa: E402
 from app.main import app  # noqa: E402
@@ -62,6 +63,7 @@ def client(engine: Engine) -> Iterator[TestClient]:
 
     app.dependency_overrides[get_db] = override_get_db
     email.outbox.clear()
+    limiter.clear()
     with TestClient(app, headers={"X-Requested-With": "fetch"}) as c:
         yield c
     app.dependency_overrides.clear()
@@ -81,7 +83,10 @@ def token_from(message: email.OutgoingEmail) -> str:
 def create_verified_user(
     client: TestClient, outbox: list[email.OutgoingEmail], address: str = "ana@example.com"
 ) -> None:
-    client.post("/api/auth/register", json={"email": address, "password": PASSWORD})
+    client.post(
+        "/api/auth/register",
+        json={"email": address, "password": PASSWORD, "accept_terms": True},
+    )
     token = token_from(outbox[-1])
     assert client.post("/api/auth/verify-email", json={"token": token}).status_code == 200
 

@@ -7,9 +7,18 @@ from fastapi.responses import JSONResponse
 from app.api import analysis, auth, budget, data, health
 from app.core.config import DEFAULT_SECRET_KEY, get_settings
 from app.core.errors import register_error_handlers
+from app.core.rate_limit import client_ip
+from app.core.request_context import RequestInfo, set_request_info
 
 SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
 CSRF_HEADER = "x-requested-with"
+SECURITY_HEADERS = {
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Referrer-Policy": "no-referrer",
+    "Permissions-Policy": "camera=(), microphone=(), geolocation=(), payment=()",
+    "Cross-Origin-Opener-Policy": "same-origin",
+}
 
 
 def create_app() -> FastAPI:
@@ -35,7 +44,7 @@ def create_app() -> FastAPI:
     )
 
     @app.middleware("http")
-    async def require_csrf_header(
+    async def security(
         request: Request, call_next: Callable[[Request], Awaitable[Response]]
     ) -> Response:
         # Proteção contra CSRF: formulários de outros sites não conseguem enviar
@@ -45,11 +54,29 @@ def create_app() -> FastAPI:
             and request.url.path.startswith("/api/")
             and request.headers.get(CSRF_HEADER) != "fetch"
         ):
-            return JSONResponse(
+            response: Response = JSONResponse(
                 {"error": "csrf", "message": "Requisição bloqueada por segurança."},
                 status_code=403,
             )
-        return await call_next(request)
+        else:
+            set_request_info(
+                RequestInfo(
+                    ip=client_ip(request),
+                    user_agent=(request.headers.get("user-agent") or "")[:255] or None,
+                )
+            )
+            response = await call_next(request)
+
+        for header, value in SECURITY_HEADERS.items():
+            response.headers.setdefault(header, value)
+        if settings.is_production:
+            response.headers.setdefault(
+                "Strict-Transport-Security", "max-age=31536000; includeSubDomains"
+            )
+        if request.url.path.startswith("/api/"):
+            # Dados financeiros: nada de cache em navegador ou proxy.
+            response.headers.setdefault("Cache-Control", "no-store")
+        return response
 
     register_error_handlers(app)
     app.include_router(health.router, prefix="/api")

@@ -26,6 +26,10 @@ class User(Base):
     failed_login_attempts: Mapped[int] = mapped_column(default=0)
     locked_until: Mapped[datetime | None] = mapped_column(UTCDateTime)
 
+    # Aceite dos Termos de uso e da Política de privacidade (LGPD): quando e qual versão.
+    terms_accepted_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    terms_version: Mapped[str | None] = mapped_column(String(20))
+
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, onupdate=utcnow)
 
@@ -43,6 +47,7 @@ class UserSession(Base):
     )
     token_hash: Mapped[str] = mapped_column(String(64), unique=True)
     user_agent: Mapped[str | None] = mapped_column(String(255))
+    ip: Mapped[str | None] = mapped_column(String(45))
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
     last_seen_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
     expires_at: Mapped[datetime] = mapped_column(UTCDateTime)
@@ -73,3 +78,18 @@ class RecoveryCode(Base):
     )
     code_hash: Mapped[str] = mapped_column(String(64))
     used_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+
+
+class SecurityEvent(Base):
+    """Registro de atividade da conta (logins, troca de senha, 2FA…), visível ao usuário."""
+
+    __tablename__ = "security_events"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    event: Mapped[str] = mapped_column(String(40))
+    ip: Mapped[str | None] = mapped_column(String(45))
+    user_agent: Mapped[str | None] = mapped_column(String(255))
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, index=True)

@@ -16,10 +16,26 @@ export type LoginResult =
 
 type Message = { message: string };
 
+export type SessionInfo = {
+  id: string;
+  user_agent: string | null;
+  ip: string | null;
+  created_at: string;
+  last_seen_at: string;
+  current: boolean;
+};
+
+export type SecurityEvent = {
+  event: string;
+  ip: string | null;
+  user_agent: string | null;
+  created_at: string;
+};
+
 export const authApi = {
   me: () => api.get<User>("/auth/me"),
-  register: (email: string, password: string) =>
-    api.post<Message>("/auth/register", { email, password }),
+  register: (email: string, password: string, accept_terms: boolean) =>
+    api.post<Message>("/auth/register", { email, password, accept_terms }),
   verifyEmail: (token: string) => api.post<Message>("/auth/verify-email", { token }),
   resendVerification: (email: string) =>
     api.post<Message>("/auth/resend-verification", { email }),
@@ -42,6 +58,12 @@ export const authApi = {
     api.post<void>("/auth/2fa/disable", { password, code }),
   regenerateRecoveryCodes: (code: string) =>
     api.post<{ recovery_codes: string[] }>("/auth/2fa/recovery-codes", { code }),
+  sessions: () => api.get<SessionInfo[]>("/auth/sessions"),
+  revokeSession: (id: string) => api.delete(`/auth/sessions/${id}`),
+  revokeOtherSessions: () => api.post<void>("/auth/sessions/revoke-others"),
+  events: () => api.get<SecurityEvent[]>("/auth/events"),
+  deleteAccount: (password: string, code: string | null) =>
+    api.post<void>("/auth/delete-account", { password, code }),
 };
 
 export const ME_KEY = ["auth", "me"] as const;
