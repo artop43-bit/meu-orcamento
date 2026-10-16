@@ -77,6 +77,7 @@ class Income(Base):
     __tablename__ = "incomes"
     __table_args__ = (
         Index("ix_incomes_user_id_month", "user_id", "month"),
+        Index("ix_incomes_user_id_import_ref", "user_id", "import_ref"),
         UniqueConstraint("recurring_id", "month"),
     )
 
@@ -86,6 +87,8 @@ class Income(Base):
     description: Mapped[str] = mapped_column(String(120))
     amount: Mapped[Decimal] = mapped_column(Money)
     recurring_id: Mapped[uuid.UUID | None] = _recurring_fk()
+    # Identificador da origem (extrato bancário ou arquivo antigo), para não importar duas vezes.
+    import_ref: Mapped[str | None] = mapped_column(String(80))
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
 
 
@@ -93,6 +96,7 @@ class Expense(Base):
     __tablename__ = "expenses"
     __table_args__ = (
         Index("ix_expenses_user_id_month", "user_id", "month"),
+        Index("ix_expenses_user_id_import_ref", "user_id", "import_ref"),
         UniqueConstraint("recurring_id", "month"),
     )
 
@@ -113,6 +117,7 @@ class Expense(Base):
     installment_total: Mapped[int | None] = mapped_column(SmallInteger)
 
     recurring_id: Mapped[uuid.UUID | None] = _recurring_fk()
+    import_ref: Mapped[str | None] = mapped_column(String(80))
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
 
 
