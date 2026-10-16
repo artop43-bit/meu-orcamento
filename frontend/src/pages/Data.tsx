@@ -303,7 +303,7 @@ function StatementImport() {
             {items.length} lançamento(s) em <strong>{file?.name}</strong> ({preview.format.toUpperCase()}).{" "}
             {chosen.length} selecionado(s).
           </p>
-          <div className="table-wrap">
+          <div className="table-wrap" tabIndex={0} role="region" aria-label="Lançamentos encontrados no extrato">
             <table className="table table--compact">
               <thead>
                 <tr>

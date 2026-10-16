@@ -46,7 +46,7 @@ export default function History() {
           </section>
 
           <section className="card">
-            <div className="table-wrap">
+            <div className="table-wrap" tabIndex={0} role="region" aria-label="Histórico mês a mês">
               <table className="table">
                 <thead>
                   <tr>

@@ -20,6 +20,32 @@ else
 fi
 export FRONTEND_URL
 
+site_ok() { curl -fsS -o /dev/null --max-time 2 http://127.0.0.1:5173/ 2> /dev/null; }
+api_ok() { curl -fsS -o /dev/null --max-time 2 http://127.0.0.1:8000/api/health 2> /dev/null; }
+
+show_info() {
+  cat <<INFO
+
+=====================================================================
+ Meu Orçamento está no ar!
+
+ Abra a aba "PORTS" (Portas) e clique no globo da porta 5173,
+ ou acesse: $FRONTEND_URL
+
+ Conta de demonstração (senha nova a cada vez que o Codespace liga):
+$(sed "s/^/   /" "$ROOT/.devcontainer/credenciais.txt" 2> /dev/null)
+
+ Para ver de novo:  cat .devcontainer/credenciais.txt
+=====================================================================
+INFO
+}
+
+# --se-parado (usado ao abrir o editor): não mexe em nada se o app já estiver rodando.
+if [ "${1:-}" = "--se-parado" ] && site_ok && api_ok; then
+  show_info
+  exit 0
+fi
+
 # Para processos de uma execução anterior (ao religar o Codespace).
 pkill -f "uvicorn app.main:app" 2> /dev/null || true
 pkill -f "vite" 2> /dev/null || true
@@ -45,34 +71,22 @@ uv run python -m app.cli seed-demo $RESET --credentials-file "$ROOT/.devcontaine
 touch "$ROOT/.devcontainer/.demo-vazia"
 chmod 600 "$ROOT/.devcontainer/credenciais.txt"
 
-# setsid: os processos continuam rodando depois que este script termina.
-setsid nohup uv run uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload \
-  > /tmp/api.log 2>&1 < /dev/null &
+# setsid -f: os processos ficam numa sessão própria e continuam rodando depois que este
+# script (e o comando de inicialização do Codespace) termina.
+setsid -f nohup uv run uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload \
+  > /tmp/api.log 2>&1 < /dev/null
 
 cd "$ROOT/frontend"
-API_PROXY_TARGET="http://127.0.0.1:8000" setsid nohup npm run dev -- --clearScreen false > /tmp/web.log 2>&1 < /dev/null &
+API_PROXY_TARGET="http://127.0.0.1:8000" setsid -f nohup npm run dev -- --clearScreen false > /tmp/web.log 2>&1 < /dev/null
 
 # Espera o site responder (até 60 s) para não mostrar o link antes da hora.
 for _ in $(seq 1 60); do
-  curl -fsS -o /dev/null http://127.0.0.1:5173/ 2> /dev/null && break
+  site_ok && api_ok && break
   sleep 1
 done
-if ! curl -fsS -o /dev/null http://127.0.0.1:5173/ 2> /dev/null; then
-  echo "O site não subiu. Veja o erro com: tail -n 30 /tmp/web.log /tmp/api.log" >&2
+if ! site_ok || ! api_ok; then
+  echo "O app não subiu. Veja o erro com: tail -n 30 /tmp/web.log /tmp/api.log" >&2
   exit 1
 fi
 
-cat <<EOF
-
-=====================================================================
- Meu Orçamento está no ar!
-
- Abra a aba "PORTS" (Portas) e clique no globo da porta 5173,
- ou acesse: $FRONTEND_URL
-
- Conta de demonstração (senha nova a cada vez que o Codespace liga):
-$(sed 's/^/   /' "$ROOT/.devcontainer/credenciais.txt")
-
- Para ver de novo:  cat .devcontainer/credenciais.txt
-=====================================================================
-EOF
+show_info

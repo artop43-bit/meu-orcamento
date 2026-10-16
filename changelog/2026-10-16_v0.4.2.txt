@@ -1,0 +1,31 @@
+MEU ORÇAMENTO · UPDATE LOG
+Versão 0.4.2 · Qualidade e confiabilidade
+Data: 16/10/2026 às 16:05 (horário de Brasília)
+
+Codespaces
+- [x] Ao abrir o editor, o site sobe sozinho se não estiver no ar (não precisa rodar o start.sh)
+- [x] API e site rodam numa sessão própria e continuam no ar depois da inicialização
+- [x] Novo teste no CI que sobe o ambiente do Codespaces de verdade e confere API e site
+
+QA automático a cada PR
+- [x] Roteiro da persona no repositório (e2e/persona.py), rodando no CI do GitHub a cada PR
+- [x] Prints anexados ao CI (artefato "e2e-prints") para conferir quando algo falhar
+- [x] Roteiro independente da data: os alertas esperados acompanham o dia do mês
+
+Acessibilidade verificada por ferramenta
+- [x] Auditoria axe (WCAG 2.1 AA) em 22 telas, celular e desktop, claro e escuro, com janelas abertas
+- [x] Corrigido: contraste do cinza secundário (menu, rodapés de indicadores, cabeçalhos de tabela,
+      versão, abas do celular) nos dois temas; tabelas que rolam de lado agora recebem foco do teclado
+- [x] Resultado: 0 problemas; a auditoria roda no CI e barra PRs com problema sério
+
+Testes do frontend
+- [x] 12 testes novos: construtor (combinações, títulos, sugestões válidas) e escala dos gráficos
+      (53 no total)
+
+Atualização planejada do frontend
+- [x] Vite 6 → 8 e plugin-react 4 → 6 juntos (Vitest 5 já compatível)
+- [x] Build 7x mais rápido (3,5 s → 0,5 s) e pacote inicial menor (383 KB → 292 KB)
+- [x] Persona 26/26 e acessibilidade 0 problemas no Vite 8
+
+Documentação
+- [x] Changelog e versão 0.4.2 no menu

@@ -13,7 +13,7 @@
   --surface-2: #f8f9f7;
   --fg: #17201c;
   --muted: #5f6b66;
-  --subtle: #8a948f;
+  --subtle: #66706b; /* contraste 4,5:1 ou mais (WCAG AA) sobre o fundo e os cartões */
   --border: #e2e6e3;
   --border-strong: #cfd6d2;
   --accent: #1f7a62;
@@ -52,7 +52,7 @@
     --surface-2: #1d231f;
     --fg: #e8ece9;
     --muted: #9ba5a0;
-    --subtle: #727c77;
+    --subtle: #8b958f; /* idem no tema escuro */
     --border: #262d29;
     --border-strong: #343c37;
     --accent: #3fb994;
@@ -3403,4 +3403,11 @@ body:has(dialog[open]) {
   .content {
     max-width: 1520px;
   }
+}
+
+/* Tabelas que rolam de lado recebem foco (teclado): contorno discreto ao focar. */
+.table-wrap:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
 }

@@ -13,6 +13,8 @@
   },
   "postCreateCommand": "bash .devcontainer/setup.sh",
   "postStartCommand": "bash .devcontainer/start.sh",
+  // Ao abrir o editor: se o site não estiver no ar (ex.: o Codespace religou), sobe de novo.
+  "postAttachCommand": "bash .devcontainer/start.sh --se-parado",
   "forwardPorts": [5173],
   "portsAttributes": {
     "5173": { "label": "Meu Orçamento", "onAutoForward": "openBrowser" },

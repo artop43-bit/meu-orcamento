@@ -1,7 +1,7 @@
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
 
 import { money, monthLabel } from "../../lib/format";
-import { colorFor, compactValue, formatValue, type ChartType, type ChartUnit } from "./format";
+import { colorFor, compactValue, formatValue, niceScale, type ChartType, type ChartUnit } from "./format";
 
 /**
  * Gráfico do app (SVG próprio, sem biblioteca externa).
@@ -49,13 +49,6 @@ function useWidth<T extends HTMLElement>() {
   return [ref, width] as const;
 }
 
-/** Passo "redondo" (1, 2, 2,5 ou 5 × 10^n) para a régua ter números fáceis de ler. */
-function niceStep(raw: number): number {
-  if (raw <= 0) return 1;
-  const exp = Math.pow(10, Math.floor(Math.log10(raw)));
-  const n = raw / exp;
-  return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 2.5 ? 2.5 : n <= 5 ? 5 : 10) * exp;
-}
 
 // Só formata como mês o que é mês ("2026-05"): durante a troca de agrupamento o gráfico
 // anterior continua na tela por um instante, com rótulos de categoria.
@@ -91,12 +84,7 @@ function XYChart({ type, labels, series, compare, unit = "money", monthLabels, h
     const lows = labels.map((_, i) => Math.min(0, ...series.map((s) => s.values[i] ?? 0), compare?.values[i] ?? 0));
     const high = Math.max(0, ...totals, ...(compare?.values.map((v) => v ?? 0) ?? []));
     const low = Math.min(0, ...lows);
-    const step = niceStep((high - low) / 4 || 1);
-    const top = Math.ceil(high / step) * step || step;
-    const bottom = Math.floor(low / step) * step;
-    const list: number[] = [];
-    for (let v = bottom; v <= top + step / 2; v += step) list.push(v);
-    return { max: top, min: bottom, ticks: list };
+    return niceScale(low, high);
   }, [labels, series, compare, stacked]);
 
   // Margem esquerda do tamanho do maior rótulo da régua.
@@ -479,7 +467,7 @@ function DonutChart({ labels, series, unit = "money", description }: ChartProps)
 export function ChartTable({ labels, series, compare, unit = "money", monthLabels, description }: ChartProps) {
   const showTotal = series.length > 1 && unit === "money";
   return (
-    <div className="table-wrap" data-no-swipe>
+    <div className="table-wrap" data-no-swipe tabIndex={0} role="region" aria-label={`Tabela: ${description}`}>
       <table className="table">
         <caption className="sr-only">{description}</caption>
         <thead>
