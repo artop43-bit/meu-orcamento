@@ -122,9 +122,7 @@ def reset_password(body: ResetPasswordIn, db: DbSession, mail: MailerDep) -> Mes
 def change_password(
     body: ChangePasswordIn, user: CurrentUser, db: DbSession, token: SessionToken, mail: MailerDep
 ) -> None:
-    auth_service.change_password(
-        db, user, body.current_password, body.new_password, token, mail
-    )
+    auth_service.change_password(db, user, body.current_password, body.new_password, token, mail)
 
 
 # ---------------------------------------------------------------- 2FA
@@ -160,8 +158,6 @@ def two_factor_disable(
 
 
 @router.post("/2fa/recovery-codes")
-def regenerate_recovery_codes(
-    body: CodeIn, user: CurrentUser, db: DbSession
-) -> RecoveryCodesOut:
+def regenerate_recovery_codes(body: CodeIn, user: CurrentUser, db: DbSession) -> RecoveryCodesOut:
     codes = auth_service.regenerate_recovery_codes(db, user, body.code)
     return RecoveryCodesOut(recovery_codes=codes)

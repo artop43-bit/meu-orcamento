@@ -19,6 +19,9 @@ class Settings(BaseSettings):
     # Endereço público do frontend, usado nos links enviados por e-mail.
     frontend_url: str = "http://localhost:5173"
 
+    # Fuso usado para saber qual é o "mês atual".
+    timezone: str = "America/Sao_Paulo"
+
     session_ttl_days: int = 30
     # None = seguro automaticamente em produção (HTTPS).
     cookie_secure: bool | None = None

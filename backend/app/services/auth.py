@@ -12,6 +12,7 @@ from app.core.config import get_settings
 from app.core.errors import AppError
 from app.db.types import utcnow
 from app.models import AuthToken, RecoveryCode, User, UserSession
+from app.services import budget
 
 # (destinatário, assunto, corpo). As rotas enviam em segundo plano, para o tempo
 # de resposta não revelar se um e-mail está cadastrado.
@@ -27,6 +28,7 @@ SESSION_TOUCH_INTERVAL = timedelta(minutes=5)
 PURPOSE_VERIFY_EMAIL = "verify_email"
 PURPOSE_RESET_PASSWORD = "reset_password"
 PURPOSE_LOGIN_2FA = "login_2fa"
+
 
 def _invalid_credentials() -> AppError:
     return AppError(401, "invalid_credentials", "E-mail ou senha incorretos.")
@@ -117,6 +119,7 @@ def register(db: Session, email: str, password: str, mail: Mailer) -> None:
     user = User(email=email, password_hash=security.hash_password(password))
     db.add(user)
     db.flush()
+    budget.create_default_categories(db, user)
     _send_verification(db, user, mail)
     db.commit()
 

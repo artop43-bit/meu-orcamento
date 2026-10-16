@@ -22,6 +22,16 @@ def _validation_message(exc: RequestValidationError) -> str:
             return "A senha é longa demais."
         if field == "email":
             return "Informe um e-mail válido."
+        if "amount" in field and error["type"] == "greater_than":
+            return "O valor precisa ser maior que zero."
+        if error["type"] == "decimal_max_places":
+            return "Use no máximo 2 casas decimais."
+        if error["type"] in ("decimal_max_digits", "decimal_whole_digits"):
+            return "Valor alto demais."
+        if field in ("description", "name") and error["type"] == "string_too_short":
+            return "Informe uma descrição." if field == "description" else "Informe um nome."
+        if field == "installments":
+            return "O número de parcelas deve ser entre 2 e 120."
     return "Verifique os dados informados."
 
 

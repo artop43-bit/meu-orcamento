@@ -274,3 +274,434 @@ code {
   font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
   word-break: break-all;
 }
+
+/* ---------- utilitários */
+
+.small {
+  font-size: 0.85rem;
+}
+
+.grow {
+  flex: 1;
+  min-width: 0;
+}
+
+.tone--ok {
+  color: var(--ok);
+}
+
+.tone--error {
+  color: var(--error);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.stack--tight {
+  gap: 6px;
+}
+
+.split {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.banner {
+  background: var(--info-bg);
+  color: var(--info);
+  padding: 10px 14px;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  font-size: 0.9rem;
+}
+
+.banner a {
+  color: inherit;
+  font-weight: 600;
+}
+
+/* ---------- navegação */
+
+.topbar .brand {
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.topbar nav {
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.topbar nav a {
+  white-space: nowrap;
+}
+
+.month-nav {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.month-nav h1 {
+  margin: 0;
+  min-width: 11ch;
+  text-align: center;
+}
+
+.icon-btn {
+  font: inherit;
+  display: inline-grid;
+  place-items: center;
+  min-width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  text-decoration: none;
+  font-size: 1.1rem;
+}
+
+.icon-btn:hover {
+  color: var(--fg);
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.section-header h1,
+.section-header h2 {
+  margin: 0;
+}
+
+.section-header__total {
+  font-weight: 400;
+}
+
+/* ---------- números */
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 16px;
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+}
+
+.stat__label {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.stat__value {
+  font-size: 1.35rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.bar {
+  height: 8px;
+  border-radius: 99px;
+  background: var(--border);
+  overflow: hidden;
+}
+
+.bar__fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 99px;
+}
+
+.breakdown {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.breakdown li {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--muted);
+  margin-right: 6px;
+  vertical-align: middle;
+}
+
+.badge {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 99px;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.badge--accent {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* ---------- listas de lançamentos */
+
+.items {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.items > li + li {
+  border-top: 1px solid var(--border);
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+}
+
+.item__main {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.item__title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.item__meta {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.item__badges {
+  display: flex;
+  gap: 4px;
+}
+
+.item__amount {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.item__check {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+  flex-shrink: 0;
+}
+
+.item--paid .item__title,
+.item--paid .item__amount {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+
+.delete-choice {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 0.85rem;
+  justify-content: flex-end;
+}
+
+/* ---------- formulários do orçamento */
+
+.inline-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px 0;
+}
+
+.inline-form label,
+.narrow {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.narrow {
+  max-width: 200px;
+}
+
+.inline-form input:not([type="checkbox"]):not([type="radio"]):not([type="color"]),
+.inline-form select,
+.card .row input:not([type="checkbox"]):not([type="color"]) {
+  font: inherit;
+  font-weight: 400;
+  padding: 9px 11px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--fg);
+  width: 100%;
+}
+
+.grid-2 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.inline-form label.check,
+.check {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  font-weight: 400;
+  font-size: 0.9rem;
+}
+
+.radios {
+  border: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+input.color {
+  width: 42px;
+  height: 40px;
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+}
+
+/* ---------- histórico */
+
+.legend {
+  display: flex;
+  gap: 12px;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  margin-right: 4px;
+}
+
+.swatch--income,
+.chart__bar--income {
+  background: var(--accent);
+}
+
+.swatch--expense,
+.chart__bar--expense {
+  background: #d98c3f;
+}
+
+.chart {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 4px;
+  height: 180px;
+  align-items: end;
+}
+
+.chart__col {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  text-decoration: none;
+  color: var(--muted);
+  min-width: 0;
+}
+
+.chart__bars {
+  flex: 1;
+  display: flex;
+  gap: 2px;
+  align-items: flex-end;
+}
+
+.chart__bar {
+  flex: 1;
+  border-radius: 3px 3px 0 0;
+  min-height: 1px;
+}
+
+.chart__label {
+  font-size: 0.65rem;
+  text-align: center;
+  margin-top: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.table th,
+.table td {
+  padding: 8px 6px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.table th {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}

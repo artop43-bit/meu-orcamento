@@ -105,17 +105,19 @@ export default function Login() {
   return (
     <AuthLayout title="Entrar">
       <form onSubmit={submitPassword} className="form">
-        <Alert tone="error">
-          {error}
-          {unverified && (
-            <>
-              {" "}
-              <button type="button" className="link" onClick={resend}>
-                Reenviar e-mail de confirmação
-              </button>
-            </>
-          )}
-        </Alert>
+        {error && (
+          <Alert tone="error">
+            {error}
+            {unverified && (
+              <>
+                {" "}
+                <button type="button" className="link" onClick={resend}>
+                  Reenviar e-mail de confirmação
+                </button>
+              </>
+            )}
+          </Alert>
+        )}
         <Alert tone="success">{info}</Alert>
         <Field
           label="E-mail"
