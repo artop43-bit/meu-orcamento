@@ -10,6 +10,6 @@ RUN npm ci --no-audit --no-fund
 COPY frontend/ ./
 RUN npm run build
 
-FROM caddy:2.8-alpine
+FROM caddy:2.11-alpine
 COPY deploy/caddy/Caddyfile /etc/caddy/Caddyfile
 COPY --from=web /web/dist /srv
