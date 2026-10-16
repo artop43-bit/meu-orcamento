@@ -2,6 +2,7 @@
 
 python -m app.cli cleanup    roda a limpeza uma vez
 python -m app.cli schedule   roda a limpeza agora e depois uma vez por dia (produção)
+python -m app.cli seed-demo  cria a conta de demonstração com dados (nunca em produção)
 """
 
 import argparse
@@ -56,15 +57,34 @@ def schedule(interval: timedelta = timedelta(hours=24)) -> None:
         time.sleep(interval.total_seconds())
 
 
+def run_seed_demo(credentials_file: str | None) -> None:
+    from app.db.session import SessionLocal
+    from app.demo import DEMO_EMAIL, seed_demo
+
+    with SessionLocal() as db:
+        password, created = seed_demo(db)
+    text = f"E-mail: {DEMO_EMAIL}\nSenha:  {password}\n"
+    if credentials_file:
+        with open(credentials_file, "w", encoding="utf-8") as f:
+            f.write(text)
+    status = "criada com dados de exemplo" if created else "já existia; senha redefinida"
+    print(f"Conta de demonstração {status}.\n{text}", flush=True)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(prog="python -m app.cli", description=__doc__)
-    parser.add_argument("command", choices=["cleanup", "schedule"])
+    parser.add_argument("command", choices=["cleanup", "schedule", "seed-demo"])
+    parser.add_argument(
+        "--credentials-file", help="seed-demo: também grava e-mail e senha neste arquivo"
+    )
     args = parser.parse_args()
 
     if args.command == "cleanup":
         run_cleanup()
-    else:
+    elif args.command == "schedule":
         schedule()
+    else:
+        run_seed_demo(args.credentials_file)
 
 
 if __name__ == "__main__":

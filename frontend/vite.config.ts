@@ -10,6 +10,8 @@ export default defineConfig({
   server: {
     host: true,
     port: 5173,
+    // Endereços do GitHub Codespaces (o Vite recusa hosts desconhecidos por segurança).
+    allowedHosts: [".app.github.dev", ".githubpreview.dev"],
     proxy: {
       "/api": { target: apiTarget, changeOrigin: true },
     },

@@ -1,0 +1,31 @@
+{
+  // Ambiente para testar o app no GitHub Codespaces (ou no VS Code com Dev Containers).
+  // Ao abrir, instala tudo, sobe API + site e cria a conta de demonstração.
+  // Veja .devcontainer/README.md.
+  "name": "Meu Orçamento",
+  "image": "mcr.microsoft.com/devcontainers/python:1-3.12-bookworm",
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": { "version": "22" }
+  },
+  "hostRequirements": { "cpus": 2 },
+  "containerEnv": {
+    "UV_LINK_MODE": "copy"
+  },
+  "postCreateCommand": "bash .devcontainer/setup.sh",
+  "postStartCommand": "bash .devcontainer/start.sh",
+  "forwardPorts": [5173],
+  "portsAttributes": {
+    "5173": { "label": "Meu Orçamento", "onAutoForward": "openBrowser" },
+    "8000": { "label": "API", "onAutoForward": "silent" }
+  },
+  // Portas internas do editor não aparecem nem abrem sozinhas (evita abrir a errada).
+  "otherPortsAttributes": { "onAutoForward": "ignore" },
+  "customizations": {
+    "codespaces": {
+      "openFiles": [".devcontainer/README.md"]
+    },
+    "vscode": {
+      "extensions": ["charliermarsh.ruff", "ms-python.python"]
+    }
+  }
+}
