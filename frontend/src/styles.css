@@ -1,0 +1,74 @@
+:root {
+  --bg: #f7f7f5;
+  --fg: #1d1d1b;
+  --muted: #6b6b66;
+  --card: #ffffff;
+  --border: #e4e4df;
+  --ok: #1f7a4d;
+  --error: #b42318;
+  --pending: #8a6d00;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #141413;
+    --fg: #ececea;
+    --muted: #9a9a94;
+    --card: #1d1d1b;
+    --border: #2e2e2b;
+    --ok: #4cc38a;
+    --error: #f97066;
+    --pending: #e5c04a;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+}
+
+.container {
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 48px 16px;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.status-list {
+  list-style: none;
+  padding: 0;
+  margin: 24px 0 0;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.status {
+  display: flex;
+  justify-content: space-between;
+  padding: 14px 16px;
+}
+
+.status + .status {
+  border-top: 1px solid var(--border);
+}
+
+.status--ok strong {
+  color: var(--ok);
+}
+.status--error strong {
+  color: var(--error);
+}
+.status--pending strong {
+  color: var(--pending);
+}

@@ -1,0 +1,4 @@
+# Finais de linha LF no repositório (o servidor é Linux).
+* text=auto eol=lf
+*.bat text eol=crlf
+*.ps1 text eol=crlf
