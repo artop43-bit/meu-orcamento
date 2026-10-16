@@ -540,7 +540,7 @@ def version(page: Page):
     expect(page.locator(".sidebar .app-version")).to_contain_text(re.compile(r"Versão \d+\.\d+\.\d+ · \d{2}/\d{2}/\d{4} às \d{2}:\d{2}"))
 
 
-@step("Celular: seções da análise trocam ao deslizar e voltam às abas nas pontas")
+@step("Celular: deslizar troca só as abas principais, em qualquer ponto da tela")
 def mobile_sections(browser):
     ctx = browser.new_context(
         storage_state=STATE["state"], viewport={"width": 390, "height": 844}, device_scale_factor=2, is_mobile=True, has_touch=True
@@ -548,25 +548,27 @@ def mobile_sections(browser):
     page = ctx.new_page()
     cdp = ctx.new_cdp_session(page)
 
-    def swipe(x0, x1):
-        cdp.send("Input.dispatchTouchEvent", {"type": "touchStart", "touchPoints": [{"x": x0, "y": 300}]})
+    def swipe(x0, x1, y=300):
+        cdp.send("Input.dispatchTouchEvent", {"type": "touchStart", "touchPoints": [{"x": x0, "y": y}]})
         for i in range(1, 13):
-            cdp.send("Input.dispatchTouchEvent", {"type": "touchMove", "touchPoints": [{"x": x0 + (x1 - x0) * i / 12, "y": 302}]})
+            cdp.send("Input.dispatchTouchEvent", {"type": "touchMove", "touchPoints": [{"x": x0 + (x1 - x0) * i / 12, "y": y + 2}]})
             page.wait_for_timeout(16)
         cdp.send("Input.dispatchTouchEvent", {"type": "touchEnd", "touchPoints": []})
         page.wait_for_timeout(700)
 
-    page.goto(f"{BASE}/analises?secao=resumo")
+    # Na Análise financeira, deslizar vai para a próxima aba principal (não troca de seção).
+    page.goto(f"{BASE}/analises?secao=tendencias")
     idle(page, 700)
     swipe(330, 60)
-    assert "secao=tendencias" in page.url, page.url
-    swipe(330, 60)
-    assert "secao=categorias" in page.url, page.url
+    assert page.url.endswith("/investimentos"), page.url
+    page.goto(f"{BASE}/analises?secao=resumo")
+    idle(page, 700)
     swipe(60, 330)
-    swipe(60, 330)
-    assert "secao=resumo" in page.url, page.url
-    swipe(60, 330)  # primeira seção: volta para a aba anterior (Metas)
     assert page.url.endswith("/metas"), page.url
+    # Tela curta (Metas): o gesto vale também na parte de baixo, onde não há conteúdo.
+    idle(page, 500)
+    swipe(330, 60, y=720)
+    assert "/analises" in page.url, page.url
     # Construtor no celular: chips abrem a janela de filtros
     page.goto(f"{BASE}/analises?secao=monte")
     idle(page, 700)
@@ -607,8 +609,9 @@ def exports(page: Page):
         path = OUT / download.suggested_filename
         download.save_as(path)
         assert path.stat().st_size > 200, f"{name} vazio"
-    backup = json.loads(next(OUT.glob("*.json")).read_text(encoding="utf-8")) if list(OUT.glob("*.json")) else {}
-    assert backup, "backup não lido"
+    # O último download é o backup: precisa ser um JSON com os lançamentos da persona.
+    backup = json.loads(path.read_text(encoding="utf-8"))
+    assert backup and "expenses" in json.dumps(backup), "backup sem os lançamentos"
 
 
 @step("Importar extrato OFX no mês atual (prévia, importa e não duplica)")

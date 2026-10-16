@@ -1,12 +1,14 @@
 """Conta de demonstração para testar o app (Codespaces, local).
 
-Por padrão a conta nasce vazia (só as categorias padrão), para testar como um usuário novo.
-Com `with_data=True` ela vem preenchida com 6 meses de exemplo.
+Por padrão a conta vem preenchida com 6 meses de exemplo (fixas, parcelas, um mês no
+vermelho, limites, metas, investimentos e uma análise fixada), para demonstrar o app.
+Com `with_data=False` ela nasce vazia, como um usuário novo (usado no QA automático).
 
 Nunca roda em produção. A senha é aleatória a cada execução e só é mostrada no terminal
 (e gravada num arquivo local fora do Git, se pedido).
 """
 
+import json
 import secrets
 from datetime import date
 from decimal import Decimal
@@ -18,7 +20,7 @@ from app.core import security
 from app.core.config import get_settings
 from app.core.months import add_months, current_month, format_month, with_day
 from app.db.types import utcnow
-from app.models import Category, Expense, Goal, Income, Investment, User
+from app.models import Category, Expense, Goal, Income, Investment, SavedAnalysis, User
 from app.services import budget
 
 DEMO_EMAIL = "admin@example.com"
@@ -32,6 +34,7 @@ VARIABLE = [
     ("790.30", "212.80", "190.00"),
     ("610.00", "140.00", "95.00"),  # mês atual, ainda em andamento
 ]
+PHARMACY = ["42.90", "118.40", "36.00", "64.70", "29.90", "51.20"]
 
 
 class DemoNotAllowed(RuntimeError):
@@ -45,7 +48,7 @@ def _category(db: Session, user: User, name: str) -> Category:
 
 
 def seed_demo(
-    db: Session, email: str = DEMO_EMAIL, *, with_data: bool = False, reset: bool = False
+    db: Session, email: str = DEMO_EMAIL, *, with_data: bool = True, reset: bool = False
 ) -> tuple[str, bool]:
     """Cria (ou redefine a senha de) a conta de demonstração. Retorna (senha, criada_agora).
 
@@ -94,6 +97,7 @@ def _fill(db: Session, user: User) -> None:
     servicos = _category(db, user, "Serviços")
     lazer = _category(db, user, "Lazer")
     educacao = _category(db, user, "Educação")
+    saude = _category(db, user, "Saúde")
     start = format_month(first)
 
     # Fixas (lançadas automaticamente em cada mês aberto).
@@ -137,10 +141,15 @@ def _fill(db: Session, user: User) -> None:
         budget.ensure_month(db, user, month)
         if offset < len(VARIABLE):
             market, transport, fun = VARIABLE[offset]
+            extras = [("Farmácia", PHARMACY[offset], saude, 14)]
+            if offset == 1:
+                # Um mês no vermelho: viagem no feriado (o consultor reage a isso).
+                extras.append(("Viagem do feriado", "1950.00", lazer, 21))
             for description, amount, category, day in (
                 ("Mercado", market, alimentacao, 8),
                 ("Combustível e Uber", transport, transporte, 18),
                 ("Restaurantes e cinema", fun, lazer, 24),
+                *extras,
             ):
                 db.add(
                     Expense(
@@ -228,4 +237,29 @@ def _fill(db: Session, user: User) -> None:
                 current_value=Decimal("1874.20"),
             ),
         ]
+    )
+
+    # Limites por categoria (o Lazer fica perto do limite no mês atual: gera alerta).
+    lazer.monthly_limit = Decimal("220.00")
+    alimentacao.monthly_limit = Decimal("900.00")
+
+    # Uma análise montada e fixada no Resumo da Análise financeira.
+    db.add(
+        SavedAnalysis(
+            user_id=user.id,
+            name="Gastos por categoria",
+            config=json.dumps(
+                {
+                    "metric": "expenses",
+                    "period": "6m",
+                    "start": None,
+                    "end": None,
+                    "group": "month_category",
+                    "categories": [],
+                    "compare": "none",
+                    "chart": "stacked",
+                }
+            ),
+            pinned=True,
+        )
     )

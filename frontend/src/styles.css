@@ -3411,3 +3411,11 @@ body:has(dialog[open]) {
   outline-offset: 2px;
   border-radius: var(--radius-sm);
 }
+
+/* Celular: a área de conteúdo ocupa a tela toda, para o deslizar funcionar mesmo em telas
+   curtas (ex.: Metas com uma meta só), e não apenas onde há conteúdo. */
+@media (max-width: 1023px) {
+  .content {
+    min-height: calc(100dvh - 56px);
+  }
+}

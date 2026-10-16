@@ -2,7 +2,7 @@
 
 python -m app.cli cleanup    roda a limpeza uma vez
 python -m app.cli schedule   roda a limpeza agora e depois uma vez por dia (produção)
-python -m app.cli seed-demo  cria a conta de demonstração vazia (nunca em produção)
+python -m app.cli seed-demo  cria a conta de demonstração com dados (nunca em produção)
 """
 
 import argparse
@@ -79,7 +79,7 @@ def main() -> None:
         "--credentials-file", help="seed-demo: também grava e-mail e senha neste arquivo"
     )
     parser.add_argument(
-        "--with-data", action="store_true", help="seed-demo: preenche 6 meses de exemplo"
+        "--vazia", action="store_true", help="seed-demo: conta sem dados (como um usuário novo)"
     )
     parser.add_argument(
         "--reset", action="store_true", help="seed-demo: apaga a conta e os dados antes de criar"
@@ -91,7 +91,7 @@ def main() -> None:
     elif args.command == "schedule":
         schedule()
     else:
-        run_seed_demo(args.credentials_file, with_data=args.with_data, reset=args.reset)
+        run_seed_demo(args.credentials_file, with_data=not args.vazia, reset=args.reset)
 
 
 if __name__ == "__main__":
