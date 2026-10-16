@@ -28,3 +28,7 @@ Thumbs.db
 *.age
 *.dump
 age-key.txt
+
+# Codespaces / ambiente de demonstração
+.devcontainer/credenciais.txt
+backend/codespace.db

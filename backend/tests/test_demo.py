@@ -1,0 +1,54 @@
+from decimal import Decimal
+
+import pytest
+from fastapi.testclient import TestClient
+from sqlalchemy.orm import Session
+
+from app.core.config import get_settings
+from app.core.months import add_months, current_month, format_month
+from app.demo import DEMO_EMAIL, DemoNotAllowed, seed_demo
+from tests.conftest import login
+
+
+def test_demo_account_is_ready_to_use(client: TestClient, db: Session) -> None:
+    password, created = seed_demo(db)
+    assert created
+
+    # Já confirmada: entra direto, sem e-mail.
+    response = login(client, DEMO_EMAIL, password)
+    assert response.status_code == 200
+    assert response.json()["status"] == "ok"
+
+    month = client.get(f"/api/months/{format_month(current_month())}").json()
+    descriptions = {e["description"] for e in month["expenses"]}
+    assert {"Aluguel", "Internet", "Mercado", "Notebook"} <= descriptions
+    assert Decimal(month["summary"]["income_total"]) == Decimal("5100.00")
+
+    history = client.get("/api/history?months=6").json()
+    assert all(p["has_data"] for p in history)
+    assert len(client.get("/api/goals").json()) == 2
+    assert len(client.get("/api/investments").json()) == 3
+
+    score = client.get("/api/analysis/overview").json()["score"]
+    assert score["score"] is not None
+
+    # Parcela do notebook continua nos próximos meses.
+    later = client.get(f"/api/months/{format_month(add_months(current_month(), 6))}").json()
+    assert any(e["description"] == "Notebook" for e in later["expenses"])
+
+
+def test_running_again_only_resets_password(client: TestClient, db: Session) -> None:
+    first, _ = seed_demo(db)
+    second, created = seed_demo(db)
+    assert not created
+    assert first != second
+    assert login(client, DEMO_EMAIL, first).status_code == 401
+    assert login(client, DEMO_EMAIL, second).status_code == 200
+    # Não duplica dados.
+    assert len(client.get("/api/goals").json()) == 2
+
+
+def test_demo_is_refused_in_production(db: Session, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(get_settings(), "environment", "production")
+    with pytest.raises(DemoNotAllowed):
+        seed_demo(db)
