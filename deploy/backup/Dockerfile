@@ -1,5 +1,5 @@
 # Backup do PostgreSQL: pg_dump -> criptografa com age -> envia ao Object Storage (rclone).
-FROM postgres:17-alpine
+FROM postgres:18-alpine
 
 RUN apk add --no-cache age rclone tzdata
 
