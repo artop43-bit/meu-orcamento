@@ -7,11 +7,25 @@ metas, análises e investimentos.
 
 ```
 meu-orcamento/
-├── backend/            API em Python (FastAPI + SQLAlchemy + Alembic)
-├── frontend/           Aplicação web (React + Vite + TypeScript)
-├── docker-compose.yml  Ambiente de desenvolvimento (Postgres + API + Web)
-└── .github/workflows/  Integração contínua (testes e build)
+├── backend/                 API em Python (FastAPI + SQLAlchemy + Alembic)
+├── frontend/                Aplicação web (React + Vite + TypeScript)
+├── deploy/                  Produção: Caddy, backup e scripts do servidor
+├── docs/DEPLOY.md           Guia de deploy na Oracle Cloud
+├── docker-compose.yml       Ambiente de desenvolvimento (Postgres + API + Web)
+├── docker-compose.prod.yml  Produção
+└── .github/                 CI, deploy automático e Dependabot
 ```
+
+## Testes
+
+| O quê | Comando |
+|---|---|
+| Backend (SQLite, rápido) | `cd backend && uv run pytest` |
+| Backend no PostgreSQL | `TEST_DATABASE_URL=postgresql+psycopg://usuario:senha@localhost/banco_vazio uv run pytest` |
+| Frontend | `cd frontend && npm test` |
+| Produção completa (Docker, Linux/WSL) | `bash deploy/scripts/smoke-test.sh` |
+
+O CI roda tudo isso a cada PR, incluindo a build das imagens para ARM (VM da Oracle).
 
 ## Rodando em desenvolvimento
 
