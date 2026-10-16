@@ -5,6 +5,7 @@ Revises:
 Create Date: 2026-10-16
 
 """
+
 from collections.abc import Sequence
 
 import sqlalchemy as sa
@@ -48,8 +49,10 @@ def upgrade() -> None:
         _ts("last_seen_at"),
         _ts("expires_at"),
         sa.ForeignKeyConstraint(
-            ["user_id"], ["users.id"],
-            name="fk_user_sessions_user_id_users", ondelete="CASCADE",
+            ["user_id"],
+            ["users.id"],
+            name="fk_user_sessions_user_id_users",
+            ondelete="CASCADE",
         ),
         sa.PrimaryKeyConstraint("id", name="pk_user_sessions"),
         sa.UniqueConstraint("token_hash", name="uq_user_sessions_token_hash"),
@@ -66,8 +69,10 @@ def upgrade() -> None:
         _ts("expires_at"),
         _ts("used_at", nullable=True),
         sa.ForeignKeyConstraint(
-            ["user_id"], ["users.id"],
-            name="fk_auth_tokens_user_id_users", ondelete="CASCADE",
+            ["user_id"],
+            ["users.id"],
+            name="fk_auth_tokens_user_id_users",
+            ondelete="CASCADE",
         ),
         sa.PrimaryKeyConstraint("id", name="pk_auth_tokens"),
         sa.UniqueConstraint("token_hash", name="uq_auth_tokens_token_hash"),
@@ -81,8 +86,10 @@ def upgrade() -> None:
         sa.Column("code_hash", sa.String(64), nullable=False),
         _ts("used_at", nullable=True),
         sa.ForeignKeyConstraint(
-            ["user_id"], ["users.id"],
-            name="fk_recovery_codes_user_id_users", ondelete="CASCADE",
+            ["user_id"],
+            ["users.id"],
+            name="fk_recovery_codes_user_id_users",
+            ondelete="CASCADE",
         ),
         sa.PrimaryKeyConstraint("id", name="pk_recovery_codes"),
     )

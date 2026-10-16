@@ -4,7 +4,7 @@ from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api import auth, health
+from app.api import auth, budget, health
 from app.core.config import DEFAULT_SECRET_KEY, get_settings
 from app.core.errors import register_error_handlers
 
@@ -54,6 +54,7 @@ def create_app() -> FastAPI:
     register_error_handlers(app)
     app.include_router(health.router, prefix="/api")
     app.include_router(auth.router, prefix="/api")
+    app.include_router(budget.router, prefix="/api")
     return app
 
 

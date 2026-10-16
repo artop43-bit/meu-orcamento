@@ -1,11 +1,15 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { BrowserRouter, Navigate, NavLink, Outlet, Route, Routes, useLocation } from "react-router";
+import { BrowserRouter, Link, Navigate, NavLink, Outlet, Route, Routes, useLocation } from "react-router";
 
 import { authApi, ME_KEY, useMe } from "./api/auth";
 import { errorMessage } from "./api/client";
+import Categories from "./pages/Categories";
 import ForgotPassword from "./pages/ForgotPassword";
-import Home from "./pages/Home";
+import Goals from "./pages/Goals";
+import History from "./pages/History";
 import Login from "./pages/Login";
+import MonthPage from "./pages/Month";
+import RecurringPage from "./pages/Recurring";
 import Register from "./pages/Register";
 import ResetPassword from "./pages/ResetPassword";
 import Security from "./pages/Security";
@@ -39,6 +43,8 @@ function GuestOnly() {
 
 function AppLayout() {
   const queryClient = useQueryClient();
+  const { data: user } = useMe();
+  const location = useLocation();
 
   async function logout() {
     await authApi.logout().catch(() => undefined);
@@ -49,11 +55,15 @@ function AppLayout() {
   return (
     <>
       <header className="topbar">
-        <span className="brand">Meu Orçamento</span>
+        <Link to="/" className="brand">
+          Meu Orçamento
+        </Link>
         <nav>
-          <NavLink to="/" end>
-            Início
-          </NavLink>
+          <NavLink to="/orcamento">Orçamento</NavLink>
+          <NavLink to="/metas">Metas</NavLink>
+          <NavLink to="/historico">Histórico</NavLink>
+          <NavLink to="/fixas">Fixas</NavLink>
+          <NavLink to="/categorias">Categorias</NavLink>
           <NavLink to="/seguranca">Segurança</NavLink>
           <button type="button" className="link" onClick={logout}>
             Sair
@@ -61,6 +71,11 @@ function AppLayout() {
         </nav>
       </header>
       <main className="container">
+        {user && !user.totp_enabled && location.pathname !== "/seguranca" && (
+          <div className="banner">
+            Proteja seus dados financeiros: <Link to="/seguranca">ative a verificação em duas etapas</Link>.
+          </div>
+        )}
         <Outlet />
       </main>
     </>
@@ -80,7 +95,12 @@ export default function App() {
         <Route path="/verificar-email" element={<VerifyEmail />} />
         <Route path="/redefinir-senha" element={<ResetPassword />} />
         <Route element={<RequireAuth />}>
-          <Route path="/" element={<Home />} />
+          <Route path="/" element={<Navigate to="/orcamento" replace />} />
+          <Route path="/orcamento/:month?" element={<MonthPage />} />
+          <Route path="/metas" element={<Goals />} />
+          <Route path="/historico" element={<History />} />
+          <Route path="/fixas" element={<RecurringPage />} />
+          <Route path="/categorias" element={<Categories />} />
           <Route path="/seguranca" element={<Security />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />

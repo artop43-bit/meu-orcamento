@@ -6,6 +6,7 @@ from sqlalchemy import engine_from_config, pool
 import app.models  # noqa: F401  (registra os modelos para o autogenerate)
 from app.core.config import get_settings
 from app.db.base import Base
+from app.db.types import UTCDateTime
 
 config = context.config
 config.set_main_option("sqlalchemy.url", get_settings().database_url)
@@ -16,6 +17,13 @@ if config.config_file_name is not None:
 target_metadata = Base.metadata
 
 
+def render_item(type_: str, obj: object, autogen_context: object) -> str | bool:
+    """Escreve o tipo customizado UTCDateTime como DateTime padrão nas migrações."""
+    if type_ == "type" and isinstance(obj, UTCDateTime):
+        return "sa.DateTime(timezone=True)"
+    return False
+
+
 def run_migrations_offline() -> None:
     context.configure(
         url=config.get_main_option("sqlalchemy.url"),
@@ -23,6 +31,7 @@ def run_migrations_offline() -> None:
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
         compare_type=True,
+        render_item=render_item,
     )
     with context.begin_transaction():
         context.run_migrations()
@@ -36,7 +45,10 @@ def run_migrations_online() -> None:
     )
     with connectable.connect() as connection:
         context.configure(
-            connection=connection, target_metadata=target_metadata, compare_type=True
+            connection=connection,
+            target_metadata=target_metadata,
+            compare_type=True,
+            render_item=render_item,
         )
         with context.begin_transaction():
             context.run_migrations()
