@@ -1,12 +1,18 @@
 import {
   useEffect,
+  useId,
   useRef,
+  useState,
   type ButtonHTMLAttributes,
   type InputHTMLAttributes,
+  type PointerEvent,
   type ReactNode,
 } from "react";
 import { BarChart3, ChartPie, ShieldCheck, Target, Wallet, X } from "lucide-react";
 import { Link } from "react-router";
+
+import { prefersReducedMotion } from "../lib/announce";
+import { haptic } from "../lib/haptics";
 
 export function Brand({ to }: { to?: string }) {
   const content = (
@@ -140,19 +146,84 @@ export function Sheet({
   wide?: boolean;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
+  // Mantém o conteúdo na tela enquanto a janela anima a saída.
+  const [rendered, setRendered] = useState(open);
+  const titleId = useId();
+  const drag = useRef<{ y: number; t: number; dy: number } | null>(null);
 
   useEffect(() => {
     const dialog = ref.current;
     if (!dialog) return;
-    if (open && !dialog.open) dialog.showModal();
-    if (!open && dialog.open) dialog.close();
+    if (open) {
+      setRendered(true);
+      dialog.classList.remove("is-closing");
+      if (!dialog.open) dialog.showModal();
+      return;
+    }
+    if (!dialog.open) return;
+    const finish = () => {
+      dialog.classList.remove("is-closing");
+      dialog.style.transition = "";
+      dialog.style.transform = "";
+      if (dialog.open) dialog.close();
+      setRendered(false);
+    };
+    // Já saiu arrastando, ou animações desligadas no sistema: fecha direto.
+    if (dialog.dataset.dragged || prefersReducedMotion()) {
+      delete dialog.dataset.dragged;
+      finish();
+      return;
+    }
+    dialog.classList.add("is-closing");
+    const timer = window.setTimeout(finish, 180);
+    return () => window.clearTimeout(timer);
   }, [open]);
+
+  // Celular: arrastar a alça (ou o título) para baixo fecha a janela.
+  function onDragStart(e: PointerEvent<HTMLDivElement>) {
+    if (e.pointerType === "mouse" || (e.target as Element).closest("button")) return;
+    drag.current = { y: e.clientY, t: e.timeStamp, dy: 0 };
+    e.currentTarget.setPointerCapture(e.pointerId);
+    ref.current!.style.transition = "none";
+  }
+
+  function onDragMove(e: PointerEvent<HTMLDivElement>) {
+    if (!drag.current) return;
+    const dy = Math.max(0, e.clientY - drag.current.y);
+    drag.current.dy = dy;
+    ref.current!.style.transform = `translateY(${dy}px)`;
+  }
+
+  function onDragEnd(e: PointerEvent<HTMLDivElement>) {
+    const state = drag.current;
+    const dialog = ref.current;
+    drag.current = null;
+    if (!state || !dialog) return;
+    const velocity = state.dy / Math.max(e.timeStamp - state.t, 1);
+    if (state.dy > dialog.offsetHeight / 3 || (velocity > 0.5 && state.dy > 40)) {
+      haptic("tap");
+      dialog.style.transition = "transform 0.18s ease-in";
+      dialog.style.transform = "translateY(100%)";
+      dialog.dataset.dragged = "1";
+      window.setTimeout(onClose, 170);
+    } else {
+      dialog.style.transition = "transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1)";
+      dialog.style.transform = "";
+    }
+  }
+
+  const dragProps = {
+    onPointerDown: onDragStart,
+    onPointerMove: onDragMove,
+    onPointerUp: onDragEnd,
+    onPointerCancel: onDragEnd,
+  };
 
   return (
     <dialog
       ref={ref}
       className={`sheet ${wide ? "sheet--wide" : ""}`}
-      aria-label={title}
+      aria-labelledby={titleId}
       // Só ações do usuário (Esc, X, clique fora) chamam onClose. O fechamento feito pelo
       // código ao trocar de janela não pode, senão anularia a próxima janela que está abrindo.
       onCancel={(e) => {
@@ -164,11 +235,13 @@ export function Sheet({
         if (e.target === ref.current) onClose();
       }}
     >
-      {open && (
+      {(open || rendered) && (
         <div className="sheet__inner">
-          <div className="sheet__handle" aria-hidden />
-          <div className="sheet__header">
-            <h2>{title}</h2>
+          <div className="sheet__grab" {...dragProps}>
+            <div className="sheet__handle" aria-hidden />
+          </div>
+          <div className="sheet__header" {...dragProps}>
+            <h2 id={titleId}>{title}</h2>
             <button type="button" className="icon-btn" aria-label="Fechar" onClick={onClose}>
               <X size={20} />
             </button>
@@ -223,6 +296,19 @@ export function Alert({ tone, children }: { tone: "error" | "success" | "info"; 
   if (!children) return null;
   return (
     <div className={`alert alert--${tone}`} role={tone === "error" ? "alert" : "status"}>
+      {children}
+    </div>
+  );
+}
+
+/** Blocos cinza pulsando no lugar do conteúdo enquanto ele carrega (evita a tela "pular"). */
+export function Skeleton({ height = 16, width, radius }: { height?: number; width?: string; radius?: number }) {
+  return <span className="skeleton" style={{ height, width, borderRadius: radius }} aria-hidden />;
+}
+
+export function LoadingRegion({ label = "Carregando", children }: { label?: string; children: ReactNode }) {
+  return (
+    <div role="status" aria-label={label} aria-busy="true">
       {children}
     </div>
   );

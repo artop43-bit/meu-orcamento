@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { api } from "./client";
 
@@ -155,7 +155,8 @@ export const keys = {
 };
 
 export function useMonth(month: string) {
-  return useQuery({ queryKey: keys.month(month), queryFn: () => budgetApi.month(month) });
+  // Ao trocar de mês, mantém o anterior na tela até o novo chegar (sem "piscar" carregando).
+  return useQuery({ queryKey: keys.month(month), queryFn: () => budgetApi.month(month), placeholderData: keepPreviousData });
 }
 
 export function useCategories() {

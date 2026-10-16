@@ -1,4 +1,6 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
+import { createPortal } from "react-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   ArrowDownLeft,
   CalendarClock,
@@ -16,6 +18,7 @@ import { Link, useParams } from "react-router";
 
 import {
   budgetApi,
+  keys,
   useBudgetMutation,
   useCategories,
   useMonth,
@@ -27,8 +30,10 @@ import {
   type MonthData,
 } from "../api/budget";
 import { errorMessage } from "../api/client";
+import { announce } from "../lib/announce";
+import { haptic } from "../lib/haptics";
 import { Badge, Bar, CategorySelect, FormActions, MoneyInput, requireMoney } from "../components/budget";
-import { Alert, Button, Kpi, PageHeader, Sheet } from "../components/ui";
+import { Alert, Button, Kpi, LoadingRegion, PageHeader, Sheet, Skeleton } from "../components/ui";
 import { addMonths, money, moneyInput, monthLabel, percent, shortDate, thisMonth, todayISO } from "../lib/format";
 
 type Editing =
@@ -105,19 +110,32 @@ function LedgerRow({
   onDelete: () => void;
 }) {
   const toggle = useBudgetMutation((paid: boolean) => budgetApi.updateExpense(expense.id, { paid }));
-  const status = statusOf(expense);
+  // Resposta imediata: mostra o novo estado enquanto o servidor confirma.
+  const paid = toggle.isPending && toggle.variables !== undefined ? toggle.variables : expense.paid;
+  const status = statusOf({ ...expense, paid });
+
+  function onToggle(next: boolean) {
+    haptic(next ? "success" : "tap");
+    toggle.mutate(next, {
+      onSuccess: () => announce(`${expense.description}: ${next ? "paga" : "a pagar"}`),
+      onError: (err) => {
+        haptic("error");
+        announce(`Não foi possível salvar: ${errorMessage(err)}`);
+      },
+    });
+  }
+
   return (
-    <li className={`ledger__row ${expense.paid ? "ledger__row--paid" : ""}`}>
-      <span className="ledger__check">
+    <li className={`ledger__row ${paid ? "ledger__row--paid" : ""}`} aria-busy={toggle.isPending || undefined}>
+      <label className="ledger__check">
         <input
           type="checkbox"
           className="item__check"
-          checked={expense.paid}
-          disabled={toggle.isPending}
-          onChange={(e) => toggle.mutate(e.target.checked)}
-          aria-label={expense.paid ? `Marcar ${expense.description} como não paga` : `Marcar ${expense.description} como paga`}
+          checked={paid}
+          onChange={(e) => onToggle(e.target.checked)}
+          aria-label={`${expense.description} paga`}
         />
-      </span>
+      </label>
       <button type="button" className="ledger__open ledger__desc" onClick={onEdit} title="Editar">
         <span className="ledger__title">
           <span>{expense.description}</span>
@@ -524,10 +542,44 @@ function DeleteExpense({ expense, onDone }: { expense: Expense; onDone: () => vo
 
 // ---------------------------------------------------------------- página
 
+function MonthSkeleton() {
+  return (
+    <LoadingRegion label="Carregando o mês">
+      <div className="stack" style={{ gap: 20 }}>
+        <div className="kpis">
+          {[0, 1, 2, 3].map((i) => (
+            <div key={i} className="kpi">
+              <Skeleton width="50%" />
+              <Skeleton height={28} width="70%" />
+              <Skeleton height={12} width="40%" />
+            </div>
+          ))}
+        </div>
+        <div className="card stack">
+          {[0, 1, 2, 3, 4].map((i) => (
+            <Skeleton key={i} height={40} />
+          ))}
+        </div>
+      </div>
+    </LoadingRegion>
+  );
+}
+
+/** Carrega o mês anterior e o próximo em segundo plano: trocar de mês fica instantâneo. */
+function usePrefetchNeighbors(month: string) {
+  const queryClient = useQueryClient();
+  useEffect(() => {
+    for (const m of [addMonths(month, -1), addMonths(month, 1)]) {
+      void queryClient.prefetchQuery({ queryKey: keys.month(m), queryFn: () => budgetApi.month(m), staleTime: 30_000 });
+    }
+  }, [month, queryClient]);
+}
+
 export default function MonthPage() {
   const params = useParams();
   const month = params.month && /^\d{4}-\d{2}$/.test(params.month) ? params.month : thisMonth();
   const data = useMonth(month);
+  usePrefetchNeighbors(month);
   const categories = useCategories();
   const [editing, setEditing] = useState<Editing>(null);
   const cats = categories.data ?? [];
@@ -573,11 +625,15 @@ export default function MonthPage() {
         }
       />
 
-      {data.isPending && <p className="muted">Carregando…</p>}
+      {data.isPending && <MonthSkeleton />}
       {data.isError && <Alert tone="error">{errorMessage(data.error)}</Alert>}
 
       {data.data && (
-        <div className="stack" style={{ gap: 20 }}>
+        <div
+          className={`stack ${data.isPlaceholderData ? "is-stale" : ""}`}
+          style={{ gap: 20 }}
+          aria-busy={data.isPlaceholderData || undefined}
+        >
           <Kpis data={data.data} />
           <div className="layout-main-side">
             <ExpensesCard data={data.data} categories={cats} setEditing={setEditing} />
@@ -589,9 +645,13 @@ export default function MonthPage() {
         </div>
       )}
 
-      <button type="button" className="fab" aria-label="Adicionar" onClick={() => setEditing({ type: "choose" })}>
-        <Plus size={26} />
-      </button>
+      {/* Fora do conteúdo (portal) para não andar junto nas animações de troca de página. */}
+      {createPortal(
+        <button type="button" className="fab no-print" aria-label="Adicionar conta ou renda" onClick={() => setEditing({ type: "choose" })}>
+          <Plus size={26} />
+        </button>,
+        document.body,
+      )}
 
       <Sheet open={editing?.type === "choose"} title="Adicionar" onClose={close}>
         <ul className="menu-list">
