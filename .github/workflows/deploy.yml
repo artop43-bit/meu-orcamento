@@ -1,0 +1,47 @@
+name: Deploy
+
+# Roda depois que o CI passa na main (ou manualmente, em Actions > Deploy > Run workflow).
+# Fica desligado até a variável de repositório DEPLOY_ENABLED ser "true" (docs/DEPLOY.md).
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: >-
+      vars.DEPLOY_ENABLED == 'true' &&
+      (github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success')
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 30
+    steps:
+      - name: Configurar SSH
+        env:
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          # Impressão digital do servidor fixada: evita conectar num servidor falso.
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+
+      - name: Atualizar o servidor
+        env:
+          HOST: ${{ secrets.DEPLOY_HOST }}
+          USER: ${{ secrets.DEPLOY_USER }}
+        # No servidor, essa chave só pode executar deploy/scripts/deploy.sh
+        # (restrição "command=" no authorized_keys).
+        run: ssh -i ~/.ssh/deploy_key -o BatchMode=yes "$USER@$HOST" deploy
+
+      - name: Verificar se o site respondeu
+        env:
+          DOMAIN: ${{ vars.DOMAIN }}
+        run: curl -fsS --retry 12 --retry-delay 10 --retry-all-errors "https://$DOMAIN/api/health/db"

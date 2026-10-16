@@ -22,3 +22,9 @@ dist/
 .idea/
 .DS_Store
 Thumbs.db
+
+# Produção
+.env.production
+*.age
+*.dump
+age-key.txt

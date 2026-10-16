@@ -1,0 +1,13 @@
+# Contexto de build da raiz (imagem do Caddy): só o frontend e a config do Caddy importam.
+**/node_modules
+**/dist
+**/.venv
+**/__pycache__
+**/.pytest_cache
+**/.ruff_cache
+.git
+.github
+.env
+.env.*
+*.age
+*.dump
