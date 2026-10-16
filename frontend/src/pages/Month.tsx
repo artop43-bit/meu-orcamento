@@ -169,7 +169,7 @@ function IncomeRow({ income }: { income: Income }) {
           <Alert tone="error">{error}</Alert>
           <div className="grid-2">
             <input value={description} onChange={(e) => setDescription(e.target.value)} required maxLength={120} aria-label="Descrição" />
-            <MoneyInput value={amount} onChange={setAmount} />
+            <MoneyInput value={amount} onChange={setAmount} label="Valor" />
           </div>
           <FormActions loading={update.isPending} onCancel={() => setEditing(false)} />
         </form>
@@ -322,8 +322,8 @@ function ExpenseEdit({ expense, categories, onDone }: { expense: Expense; catego
       )}
       <div className="grid-2">
         <input value={description} onChange={(e) => setDescription(e.target.value)} required maxLength={120} aria-label="Descrição" />
-        <MoneyInput value={amount} onChange={setAmount} />
-        <CategorySelect categories={categories} value={categoryId} onChange={setCategoryId} />
+        <MoneyInput value={amount} onChange={setAmount} label="Valor" />
+        <CategorySelect categories={categories} value={categoryId} onChange={setCategoryId} label="Categoria" />
         <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} aria-label="Vencimento" />
       </div>
       <FormActions loading={update.isPending} onCancel={onDone} />

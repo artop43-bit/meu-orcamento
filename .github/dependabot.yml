@@ -1,0 +1,35 @@
+# Abre PRs quando sai atualização das dependências (o CI testa cada uma antes do merge).
+# Atualizações de segurança chegam assim que publicadas; as demais, uma vez por semana,
+# agrupadas para não virar uma enxurrada de PRs.
+version: 2
+updates:
+  - package-ecosystem: uv
+    directory: /backend
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      backend:
+        update-types: [minor, patch]
+
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      frontend:
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+
+  - package-ecosystem: docker
+    directories:
+      - /backend
+      - /deploy/backup
+      - /deploy/caddy
+    schedule:
+      interval: monthly
