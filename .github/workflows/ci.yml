@@ -107,3 +107,69 @@ jobs:
         run: docker buildx build --platform linux/arm64 ./deploy/backup
       - name: Caddy + frontend
         run: docker buildx build --platform linux/arm64 -f deploy/caddy/Dockerfile .
+
+  # Usa o app pela interface como uma pessoa de verdade (persona com 9 meses de dados) e
+  # audita a acessibilidade de todas as telas. Ver e2e/persona.py e e2e/acessibilidade.py.
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      ENVIRONMENT: development
+      DATABASE_URL: sqlite+pysqlite:///${{ github.workspace }}/backend/e2e.db
+      EMAIL_BACKEND: console
+      SECRET_KEY: e2e-ci-somente-teste
+      FRONTEND_URL: http://localhost:5173
+      QA_CREDENTIALS: ${{ github.workspace }}/backend/e2e-cred.txt
+      QA_OUT: ${{ github.workspace }}/e2e/saida
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - name: Instalar
+        run: |
+          (cd backend && uv sync)
+          (cd frontend && npm ci)
+          uv run --no-project --with playwright python -m playwright install --with-deps chromium
+      - name: Subir API e site
+        run: |
+          cd backend
+          uv run alembic upgrade head
+          uv run python -m app.cli seed-demo --credentials-file "$QA_CREDENTIALS"
+          nohup uv run uvicorn app.main:app --port 8000 > /tmp/api.log 2>&1 &
+          cd ../frontend
+          API_PROXY_TARGET=http://127.0.0.1:8000 nohup npm run dev -- --clearScreen false > /tmp/web.log 2>&1 &
+          for _ in $(seq 1 60); do curl -fsS -o /dev/null http://localhost:5173/ && curl -fsS -o /dev/null http://127.0.0.1:8000/api/health && break; sleep 1; done
+      - name: Persona (QA pela interface)
+        run: uv run --no-project --with playwright --with pyotp python e2e/persona.py
+      - name: Acessibilidade (axe, WCAG 2.1 AA)
+        if: always()
+        run: uv run --no-project --with playwright python e2e/acessibilidade.py
+      - name: Logs dos servidores
+        if: failure()
+        run: tail -n 80 /tmp/api.log /tmp/web.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e2e-prints
+          path: e2e/saida
+          retention-days: 7
+
+  # Sobe o ambiente do Codespaces de verdade (devcontainer) e confere que API e site
+  # continuam no ar depois da inicialização automática.
+  codespaces:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+      - uses: devcontainers/ci@v0.3
+        with:
+          push: never
+          runCmd: |
+            sleep 5
+            curl -fsS -o /dev/null http://127.0.0.1:5173/ && echo "site ok"
+            curl -fsS http://127.0.0.1:8000/api/health && echo " api ok"
+            bash .devcontainer/start.sh --se-parado

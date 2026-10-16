@@ -42,3 +42,23 @@ export const CHART_NAMES: Record<ChartType, string> = {
   hbar: "Ranking",
   table: "Tabela",
 };
+
+/** Passo "redondo" (1, 2, 2,5 ou 5 × 10^n) para a régua ter números fáceis de ler. */
+export function niceStep(raw: number): number {
+  if (raw <= 0) return 1;
+  const exp = Math.pow(10, Math.floor(Math.log10(raw)));
+  const n = raw / exp;
+  return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 2.5 ? 2.5 : n <= 5 ? 5 : 10) * exp;
+}
+
+/** Régua de um gráfico: mínimo, máximo e marcas, sempre incluindo o zero. */
+export function niceScale(low: number, high: number): { min: number; max: number; ticks: number[] } {
+  const lo = Math.min(0, low);
+  const hi = Math.max(0, high);
+  const step = niceStep((hi - lo) / 4 || 1);
+  const max = Math.ceil(hi / step) * step || step;
+  const min = Math.floor(lo / step) * step;
+  const ticks: number[] = [];
+  for (let v = min; v <= max + step / 2; v += step) ticks.push(Math.round(v * 100) / 100);
+  return { min, max, ticks };
+}

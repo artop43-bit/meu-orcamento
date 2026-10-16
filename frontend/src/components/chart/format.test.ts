@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { chartsFor, colorFor, compactValue, formatValue } from "./format";
+import { chartsFor, colorFor, compactValue, formatValue, niceScale, niceStep } from "./format";
 
 describe("formatValue", () => {
   it("dinheiro, porcentagem e vazio", () => {
@@ -32,5 +32,33 @@ describe("colorFor", () => {
   it("usa a cor própria ou a paleta", () => {
     expect(colorFor("#123456", 3)).toBe("#123456");
     expect(colorFor(null, 0)).toMatch(/^#/);
+  });
+});
+
+describe("niceScale", () => {
+  it("passos redondos que cobrem o maior valor", () => {
+    const s = niceScale(0, 4300);
+    expect(s.ticks).toEqual([0, 2000, 4000, 6000]);
+    expect(s.max).toBeGreaterThanOrEqual(4300);
+  });
+  it("inclui valores negativos e o zero", () => {
+    const s = niceScale(-1172, 900);
+    expect(s.min).toBeLessThanOrEqual(-1172);
+    expect(s.ticks).toContain(0);
+    expect(s.ticks.every((t, i, all) => i === 0 || t > all[i - 1])).toBe(true);
+  });
+  it("sem dados não quebra", () => {
+    expect(niceScale(0, 0).ticks).toEqual([0, 1]);
+  });
+  it("porcentagens pequenas", () => {
+    expect(niceScale(-24, 27).ticks).toEqual([-40, -20, 0, 20, 40]);
+  });
+});
+
+describe("niceStep", () => {
+  it("arredonda para 1, 2, 2,5, 5 ou 10", () => {
+    expect(niceStep(1075)).toBe(2000);
+    expect(niceStep(240)).toBe(250);
+    expect(niceStep(0)).toBe(1);
   });
 });

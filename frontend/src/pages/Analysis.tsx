@@ -638,7 +638,7 @@ function CompareTab({ month }: { month: string }) {
       {comparison.isError && <Alert tone="error">{errorMessage(comparison.error)}</Alert>}
       {data && (
         <section className="card">
-          <div className="table-wrap">
+          <div className="table-wrap" tabIndex={0} role="region" aria-label="Tabela da comparação entre os meses">
             <table className="table">
               <thead>
                 <tr>
@@ -752,7 +752,7 @@ function ProjectionTab() {
             />
           </section>
           <section className="card">
-            <div className="table-wrap">
+            <div className="table-wrap" tabIndex={0} role="region" aria-label="Tabela da projeção mês a mês">
               <table className="table">
                 <thead>
                   <tr>
