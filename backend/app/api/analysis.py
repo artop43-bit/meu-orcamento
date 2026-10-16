@@ -7,6 +7,7 @@ from app.api.budget import _changes
 from app.api.deps import CurrentUser, DbSession
 from app.core.months import current_month, format_month, parse_month
 from app.schemas.analysis import (
+    AnalysisConfig,
     CompareOut,
     IndicatorsOut,
     InsightsOut,
@@ -16,10 +17,14 @@ from app.schemas.analysis import (
     OverviewOut,
     ProjectionPoint,
     RuleOut,
+    SavedAnalysisIn,
+    SavedAnalysisOut,
+    SavedAnalysisPatch,
     ScoreOut,
+    SeriesOut,
     TrendsOut,
 )
-from app.services import analysis, indicators, insights, investments
+from app.services import analysis, indicators, insights, investments, series
 
 router = APIRouter(tags=["análises"])
 
@@ -75,6 +80,38 @@ def get_trends(
     """Evolução de renda, gastos e categorias, médias e comparação com o ano anterior."""
     last = parse_month(until) if until else current_month()
     return TrendsOut.model_validate(insights.trends(db, user, last, months))
+
+
+@router.post("/analysis/series")
+def get_series(config: AnalysisConfig, user: CurrentUser, db: DbSession) -> SeriesOut:
+    """Monta os dados de uma análise personalizada (o quê, período, agrupamento, comparação)."""
+    return SeriesOut.model_validate(series.build(db, user, config.model_dump(mode="json")))
+
+
+@router.get("/analysis/saved")
+def list_saved(user: CurrentUser, db: DbSession) -> list[SavedAnalysisOut]:
+    return [SavedAnalysisOut.model_validate(s) for s in series.list_saved(db, user)]
+
+
+@router.post("/analysis/saved", status_code=status.HTTP_201_CREATED)
+def create_saved(body: SavedAnalysisIn, user: CurrentUser, db: DbSession) -> SavedAnalysisOut:
+    item = series.create_saved(
+        db, user, body.name, body.config.model_dump(mode="json"), body.pinned
+    )
+    return SavedAnalysisOut.model_validate(item)
+
+
+@router.patch("/analysis/saved/{item_id}")
+def update_saved(
+    item_id: uuid.UUID, body: SavedAnalysisPatch, user: CurrentUser, db: DbSession
+) -> SavedAnalysisOut:
+    changes = body.model_dump(mode="json", exclude_unset=True, exclude_none=True)
+    return SavedAnalysisOut.model_validate(series.update_saved(db, user, item_id, changes))
+
+
+@router.delete("/analysis/saved/{item_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_saved(item_id: uuid.UUID, user: CurrentUser, db: DbSession) -> None:
+    series.delete_saved(db, user, item_id)
 
 
 # ---------------------------------------------------------------- investimentos

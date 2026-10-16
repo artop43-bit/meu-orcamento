@@ -1,24 +1,28 @@
+import { Suspense } from "react";
 import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation } from "react-router";
 
 import { useMe } from "./api/auth";
 import { errorMessage } from "./api/client";
 import { Shell } from "./components/Shell";
-import Analysis from "./pages/Analysis";
-import Categories from "./pages/Categories";
-import DataPage from "./pages/Data";
 import ForgotPassword from "./pages/ForgotPassword";
-import Goals from "./pages/Goals";
-import History from "./pages/History";
-import Investments from "./pages/Investments";
 import Login from "./pages/Login";
 import MonthPage from "./pages/Month";
-import RecurringPage from "./pages/Recurring";
-import Report from "./pages/Report";
 import Register from "./pages/Register";
-import { Privacy, Terms } from "./pages/Legal";
 import ResetPassword from "./pages/ResetPassword";
-import Security from "./pages/Security";
 import VerifyEmail from "./pages/VerifyEmail";
+import {
+  Analysis,
+  Categories,
+  DataPage,
+  Goals,
+  History,
+  Investments,
+  Privacy,
+  RecurringPage,
+  Report,
+  Security,
+  Terms,
+} from "./pages/lazy";
 
 function FullPageMessage({ children }: { children: React.ReactNode }) {
   return (
@@ -49,6 +53,7 @@ function GuestOnly() {
 export default function App() {
   return (
     <BrowserRouter>
+      <Suspense fallback={<FullPageMessage>Carregando…</FullPageMessage>}>
       <Routes>
         <Route element={<GuestOnly />}>
           <Route path="/entrar" element={<Login />} />
@@ -75,6 +80,7 @@ export default function App() {
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      </Suspense>
     </BrowserRouter>
   );
 }

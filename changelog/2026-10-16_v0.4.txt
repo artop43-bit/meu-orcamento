@@ -1,0 +1,54 @@
+MEU ORÇAMENTO · UPDATE LOG
+Versão 0.4.0 · Análise financeira personalizável
+Data: 16/10/2026 às 15:35 (horário de Brasília)
+
+Versão no app
+- [x] Número da versão, data e hora do update fixos no fim do menu (lateral no desktop, "Mais" no celular)
+
+Organização (fim do "tudo jogado")
+- [x] Análise financeira em seções: Resumo, Tendências, Categorias, Saúde financeira, Patrimônio e metas,
+      Comparar meses, Projeção, Simulador e Monte sua análise
+- [x] Resumo enxuto: consultor, alertas, 4 indicadores e as análises que você fixou
+- [x] Navegação nativa: menu de seções na lateral (desktop); seletor fixo no topo e deslizar entre seções (celular)
+- [x] Nas pontas (primeira/última seção) o deslizar volta a trocar as abas do app
+
+Monte sua análise (personalizada)
+- [x] O quê: gastos, renda, sobra, taxa de poupança ou patrimônio; filtro por categorias
+- [x] Período: 3, 6, 12 ou 24 meses ou datas livres (até 5 anos)
+- [x] Agrupar: por mês, mês × categoria, mês × essencial, por categoria, essencial × não essencial
+- [x] Comparar com: período anterior, ano passado ou sua média (12 meses antes)
+- [x] Gráfico: barras, empilhadas, linhas, área, ranking, rosca ou tabela (só aparecem os que combinam)
+- [x] 6 sugestões prontas para começar
+- [x] Salvar como "Minhas análises" (na conta), editar, fixar no Resumo e excluir com Desfazer
+- [x] Backend: endpoint de séries + análises salvas (migração 0007) com 20 testes novos (152 no total)
+
+Gráficos premium
+- [x] Biblioteca própria em SVG, usada em todo o app (Análise, Histórico, Projeção, Simulador)
+- [x] Dica com valores ao passar o mouse; arrastar o dedo percorre os pontos no celular
+- [x] Teclado: setas, Home/End e Enter; leitor de tela anuncia cada ponto
+- [x] Animação ao trocar filtros (desligada com "reduzir movimento")
+- [x] Períodos longos no celular rolam de lado com a régua de valores fixa
+- [x] Régua com números redondos e margem do tamanho certo
+
+Nativo em cada aparelho
+- [x] Desktop: filtros fixos ao lado de um gráfico grande; monitores grandes usam mais largura
+- [x] Celular: filtros em chips que abrem janela de baixo; sugestões em carrossel; título grande que sobe
+      para a barra ao rolar (como iOS/Android)
+- [x] Tablet: layout próprio em duas colunas, abas com ícone ao lado do nome, janelas centralizadas
+- [x] Celular deitado: barras e cabeçalhos compactos
+- [x] Mais leve: cada tela carrega sob demanda (pacote inicial de 476 KB para 383 KB) e o resto
+      é baixado em segundo plano logo após entrar, então trocar de aba continua instantâneo
+- [x] Revisão visual de 10 telas em 6 tamanhos (celular, celular deitado, tablet, tablet deitado,
+      notebook, monitor): nenhuma rolagem lateral indevida
+
+QA e documentação
+- [x] QA pela interface com a mesma persona (9 meses): 26 de 26 etapas OK
+- [x] Novos testes de QA: seções, construtor (combinações variadas), salvar/fixar/editar/excluir,
+      gráfico com mouse e teclado, deslizar entre seções no celular, versão no menu
+- [x] Encontrado e corrigido no QA:
+      · trocar "por categoria" → "mês × categoria" deixava a tela em branco → corrigido
+      · proteção nova: se uma tela falhar, aparece um aviso com "Tentar de novo" (o app não fica em branco)
+      · régua dos gráficos cortada e com números quebrados → passos redondos
+      · régua sumia quando o gráfico rolava de lado → régua fixa
+      · gráficos curtos rolavam de lado sem necessidade no celular → só rolam quando não cabem
+      · título repetido no celular (barra + página) → título grande nativo

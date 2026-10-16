@@ -1,8 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
-import { Link } from "react-router";
+import { Link, useNavigate } from "react-router";
 
 import { budgetApi, keys } from "../api/budget";
 import { errorMessage } from "../api/client";
+import { Chart } from "../components/chart/Chart";
 import { Alert, PageHeader } from "../components/ui";
 import { money, monthLabel, percent } from "../lib/format";
 
@@ -10,7 +11,7 @@ export default function History() {
   const history = useQuery({ queryKey: [...keys.history, 12], queryFn: () => budgetApi.history(12) });
 
   const points = history.data ?? [];
-  const max = Math.max(1, ...points.flatMap((p) => [Number(p.income), Number(p.expenses)]));
+  const navigate = useNavigate();
   const withData = points.filter((p) => p.has_data);
   const avgBalance = withData.length
     ? withData.reduce((sum, p) => sum + Number(p.balance), 0) / withData.length
@@ -25,24 +26,18 @@ export default function History() {
       {history.data && (
         <>
           <section className="card stack">
-            <div className="section-header">
-              <h2>Últimos 12 meses</h2>
-              <div className="legend">
-                <span><i className="swatch swatch--income" /> Renda</span>
-                <span><i className="swatch swatch--expense" /> Contas</span>
-              </div>
-            </div>
-            <div className="chart" role="img" aria-label="Gráfico de renda e contas por mês">
-              {points.map((p) => (
-                <Link key={p.month} to={`/orcamento/${p.month}`} className="chart__col" title={monthLabel(p.month)}>
-                  <div className="chart__bars">
-                    <div className="chart__bar chart__bar--income" style={{ height: `${(Number(p.income) / max) * 100}%` }} />
-                    <div className="chart__bar chart__bar--expense" style={{ height: `${(Number(p.expenses) / max) * 100}%` }} />
-                  </div>
-                  <span className="chart__label">{monthLabel(p.month, true)}</span>
-                </Link>
-              ))}
-            </div>
+            <h2>Últimos 12 meses</h2>
+            <Chart
+              type="bar"
+              labels={points.map((p) => ({ key: p.month, label: p.month }))}
+              series={[
+                { key: "income", name: "Renda", color: "var(--accent)", values: points.map((p) => Number(p.income)) },
+                { key: "expenses", name: "Contas", color: "var(--expense)", values: points.map((p) => Number(p.expenses)) },
+              ]}
+              monthLabels
+              description="Renda e contas por mês nos últimos 12 meses"
+              onSelect={(key) => navigate(`/orcamento/${key}`)}
+            />
             {avgBalance !== null && (
               <p className="muted small">
                 Saldo médio nos meses com lançamentos: <strong>{money(avgBalance)}</strong>

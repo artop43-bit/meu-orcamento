@@ -41,3 +41,44 @@ export const insightsApi = {
   insights: (month: string) => api.get<Insights>(`/analysis/insights?month=${month}`),
   trends: (until: string, months = 12) => api.get<Trends>(`/analysis/trends?until=${until}&months=${months}`),
 };
+
+// ---------------------------------------------------------------- monte sua análise
+
+export type Metric = "expenses" | "income" | "balance" | "savings_rate" | "investments";
+export type Period = "3m" | "6m" | "12m" | "24m" | "custom";
+export type Group = "month" | "month_category" | "month_type" | "category" | "type" | "kind";
+export type Compare = "none" | "previous" | "last_year" | "average";
+export type ChartKind = "bar" | "stacked" | "line" | "area" | "donut" | "hbar" | "table";
+
+export type AnalysisConfig = {
+  metric: Metric;
+  period: Period;
+  start?: string | null;
+  end?: string | null;
+  group: Group;
+  categories: string[];
+  compare: Compare;
+  chart: ChartKind;
+};
+
+export type SeriesResult = {
+  labels: { key: string; label: string; color?: string | null }[];
+  series: { key: string; name: string; color: string | null; values: (number | null)[] }[];
+  compare: { name: string; values: (number | null)[] } | null;
+  unit: "money" | "percent";
+  total: number | null;
+  compare_total: number | null;
+  start: string;
+  end: string;
+};
+
+export type SavedAnalysis = { id: string; name: string; config: AnalysisConfig; pinned: boolean; position: number };
+
+export const builderApi = {
+  series: (config: AnalysisConfig) => api.post<SeriesResult>("/analysis/series", config),
+  saved: () => api.get<SavedAnalysis[]>("/analysis/saved"),
+  save: (data: { name: string; config: AnalysisConfig; pinned: boolean }) => api.post<SavedAnalysis>("/analysis/saved", data),
+  update: (id: string, data: Partial<{ name: string; config: AnalysisConfig; pinned: boolean }>) =>
+    api.patch<SavedAnalysis>(`/analysis/saved/${id}`, data),
+  remove: (id: string) => api.delete(`/analysis/saved/${id}`),
+};

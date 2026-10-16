@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type MouseEvent, type ReactNode } from "react";
+import { Suspense, useEffect, useLayoutEffect, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeftRight,
@@ -21,9 +21,26 @@ import { authApi, ME_KEY, useMe } from "../api/auth";
 import { announce, prefersReducedMotion } from "../lib/announce";
 import { neighbor } from "../lib/gestures";
 import { haptic } from "../lib/haptics";
-import { Brand, Sheet } from "./ui";
+import { releaseLabel } from "../release";
+import { Brand, LoadingRegion, Sheet, Skeleton } from "./ui";
 import { UndoProvider } from "./undo";
+import { SwipeProvider, type SwipeHandler } from "./swipe";
+import { ErrorBoundary } from "./ErrorBoundary";
+import { preloadPages } from "../pages/lazy";
 import { resetSwipe, useMobileGestures } from "./useMobileGestures";
+
+/** Enquanto a tela é baixada (primeira visita, conexão lenta). */
+function PageLoading() {
+  return (
+    <LoadingRegion label="Carregando a tela">
+      <div className="stack">
+        <Skeleton height={34} width="45%" />
+        <Skeleton height={160} />
+        <Skeleton height={220} />
+      </div>
+    </LoadingRegion>
+  );
+}
 
 type NavItem = { to: string; label: string; icon: ReactNode; short?: string };
 
@@ -91,12 +108,42 @@ export function Shell() {
   const tabIndex = TAB_PATHS.indexOf(section);
   const inMore = MORE.some((item) => item.to === section);
 
+  // Depois de entrar, baixa as outras telas em segundo plano (navegação instantânea).
+  useEffect(() => preloadPages(), []);
+
   // Fecha o menu "Mais" ao trocar de página.
   useEffect(() => setMoreOpen(false), [location.pathname]);
 
   useEffect(() => {
     document.title = `${title} · Meu Orçamento`;
   }, [title]);
+
+  // "Título grande" (como no iOS/Android): o título fica grande na página e só aparece
+  // na barra do topo quando ele sai da tela ao rolar.
+  const [condensed, setCondensed] = useState(false);
+  useEffect(() => {
+    if (typeof IntersectionObserver === "undefined") {
+      setCondensed(true);
+      return;
+    }
+    const observer = new IntersectionObserver(([entry]) => setCondensed(!entry.isIntersecting), {
+      rootMargin: "-56px 0px 0px 0px",
+    });
+    // A tela pode ainda estar sendo baixada: espera o título aparecer (até ~3 s).
+    let tries = 0;
+    let timer = 0;
+    const attach = () => {
+      const heading = pageRef.current?.querySelector("h1");
+      if (heading) observer.observe(heading);
+      else if (tries++ < 30) timer = window.setTimeout(attach, 100);
+      else setCondensed(true);
+    };
+    attach();
+    return () => {
+      window.clearTimeout(timer);
+      observer.disconnect();
+    };
+  }, [location.pathname, location.search]);
 
   // Troca de seção: animação de entrada na direção certa, volta ao topo e leva o foco
   // ao título (quem usa leitor de tela ou teclado fica sabendo que a página mudou).
@@ -116,9 +163,16 @@ export function Shell() {
     }
   }, [section]);
 
+  // Páginas podem assumir o deslizar (ex.: seções da Análise financeira); nas pontas, troca de aba.
+  const swipeHandler = useRef<SwipeHandler | null>(null);
   useMobileGestures(contentRef, pullRef, {
-    canGo: (dir) => neighbor(TAB_PATHS, tabIndex, dir) !== null,
+    canGo: (dir) => Boolean(swipeHandler.current?.canGo(dir)) || neighbor(TAB_PATHS, tabIndex, dir) !== null,
     go: (dir) => {
+      if (swipeHandler.current?.canGo(dir)) {
+        swipeHandler.current.go(dir);
+        resetSwipe(contentRef.current);
+        return;
+      }
       const to = neighbor(TAB_PATHS, tabIndex, dir);
       if (to) navigate(to);
     },
@@ -194,11 +248,14 @@ export function Shell() {
               Termos
             </Link>
           </span>
+          <span className="app-version" title="Versão do Meu Orçamento">
+            {releaseLabel()}
+          </span>
         </div>
       </aside>
 
       <div className="shell__main">
-        <header className="mobile-bar no-print">
+        <header className={`mobile-bar no-print ${condensed ? "is-condensed" : ""}`}>
           <strong style={{ fontSize: "1.1rem" }}>{title}</strong>
           <Link to="/" className="brand__logo" aria-label="Meu Orçamento, início">
             <Wallet size={18} />
@@ -227,7 +284,13 @@ export function Shell() {
                 </span>
               </div>
             )}
-            <Outlet />
+            <SwipeProvider handler={swipeHandler}>
+              <ErrorBoundary key={location.pathname}>
+                <Suspense fallback={<PageLoading />}>
+                  <Outlet />
+                </Suspense>
+              </ErrorBoundary>
+            </SwipeProvider>
           </div>
         </main>
       </div>
@@ -270,6 +333,9 @@ export function Shell() {
         </ul>
         <p className="muted small" style={{ margin: "12px 0 0" }}>
           {user?.email} · <Link to="/privacidade">Privacidade</Link> · <Link to="/termos">Termos</Link>
+        </p>
+        <p className="app-version" style={{ margin: "8px 0 0" }}>
+          {releaseLabel()}
         </p>
       </Sheet>
 

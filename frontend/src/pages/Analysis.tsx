@@ -1,27 +1,44 @@
-import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { CalendarRange, History as HistoryIcon, PiggyBank, Receipt } from "lucide-react";
-import { Link, useSearchParams } from "react-router";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import {
+  ArrowDownLeft,
+  CalendarRange,
+  ChartBarDecreasing,
+  ChartPie,
+  FlaskConical,
+  GitCompareArrows,
+  HeartPulse,
+  History as HistoryIcon,
+  Landmark,
+  LayoutDashboard,
+  PiggyBank,
+  Receipt,
+  Scale,
+  ShieldCheck,
+  Sparkles,
+  Tags,
+  Target,
+  Telescope,
+  TrendingUp,
+  WandSparkles,
+  type LucideIcon,
+} from "lucide-react";
+import { Link, useNavigate, useSearchParams } from "react-router";
 
-import { analysisApi, type Overview, type Rule, type Score } from "../api/analysis";
-import { useCategories, useMonth, type CategoryTotal } from "../api/budget";
-import { insightsApi, type Insights, type Trends } from "../api/insights";
+import { analysisApi, type Rule, type Score } from "../api/analysis";
+import { budgetApi, keys, useCategories, useMonth } from "../api/budget";
 import { errorMessage } from "../api/client";
-import { Bar, Stat } from "../components/budget";
+import { insightsApi, type AnalysisConfig, type SavedAnalysis } from "../api/insights";
+import { AnalysisResult, Builder, PRESETS, SavedCard, useSaved } from "../components/AnalysisBuilder";
+import { Bar } from "../components/budget";
+import { Chart } from "../components/chart/Chart";
 import { AlertsCard, ConsultantCard, useInsights } from "../components/consultant";
-import { ChartData, Donut, FALLBACK_COLORS, IncomeExpenseChart, StackedBars } from "../components/dashboardCharts";
-import { LineChart } from "../components/charts";
+import { useSwipeOverride } from "../components/swipe";
 import { Alert, Button, Kpi, LoadingRegion, PageHeader, Skeleton } from "../components/ui";
+import { useUndo } from "../components/undo";
+import { prefersReducedMotion } from "../lib/announce";
 import { addMonths, money, monthLabel, percent, thisMonth } from "../lib/format";
 import { cumulativeBalance, simulate, ZERO_SIM, type Sim } from "../lib/simulate";
-
-type Tab = "geral" | "comparar" | "projecao" | "simulador";
-const TABS: [Tab, string][] = [
-  ["geral", "Painel"],
-  ["comparar", "Comparar meses"],
-  ["projecao", "Projeção"],
-  ["simulador", "Simulador"],
-];
 
 const SCORE_COLORS: Record<string, string> = {
   Excelente: "var(--ok)",
@@ -142,248 +159,455 @@ function ChangeFoot({ change, of }: { change: number | null; of: string }) {
   );
 }
 
-function DashboardTab({ month, setMonth }: { month: string; setMonth: (m: string) => void }) {
-  const insights = useInsights(month);
-  const trends = useQuery({
+function useTrends(month: string) {
+  return useQuery({
     queryKey: ["budget", "analysis", "trends", month],
     queryFn: () => insightsApi.trends(month, 12),
+    placeholderData: keepPreviousData,
   });
-  const overview = useQuery({
-    queryKey: ["budget", "analysis", "overview", month],
-    queryFn: () => analysisApi.overview(month),
-  });
-  const monthData = useMonth(month);
-  const categories = useCategories();
+}
 
-  const loading = insights.isPending || trends.isPending || overview.isPending;
-  const error = insights.error ?? trends.error ?? overview.error;
-
+function SectionTitle({ title, text, month, setMonth }: { title: string; text?: string; month?: string; setMonth?: (m: string) => void }) {
   return (
-    <div className="stack" style={{ gap: 20 }}>
-      <MonthPicker label="Mês analisado" value={month} onChange={setMonth} />
-      {loading && (
-        <LoadingRegion label="Carregando a análise">
-          <div className="layout-main-side">
-            <div className="card stack">
-              <Skeleton height={28} width="60%" />
-              <Skeleton height={60} />
-              <Skeleton height={40} />
-            </div>
-            <div className="card stack">
-              <Skeleton height={20} width="40%" />
-              <Skeleton height={60} />
-            </div>
-          </div>
-        </LoadingRegion>
-      )}
-      {error && <Alert tone="error">{errorMessage(error)}</Alert>}
-      {insights.data && trends.data && overview.data && (
-        <DashboardContent
-          month={month}
-          insights={insights.data}
-          trends={trends.data}
-          overview={overview.data}
-          byCategory={monthData.data?.summary.by_category ?? []}
-          colors={new Map((categories.data ?? []).map((c) => [c.id, c.color]))}
-        />
-      )}
+    <div className="section-title">
+      <div>
+        <h2>{title}</h2>
+        {text && <p>{text}</p>}
+      </div>
+      {month && setMonth && <MonthPicker label="Mês" value={month} onChange={setMonth} />}
     </div>
   );
 }
 
-function DashboardContent({
-  month,
-  insights,
-  trends,
-  overview,
-  byCategory,
-  colors,
-}: {
-  month: string;
-  insights: Insights;
-  trends: Trends;
-  overview: Overview;
-  byCategory: CategoryTotal[];
-  colors: Map<string, string | null>;
-}) {
-  if (insights.mood === "empty") {
-    return (
-      <div className="layout-main-side">
-        <ConsultantCard data={insights} />
-        <section className="card stack">
-          <h2>Como começar</h2>
-          <ol className="steps">
-            <li>
-              Cadastre o que se repete todo mês (salário, aluguel, internet) em <Link to="/fixas">Contas fixas</Link>.
-            </li>
-            <li>
-              Lance os gastos do mês no <Link to={`/orcamento/${month}`}>Orçamento</Link>.
-            </li>
-            <li>
-              Opcional: defina limites por categoria em <Link to="/categorias">Categorias</Link> para receber alertas.
-            </li>
-          </ol>
-        </section>
+function Loading() {
+  return (
+    <LoadingRegion label="Carregando">
+      <div className="card stack">
+        <Skeleton height={24} width="40%" />
+        <Skeleton height={200} />
       </div>
+    </LoadingRegion>
+  );
+}
+
+const num = (v: string | null | undefined) => (v === null || v === undefined ? null : Number(v));
+
+// ---------------------------------------------------------------- resumo
+
+function SummarySection({ month, setMonth, goTo }: { month: string; setMonth: (m: string) => void; goTo: (s: SectionKey, config?: AnalysisConfig) => void }) {
+  const insights = useInsights(month);
+  const trends = useTrends(month);
+  const saved = useSaved();
+  const undo = useUndo();
+  const pinned = (saved.data ?? []).filter((s) => s.pinned && !undo.isHidden(s.id));
+
+  if (insights.isPending || trends.isPending) return <Loading />;
+  if (insights.isError) return <Alert tone="error">{errorMessage(insights.error)}</Alert>;
+  const data = insights.data;
+
+  if (data.mood === "empty") {
+    return (
+      <>
+        <SectionTitle title="Resumo" month={month} setMonth={setMonth} />
+        <div className="layout-main-side">
+          <ConsultantCard data={data} />
+          <section className="card stack">
+            <h2>Como começar</h2>
+            <ol className="steps">
+              <li>
+                Cadastre o que se repete todo mês (salário, aluguel, internet) em <Link to="/fixas">Contas fixas</Link>.
+              </li>
+              <li>
+                Lance os gastos do mês no <Link to={`/orcamento/${month}`}>Orçamento</Link>.
+              </li>
+              <li>
+                Opcional: defina limites por categoria em <Link to="/categorias">Categorias</Link> para receber alertas.
+              </li>
+            </ol>
+          </section>
+        </div>
+      </>
     );
   }
 
-  const points = trends.months;
+  const t = trends.data;
+  const points = t?.months ?? [];
   const current = points[points.length - 1];
   const previous = points.slice(0, -1).filter((p) => p.has_data);
+  const avg3 = previous.slice(-3).length ? previous.slice(-3).reduce((s, p) => s + Number(p.expenses), 0) / previous.slice(-3).length : null;
   const lastMonth = points[points.length - 2];
-  const recent = previous.slice(-3);
-  const avg3 = recent.length ? recent.reduce((sum, p) => sum + Number(p.expenses), 0) / recent.length : null;
-  const expenses = Number(current.expenses);
-  const ly = trends.same_month_last_year;
-
-  // Pula os meses vazios do começo (conta nova), mantendo pelo menos 6 no gráfico.
-  const firstWithData = Math.max(0, points.findIndex((p) => p.has_data));
-  const chartPoints = points.slice(Math.min(firstWithData, points.length - 6)).map((p) => ({
-    label: monthLabel(p.month, true).split(" ")[0],
-    title: monthLabel(p.month),
-    income: Number(p.income),
-    expenses: Number(p.expenses),
-    balance: Number(p.balance),
-  }));
-
-  const last6 = points.slice(-6);
-  const stack = trends.categories.map((c, i) => ({
-    name: c.name,
-    color: c.color ?? FALLBACK_COLORS[i % FALLBACK_COLORS.length],
-    values: c.totals.slice(-6).map(Number),
-  }));
-
-  const slices = byCategory.map((c, i) => ({
-    name: c.name,
-    value: Number(c.total),
-    color: (c.category_id && colors.get(c.category_id)) || FALLBACK_COLORS[i % FALLBACK_COLORS.length],
-  }));
-
-  const wealth = trends.wealth;
-  const goals = trends.goals;
+  const expenses = Number(current?.expenses ?? 0);
 
   return (
     <>
+      <SectionTitle title="Resumo" text="Como está o mês, o que precisa de atenção e suas análises fixadas." month={month} setMonth={setMonth} />
       <div className="layout-main-side">
-        <ConsultantCard data={insights} />
-        <AlertsCard alerts={insights.alerts} />
+        <ConsultantCard data={data} />
+        <AlertsCard alerts={data.alerts} />
       </div>
+      {t && (
+        <div className="kpis">
+          <Kpi
+            icon={<PiggyBank size={18} />}
+            label="Taxa de poupança"
+            value={data.savings_pct === null ? "—" : percent(data.savings_pct)}
+            valueClass={data.savings_pct !== null && data.savings_pct < 0 ? "tone--error" : undefined}
+            foot="Recomendado: 20% ou mais"
+          />
+          <Kpi icon={<Receipt size={18} />} tone="expense" label="Gastos do mês" value={money(expenses)} foot={<ChangeFoot change={pctChange(expenses, avg3)} of="da média de 3 meses" />} />
+          <Kpi
+            icon={<CalendarRange size={18} />}
+            tone="neutral"
+            label="Mês anterior"
+            value={lastMonth?.has_data ? money(lastMonth.expenses) : "—"}
+            foot={<ChangeFoot change={lastMonth?.has_data ? pctChange(expenses, Number(lastMonth.expenses)) : null} of="do mês anterior" />}
+          />
+          <Kpi
+            icon={<HistoryIcon size={18} />}
+            tone="neutral"
+            label={monthLabel(t.same_month_last_year.month)}
+            value={t.same_month_last_year.has_data ? money(t.same_month_last_year.expenses) : "—"}
+            foot={<ChangeFoot change={t.same_month_last_year.has_data ? pctChange(expenses, Number(t.same_month_last_year.expenses)) : null} of="do ano passado" />}
+          />
+        </div>
+      )}
+      <div className="section-title">
+        <div>
+          <h2>Minhas análises</h2>
+          <p>{pinned.length ? "Fixadas por você. Edite ou crie novas em Monte sua análise." : "Monte gráficos do seu jeito e fixe aqui."}</p>
+        </div>
+        <Button type="button" variant="secondary" onClick={() => goTo("monte")}>
+          <WandSparkles size={16} /> Monte sua análise
+        </Button>
+      </div>
+      {pinned.length > 0 ? (
+        <div className="saved-grid">
+          {pinned.map((item) => (
+            <SavedCard key={item.id} item={item} compact />
+          ))}
+        </div>
+      ) : (
+        <div className="presets">
+          {PRESETS.slice(0, 3).map((p) => (
+            <button key={p.title} type="button" className="preset" onClick={() => goTo("monte", p.config)}>
+              <span className="kpi__icon" aria-hidden>
+                <Sparkles size={16} />
+              </span>
+              <span>
+                <strong>{p.title}</strong>
+                <small>{p.hint}</small>
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
 
+// ---------------------------------------------------------------- tendências
+
+function TrendsSection({ month, setMonth }: { month: string; setMonth: (m: string) => void }) {
+  const trends = useTrends(month);
+  const navigate = useNavigate();
+  if (trends.isPending) return <Loading />;
+  if (trends.isError) return <Alert tone="error">{errorMessage(trends.error)}</Alert>;
+  const t = trends.data;
+  // Pula os meses vazios do começo (conta nova), mantendo pelo menos 6.
+  const first = Math.max(0, t.months.findIndex((p) => p.has_data));
+  const points = t.months.slice(Math.min(first, t.months.length - 6));
+  const labels = points.map((p) => ({ key: p.month, label: p.month }));
+  const open = (key: string) => navigate(`/orcamento/${key}`);
+
+  return (
+    <>
+      <SectionTitle title="Tendências" text="Como renda, gastos e sobra evoluíram até o mês escolhido." month={month} setMonth={setMonth} />
+      <section className="card stack">
+        <h3 className="builder__title">Renda × gastos</h3>
+        <Chart
+          type="bar"
+          labels={labels}
+          series={[
+            { key: "income", name: "Renda", color: "var(--accent)", values: points.map((p) => Number(p.income)) },
+            { key: "expenses", name: "Gastos", color: "var(--expense)", values: points.map((p) => Number(p.expenses)) },
+          ]}
+          monthLabels
+          description="Renda e gastos por mês"
+          onSelect={open}
+        />
+      </section>
+      <div className="layout-2">
+        <section className="card stack">
+          <h3 className="builder__title">Sobra ou falta no mês</h3>
+          <Chart
+            type="bar"
+            labels={labels}
+            series={[{ key: "balance", name: "Sobra", color: "var(--ok)", values: points.map((p) => (p.has_data ? Number(p.balance) : null)) }]}
+            compare={t.averages.balance_6m ? { name: "Média de 6 meses", values: points.map(() => num(t.averages.balance_6m)) } : null}
+            monthLabels
+            height={220}
+            description="Sobra por mês"
+            onSelect={open}
+          />
+        </section>
+        <section className="card stack">
+          <h3 className="builder__title">Taxa de poupança</h3>
+          <Chart
+            type="area"
+            labels={labels}
+            series={[{ key: "savings", name: "Poupança", color: "var(--accent)", values: points.map((p) => p.savings_pct) }]}
+            compare={{ name: "Meta de 20%", values: points.map(() => 20) }}
+            unit="percent"
+            monthLabels
+            height={220}
+            description="Taxa de poupança por mês"
+            onSelect={open}
+          />
+        </section>
+      </div>
       <div className="kpis">
-        <Kpi
-          icon={<PiggyBank size={18} />}
-          label="Taxa de poupança"
-          value={insights.savings_pct === null ? "—" : percent(insights.savings_pct)}
-          valueClass={insights.savings_pct !== null && insights.savings_pct < 0 ? "tone--error" : undefined}
-          foot="Recomendado: 20% ou mais"
-        />
-        <Kpi
-          icon={<Receipt size={18} />}
-          tone="expense"
-          label="Gastos × sua média"
-          value={money(expenses)}
-          foot={<ChangeFoot change={pctChange(expenses, avg3)} of="da média de 3 meses" />}
-        />
-        <Kpi
-          icon={<CalendarRange size={18} />}
-          tone="neutral"
-          label="Mês anterior"
-          value={lastMonth?.has_data ? money(lastMonth.expenses) : "—"}
-          foot={
-            <ChangeFoot
-              change={lastMonth?.has_data ? pctChange(expenses, Number(lastMonth.expenses)) : null}
-              of="do mês anterior"
-            />
-          }
-        />
+        <Kpi icon={<ArrowDownLeft size={18} />} label="Renda média (6 meses)" value={money(t.averages.income_6m)} foot={`3 meses: ${money(t.averages.income_3m)}`} />
+        <Kpi icon={<Receipt size={18} />} tone="expense" label="Gasto médio (6 meses)" value={money(t.averages.expenses_6m)} foot={`3 meses: ${money(t.averages.expenses_3m)}`} />
+        <Kpi icon={<Scale size={18} />} tone="neutral" label="Sobra média (6 meses)" value={money(t.averages.balance_6m)} foot={`3 meses: ${money(t.averages.balance_3m)}`} />
         <Kpi
           icon={<HistoryIcon size={18} />}
           tone="neutral"
-          label={`${monthLabel(ly.month)}`}
-          value={ly.has_data ? money(ly.expenses) : "—"}
-          foot={<ChangeFoot change={ly.has_data ? pctChange(expenses, Number(ly.expenses)) : null} of="do ano passado" />}
+          label={`Ano passado (${monthLabel(t.same_month_last_year.month, true)})`}
+          value={t.same_month_last_year.has_data ? money(t.same_month_last_year.balance) : "—"}
+          foot={t.same_month_last_year.has_data ? "Sobra no mesmo mês" : "Sem dados"}
         />
       </div>
+    </>
+  );
+}
 
-      <section className="card stack">
-        <h2>Renda, gastos e sobra · 12 meses</h2>
-        <IncomeExpenseChart points={chartPoints} />
-        <ChartData
-          headers={["Mês", "Renda", "Gastos", "Sobra", "Poupança"]}
-          rows={points
-            .filter((p) => p.has_data)
-            .map((p) => [monthLabel(p.month), money(p.income), money(p.expenses), money(p.balance), percent(p.savings_pct)])}
-        />
-      </section>
+// ---------------------------------------------------------------- categorias
 
+function CategoriesSection({ month, setMonth }: { month: string; setMonth: (m: string) => void }) {
+  const trends = useTrends(month);
+  const monthData = useMonth(month);
+  const [view, setView] = useState<"hbar" | "donut">("hbar");
+  const colors = new Map((useCategories().data ?? []).map((c) => [c.id, c.color]));
+  if (trends.isPending || monthData.isPending) return <Loading />;
+  if (trends.isError) return <Alert tone="error">{errorMessage(trends.error)}</Alert>;
+  const t = trends.data;
+  const byCategory = monthData.data?.summary.by_category ?? [];
+  const last6 = t.months.slice(-6);
+  const withLimit = byCategory.filter((c) => c.limit);
+
+  return (
+    <>
+      <SectionTitle title="Categorias" text="Para onde vai o dinheiro e como cada categoria evolui." month={month} setMonth={setMonth} />
       <div className="layout-2">
         <section className="card stack">
-          <h2>Para onde foi o dinheiro</h2>
-          {slices.length === 0 ? (
-            <p className="muted">Nenhum gasto lançado neste mês.</p>
+          <div className="builder__result-head">
+            <h3 className="builder__title">{monthLabel(month)}</h3>
+            <div className="chart-types" role="radiogroup" aria-label="Visualização">
+              {(["hbar", "donut"] as const).map((type) => {
+                const Icon = type === "hbar" ? ChartBarDecreasing : ChartPie;
+                return (
+                  <label key={type} title={type === "hbar" ? "Ranking" : "Rosca"}>
+                    <input type="radio" name="cat-view" checked={view === type} onChange={() => setView(type)} aria-label={type === "hbar" ? "Ranking" : "Rosca"} />
+                    <span>
+                      <Icon size={18} aria-hidden />
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+          {byCategory.length === 0 ? (
+            <p className="muted">Nenhum gasto neste mês.</p>
           ) : (
-            <Donut slices={slices} center={compactTotal(expenses)} caption={`Gastos de ${monthLabel(month)}`} />
+            <Chart
+              type={view}
+              labels={byCategory.map((c) => ({ key: c.category_id ?? "none", label: c.name, color: c.category_id ? colors.get(c.category_id) : "#9aa3a0" }))}
+              series={[{ key: "total", name: "Gastos", values: byCategory.map((c) => Number(c.total)) }]}
+              description={`Gastos por categoria em ${monthLabel(month)}`}
+            />
           )}
         </section>
         <section className="card stack">
-          <h2>Gastos por categoria · 6 meses</h2>
-          {stack.length === 0 ? (
+          <h3 className="builder__title">Últimos 6 meses</h3>
+          {t.categories.length === 0 ? (
             <p className="muted">Sem gastos no período.</p>
           ) : (
-            <>
-              <StackedBars
-                labels={last6.map((p) => monthLabel(p.month, true).split(" ")[0])}
-                titles={last6.map((p) => monthLabel(p.month))}
-                series={stack}
-              />
-              <ChartData
-                headers={["Categoria", ...last6.map((p) => monthLabel(p.month, true))]}
-                rows={stack.map((s) => [s.name, ...s.values.map((v) => money(v))])}
-              />
-            </>
+            <Chart
+              type="stacked"
+              labels={last6.map((p) => ({ key: p.month, label: p.month }))}
+              series={t.categories.map((c) => ({ key: c.category_id ?? c.name, name: c.name, color: c.color, values: c.totals.slice(-6).map(Number) }))}
+              monthLabels
+              height={240}
+              description="Gastos por categoria nos últimos 6 meses"
+            />
           )}
         </section>
       </div>
-
-      <div className="layout-2">
-        <ScoreCard score={overview.score} />
-        <RuleCard rule={overview.rule} />
-      </div>
-
       <section className="card stack">
-        <h2>Patrimônio e metas</h2>
-        <div className="stats">
-          <Stat label="Investido" value={money(wealth.invested)} />
-          <Stat label="Valor atual" value={money(wealth.current)} />
-          <Stat label="Rendimento" value={money(wealth.return_value)} tone={Number(wealth.return_value) >= 0 ? "ok" : "error"} />
-          <Stat label="Reserva de emergência" value={money(wealth.reserve)} />
-        </div>
-        {goals.count > 0 ? (
-          <div className="stack stack--tight">
-            <span className="small muted">
-              {goals.count} meta(s): {money(goals.saved)} guardados de {money(goals.target)}
-            </span>
-            <Bar pct={(Number(goals.saved) / Math.max(Number(goals.target), 1)) * 100} />
-          </div>
+        <h3 className="builder__title">Limites do mês</h3>
+        {withLimit.length === 0 ? (
+          <p className="muted" style={{ margin: 0 }}>
+            Defina um limite mensal em <Link to="/categorias">Categorias</Link> para acompanhar aqui e receber alertas.
+          </p>
         ) : (
-          <p className="muted small">
-            Nenhuma meta ainda. <Link to="/metas">Crie uma meta</Link> para acompanhar quanto falta.
-          </p>
-        )}
-        {Number(wealth.invested) === 0 && (
-          <p className="muted small">
-            Cadastre seus investimentos em <Link to="/investimentos">Investimentos</Link> para ver o patrimônio aqui.
-          </p>
+          <ul className="breakdown">
+            {withLimit.map((c) => (
+              <li key={c.category_id ?? "none"}>
+                <div className="split">
+                  <span>{c.name}</span>
+                  <span className="num">
+                    {money(c.total)} <span className="muted small">de {money(c.limit)}</span>
+                  </span>
+                </div>
+                <Bar pct={Math.min(c.limit_pct ?? 0, 100)} color={(c.limit_pct ?? 0) >= 100 ? "var(--error)" : (c.limit_pct ?? 0) >= 80 ? "var(--warn)" : undefined} />
+              </li>
+            ))}
+          </ul>
         )}
       </section>
     </>
   );
 }
 
-function compactTotal(value: number): string {
-  if (value >= 10000) return `R$ ${(value / 1000).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} mil`;
-  return money(value).replace(/,\d\d$/, "");
+// ---------------------------------------------------------------- saúde financeira
+
+function HealthSection({ month, setMonth }: { month: string; setMonth: (m: string) => void }) {
+  const overview = useQuery({ queryKey: ["budget", "analysis", "overview", month], queryFn: () => analysisApi.overview(month) });
+  if (overview.isPending) return <Loading />;
+  if (overview.isError) return <Alert tone="error">{errorMessage(overview.error)}</Alert>;
+  return (
+    <>
+      <SectionTitle title="Saúde financeira" text="Score de 0 a 100 e a regra 50/30/20 aplicada ao seu mês." month={month} setMonth={setMonth} />
+      <div className="layout-2">
+        <ScoreCard score={overview.data.score} />
+        <RuleCard rule={overview.data.rule} />
+      </div>
+    </>
+  );
+}
+
+// ---------------------------------------------------------------- patrimônio e metas
+
+function WealthSection({ month }: { month: string }) {
+  const trends = useTrends(month);
+  const goals = useQuery({ queryKey: keys.goals, queryFn: budgetApi.goals });
+  if (trends.isPending) return <Loading />;
+  if (trends.isError) return <Alert tone="error">{errorMessage(trends.error)}</Alert>;
+  const w = trends.data.wealth;
+  const investConfig = PRESETS[PRESETS.length - 1].config;
+  return (
+    <>
+      <SectionTitle title="Patrimônio e metas" text="Onde seu dinheiro está guardado e quanto falta para cada objetivo." />
+      <div className="kpis">
+        <Kpi icon={<Landmark size={18} />} label="Valor atual" value={money(w.current)} foot={`Investido: ${money(w.invested)}`} />
+        <Kpi
+          icon={<TrendingUp size={18} />}
+          tone="neutral"
+          label="Rendimento"
+          value={money(w.return_value)}
+          valueClass={Number(w.return_value) >= 0 ? "tone--ok" : "tone--error"}
+          foot={Number(w.invested) > 0 ? percent((Number(w.return_value) / Number(w.invested)) * 100) : "—"}
+        />
+        <Kpi icon={<ShieldCheck size={18} />} tone="neutral" label="Reserva de emergência" value={money(w.reserve)} foot="Investimentos marcados como reserva" />
+        <Kpi icon={<Target size={18} />} tone="neutral" label="Metas" value={money(trends.data.goals.saved)} foot={`de ${money(trends.data.goals.target)} (${trends.data.goals.count} meta(s))`} />
+      </div>
+      <div className="layout-2">
+        {Number(w.current) > 0 ? (
+          <AnalysisResult config={investConfig} title="Por tipo de investimento" height={220} />
+        ) : (
+          <section className="card stack">
+            <h3 className="builder__title">Investimentos</h3>
+            <p className="muted">
+              Cadastre seus investimentos em <Link to="/investimentos">Investimentos</Link> para ver o patrimônio aqui.
+            </p>
+          </section>
+        )}
+        <section className="card stack">
+          <h3 className="builder__title">Metas</h3>
+          {(goals.data ?? []).length === 0 ? (
+            <p className="muted">
+              Nenhuma meta ainda. <Link to="/metas">Crie uma meta</Link>.
+            </p>
+          ) : (
+            <ul className="breakdown">
+              {(goals.data ?? []).map((g) => (
+                <li key={g.id}>
+                  <div className="split">
+                    <span>{g.name}</span>
+                    <span className="num">
+                      {money(g.current_amount)} <span className="muted small">de {money(g.target_amount)}</span>
+                    </span>
+                  </div>
+                  <Bar pct={g.progress_pct} />
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      </div>
+    </>
+  );
+}
+
+// ---------------------------------------------------------------- monte sua análise
+
+function BuilderSection({ initial }: { initial?: AnalysisConfig }) {
+  const saved = useSaved();
+  const undo = useUndo();
+  const [editing, setEditing] = useState<SavedAnalysis | null>(null);
+  const [start, setStart] = useState<AnalysisConfig | undefined>(initial);
+  const items = (saved.data ?? []).filter((s) => !undo.isHidden(s.id));
+
+  return (
+    <>
+      <SectionTitle title="Monte sua análise" text="Escolha o que ver, o período, como agrupar, com o que comparar e o tipo de gráfico." />
+      <div className="presets">
+        {PRESETS.map((p) => (
+          <button
+            key={p.title}
+            type="button"
+            className="preset"
+            onClick={() => {
+              setEditing(null);
+              setStart({ ...p.config });
+            }}
+          >
+            <span className="kpi__icon" aria-hidden>
+              <Sparkles size={16} />
+            </span>
+            <span>
+              <strong>{p.title}</strong>
+              <small>{p.hint}</small>
+            </span>
+          </button>
+        ))}
+      </div>
+      <Builder initial={start} editing={editing} onEditingDone={() => setEditing(null)} />
+      {items.length > 0 && (
+        <>
+          <div className="section-title">
+            <div>
+              <h2>Salvas</h2>
+              <p>Fixe no Resumo as que quiser ver sempre.</p>
+            </div>
+          </div>
+          <div className="saved-grid">
+            {items.map((item) => (
+              <SavedCard
+                key={item.id}
+                item={item}
+                onEdit={() => {
+                  setEditing(item);
+                  setStart({ ...item.config });
+                  window.scrollTo({ top: 0, behavior: "smooth" });
+                }}
+              />
+            ))}
+          </div>
+        </>
+      )}
+    </>
+  );
 }
 
 // ---------------------------------------------------------------- comparar
@@ -519,9 +743,12 @@ function ProjectionTab() {
                 </strong>
               </div>
             </div>
-            <LineChart
-              labels={points.map((p) => monthLabel(p.month, true))}
-              series={[{ label: "Saldo acumulado", color: "var(--accent)", values: points.map((p) => Number(p.cumulative)) }]}
+            <Chart
+              type="area"
+              labels={points.map((p) => ({ key: p.month, label: p.month }))}
+              series={[{ key: "cumulative", name: "Saldo acumulado", color: "var(--accent)", values: points.map((p) => Number(p.cumulative)) }]}
+              monthLabels
+              description="Saldo acumulado projetado nos próximos meses"
             />
           </section>
           <section className="card">
@@ -597,7 +824,7 @@ function SimulatorTab() {
     expenses: Number(p.expenses),
     nonEssential: Number(p.non_essential),
   }));
-  const labels = projection.data.map((p) => monthLabel(p.month, true));
+  const labels = projection.data.map((p) => ({ key: p.month, label: p.month }));
   const base = cumulativeBalance(months, ZERO_SIM);
   const scenario = cumulativeBalance(months, sim);
 
@@ -663,12 +890,13 @@ function SimulatorTab() {
             {money(scenario[scenario.length - 1] - base[base.length - 1])}
           </strong>
         </p>
-        <LineChart
+        <Chart
+          type="line"
           labels={labels}
-          series={[
-            { label: "Projeção atual", color: "var(--muted)", values: base, dashed: true },
-            { label: "Com a simulação", color: "var(--accent)", values: scenario },
-          ]}
+          series={[{ key: "scenario", name: "Com a simulação", color: "var(--accent)", values: scenario }]}
+          compare={{ name: "Projeção atual", values: base }}
+          monthLabels
+          description="Saldo acumulado: projeção atual e com a simulação"
         />
       </section>
     </div>
@@ -677,36 +905,107 @@ function SimulatorTab() {
 
 // ---------------------------------------------------------------- página
 
+type SectionKey = "resumo" | "tendencias" | "categorias" | "saude" | "patrimonio" | "comparar" | "projecao" | "simulador" | "monte";
+
+const SECTIONS: { key: SectionKey; label: string; group: string; icon: LucideIcon }[] = [
+  { key: "resumo", label: "Resumo", group: "Visão geral", icon: LayoutDashboard },
+  { key: "tendencias", label: "Tendências", group: "Visão geral", icon: TrendingUp },
+  { key: "categorias", label: "Categorias", group: "Visão geral", icon: Tags },
+  { key: "saude", label: "Saúde financeira", group: "Visão geral", icon: HeartPulse },
+  { key: "patrimonio", label: "Patrimônio e metas", group: "Visão geral", icon: Landmark },
+  { key: "comparar", label: "Comparar meses", group: "Ferramentas", icon: GitCompareArrows },
+  { key: "projecao", label: "Projeção", group: "Ferramentas", icon: Telescope },
+  { key: "simulador", label: "Simulador", group: "Ferramentas", icon: FlaskConical },
+  { key: "monte", label: "Monte sua análise", group: "Personalizar", icon: WandSparkles },
+];
+
+// Endereços antigos (?aba=...) continuam funcionando.
+const LEGACY: Record<string, SectionKey> = { geral: "resumo", comparar: "comparar", projecao: "projecao", simulador: "simulador" };
+
 export default function Analysis() {
   const [params, setParams] = useSearchParams();
-  const tab = (TABS.find(([key]) => key === params.get("aba"))?.[0] ?? "geral") as Tab;
+  const requested = params.get("secao") ?? LEGACY[params.get("aba") ?? ""] ?? "resumo";
+  const section = (SECTIONS.find((s) => s.key === requested)?.key ?? "resumo") as SectionKey;
+  const index = SECTIONS.findIndex((s) => s.key === section);
   const fromLink = params.get("mes");
   const [month, setMonth] = useState(fromLink && /^\d{4}-\d{2}$/.test(fromLink) ? fromLink : thisMonth());
+  const [builderStart, setBuilderStart] = useState<AnalysisConfig | undefined>();
+  const [direction, setDirection] = useState(0);
+  const navRef = useRef<HTMLElement>(null);
 
+  function goTo(next: SectionKey, config?: AnalysisConfig) {
+    if (config) setBuilderStart({ ...config });
+    setDirection(Math.sign(SECTIONS.findIndex((s) => s.key === next) - index));
+    setParams({ secao: next }, { replace: true });
+    window.scrollTo({ top: 0 });
+  }
+
+  // Celular: deslizar troca de seção (nas pontas, volta a trocar as abas do app).
+  useSwipeOverride({
+    canGo: (dir) => index + dir >= 0 && index + dir < SECTIONS.length,
+    go: (dir) => goTo(SECTIONS[index + dir].key),
+  });
+
+  // Mantém a seção ativa visível no seletor do celular.
+  useEffect(() => {
+    navRef.current?.querySelector('[aria-current="page"]')?.scrollIntoView({ block: "nearest", inline: "center", behavior: prefersReducedMotion() ? "auto" : "smooth" });
+  }, [section]);
+
+  let group = "";
   return (
     <div className="stack">
-      <PageHeader
-        title="Análise financeira"
-        subtitle="Seu consultor: como foi o mês, alertas, tendências, comparações e projeções."
-      />
-      <div className="tabs" role="tablist">
-        {TABS.map(([key, label]) => (
-          <button
-            key={key}
-            type="button"
-            role="tab"
-            aria-selected={tab === key}
-            className={`tab ${tab === key ? "tab--active" : ""}`}
-            onClick={() => setParams({ aba: key }, { replace: true })}
-          >
-            {label}
-          </button>
-        ))}
+      <PageHeader title="Análise financeira" subtitle="Seu consultor: como foi o mês, tendências, comparações e análises do seu jeito." />
+      <div className="analysis">
+        <nav className="analysis__nav no-print" aria-label="Seções da análise" ref={navRef}>
+          {SECTIONS.map((s) => {
+            const header = s.group !== group ? <span className="analysis__nav-group">{s.group}</span> : null;
+            group = s.group;
+            const Icon = s.icon;
+            return (
+              <Fragment key={s.key}>
+                {header}
+                <a
+                  href={`?secao=${s.key}`}
+                  aria-current={s.key === section ? "page" : undefined}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    goTo(s.key);
+                  }}
+                >
+                  <Icon size={16} aria-hidden />
+                  {s.label}
+                </a>
+              </Fragment>
+            );
+          })}
+        </nav>
+        <div className="analysis__body page" key={section} data-enter={direction || undefined}>
+          {section === "resumo" && <SummarySection month={month} setMonth={setMonth} goTo={goTo} />}
+          {section === "tendencias" && <TrendsSection month={month} setMonth={setMonth} />}
+          {section === "categorias" && <CategoriesSection month={month} setMonth={setMonth} />}
+          {section === "saude" && <HealthSection month={month} setMonth={setMonth} />}
+          {section === "patrimonio" && <WealthSection month={month} />}
+          {section === "comparar" && (
+            <>
+              <SectionTitle title="Comparar meses" text="Dois meses lado a lado, categoria por categoria." />
+              <CompareTab month={month} />
+            </>
+          )}
+          {section === "projecao" && (
+            <>
+              <SectionTitle title="Projeção" text="Os próximos 12 meses com as contas fixas e parcelas que você já tem." />
+              <ProjectionTab />
+            </>
+          )}
+          {section === "simulador" && (
+            <>
+              <SectionTitle title="Simulador" text="E se você cortasse gastos ou ganhasse mais? Veja o efeito em 12 meses." />
+              <SimulatorTab />
+            </>
+          )}
+          {section === "monte" && <BuilderSection initial={builderStart} />}
+        </div>
       </div>
-      {tab === "geral" && <DashboardTab month={month} setMonth={setMonth} />}
-      {tab === "comparar" && <CompareTab month={month} />}
-      {tab === "projecao" && <ProjectionTab />}
-      {tab === "simulador" && <SimulatorTab />}
     </div>
   );
 }
