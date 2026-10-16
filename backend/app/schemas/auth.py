@@ -22,6 +22,8 @@ class UserOut(BaseModel):
 class RegisterIn(BaseModel):
     email: EmailStr
     password: Password
+    # Precisa ser true: o aceite fica registrado com data e versão dos termos.
+    accept_terms: Literal[True]
 
 
 class EmailIn(BaseModel):
@@ -84,3 +86,26 @@ class TwoFactorStatusOut(BaseModel):
 
 class MessageOut(BaseModel):
     message: str
+
+
+class SessionOut(BaseModel):
+    id: uuid.UUID
+    user_agent: str | None
+    ip: str | None
+    created_at: datetime
+    last_seen_at: datetime
+    current: bool
+
+
+class SecurityEventOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    event: str
+    ip: str | None
+    user_agent: str | None
+    created_at: datetime
+
+
+class DeleteAccountIn(BaseModel):
+    password: Annotated[str, Field(min_length=1, max_length=128)]
+    code: Annotated[str, Field(max_length=32)] | None = None

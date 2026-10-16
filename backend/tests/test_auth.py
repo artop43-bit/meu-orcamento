@@ -18,7 +18,8 @@ Outbox = list[OutgoingEmail]
 
 def test_register_verify_and_login(client: TestClient, outbox: Outbox) -> None:
     response = client.post(
-        "/api/auth/register", json={"email": " Ana@Example.com ", "password": PASSWORD}
+        "/api/auth/register",
+        json={"email": " Ana@Example.com ", "password": PASSWORD, "accept_terms": True},
     )
     assert response.status_code == 202
     assert len(outbox) == 1
@@ -51,7 +52,8 @@ def test_register_existing_email_does_not_reveal_it(
     outbox.clear()
 
     response = client.post(
-        "/api/auth/register", json={"email": "ana@example.com", "password": "outra-senha-123"}
+        "/api/auth/register",
+        json={"email": "ana@example.com", "password": "outra-senha-123", "accept_terms": True},
     )
     assert response.status_code == 202
     assert "já está cadastrado" in outbox[0].body
@@ -61,7 +63,10 @@ def test_register_existing_email_does_not_reveal_it(
 
 
 def test_resend_verification_invalidates_previous_link(client: TestClient, outbox: Outbox) -> None:
-    client.post("/api/auth/register", json={"email": "ana@example.com", "password": PASSWORD})
+    client.post(
+        "/api/auth/register",
+        json={"email": "ana@example.com", "password": PASSWORD, "accept_terms": True},
+    )
     old = token_from(outbox[-1])
     client.post("/api/auth/resend-verification", json={"email": "ana@example.com"})
     new = token_from(outbox[-1])
@@ -72,7 +77,8 @@ def test_resend_verification_invalidates_previous_link(client: TestClient, outbo
 
 def test_short_password_is_rejected_with_friendly_message(client: TestClient) -> None:
     response = client.post(
-        "/api/auth/register", json={"email": "ana@example.com", "password": "curta"}
+        "/api/auth/register",
+        json={"email": "ana@example.com", "password": "curta", "accept_terms": True},
     )
     assert response.status_code == 422
     assert response.json()["message"] == "A senha precisa ter pelo menos 10 caracteres."

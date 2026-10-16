@@ -15,6 +15,7 @@ import MonthPage from "./pages/Month";
 import RecurringPage from "./pages/Recurring";
 import Report from "./pages/Report";
 import Register from "./pages/Register";
+import { Privacy, Terms } from "./pages/Legal";
 import ResetPassword from "./pages/ResetPassword";
 import Security from "./pages/Security";
 import VerifyEmail from "./pages/VerifyEmail";
@@ -85,6 +86,10 @@ function AppLayout() {
         )}
         <Outlet />
       </main>
+      <footer className="footer no-print">
+        <Link to="/privacidade">Privacidade</Link>
+        <Link to="/termos">Termos de uso</Link>
+      </footer>
     </>
   );
 }
@@ -101,6 +106,8 @@ export default function App() {
         {/* Acessíveis com ou sem login (abertas a partir de links de e-mail). */}
         <Route path="/verificar-email" element={<VerifyEmail />} />
         <Route path="/redefinir-senha" element={<ResetPassword />} />
+        <Route path="/privacidade" element={<Privacy />} />
+        <Route path="/termos" element={<Terms />} />
         <Route element={<RequireAuth />}>
           <Route path="/" element={<Navigate to="/orcamento" replace />} />
           <Route path="/orcamento/:month?" element={<MonthPage />} />

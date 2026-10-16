@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Link, useNavigate } from "react-router";
+import { Link, useLocation, useNavigate } from "react-router";
 
 import { authApi, ME_KEY } from "../api/auth";
 import { ApiError, errorMessage } from "../api/client";
@@ -8,6 +8,8 @@ import { Alert, AuthLayout, Button, Field } from "../components/ui";
 
 export default function Login() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const notice = (location.state as { notice?: string } | null)?.notice ?? "";
   const queryClient = useQueryClient();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -119,6 +121,7 @@ export default function Login() {
           </Alert>
         )}
         <Alert tone="success">{info}</Alert>
+        {!info && <Alert tone="success">{notice}</Alert>}
         <Field
           label="E-mail"
           name="email"

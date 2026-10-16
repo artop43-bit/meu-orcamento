@@ -23,6 +23,12 @@ class Settings(BaseSettings):
     timezone: str = "America/Sao_Paulo"
 
     session_ttl_days: int = 30
+    rate_limit_enabled: bool = True
+    # Versão vigente dos Termos de uso e da Política de privacidade. Ao mudar os textos,
+    # atualize aqui: o aceite fica registrado com a versão aceita.
+    terms_version: str = "2026-10-16"
+    # Por quanto tempo os eventos de segurança (logins etc.) ficam guardados.
+    security_event_retention_days: int = 180
     # None = seguro automaticamente em produção (HTTPS).
     cookie_secure: bool | None = None
 

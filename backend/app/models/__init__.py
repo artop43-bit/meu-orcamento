@@ -7,7 +7,7 @@ from app.models.budget import (
     Investment,
     RecurringItem,
 )
-from app.models.user import AuthToken, RecoveryCode, User, UserSession
+from app.models.user import AuthToken, RecoveryCode, SecurityEvent, User, UserSession
 
 __all__ = [
     "AuthToken",
@@ -19,6 +19,7 @@ __all__ = [
     "Investment",
     "RecoveryCode",
     "RecurringItem",
+    "SecurityEvent",
     "User",
     "UserSession",
 ]

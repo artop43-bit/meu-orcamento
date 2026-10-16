@@ -84,4 +84,13 @@ docker compose exec backend alembic upgrade head
 4. Análises (score, 50/30/20, comparar meses, projeção, simulador, investimentos) ✅
 5. Importação/exportação (JSON do app antigo, extratos, CSV/Excel/PDF) ✅
 6. Deploy na Oracle Cloud (Docker, Caddy/HTTPS, backups)
-7. Produto público (LGPD, termos, rate limiting, e-mails)
+7. Produto público (LGPD, termos, rate limiting, e-mails) ✅ (falta preencher `frontend/src/legal.ts`)
+
+## Antes de abrir ao público
+
+- Preencha os dados do responsável em `frontend/src/legal.ts` (nome/CNPJ, e-mail de contato,
+  provedor de e-mail, foro). Enquanto houver campos entre colchetes, Termos e Privacidade
+  mostram um aviso de rascunho. Recomendado: revisão por um advogado.
+- Ao mudar os textos legais, atualize a versão em `legal.ts` e em `TERMS_VERSION` (backend).
+- Agende `python -m app.cli cleanup` para rodar uma vez por dia (sessões e links vencidos,
+  eventos de segurança com mais de 180 dias).

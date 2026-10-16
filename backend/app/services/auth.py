@@ -1,8 +1,10 @@
 """Regras de negócio de autenticação: cadastro, login, sessões, 2FA e recuperação de senha."""
 
+import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import timedelta
+from typing import Any
 
 from sqlalchemy import delete, select, update
 from sqlalchemy.orm import Session
@@ -10,8 +12,9 @@ from sqlalchemy.orm import Session
 from app.core import security, totp
 from app.core.config import get_settings
 from app.core.errors import AppError
+from app.core.request_context import request_info
 from app.db.types import utcnow
-from app.models import AuthToken, RecoveryCode, User, UserSession
+from app.models import AuthToken, RecoveryCode, SecurityEvent, User, UserSession
 from app.services import budget
 
 # (destinatário, assunto, corpo). As rotas enviam em segundo plano, para o tempo
@@ -44,6 +47,12 @@ def _invalid_code() -> AppError:
 
 def normalize_email(email: str) -> str:
     return email.strip().lower()
+
+
+def _record(db: Session, user: User, event: str) -> None:
+    """Registra um evento de segurança com o IP e o navegador da requisição atual."""
+    info = request_info()
+    db.add(SecurityEvent(user_id=user.id, event=event, ip=info.ip, user_agent=info.user_agent))
 
 
 def _get_user_by_email(db: Session, email: str) -> User | None:
@@ -116,7 +125,12 @@ def register(db: Session, email: str, password: str, mail: Mailer) -> None:
         db.commit()
         return
 
-    user = User(email=email, password_hash=security.hash_password(password))
+    user = User(
+        email=email,
+        password_hash=security.hash_password(password),
+        terms_accepted_at=utcnow(),
+        terms_version=get_settings().terms_version,
+    )
     db.add(user)
     db.flush()
     budget.create_default_categories(db, user)
@@ -149,6 +163,7 @@ def verify_email(db: Session, raw_token: str) -> None:
     token.used_at = now
     if user.email_verified_at is None:
         user.email_verified_at = now
+        _record(db, user, "email_verified")
     db.commit()
 
 
@@ -171,8 +186,9 @@ def _ensure_not_locked(user: User) -> None:
         )
 
 
-def _register_failure(db: Session, user: User) -> None:
+def _register_failure(db: Session, user: User, event: str) -> None:
     now = utcnow()
+    _record(db, user, event)
     if user.locked_until is not None and user.locked_until <= now:
         user.failed_login_attempts = 0
         user.locked_until = None
@@ -195,7 +211,7 @@ def login(db: Session, email: str, password: str, user_agent: str | None) -> Log
 
     _ensure_not_locked(user)
     if not security.verify_password(user.password_hash, password):
-        _register_failure(db, user)
+        _register_failure(db, user, "login_failed")
         raise _invalid_credentials()
 
     if not user.email_verified:
@@ -215,6 +231,7 @@ def login(db: Session, email: str, password: str, user_agent: str | None) -> Log
 
     _reset_failures(user)
     session_token = _start_session(db, user, user_agent)
+    _record(db, user, "login")
     db.commit()
     return LoginResult(user=user, session_token=session_token)
 
@@ -227,12 +244,13 @@ def complete_login_2fa(
     _ensure_not_locked(user)
 
     if not _verify_second_factor(db, user, code):
-        _register_failure(db, user)
+        _register_failure(db, user, "login_2fa_failed")
         raise _invalid_code()
 
     token.used_at = utcnow()
     _reset_failures(user)
     session_token = _start_session(db, user, user_agent)
+    _record(db, user, "login")
     db.commit()
     return LoginResult(user=user, session_token=session_token)
 
@@ -244,6 +262,7 @@ def _start_session(db: Session, user: User, user_agent: str | None) -> str:
             user_id=user.id,
             token_hash=security.hash_token(raw),
             user_agent=(user_agent or "")[:255] or None,
+            ip=request_info().ip,
             expires_at=utcnow() + timedelta(days=get_settings().session_ttl_days),
         )
     )
@@ -280,6 +299,79 @@ def _revoke_sessions(db: Session, user: User, keep_token: str | None = None) -> 
     db.execute(stmt)
 
 
+def list_sessions(db: Session, user: User, current_token: str | None) -> list[dict[str, Any]]:
+    current_hash = security.hash_token(current_token) if current_token else None
+    sessions = db.scalars(
+        select(UserSession)
+        .where(UserSession.user_id == user.id, UserSession.expires_at > utcnow())
+        .order_by(UserSession.last_seen_at.desc())
+    )
+    return [
+        {
+            "id": s.id,
+            "user_agent": s.user_agent,
+            "ip": s.ip,
+            "created_at": s.created_at,
+            "last_seen_at": s.last_seen_at,
+            "current": s.token_hash == current_hash,
+        }
+        for s in sessions
+    ]
+
+
+def revoke_session(
+    db: Session, user: User, session_id: uuid.UUID, current_token: str | None
+) -> None:
+    session = db.get(UserSession, session_id)
+    if session is None or session.user_id != user.id:
+        raise AppError(404, "not_found", "Sessão não encontrada.")
+    if current_token and session.token_hash == security.hash_token(current_token):
+        raise AppError(400, "current_session", "Para encerrar esta sessão, use o botão Sair.")
+    db.delete(session)
+    _record(db, user, "session_revoked")
+    db.commit()
+
+
+def revoke_other_sessions(db: Session, user: User, current_token: str | None) -> None:
+    _revoke_sessions(db, user, keep_token=current_token)
+    _record(db, user, "sessions_revoked")
+    db.commit()
+
+
+def list_events(db: Session, user: User, limit: int = 30) -> list[SecurityEvent]:
+    return list(
+        db.scalars(
+            select(SecurityEvent)
+            .where(SecurityEvent.user_id == user.id)
+            .order_by(SecurityEvent.created_at.desc())
+            .limit(limit)
+        )
+    )
+
+
+# ---------------------------------------------------------------- exclusão de conta
+
+
+def delete_account(db: Session, user: User, password: str, code: str | None, mail: Mailer) -> None:
+    """Exclui a conta e todos os dados dela (LGPD, art. 18, VI). Não há como desfazer."""
+    if not security.verify_password(user.password_hash, password):
+        raise AppError(400, "wrong_password", "Senha incorreta.")
+    if user.totp_enabled and (not code or not _verify_second_factor(db, user, code)):
+        raise AppError(400, "invalid_code", "Informe um código válido do aplicativo autenticador.")
+
+    email = user.email
+    # As demais tabelas apagam junto (ON DELETE CASCADE).
+    db.delete(user)
+    db.commit()
+    mail(
+        email,
+        "Sua conta foi excluída",
+        "Sua conta no Meu Orçamento e todos os dados dela foram excluídos, como você pediu.\n\n"
+        "Se não foi você, entre em contato pelo e-mail indicado na Política de privacidade: "
+        f"{get_settings().frontend_url}/privacidade",
+    )
+
+
 # ---------------------------------------------------------------- senha
 
 
@@ -311,6 +403,7 @@ def reset_password(db: Session, raw_token: str, new_password: str, mail: Mailer)
         user.email_verified_at = now
     _reset_failures(user)
     _revoke_sessions(db, user)
+    _record(db, user, "password_reset")
     db.commit()
     _notify_password_changed(user, mail)
 
@@ -327,6 +420,7 @@ def change_password(
         raise AppError(400, "wrong_password", "Senha atual incorreta.")
     user.password_hash = security.hash_password(new_password)
     _revoke_sessions(db, user, keep_token=current_session)
+    _record(db, user, "password_changed")
     db.commit()
     _notify_password_changed(user, mail)
 
@@ -369,6 +463,7 @@ def enable_2fa(db: Session, user: User, code: str, mail: Mailer) -> list[str]:
     user.totp_enabled = True
     user.totp_last_used_step = step
     codes = _replace_recovery_codes(db, user)
+    _record(db, user, "2fa_enabled")
     db.commit()
     mail(
         user.email,
@@ -392,6 +487,7 @@ def disable_2fa(db: Session, user: User, password: str, code: str, mail: Mailer)
     user.totp_secret_encrypted = None
     user.totp_last_used_step = None
     db.execute(delete(RecoveryCode).where(RecoveryCode.user_id == user.id))
+    _record(db, user, "2fa_disabled")
     db.commit()
     mail(
         user.email,
@@ -407,6 +503,7 @@ def regenerate_recovery_codes(db: Session, user: User, code: str) -> list[str]:
     if not _verify_totp(user, code):
         raise _invalid_code()
     codes = _replace_recovery_codes(db, user)
+    _record(db, user, "recovery_codes_regenerated")
     db.commit()
     return codes
 
