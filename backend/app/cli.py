@@ -1,7 +1,7 @@
 """Tarefas de manutenção.
 
-  python -m app.cli cleanup    roda a limpeza uma vez
-  python -m app.cli schedule   roda a limpeza agora e depois uma vez por dia (produção)
+python -m app.cli cleanup    roda a limpeza uma vez
+python -m app.cli schedule   roda a limpeza agora e depois uma vez por dia (produção)
 """
 
 import argparse

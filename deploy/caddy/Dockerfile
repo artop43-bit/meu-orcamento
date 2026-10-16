@@ -1,7 +1,9 @@
 # Caddy servindo o frontend compilado e repassando /api para a API.
 # Contexto de build: raiz do repositório (ver docker-compose.prod.yml).
 
-FROM node:22-alpine AS web
+# O resultado do build (HTML/JS/CSS) não depende do processador: compila na arquitetura
+# da máquina de build, mesmo quando a imagem final é ARM (mais rápido sob emulação).
+FROM --platform=$BUILDPLATFORM node:22-alpine AS web
 WORKDIR /web
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci --no-audit --no-fund

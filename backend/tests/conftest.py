@@ -30,8 +30,33 @@ from app.main import app  # noqa: E402
 PASSWORD = "senha-forte-123"
 
 
+# Por padrão os testes usam SQLite em memória (rápido, sem dependências).
+# Com TEST_DATABASE_URL apontando para um PostgreSQL vazio, rodam no banco de produção
+# (é o que o CI faz): o esquema é criado uma vez e as tabelas são esvaziadas a cada teste.
+TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL")
+
+
+@pytest.fixture(scope="session")
+def postgres_engine() -> Iterator[Engine]:
+    assert TEST_DATABASE_URL
+    engine = create_engine(TEST_DATABASE_URL)
+    Base.metadata.drop_all(engine)
+    Base.metadata.create_all(engine)
+    yield engine
+    Base.metadata.drop_all(engine)
+    engine.dispose()
+
+
 @pytest.fixture
-def engine() -> Iterator[Engine]:
+def engine(request: pytest.FixtureRequest) -> Iterator[Engine]:
+    if TEST_DATABASE_URL:
+        engine: Engine = request.getfixturevalue("postgres_engine")
+        yield engine
+        tables = ", ".join(t.name for t in Base.metadata.sorted_tables)
+        with engine.begin() as connection:
+            connection.exec_driver_sql(f"TRUNCATE {tables} RESTART IDENTITY CASCADE")
+        return
+
     engine = create_engine(
         "sqlite+pysqlite://",
         connect_args={"check_same_thread": False},
