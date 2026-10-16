@@ -2163,3 +2163,11 @@ body:has(dialog[open]) {
     height: 22px;
   }
 }
+
+/* Durante o arrasto e a animação de entrada a página passa da largura da tela:
+   corta o excesso para a tela não "escorregar" para o lado. (clip não cria rolagem,
+   então a barra do topo continua grudada.) */
+.shell__main {
+  overflow-x: clip;
+  min-width: 0;
+}
