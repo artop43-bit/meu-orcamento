@@ -1,4 +1,17 @@
 import { useState, type FormEvent } from "react";
+import {
+  ArrowDownLeft,
+  CalendarClock,
+  ChevronLeft,
+  ChevronRight,
+  Gauge,
+  Pencil,
+  Plus,
+  Receipt,
+  Scale,
+  Trash2,
+  Wallet,
+} from "lucide-react";
 import { Link, useParams } from "react-router";
 
 import {
@@ -7,80 +20,275 @@ import {
   useCategories,
   useMonth,
   type Category,
+  type DeleteScope,
   type Expense,
   type ExpenseInput,
   type Income,
   type MonthData,
 } from "../api/budget";
 import { errorMessage } from "../api/client";
-import {
-  Badge,
-  Bar,
-  CategorySelect,
-  DeleteControl,
-  FormActions,
-  MoneyInput,
-  SectionHeader,
-  Stat,
-  requireMoney,
-} from "../components/budget";
-import { Alert, Button } from "../components/ui";
+import { Badge, Bar, CategorySelect, FormActions, MoneyInput, requireMoney } from "../components/budget";
+import { Alert, Button, Kpi, PageHeader, Sheet } from "../components/ui";
 import { addMonths, money, moneyInput, monthLabel, percent, shortDate, thisMonth, todayISO } from "../lib/format";
 
-// ---------------------------------------------------------------- resumo
+type Editing =
+  | { type: "new-expense" }
+  | { type: "new-income" }
+  | { type: "expense"; expense: Expense }
+  | { type: "income"; income: Income }
+  | { type: "delete-expense"; expense: Expense }
+  | { type: "choose" }
+  | null;
 
-function Summary({ data }: { data: MonthData }) {
+// ---------------------------------------------------------------- indicadores
+
+function Kpis({ data }: { data: MonthData }) {
   const s = data.summary;
   const balance = Number(s.balance);
-  const committed = s.committed_pct ?? 0;
+  const committed = s.committed_pct;
+  const expenseTotal = Number(s.expense_total);
+  const paidPct = expenseTotal > 0 ? (Number(s.paid_total) / expenseTotal) * 100 : 0;
+  return (
+    <div className="kpis">
+      <Kpi icon={<ArrowDownLeft size={17} />} label="Renda" value={money(s.income_total)} foot={`${data.incomes.length} lançamento(s)`} />
+      <Kpi
+        icon={<Receipt size={17} />}
+        tone="expense"
+        label="Contas"
+        value={money(s.expense_total)}
+        foot={
+          <span className="stack stack--tight" style={{ gap: 6 }}>
+            <Bar pct={paidPct} />
+            <span>
+              Pago {money(s.paid_total)} · falta {money(s.pending_total)}
+            </span>
+          </span>
+        }
+      />
+      <Kpi
+        icon={<Scale size={17} />}
+        tone={balance < 0 ? "expense" : "accent"}
+        label="Saldo"
+        value={money(s.balance)}
+        valueClass={balance < 0 ? "tone--error" : "tone--ok"}
+        foot={balance < 0 ? "As contas passam da renda" : "Sobra depois das contas"}
+      />
+      <Kpi
+        icon={<Gauge size={17} />}
+        tone="neutral"
+        label="Renda comprometida"
+        value={percent(committed)}
+        valueClass={committed !== null && committed > 100 ? "tone--error" : undefined}
+        foot={committed === null ? "Sem renda lançada" : committed <= 50 ? "Saudável (até 50%)" : committed <= 80 ? "Atenção" : "Alto"}
+      />
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------- contas
+
+function statusOf(expense: Expense): { label: string; tone: "ok" | "warn" | "error" } {
+  if (expense.paid) return { label: "Paga", tone: "ok" };
+  if (expense.due_date && expense.due_date < todayISO()) return { label: "Atrasada", tone: "error" };
+  return { label: "A pagar", tone: "warn" };
+}
+
+function LedgerRow({
+  expense,
+  category,
+  onEdit,
+  onDelete,
+}: {
+  expense: Expense;
+  category: Category | undefined;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  const toggle = useBudgetMutation((paid: boolean) => budgetApi.updateExpense(expense.id, { paid }));
+  const status = statusOf(expense);
+  return (
+    <li className={`ledger__row ${expense.paid ? "ledger__row--paid" : ""}`}>
+      <span className="ledger__check">
+        <input
+          type="checkbox"
+          className="item__check"
+          checked={expense.paid}
+          disabled={toggle.isPending}
+          onChange={(e) => toggle.mutate(e.target.checked)}
+          aria-label={expense.paid ? `Marcar ${expense.description} como não paga` : `Marcar ${expense.description} como paga`}
+        />
+      </span>
+      <button type="button" className="ledger__open ledger__desc" onClick={onEdit} title="Editar">
+        <span className="ledger__title">
+          <span>{expense.description}</span>
+          {expense.installment_total && (
+            <Badge tone="accent">
+              {expense.installment_number}/{expense.installment_total}
+            </Badge>
+          )}
+          {expense.recurring_id && <Badge>fixa</Badge>}
+        </span>
+        <span className="ledger__sub">
+          <span className="dot" style={{ background: category?.color ?? undefined }} aria-hidden />
+          {category?.name ?? "Sem categoria"}
+          {" · "}
+          {expense.due_date ? `vence ${shortDate(expense.due_date)}` : "sem vencimento"}
+        </span>
+      </button>
+      <span className="ledger__status">
+        <span className={`badge badge--${status.tone}`}>{status.label}</span>
+      </span>
+      <span className="ledger__amount">{money(expense.amount)}</span>
+      <span className="ledger__actions">
+        <button type="button" className="icon-btn" aria-label={`Editar ${expense.description}`} title="Editar" onClick={onEdit}>
+          <Pencil size={16} />
+        </button>
+        <button type="button" className="icon-btn" aria-label={`Excluir ${expense.description}`} title="Excluir" onClick={onDelete}>
+          <Trash2 size={16} />
+        </button>
+      </span>
+    </li>
+  );
+}
+
+function ExpensesCard({
+  data,
+  categories,
+  setEditing,
+}: {
+  data: MonthData;
+  categories: Category[];
+  setEditing: (e: Editing) => void;
+}) {
+  const byId = new Map(categories.map((c) => [c.id, c]));
   return (
     <section className="card stack">
-      <div className="stats">
-        <Stat label="Renda" value={money(s.income_total)} />
-        <Stat label="Contas" value={money(s.expense_total)} />
-        <Stat label="Saldo" value={money(s.balance)} tone={balance < 0 ? "error" : "ok"} />
-        <Stat label="Comprometido" value={percent(s.committed_pct)} tone={committed > 100 ? "error" : undefined} />
+      <div className="section-header">
+        <h2>
+          Contas <span className="muted section-header__total">· {money(data.summary.expense_total)}</span>
+        </h2>
+        <Button type="button" variant="secondary" className="only-desktop" onClick={() => setEditing({ type: "new-expense" })}>
+          <Plus size={16} /> Conta
+        </Button>
       </div>
-      {Number(s.expense_total) > 0 && (
-        <div className="stack stack--tight">
-          <div className="split">
-            <span>
-              Pago <strong>{money(s.paid_total)}</strong>
-            </span>
-            <span>
-              A pagar <strong>{money(s.pending_total)}</strong>
-            </span>
-          </div>
-          <Bar pct={(Number(s.paid_total) / Number(s.expense_total)) * 100} />
-        </div>
+      {data.expenses.length === 0 ? (
+        <EmptyState
+          icon={<Receipt size={22} />}
+          text="Nenhuma conta lançada neste mês."
+          action={
+            <Button type="button" onClick={() => setEditing({ type: "new-expense" })}>
+              <Plus size={16} /> Lançar conta
+            </Button>
+          }
+        />
+      ) : (
+        <ul className="ledger">
+          <li className="ledger__head" aria-hidden>
+            <span />
+            <span>Descrição</span>
+            <span>Situação</span>
+            <span style={{ textAlign: "right" }}>Valor</span>
+            <span />
+          </li>
+          {data.expenses.map((expense) => (
+            <LedgerRow
+              key={expense.id}
+              expense={expense}
+              category={expense.category_id ? byId.get(expense.category_id) : undefined}
+              onEdit={() => setEditing({ type: "expense", expense })}
+              onDelete={() => setEditing({ type: "delete-expense", expense })}
+            />
+          ))}
+        </ul>
       )}
     </section>
   );
 }
 
-function CategoryBreakdown({ data, categories }: { data: MonthData; categories: Category[] }) {
+function EmptyState({ icon, text, action }: { icon: React.ReactNode; text: string; action?: React.ReactNode }) {
+  return (
+    <div className="stack" style={{ alignItems: "center", textAlign: "center", padding: "28px 8px" }}>
+      <span className="kpi__icon kpi__icon--neutral" style={{ width: 44, height: 44, borderRadius: 12 }}>
+        {icon}
+      </span>
+      <p className="muted" style={{ margin: 0 }}>
+        {text}
+      </p>
+      {action}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------- renda e categorias (coluna lateral)
+
+function IncomesCard({ data, setEditing }: { data: MonthData; setEditing: (e: Editing) => void }) {
+  return (
+    <section className="card stack">
+      <div className="section-header">
+        <h2>
+          Renda <span className="muted section-header__total">· {money(data.summary.income_total)}</span>
+        </h2>
+        <Button type="button" variant="secondary" className="only-desktop" onClick={() => setEditing({ type: "new-income" })}>
+          <Plus size={16} /> Renda
+        </Button>
+      </div>
+      {data.incomes.length === 0 ? (
+        <p className="muted" style={{ margin: 0 }}>
+          Nenhuma renda lançada neste mês.
+        </p>
+      ) : (
+        <ul className="items">
+          {data.incomes.map((income) => (
+            <li key={income.id} className="item">
+              <button type="button" className="item__main" onClick={() => setEditing({ type: "income", income })} title="Editar">
+                <span className="item__title">{income.description}</span>
+                {income.recurring_id && <span className="item__meta">Todo mês</span>}
+              </button>
+              <span className="item__amount tone--ok">{money(income.amount)}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+function BreakdownCard({ data, categories }: { data: MonthData; categories: Category[] }) {
   const s = data.summary;
   const total = Number(s.expense_total);
   if (total === 0) return null;
   const colors = new Map(categories.map((c) => [c.id, c.color ?? undefined]));
+  const essentialPct = (Number(s.essential_total) / total) * 100;
   return (
     <section className="card stack">
       <h2>Para onde vai o dinheiro</h2>
-      <div className="split muted">
-        <span>
-          Essencial <strong>{money(s.essential_total)}</strong>
-        </span>
-        <span>
-          Não essencial <strong>{money(s.non_essential_total)}</strong>
-        </span>
+      <div className="stack stack--tight">
+        <div className="stacked-bar" aria-hidden>
+          <div className="seg--needs" style={{ width: `${essentialPct}%` }} />
+          <div className="seg--wants" style={{ width: `${100 - essentialPct}%` }} />
+        </div>
+        <div className="split small">
+          <span>
+            <i className="swatch" style={{ background: "#4e79a7" }} />
+            Essencial <strong>{money(s.essential_total)}</strong>
+          </span>
+          <span>
+            <i className="swatch swatch--expense" />
+            Não essencial <strong>{money(s.non_essential_total)}</strong>
+          </span>
+        </div>
       </div>
       <ul className="breakdown">
         {s.by_category.map((c) => (
           <li key={c.category_id ?? "none"}>
             <div className="split">
-              <span>{c.name}</span>
               <span>
-                {money(c.total)} <span className="muted">· {percent(Math.round((Number(c.total) / total) * 1000) / 10)}</span>
+                <span className="dot" style={{ background: c.category_id ? colors.get(c.category_id) : undefined }} aria-hidden />
+                {c.name}
+              </span>
+              <span className="num">
+                {money(c.total)}{" "}
+                <span className="muted small">{percent(Math.round((Number(c.total) / total) * 1000) / 10)}</span>
               </span>
             </div>
             <Bar pct={(Number(c.total) / total) * 100} color={c.category_id ? colors.get(c.category_id) : undefined} />
@@ -91,121 +299,25 @@ function CategoryBreakdown({ data, categories }: { data: MonthData; categories: 
   );
 }
 
-// ---------------------------------------------------------------- rendas
-
-function IncomeForm({ month, onDone }: { month: string; onDone: () => void }) {
-  const [description, setDescription] = useState("");
-  const [amount, setAmount] = useState("");
-  const [everyMonth, setEveryMonth] = useState(false);
-  const [error, setError] = useState("");
-  const save = useBudgetMutation(async () => {
-    const value = requireMoney(amount);
-    if (everyMonth) {
-      await budgetApi.createRecurring({ kind: "income", description, amount: value, start_month: month });
-    } else {
-      await budgetApi.createIncome(month, { description, amount: value });
-    }
-  });
-
-  async function submit(event: FormEvent) {
-    event.preventDefault();
-    setError("");
-    try {
-      await save.mutateAsync(undefined);
-      onDone();
-    } catch (err) {
-      setError(errorMessage(err));
-    }
-  }
-
-  return (
-    <form className="inline-form" onSubmit={submit}>
-      <Alert tone="error">{error}</Alert>
-      <div className="grid-2">
-        <label>
-          Descrição
-          <input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Salário" required maxLength={120} autoFocus />
-        </label>
-        <label>
-          Valor
-          <MoneyInput value={amount} onChange={setAmount} />
-        </label>
-      </div>
-      <label className="check">
-        <input type="checkbox" checked={everyMonth} onChange={(e) => setEveryMonth(e.target.checked)} />
-        Recebo todo mês (renda fixa)
-      </label>
-      <FormActions loading={save.isPending} onCancel={onDone} label="Adicionar" />
-    </form>
-  );
-}
-
-function IncomeRow({ income }: { income: Income }) {
-  const [editing, setEditing] = useState(false);
-  const [description, setDescription] = useState(income.description);
-  const [amount, setAmount] = useState(moneyInput(income.amount));
-  const [error, setError] = useState("");
-  const update = useBudgetMutation(() =>
-    budgetApi.updateIncome(income.id, { description, amount: requireMoney(amount) }),
-  );
-  const remove = useBudgetMutation((scope: "one" | "following") => budgetApi.deleteIncome(income.id, scope));
-
-  if (editing) {
-    return (
-      <li>
-        <form
-          className="inline-form"
-          onSubmit={async (e) => {
-            e.preventDefault();
-            setError("");
-            try {
-              await update.mutateAsync(undefined);
-              setEditing(false);
-            } catch (err) {
-              setError(errorMessage(err));
-            }
-          }}
-        >
-          <Alert tone="error">{error}</Alert>
-          <div className="grid-2">
-            <input value={description} onChange={(e) => setDescription(e.target.value)} required maxLength={120} aria-label="Descrição" />
-            <MoneyInput value={amount} onChange={setAmount} label="Valor" />
-          </div>
-          <FormActions loading={update.isPending} onCancel={() => setEditing(false)} />
-        </form>
-      </li>
-    );
-  }
-
-  return (
-    <li className="item">
-      <button type="button" className="item__main" onClick={() => setEditing(true)} title="Editar">
-        <span className="item__title">{income.description}</span>
-      </button>
-      {income.recurring_id && (
-        <span className="item__badges">
-          <Badge>fixa</Badge>
-        </span>
-      )}
-      <span className="item__amount">{money(income.amount)}</span>
-      <DeleteControl
-        repeats={income.recurring_id !== null}
-        repeatLabel="Esta e as próximas"
-        onDelete={(scope) => remove.mutateAsync(scope)}
-      />
-    </li>
-  );
-}
-
-// ---------------------------------------------------------------- contas
+// ---------------------------------------------------------------- formulários (janelas)
 
 type ExpenseKind = "single" | "installments" | "recurring";
 
-function ExpenseForm({ month, categories, onDone }: { month: string; categories: Category[]; onDone: () => void }) {
-  const [description, setDescription] = useState("");
-  const [amount, setAmount] = useState("");
-  const [categoryId, setCategoryId] = useState("");
-  const [dueDate, setDueDate] = useState("");
+function ExpenseForm({
+  month,
+  categories,
+  expense,
+  onDone,
+}: {
+  month: string;
+  categories: Category[];
+  expense?: Expense;
+  onDone: () => void;
+}) {
+  const [description, setDescription] = useState(expense?.description ?? "");
+  const [amount, setAmount] = useState(expense ? moneyInput(expense.amount) : "");
+  const [categoryId, setCategoryId] = useState(expense?.category_id ?? "");
+  const [dueDate, setDueDate] = useState(expense?.due_date ?? "");
   const [kind, setKind] = useState<ExpenseKind>("single");
   const [installments, setInstallments] = useState("2");
   const [error, setError] = useState("");
@@ -213,6 +325,10 @@ function ExpenseForm({ month, categories, onDone }: { month: string; categories:
   const save = useBudgetMutation(async () => {
     const value = requireMoney(amount);
     const category_id = categoryId || null;
+    if (expense) {
+      await budgetApi.updateExpense(expense.id, { description, amount: value, category_id, due_date: dueDate || null });
+      return;
+    }
     if (kind === "recurring") {
       await budgetApi.createRecurring({
         kind: "expense",
@@ -243,150 +359,166 @@ function ExpenseForm({ month, categories, onDone }: { month: string; categories:
   return (
     <form className="inline-form" onSubmit={submit}>
       <Alert tone="error">{error}</Alert>
+      {expense?.recurring_id && (
+        <Alert tone="info">Isto altera só este mês. Para mudar todos os meses, edite em Contas fixas.</Alert>
+      )}
+      <label>
+        Descrição
+        <input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Ex.: Aluguel" required maxLength={120} autoFocus />
+      </label>
       <div className="grid-2">
-        <label>
-          Descrição
-          <input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Aluguel" required maxLength={120} autoFocus />
-        </label>
         <label>
           {kind === "installments" ? "Valor de cada parcela" : "Valor"}
           <MoneyInput value={amount} onChange={setAmount} />
         </label>
         <label>
-          Categoria
-          <CategorySelect categories={categories} value={categoryId} onChange={setCategoryId} />
-        </label>
-        <label>
-          {kind === "recurring" ? "Vence no dia (escolha uma data)" : "Vencimento"}
+          {kind === "recurring" ? "Vence todo dia (escolha uma data)" : "Vencimento"}
           <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
         </label>
       </div>
-      <fieldset className="radios">
-        <legend className="sr-only">Tipo de conta</legend>
-        <label className="check">
-          <input type="radio" name="kind" checked={kind === "single"} onChange={() => setKind("single")} />
-          Só neste mês
-        </label>
-        <label className="check">
-          <input type="radio" name="kind" checked={kind === "installments"} onChange={() => setKind("installments")} />
-          Parcelada
-        </label>
-        <label className="check">
-          <input type="radio" name="kind" checked={kind === "recurring"} onChange={() => setKind("recurring")} />
-          Todo mês (conta fixa)
-        </label>
-      </fieldset>
+      <label>
+        Categoria
+        <CategorySelect categories={categories} value={categoryId} onChange={setCategoryId} />
+      </label>
+      {!expense && (
+        <fieldset className="radios">
+          <legend className="sr-only">Tipo de conta</legend>
+          <div className="segmented">
+            <label>
+              <input type="radio" name="kind" checked={kind === "single"} onChange={() => setKind("single")} />
+              Só neste mês
+            </label>
+            <label>
+              <input type="radio" name="kind" checked={kind === "installments"} onChange={() => setKind("installments")} />
+              Parcelada
+            </label>
+            <label>
+              <input type="radio" name="kind" checked={kind === "recurring"} onChange={() => setKind("recurring")} />
+              Todo mês
+            </label>
+          </div>
+        </fieldset>
+      )}
       {kind === "installments" && (
         <label className="narrow">
           Número de parcelas
           <input type="number" min={2} max={120} value={installments} onChange={(e) => setInstallments(e.target.value)} required />
         </label>
       )}
-      <FormActions loading={save.isPending} onCancel={onDone} label="Adicionar" />
+      <FormActions loading={save.isPending} onCancel={onDone} label={expense ? "Salvar" : "Adicionar conta"} />
     </form>
   );
 }
 
-function ExpenseEdit({ expense, categories, onDone }: { expense: Expense; categories: Category[]; onDone: () => void }) {
-  const [description, setDescription] = useState(expense.description);
-  const [amount, setAmount] = useState(moneyInput(expense.amount));
-  const [categoryId, setCategoryId] = useState(expense.category_id ?? "");
-  const [dueDate, setDueDate] = useState(expense.due_date ?? "");
+function IncomeForm({ month, income, onDone }: { month: string; income?: Income; onDone: () => void }) {
+  const [description, setDescription] = useState(income?.description ?? "");
+  const [amount, setAmount] = useState(income ? moneyInput(income.amount) : "");
+  const [everyMonth, setEveryMonth] = useState(false);
   const [error, setError] = useState("");
-  const update = useBudgetMutation(() =>
-    budgetApi.updateExpense(expense.id, {
-      description,
-      amount: requireMoney(amount),
-      category_id: categoryId || null,
-      due_date: dueDate || null,
-    }),
-  );
+  const save = useBudgetMutation(async () => {
+    const value = requireMoney(amount);
+    if (income) await budgetApi.updateIncome(income.id, { description, amount: value });
+    else if (everyMonth) await budgetApi.createRecurring({ kind: "income", description, amount: value, start_month: month });
+    else await budgetApi.createIncome(month, { description, amount: value });
+  });
+  const remove = useBudgetMutation((scope: DeleteScope) => budgetApi.deleteIncome(income!.id, scope));
 
-  return (
-    <form
-      className="inline-form"
-      onSubmit={async (e) => {
-        e.preventDefault();
-        setError("");
-        try {
-          await update.mutateAsync(undefined);
-          onDone();
-        } catch (err) {
-          setError(errorMessage(err));
-        }
-      }}
-    >
-      <Alert tone="error">{error}</Alert>
-      {expense.recurring_id && (
-        <p className="muted small">Isto altera só este mês. Para mudar todos os meses, edite em Contas fixas.</p>
-      )}
-      <div className="grid-2">
-        <input value={description} onChange={(e) => setDescription(e.target.value)} required maxLength={120} aria-label="Descrição" />
-        <MoneyInput value={amount} onChange={setAmount} label="Valor" />
-        <CategorySelect categories={categories} value={categoryId} onChange={setCategoryId} label="Categoria" />
-        <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} aria-label="Vencimento" />
-      </div>
-      <FormActions loading={update.isPending} onCancel={onDone} />
-    </form>
-  );
-}
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    setError("");
+    try {
+      await save.mutateAsync(undefined);
+      onDone();
+    } catch (err) {
+      setError(errorMessage(err));
+    }
+  }
 
-function ExpenseRow({ expense, categories }: { expense: Expense; categories: Category[] }) {
-  const [editing, setEditing] = useState(false);
-  const togglePaid = useBudgetMutation((paid: boolean) => budgetApi.updateExpense(expense.id, { paid }));
-  const remove = useBudgetMutation((scope: "one" | "following") => budgetApi.deleteExpense(expense.id, scope));
-  const category = categories.find((c) => c.id === expense.category_id);
-  const overdue = !expense.paid && expense.due_date !== null && expense.due_date < todayISO();
-
-  if (editing) {
-    return (
-      <li>
-        <ExpenseEdit expense={expense} categories={categories} onDone={() => setEditing(false)} />
-      </li>
-    );
+  async function del(scope: DeleteScope) {
+    setError("");
+    try {
+      await remove.mutateAsync(scope);
+      onDone();
+    } catch (err) {
+      setError(errorMessage(err));
+    }
   }
 
   return (
-    <li className={`item ${expense.paid ? "item--paid" : ""}`}>
-      <input
-        type="checkbox"
-        className="item__check"
-        checked={expense.paid}
-        disabled={togglePaid.isPending}
-        onChange={(e) => togglePaid.mutate(e.target.checked)}
-        aria-label={expense.paid ? "Marcar como não paga" : "Marcar como paga"}
-      />
-      <button type="button" className="item__main" onClick={() => setEditing(true)} title="Editar">
-        <span className="item__title">{expense.description}</span>
-        <span className="item__meta">
-          {category && (
-            <span className="dot" style={{ background: category.color ?? undefined }} aria-hidden />
+    <form className="inline-form" onSubmit={submit}>
+      <Alert tone="error">{error}</Alert>
+      <label>
+        Descrição
+        <input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Ex.: Salário" required maxLength={120} autoFocus />
+      </label>
+      <label>
+        Valor
+        <MoneyInput value={amount} onChange={setAmount} />
+      </label>
+      {!income && (
+        <label className="check">
+          <input type="checkbox" checked={everyMonth} onChange={(e) => setEveryMonth(e.target.checked)} />
+          Recebo todo mês (renda fixa)
+        </label>
+      )}
+      <FormActions loading={save.isPending} onCancel={onDone} label={income ? "Salvar" : "Adicionar renda"} />
+      {income && (
+        <div className="stack stack--tight" style={{ borderTop: "1px solid var(--border)", paddingTop: 16 }}>
+          <Button type="button" variant="danger" onClick={() => del("one")} loading={remove.isPending}>
+            <Trash2 size={16} /> {income.recurring_id ? "Excluir só deste mês" : "Excluir"}
+          </Button>
+          {income.recurring_id && (
+            <Button type="button" variant="danger" onClick={() => del("following")} disabled={remove.isPending}>
+              Excluir deste mês em diante
+            </Button>
           )}
-          {category?.name ?? "Sem categoria"}
-          {expense.due_date && (
-            <span className={overdue ? "tone--error" : undefined}>
-              {" · vence "}
-              {shortDate(expense.due_date)}
-              {overdue && " (atrasada)"}
-            </span>
-          )}
-        </span>
-      </button>
-      <span className="item__badges">
-        {expense.installment_total && (
-          <Badge tone="accent">
-            {expense.installment_number}/{expense.installment_total}
-          </Badge>
+        </div>
+      )}
+    </form>
+  );
+}
+
+function DeleteExpense({ expense, onDone }: { expense: Expense; onDone: () => void }) {
+  const [error, setError] = useState("");
+  const remove = useBudgetMutation((scope: DeleteScope) => budgetApi.deleteExpense(expense.id, scope));
+  const repeats = expense.installment_group_id !== null || expense.recurring_id !== null;
+
+  async function del(scope: DeleteScope) {
+    setError("");
+    try {
+      await remove.mutateAsync(scope);
+      onDone();
+    } catch (err) {
+      setError(errorMessage(err));
+    }
+  }
+
+  return (
+    <div className="stack">
+      <Alert tone="error">{error}</Alert>
+      <p style={{ margin: 0 }}>
+        <strong>{expense.description}</strong> · {money(expense.amount)}
+        {expense.installment_total && ` · parcela ${expense.installment_number}/${expense.installment_total}`}
+      </p>
+      {repeats && (
+        <p className="muted" style={{ margin: 0 }}>
+          {expense.installment_group_id ? "É uma compra parcelada." : "É uma conta fixa."} Excluir só esta ou também as próximas?
+        </p>
+      )}
+      <div className="form-actions">
+        <Button type="button" variant="secondary" onClick={onDone}>
+          Cancelar
+        </Button>
+        {repeats && (
+          <Button type="button" variant="danger" onClick={() => del("following")} disabled={remove.isPending}>
+            {expense.installment_group_id ? "Esta e as próximas parcelas" : "Deste mês em diante"}
+          </Button>
         )}
-        {expense.recurring_id && <Badge>fixa</Badge>}
-      </span>
-      <span className="item__amount">{money(expense.amount)}</span>
-      <DeleteControl
-        repeats={expense.installment_group_id !== null || expense.recurring_id !== null}
-        repeatLabel={expense.installment_group_id ? "Esta e as próximas parcelas" : "Esta e as próximas"}
-        onDelete={(scope) => remove.mutateAsync(scope)}
-      />
-    </li>
+        <Button type="button" variant="danger" onClick={() => del("one")} loading={remove.isPending}>
+          <Trash2 size={16} /> {repeats ? "Só esta" : "Excluir"}
+        </Button>
+      </div>
+    </div>
   );
 }
 
@@ -397,85 +529,118 @@ export default function MonthPage() {
   const month = params.month && /^\d{4}-\d{2}$/.test(params.month) ? params.month : thisMonth();
   const data = useMonth(month);
   const categories = useCategories();
-  const [adding, setAdding] = useState<"income" | "expense" | null>(null);
-
+  const [editing, setEditing] = useState<Editing>(null);
   const cats = categories.data ?? [];
+  const close = () => setEditing(null);
+  const isCurrent = month === thisMonth();
+
+  const title = (
+    <div className="month-nav">
+      <Link className="icon-btn icon-btn--bordered" to={`/orcamento/${addMonths(month, -1)}`} aria-label="Mês anterior">
+        <ChevronLeft size={18} />
+      </Link>
+      <h1>{monthLabel(month)}</h1>
+      <Link className="icon-btn icon-btn--bordered" to={`/orcamento/${addMonths(month, 1)}`} aria-label="Próximo mês">
+        <ChevronRight size={18} />
+      </Link>
+    </div>
+  );
 
   return (
-    <div className="stack">
-      <div className="month-nav">
-        <Link className="icon-btn" to={`/orcamento/${addMonths(month, -1)}`} aria-label="Mês anterior">
-          ‹
-        </Link>
-        <h1>{monthLabel(month)}</h1>
-        <Link className="icon-btn" to={`/orcamento/${addMonths(month, 1)}`} aria-label="Próximo mês">
-          ›
-        </Link>
-        {month !== thisMonth() && (
-          <Link className="link small" to={`/orcamento/${thisMonth()}`}>
-            Ir para o mês atual
-          </Link>
-        )}
-      </div>
+    <>
+      <PageHeader
+        title={title}
+        subtitle={
+          isCurrent ? (
+            <span className="row" style={{ gap: 6 }}>
+              <CalendarClock size={15} /> Mês atual
+            </span>
+          ) : (
+            <Link to={`/orcamento/${thisMonth()}`}>Voltar para o mês atual</Link>
+          )
+        }
+        actions={
+          <span className="only-desktop">
+            <span className="row">
+              <Button type="button" variant="secondary" onClick={() => setEditing({ type: "new-income" })}>
+                <Wallet size={16} /> Nova renda
+              </Button>
+              <Button type="button" onClick={() => setEditing({ type: "new-expense" })}>
+                <Plus size={16} /> Nova conta
+              </Button>
+            </span>
+          </span>
+        }
+      />
 
       {data.isPending && <p className="muted">Carregando…</p>}
       {data.isError && <Alert tone="error">{errorMessage(data.error)}</Alert>}
 
       {data.data && (
-        <>
-          <Summary data={data.data} />
-
-          <section className="card stack">
-            <SectionHeader
-              title="Renda"
-              total={data.data.summary.income_total}
-              action={
-                adding !== "income" && (
-                  <Button type="button" variant="secondary" onClick={() => setAdding("income")}>
-                    + Renda
-                  </Button>
-                )
-              }
-            />
-            {adding === "income" && <IncomeForm month={month} onDone={() => setAdding(null)} />}
-            {data.data.incomes.length === 0 && adding !== "income" && (
-              <p className="muted">Nenhuma renda lançada neste mês.</p>
-            )}
-            <ul className="items">
-              {data.data.incomes.map((income) => (
-                <IncomeRow key={income.id} income={income} />
-              ))}
-            </ul>
-          </section>
-
-          <section className="card stack">
-            <SectionHeader
-              title="Contas"
-              total={data.data.summary.expense_total}
-              action={
-                adding !== "expense" && (
-                  <Button type="button" variant="secondary" onClick={() => setAdding("expense")}>
-                    + Conta
-                  </Button>
-                )
-              }
-            />
-            {adding === "expense" && (
-              <ExpenseForm month={month} categories={cats} onDone={() => setAdding(null)} />
-            )}
-            {data.data.expenses.length === 0 && adding !== "expense" && (
-              <p className="muted">Nenhuma conta lançada neste mês.</p>
-            )}
-            <ul className="items">
-              {data.data.expenses.map((expense) => (
-                <ExpenseRow key={expense.id} expense={expense} categories={cats} />
-              ))}
-            </ul>
-          </section>
-
-          <CategoryBreakdown data={data.data} categories={cats} />
-        </>
+        <div className="stack" style={{ gap: 20 }}>
+          <Kpis data={data.data} />
+          <div className="layout-main-side">
+            <ExpensesCard data={data.data} categories={cats} setEditing={setEditing} />
+            <div className="stack" style={{ gap: 20 }}>
+              <IncomesCard data={data.data} setEditing={setEditing} />
+              <BreakdownCard data={data.data} categories={cats} />
+            </div>
+          </div>
+        </div>
       )}
-    </div>
+
+      <button type="button" className="fab" aria-label="Adicionar" onClick={() => setEditing({ type: "choose" })}>
+        <Plus size={26} />
+      </button>
+
+      <Sheet open={editing?.type === "choose"} title="Adicionar" onClose={close}>
+        <ul className="menu-list">
+          <li>
+            <button type="button" onClick={() => setEditing({ type: "new-expense" })}>
+              <span className="kpi__icon kpi__icon--expense">
+                <Receipt size={18} />
+              </span>
+              Nova conta
+            </button>
+          </li>
+          <li>
+            <button type="button" onClick={() => setEditing({ type: "new-income" })}>
+              <span className="kpi__icon">
+                <Wallet size={18} />
+              </span>
+              Nova renda
+            </button>
+          </li>
+        </ul>
+      </Sheet>
+
+      <Sheet open={editing?.type === "new-expense"} title={`Nova conta · ${monthLabel(month)}`} onClose={close}>
+        <ExpenseForm month={month} categories={cats} onDone={close} />
+      </Sheet>
+      <Sheet open={editing?.type === "expense"} title="Editar conta" onClose={close}>
+        {editing?.type === "expense" && (
+          <div className="stack">
+            <ExpenseForm month={month} categories={cats} expense={editing.expense} onDone={close} />
+            <Button
+              type="button"
+              variant="danger"
+              className="only-mobile"
+              onClick={() => setEditing({ type: "delete-expense", expense: editing.expense })}
+            >
+              <Trash2 size={16} /> Excluir conta
+            </Button>
+          </div>
+        )}
+      </Sheet>
+      <Sheet open={editing?.type === "delete-expense"} title="Excluir conta" onClose={close}>
+        {editing?.type === "delete-expense" && <DeleteExpense expense={editing.expense} onDone={close} />}
+      </Sheet>
+      <Sheet open={editing?.type === "new-income"} title={`Nova renda · ${monthLabel(month)}`} onClose={close}>
+        <IncomeForm month={month} onDone={close} />
+      </Sheet>
+      <Sheet open={editing?.type === "income"} title="Editar renda" onClose={close}>
+        {editing?.type === "income" && <IncomeForm month={month} income={editing.income} onDone={close} />}
+      </Sheet>
+    </>
   );
 }

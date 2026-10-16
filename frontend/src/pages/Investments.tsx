@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { Landmark, Plus, ShieldCheck, Trash2, TrendingUp } from "lucide-react";
 
 import {
   analysisApi,
@@ -10,7 +11,7 @@ import {
 import { useBudgetMutation } from "../api/budget";
 import { errorMessage } from "../api/client";
 import { Badge, Bar, FormActions, MoneyInput, requireMoney } from "../components/budget";
-import { Alert, Button } from "../components/ui";
+import { Alert, Button, Kpi, PageHeader, Sheet } from "../components/ui";
 import { money, moneyInput, parseMoney, percent } from "../lib/format";
 
 const KEY = ["budget", "investments"] as const;
@@ -144,15 +145,11 @@ function InvestmentRow({ investment }: { investment: Investment }) {
   const remove = useBudgetMutation(() => analysisApi.deleteInvestment(investment.id));
   const ret = Number(investment.return_amount);
 
-  if (editing) {
-    return (
-      <li>
-        <InvestmentForm investment={investment} onDone={() => setEditing(false)} />
-      </li>
-    );
-  }
   return (
     <li className="item">
+      <Sheet open={editing} title="Editar investimento" onClose={() => setEditing(false)}>
+        <InvestmentForm investment={investment} onDone={() => setEditing(false)} />
+      </Sheet>
       <button type="button" className="item__main" onClick={() => setEditing(true)} title="Editar">
         <span className="item__title">
           <span className="dot" style={{ background: KIND_COLORS[investment.kind] }} aria-hidden />
@@ -185,7 +182,7 @@ function InvestmentRow({ investment }: { investment: Investment }) {
         title="Excluir"
         onClick={() => window.confirm(`Excluir "${investment.name}"?`) && remove.mutate(undefined)}
       >
-        ✕
+        <Trash2 size={17} />
       </button>
     </li>
   );
@@ -206,76 +203,89 @@ export default function Investments() {
     }, {}),
   ).sort((a, b) => b[1] - a[1]);
 
+  const gain = current - invested;
+
   return (
-    <div className="stack">
-      <div className="section-header">
-        <h1>Investimentos</h1>
-        {!adding && (
+    <>
+      <PageHeader
+        title="Investimentos"
+        subtitle="Onde seu dinheiro está guardado e quanto está rendendo."
+        actions={
           <Button type="button" onClick={() => setAdding(true)}>
-            + Investimento
+            <Plus size={16} /> Novo investimento
           </Button>
-        )}
-      </div>
-
-      <Indicators />
-
+        }
+      />
       {list.isError && <Alert tone="error">{errorMessage(list.error)}</Alert>}
 
-      {items.length > 0 && (
-        <section className="card stack">
-          <div className="stats">
-            <div className="stat">
-              <span className="stat__label">Patrimônio</span>
-              <strong className="stat__value">{money(current)}</strong>
-            </div>
-            <div className="stat">
-              <span className="stat__label">Rendimento</span>
-              <strong className={`stat__value ${current - invested < 0 ? "tone--error" : "tone--ok"}`}>
-                {money(current - invested)}
-              </strong>
-              {invested > 0 && <span className="muted small">{percent(Math.round(((current - invested) / invested) * 1000) / 10)}</span>}
-            </div>
-            <div className="stat">
-              <span className="stat__label">Reserva de emergência</span>
-              <strong className="stat__value">{money(reserve)}</strong>
-            </div>
+      <div className="stack" style={{ gap: 20 }}>
+        {items.length > 0 && (
+          <div className="kpis kpis--3">
+            <Kpi icon={<Landmark size={17} />} label="Patrimônio" value={money(current)} foot={`Investido ${money(invested)}`} />
+            <Kpi
+              icon={<TrendingUp size={17} />}
+              tone={gain < 0 ? "expense" : "accent"}
+              label="Rendimento"
+              value={money(gain)}
+              valueClass={gain < 0 ? "tone--error" : "tone--ok"}
+              foot={invested > 0 ? percent(Math.round((gain / invested) * 1000) / 10) + " sobre o investido" : undefined}
+            />
+            <Kpi icon={<ShieldCheck size={17} />} tone="neutral" label="Reserva de emergência" value={money(reserve)} foot="Conta no score financeiro" />
           </div>
-          <ul className="breakdown">
-            {byKind.map(([kind, value]) => (
-              <li key={kind}>
-                <div className="split">
-                  <span>{INVESTMENT_KINDS[kind as InvestmentKind]}</span>
-                  <span>
-                    {money(value)} <span className="muted">· {percent(Math.round((value / current) * 1000) / 10)}</span>
-                  </span>
-                </div>
-                <Bar pct={current > 0 ? (value / current) * 100 : 0} color={KIND_COLORS[kind as InvestmentKind]} />
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-
-      <section className="card stack">
-        <h2>Carteira</h2>
-        {adding && <InvestmentForm onDone={() => setAdding(false)} />}
-        {list.isPending && <p className="muted">Carregando…</p>}
-        {items.length === 0 && !adding && !list.isPending && (
-          <p className="muted">
-            Cadastre onde seu dinheiro está guardado. Marque o que é reserva de emergência para que conte no seu
-            score financeiro.
-          </p>
         )}
-        <ul className="items">
-          {items.map((i) => (
-            <InvestmentRow key={i.id} investment={i} />
-          ))}
-        </ul>
-        <p className="muted small">
-          Os valores atuais são informados por você. Atualize de tempos em tempos com o saldo do banco ou da
-          corretora.
-        </p>
-      </section>
-    </div>
+
+        <div className="layout-main-side">
+          <section className="card stack">
+            <h2>Carteira</h2>
+            {list.isPending && <p className="muted">Carregando…</p>}
+            {items.length === 0 && !list.isPending && (
+              <p className="muted" style={{ margin: 0 }}>
+                Cadastre onde seu dinheiro está guardado. Marque o que é reserva de emergência para que conte no seu
+                score financeiro.
+              </p>
+            )}
+            <ul className="items">
+              {items.map((i) => (
+                <InvestmentRow key={i.id} investment={i} />
+              ))}
+            </ul>
+            <p className="muted small" style={{ margin: 0 }}>
+              Os valores atuais são informados por você. Atualize de tempos em tempos com o saldo do banco ou da
+              corretora.
+            </p>
+          </section>
+
+          <div className="stack" style={{ gap: 20 }}>
+            {byKind.length > 0 && (
+              <section className="card stack">
+                <h2>Alocação</h2>
+                <ul className="breakdown">
+                  {byKind.map(([kind, value]) => (
+                    <li key={kind}>
+                      <div className="split">
+                        <span>
+                          <span className="dot" style={{ background: KIND_COLORS[kind as InvestmentKind] }} aria-hidden />
+                          {INVESTMENT_KINDS[kind as InvestmentKind]}
+                        </span>
+                        <span className="num">
+                          {money(value)}{" "}
+                          <span className="muted small">{percent(Math.round((value / current) * 1000) / 10)}</span>
+                        </span>
+                      </div>
+                      <Bar pct={current > 0 ? (value / current) * 100 : 0} color={KIND_COLORS[kind as InvestmentKind]} />
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+            <Indicators />
+          </div>
+        </div>
+      </div>
+
+      <Sheet open={adding} title="Novo investimento" onClose={() => setAdding(false)}>
+        <InvestmentForm onDone={() => setAdding(false)} />
+      </Sheet>
+    </>
   );
 }

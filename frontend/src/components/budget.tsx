@@ -156,7 +156,7 @@ export function SectionHeader({ title, total, action }: { title: string; total?:
 
 export function FormActions({ loading, onCancel, label = "Salvar" }: { loading: boolean; onCancel: () => void; label?: string }) {
   return (
-    <div className="row">
+    <div className="form-actions">
       <Button type="button" variant="secondary" onClick={onCancel}>
         Cancelar
       </Button>

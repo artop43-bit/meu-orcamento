@@ -11,7 +11,7 @@ import {
   type StatementPreview,
 } from "../api/data";
 import { Badge, CategorySelect } from "../components/budget";
-import { Alert, Button } from "../components/ui";
+import { Alert, Button, PageHeader } from "../components/ui";
 import { addMonths, money, monthLabel, shortDate, thisMonth } from "../lib/format";
 
 // ---------------------------------------------------------------- app antigo
@@ -462,10 +462,12 @@ function Export() {
 export default function DataPage() {
   return (
     <div className="stack">
-      <h1>Importar e exportar</h1>
+      <PageHeader title="Importar e exportar" subtitle="Traga extratos e o arquivo do app antigo; leve seus dados em CSV, Excel, PDF ou backup." />
       <StatementImport />
-      <LegacyImport />
-      <Export />
+      <div className="layout-2">
+        <LegacyImport />
+        <Export />
+      </div>
     </div>
   );
 }

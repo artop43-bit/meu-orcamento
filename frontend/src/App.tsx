@@ -1,8 +1,8 @@
-import { useQueryClient } from "@tanstack/react-query";
-import { BrowserRouter, Link, Navigate, NavLink, Outlet, Route, Routes, useLocation } from "react-router";
+import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation } from "react-router";
 
-import { authApi, ME_KEY, useMe } from "./api/auth";
+import { useMe } from "./api/auth";
 import { errorMessage } from "./api/client";
+import { Shell } from "./components/Shell";
 import Analysis from "./pages/Analysis";
 import Categories from "./pages/Categories";
 import DataPage from "./pages/Data";
@@ -35,7 +35,7 @@ function RequireAuth() {
   if (me.isPending) return <FullPageMessage>Carregando…</FullPageMessage>;
   if (me.isError) return <FullPageMessage>{errorMessage(me.error)}</FullPageMessage>;
   if (!me.data) return <Navigate to="/entrar" replace state={{ from: location.pathname }} />;
-  return <AppLayout />;
+  return <Shell />;
 }
 
 /** Páginas só para visitantes (login, cadastro): quem já entrou vai para o início. */
@@ -44,54 +44,6 @@ function GuestOnly() {
   if (me.isPending) return <FullPageMessage>Carregando…</FullPageMessage>;
   if (me.data) return <Navigate to="/" replace />;
   return <Outlet />;
-}
-
-function AppLayout() {
-  const queryClient = useQueryClient();
-  const { data: user } = useMe();
-  const location = useLocation();
-
-  async function logout() {
-    await authApi.logout().catch(() => undefined);
-    queryClient.setQueryData(ME_KEY, null);
-    queryClient.clear();
-  }
-
-  return (
-    <>
-      <header className="topbar no-print">
-        <Link to="/" className="brand">
-          Meu Orçamento
-        </Link>
-        <nav>
-          <NavLink to="/orcamento">Orçamento</NavLink>
-          <NavLink to="/metas">Metas</NavLink>
-          <NavLink to="/historico">Histórico</NavLink>
-          <NavLink to="/analises">Análises</NavLink>
-          <NavLink to="/investimentos">Investimentos</NavLink>
-          <NavLink to="/fixas">Fixas</NavLink>
-          <NavLink to="/categorias">Categorias</NavLink>
-          <NavLink to="/dados">Dados</NavLink>
-          <NavLink to="/seguranca">Segurança</NavLink>
-          <button type="button" className="link" onClick={logout}>
-            Sair
-          </button>
-        </nav>
-      </header>
-      <main className="container">
-        {user && !user.totp_enabled && location.pathname !== "/seguranca" && (
-          <div className="banner no-print">
-            Proteja seus dados financeiros: <Link to="/seguranca">ative a verificação em duas etapas</Link>.
-          </div>
-        )}
-        <Outlet />
-      </main>
-      <footer className="footer no-print">
-        <Link to="/privacidade">Privacidade</Link>
-        <Link to="/termos">Termos de uso</Link>
-      </footer>
-    </>
-  );
 }
 
 export default function App() {

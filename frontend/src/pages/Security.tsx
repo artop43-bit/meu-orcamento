@@ -5,7 +5,7 @@ import { QRCodeSVG } from "qrcode.react";
 import { authApi, ME_KEY, useMe } from "../api/auth";
 import { errorMessage } from "../api/client";
 import { ActivitySection, DeleteAccountSection, SessionsSection } from "../components/account";
-import { Alert, Button, Field } from "../components/ui";
+import { Alert, Button, Field, PageHeader } from "../components/ui";
 import { MIN_PASSWORD } from "./Register";
 
 const TWO_FACTOR_KEY = ["auth", "2fa"] as const;
@@ -279,26 +279,32 @@ function ChangePasswordSection() {
 export default function Security() {
   const { data: user } = useMe();
   return (
-    <div className="stack">
-      <h1>Segurança da conta</h1>
-      <section className="card">
-        <h2>Verificação em duas etapas</h2>
-        <TwoFactorSection />
-      </section>
-      <section className="card">
-        <h2>Alterar senha</h2>
-        <ChangePasswordSection />
-      </section>
-      <section className="card">
-        <h2>Sessões ativas</h2>
-        <SessionsSection />
-      </section>
-      <section className="card">
-        <h2>Atividade recente</h2>
-        <ActivitySection />
-      </section>
+    <div className="stack" style={{ gap: 20 }}>
+      <PageHeader title="Segurança da conta" subtitle={user?.email} />
+      <div className="layout-2">
+        <div className="stack" style={{ gap: 20 }}>
+          <section className="card stack">
+            <h2>Verificação em duas etapas</h2>
+            <TwoFactorSection />
+          </section>
+          <section className="card stack">
+            <h2>Alterar senha</h2>
+            <ChangePasswordSection />
+          </section>
+        </div>
+        <div className="stack" style={{ gap: 20 }}>
+          <section className="card stack">
+            <h2>Sessões ativas</h2>
+            <SessionsSection />
+          </section>
+          <section className="card stack">
+            <h2>Atividade recente</h2>
+            <ActivitySection />
+          </section>
+        </div>
+      </div>
       {user && (
-        <section className="card card--danger">
+        <section className="card card--danger stack">
           <h2>Excluir conta</h2>
           <DeleteAccountSection user={user} />
         </section>
