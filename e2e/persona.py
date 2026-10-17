@@ -129,14 +129,32 @@ def add_income(page: Page, desc: str, amount: float, every_month: bool = False):
     idle(page, 50)
 
 
-def pay_all(page: Page):
-    boxes = page.locator(".ledger__row input[type=checkbox]:not(:checked)")
-    for _ in range(40):
-        if boxes.count() == 0:
+def pay_all(page: Page, month: str | None = None):
+    """Marca todas as contas da tela como pagas, confirmando cada clique.
+
+    Num servidor lento, um clique pode cair enquanto a lista se atualiza: por isso cada
+    marcação é conferida e, no fim, o total pendente é checado na API (com nova tentativa).
+    """
+    for attempt in range(3):
+        boxes = page.locator(".ledger__row input[type=checkbox]:not(:checked)")
+        for _ in range(40):
+            if boxes.count() == 0:
+                break
+            label = boxes.first.get_attribute("aria-label")
+            boxes.first.click()
+            try:
+                expect(page.locator(f'input[aria-label="{label}"]').first).to_be_checked(timeout=5000)
+            except AssertionError:
+                pass  # conferido de novo abaixo
+            idle(page, 120)
+        if month is None:
             return
-        boxes.first.click()
-        idle(page, 80)
-    raise AssertionError("contas não ficaram pagas")
+        pending = api(page, f"/months/{month}")["summary"]["pending_total"]
+        if pending in ("0.00", "0"):
+            return
+        page.reload()
+        idle(page, 300)
+    raise AssertionError(f"{month}: contas não ficaram pagas (pendente {pending})")
 
 
 def api(page: Page, path: str):
@@ -243,7 +261,7 @@ def fill_month(page: Page, index: int, month: str, current: bool):
     if index == 6:
         add_income(page, "Freela (site)", 450)
     if not current:
-        pay_all(page)
+        pay_all(page, month)
 
 
 @step("Lançar 8 meses completos (variáveis, parcelas, freelas) e marcar tudo como pago")
