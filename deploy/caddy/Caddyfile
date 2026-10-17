@@ -1,8 +1,3 @@
-{
-	# E-mail para avisos do Let's Encrypt (certificado HTTPS).
-	email {$ACME_EMAIL}
-}
-
 {$DOMAIN} {
 	encode zstd gzip
 

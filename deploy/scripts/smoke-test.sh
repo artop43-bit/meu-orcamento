@@ -50,7 +50,6 @@ RECIPIENT="$(grep -o 'age1[0-9a-z]*' "$WORK/age-key.txt" | head -1)"
 umask 077
 cat > .env.production <<EOF
 DOMAIN=localhost
-ACME_EMAIL=ci@example.com
 POSTGRES_USER=orcamento
 POSTGRES_DB=orcamento
 POSTGRES_PASSWORD=$(head -c 24 /dev/urandom | od -An -tx1 | tr -d ' \n')
