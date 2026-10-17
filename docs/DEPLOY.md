@@ -65,6 +65,10 @@ No painel do seu domínio (ex.: registro.br → DNS), crie:
 
 A propagação leva de minutos a algumas horas. Confira com `nslookup seudominio.com.br`.
 
+**Ainda sem domínio?** Dá para subir o site já com HTTPS usando um endereço provisório gratuito
+que aponta para o IP: no `.env.production`, use `DOMAIN=144-22-130-13.sslip.io` (o IP da VM com
+hífens no lugar dos pontos). Quando tiver o domínio, troque o `DOMAIN` e rode o deploy de novo.
+
 ## 4. Preparar o servidor
 
 No seu PC:

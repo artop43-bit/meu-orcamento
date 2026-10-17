@@ -9,12 +9,14 @@ if [ "$(id -u)" -eq 0 ]; then
   exit 1
 fi
 
-export DEBIAN_FRONTEND=noninteractive
+# O sudo descarta variáveis de ambiente: passe-as no próprio comando, senão o apt e o
+# needrestart (Ubuntu 22.04+) param no meio para fazer perguntas.
+APT=(sudo env DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a apt-get)
 
 echo "==> Atualizando o sistema"
-sudo apt-get update -q
-sudo apt-get upgrade -yq
-sudo apt-get install -yq ca-certificates curl git unattended-upgrades fail2ban iptables-persistent
+"${APT[@]}" update -q
+"${APT[@]}" upgrade -yq
+"${APT[@]}" install -yq ca-certificates curl git unattended-upgrades fail2ban iptables-persistent
 
 echo "==> Atualizações de segurança automáticas"
 sudo dpkg-reconfigure -f noninteractive unattended-upgrades
@@ -26,8 +28,8 @@ sudo chmod a+r /etc/apt/keyrings/docker.asc
 echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] \
 https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" \
   | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-sudo apt-get update -q
-sudo apt-get install -yq docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+"${APT[@]}" update -q
+"${APT[@]}" install -yq docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 sudo usermod -aG docker "$USER"
 sudo systemctl enable --now docker
 

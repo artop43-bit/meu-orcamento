@@ -1,0 +1,11 @@
+MEU ORÇAMENTO · UPDATE LOG
+Versão 0.4.4 · Ajustes para o deploy na Oracle
+Data: 16/10/2026 às 21:15 (horário de Brasília)
+
+Servidor
+- [x] Preparação do servidor sem perguntas no meio (a tela roxa do Ubuntu 22.04 não aparece mais)
+- [x] HTTPS sem precisar informar e-mail ao Let's Encrypt (eles não enviam mais avisos por e-mail)
+- [x] Guia de deploy: como subir o site com endereço provisório (sslip.io) antes de ter domínio
+
+Documentação
+- [x] Changelog e versão 0.4.4 no menu
