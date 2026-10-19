@@ -208,7 +208,7 @@ def empty_state(page: Page):
     expect(page.get_by_role("heading", name="Comece pela sua renda")).to_be_visible()
     page.goto(f"{BASE}/analises")
     idle(page)
-    expect(page.get_by_role("heading", name="Vamos começar?")).to_be_visible()
+    expect(page.get_by_role("heading", name="Sem lançamentos no período")).to_be_visible()
     expect(page.get_by_role("heading", name="Como começar")).to_be_visible()
 
 
@@ -402,12 +402,12 @@ def consultant(page: Page, months: list[str]):
     assert current["in_progress"] is True
     titles = [a["title"] for a in current["alerts"]]
     # Streaming (R$ 44,90) também é Lazer: 260 + 44,90 passa do limite de 300.
-    assert "Limite de Lazer estourado" in titles, titles
+    assert "Limite de Lazer excedido" in titles, titles
     # Compras lançadas com data passada já entram pagas; ficam em atraso só as não pagas de propósito.
     # Ficam sem pagar de propósito: parcela do celular (dia 12), internet (15) e plano de celular (20).
     overdue = sum(1 for day in (12, 15, 20) if day < TODAY.day)
     if overdue:
-        assert f"{overdue} conta(s) em atraso" in titles, titles
+        assert f"{overdue} despesa(s) em atraso" in titles, titles
     else:
         assert not any("atraso" in t for t in titles), titles
     messages = [m["title"] for m in current["messages"]]
@@ -441,7 +441,7 @@ def dashboard(page: Page, months: list[str]):
     idle(page, 400)
     page.get_by_label("Mês", exact=True).fill(months[5])
     idle(page, 600)
-    expect(page.get_by_role("heading", name="Este mês fechou no vermelho")).to_be_visible()
+    expect(page.get_by_role("heading", name="Resultado negativo no mês")).to_be_visible()
 
 
 @step("Comparar meses, projeção e simulador (seções Ferramentas)")
