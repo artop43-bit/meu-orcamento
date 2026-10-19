@@ -62,7 +62,7 @@ export function ConsultantCard({ data }: { data: Insights }) {
           <Icon size={26} />
         </span>
         <div>
-          <p className="consultant__eyebrow">Seu consultor</p>
+          <p className="consultant__eyebrow">Insights do mês</p>
           <h2 id="consultor-titulo">{data.headline}</h2>
         </div>
       </div>
@@ -114,7 +114,7 @@ export function ConsultantTeaser({ month }: { month: string }) {
       <span className="grow">
         <strong>{data.headline}</strong>
         <span className="teaser__text">
-          {urgent.length > 0 ? `${maskMoney(urgent[0].title)}${urgent.length > 1 ? ` e mais ${urgent.length - 1} alerta(s)` : ""}` : "Veja a análise completa do mês"}
+          {urgent.length > 0 ? `${maskMoney(urgent[0].title)}${urgent.length > 1 ? ` e mais ${urgent.length - 1} alerta(s)` : ""}` : "Ver análise completa"}
         </span>
       </span>
       <ChevronRight size={18} aria-hidden />

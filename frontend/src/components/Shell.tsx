@@ -1,26 +1,22 @@
 import { Suspense, useEffect, useLayoutEffect, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
-  ArrowLeftRight,
+  Banknote,
   CalendarDays,
   ChartPie,
-  CircleHelp,
   CreditCard,
+  Ellipsis,
   Eye,
   EyeOff,
-  Inbox,
-  MessageSquarePlus,
-  Search,
-  SlidersHorizontal,
-  Ellipsis,
   History,
   Landmark,
   LogOut,
+  MessageSquarePlus,
   RefreshCw,
-  Repeat,
+  Search,
+  Settings,
   ShieldAlert,
   ShieldCheck,
-  Tags,
   Target,
   Wallet,
 } from "lucide-react";
@@ -58,29 +54,25 @@ type NavItem = { to: string; label: string; icon: ReactNode; short?: string };
 const MAIN: NavItem[] = [
   { to: "/orcamento", label: "Orçamento", icon: <Wallet size={20} /> },
   { to: "/calendario", label: "Calendário", icon: <CalendarDays size={20} /> },
-  { to: "/analises", label: "Análise financeira", short: "Análises", icon: <ChartPie size={20} /> },
+  { to: "/analises", label: "Insights", icon: <ChartPie size={20} /> },
   { to: "/investimentos", label: "Investimentos", icon: <Landmark size={20} /> },
+  { to: "/contas", label: "Contas", icon: <Banknote size={20} /> },
   { to: "/cartoes", label: "Cartões", icon: <CreditCard size={20} /> },
   { to: "/metas", label: "Metas", icon: <Target size={20} /> },
   { to: "/historico", label: "Histórico", icon: <History size={20} /> },
 ];
 
-const SETTINGS: NavItem[] = [
-  { to: "/fixas", label: "Contas fixas", icon: <Repeat size={20} /> },
-  { to: "/categorias", label: "Categorias", icon: <Tags size={20} /> },
-  { to: "/dados", label: "Importar e exportar", icon: <ArrowLeftRight size={20} /> },
-  { to: "/seguranca", label: "Segurança", icon: <ShieldCheck size={20} /> },
-  { to: "/preferencias", label: "Preferências", icon: <SlidersHorizontal size={20} /> },
-  { to: "/ajuda", label: "Como usar", icon: <CircleHelp size={20} /> },
-];
-const ADMIN: NavItem = { to: "/admin", label: "Sugestões recebidas", icon: <Inbox size={20} /> };
+const SETTINGS: NavItem[] = [{ to: "/ajustes", label: "Ajustes", icon: <Settings size={20} /> }];
+const ADMIN: NavItem = { to: "/admin", label: "Administração", icon: <ShieldCheck size={20} /> };
+// Telas fora do menu (títulos da barra do topo e do navegador).
+const EXTRA_TITLES: Record<string, string> = { "/revisar": "Para revisar", "/busca": "Busca", "/admin": "Administração" };
 
 // No celular, as 4 primeiras viram abas; o resto vai para "Mais".
 const TABS = MAIN.slice(0, 4);
 const MORE = [...MAIN.slice(4), ...SETTINGS];
 
 const ALL = [...MAIN, ...SETTINGS];
-const TITLES: Record<string, string> = Object.fromEntries(ALL.map((item) => [item.to, item.label]));
+const TITLES: Record<string, string> = { ...Object.fromEntries(ALL.map((item) => [item.to, item.label])), ...EXTRA_TITLES };
 const TAB_PATHS = TABS.map((item) => item.to);
 const LATER_KEY = "2fa-lembrar-depois";
 
@@ -203,7 +195,7 @@ export function Shell() {
 
   async function dismissTwoFactor() {
     if (user) queryClient.setQueryData(ME_KEY, { ...user, twofa_prompt_dismissed: true });
-    announce("Tudo bem. Você pode ativar quando quiser em Segurança.");
+    announce("Lembrete desativado. A verificação pode ser ativada em Ajustes, Segurança.");
     await authApi.setTwoFactorPrompt(true).catch(() => undefined);
   }
 
@@ -236,7 +228,7 @@ export function Shell() {
               {item.label}
             </NavLink>
           ))}
-          <p className="sidebar__group">Configurações</p>
+          <p className="sidebar__group" aria-hidden></p>
           {SETTINGS.map((item) => (
             <NavLink key={item.to} to={item.to} className="sidebar__link" onClick={(e) => onNavClick(e, item.to)}>
               {item.icon}
@@ -244,7 +236,7 @@ export function Shell() {
             </NavLink>
           ))}
           {user?.is_admin && (
-            <NavLink to="/admin/sugestoes" className="sidebar__link">
+            <NavLink to="/admin" className="sidebar__link">
               {ADMIN.icon}
               {ADMIN.label}
             </NavLink>
@@ -264,7 +256,7 @@ export function Shell() {
           >
             {prefs.privacy ? <Eye size={17} /> : <EyeOff size={17} />}
           </button>
-          <button type="button" className="sidebar__tool" onClick={openFeedback} aria-label="Enviar sugestão" title="Enviar sugestão">
+          <button type="button" className="sidebar__tool" onClick={openFeedback} aria-label="Enviar feedback" title="Enviar feedback">
             <MessageSquarePlus size={17} />
           </button>
         </div>
@@ -315,7 +307,7 @@ export function Shell() {
               <div className="banner no-print" role="region" aria-label="Sugestão de segurança">
                 <ShieldAlert size={18} />
                 <span>
-                  Recomendado: <Link to="/seguranca">ative a verificação em duas etapas</Link> para proteger sua conta.
+                  Recomendado: <Link to="/ajustes/seguranca">ative a verificação em duas etapas</Link> para proteger o acesso.
                 </span>
                 <span className="banner__actions">
                   <button type="button" onClick={remindLater}>
@@ -369,7 +361,7 @@ export function Shell() {
           ))}
           {user?.is_admin && (
             <li>
-              <Link to="/admin/sugestoes">
+              <Link to="/admin">
                 {ADMIN.icon}
                 {ADMIN.label}
               </Link>
@@ -377,7 +369,7 @@ export function Shell() {
           )}
           <li>
             <button type="button" onClick={openFeedback}>
-              <MessageSquarePlus size={20} /> Enviar sugestão
+              <MessageSquarePlus size={20} /> Enviar feedback
             </button>
           </li>
           <li>

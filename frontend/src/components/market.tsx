@@ -82,7 +82,7 @@ function Ranking({ title, items, onOpen }: { title: string; items: Quote[]; onOp
       <h3 style={{ margin: 0 }}>{title}</h3>
       {items.length === 0 ? (
         <p className="muted small" style={{ margin: 0 }}>
-          Indisponível agora (bolsa fechada ou fonte fora do ar).
+          Indisponível no momento (pregão fechado ou fonte inacessível).
         </p>
       ) : (
         <ol className="rank">
@@ -191,7 +191,7 @@ function AssetSheet({ symbol, onClose, watching }: { symbol: string | null; onCl
             loading={toggle.isPending}
             onClick={() => symbol && toggle.mutate({ symbol, watch: !isWatching })}
           >
-            {isWatching ? <EyeOff size={16} /> : <Eye size={16} />} {isWatching ? "Parar de acompanhar" : "Acompanhar"}
+            {isWatching ? <EyeOff size={16} /> : <Eye size={16} />} {isWatching ? "Remover da lista" : "Acompanhar"}
           </Button>
           <Disclaimer />
         </div>
@@ -237,8 +237,8 @@ function Watchlist({ onOpen }: { onOpen: (s: string) => void }) {
     <section className="card stack">
       <div className="section-header">
         <h2>
-          Acompanhando{" "}
-          <Tip>Sua lista de ativos para ver de relance. Ações e FIIs pelo código da B3 (PETR4, MXRF11) ou cripto (BTC, ETH, SOL).</Tip>
+          Lista de acompanhamento{" "}
+          <Tip>Ativos selecionados para acompanhamento: códigos da B3 (PETR4, MXRF11) ou criptoativos (BTC, ETH, SOL).</Tip>
         </h2>
       </div>
       <form className="row" onSubmit={add}>
@@ -254,7 +254,7 @@ function Watchlist({ onOpen }: { onOpen: (s: string) => void }) {
       <Alert tone="error">{error}</Alert>
       {list.data && list.data.length === 0 && (
         <p className="muted small" style={{ margin: 0 }}>
-          Nada na lista ainda. Toque num ativo das listas abaixo e escolha “Acompanhar”, ou digite o código.
+          Nenhum ativo na lista. Informe um código ou abra um ativo abaixo e selecione “Acompanhar”.
         </p>
       )}
       {list.data && list.data.length > 0 && (
@@ -309,22 +309,22 @@ function Simulator() {
       <h2>
         Simulador de renda fixa{" "}
         <Tip>
-          Compara quanto o valor viraria em cada aplicação com as taxas de hoje (Selic, CDI e IPCA do Banco Central), já descontando o
-          IR quando há. É uma estimativa: as taxas mudam.
+          Projeção de cada aplicação com as taxas atuais (Selic, CDI e IPCA do Banco Central), já descontado o IR quando aplicável.
+          Estimativa sujeita à variação das taxas.
         </Tip>
       </h2>
       <form className="grid-3" onSubmit={run}>
         <label>
-          Quanto aplicar
+          Valor aplicado
           <input inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="Ex.: 1.000,00" />
         </label>
         <label>
-          Por quantos meses
+          Prazo (meses)
           <input type="number" inputMode="numeric" min={1} max={600} value={months} onChange={(e) => setMonths(e.target.value)} />
         </label>
         <label>
           <span className="field-label">
-            CDB rende (% do CDI) <Tip>Quanto o banco paga sobre o CDI. Ex.: 100% (comum) ou 110% (bancos médios).</Tip>
+            Rentabilidade do CDB (% do CDI) <Tip>Percentual do CDI oferecido pelo emissor, ex.: 100% ou 110%.</Tip>
           </span>
           <input type="number" inputMode="numeric" min={50} max={200} value={cdb} onChange={(e) => setCdb(e.target.value)} />
         </label>
@@ -399,7 +399,7 @@ export function MarketSection() {
         </button>
       </div>
       {overview.isPending && (
-        <LoadingRegion label="Carregando o mercado">
+        <LoadingRegion label="Carregando as cotações">
           <Skeleton height={120} />
         </LoadingRegion>
       )}
@@ -407,7 +407,7 @@ export function MarketSection() {
       {data && (
         <>
           <section className="card stack">
-            <h2>Panorama</h2>
+            <h2>Visão geral</h2>
             <ul className="quotes">
               {data.indexes.map((q) => (
                 <li key={q.symbol}>
@@ -422,7 +422,7 @@ export function MarketSection() {
             </ul>
             {data.indexes_need_token && (
               <p className="muted small" style={{ margin: 0 }}>
-                Ibovespa e IFIX aparecem quando o administrador do app configurar a chave gratuita da brapi.dev.
+                Ibovespa e IFIX ficam disponíveis após a configuração da chave da brapi.dev no servidor.
               </p>
             )}
           </section>
@@ -435,7 +435,7 @@ export function MarketSection() {
             <Ranking title="Mais negociadas" items={data.most_traded} onOpen={setOpen} />
           </div>
           <p className="muted small" style={{ margin: 0 }}>
-            Listas de ações com volume relevante na B3. Aparecer aqui não é indicação de compra ou venda.
+            Ações com volume relevante na B3. A presença na lista não constitui recomendação de compra ou venda.
           </p>
 
           <section className="card stack">
@@ -473,7 +473,7 @@ export function PortfolioComments({ comments }: { comments: { tone: string; titl
   if (comments.length === 0) return null;
   return (
     <section className="card stack">
-      <h2>Leitura da carteira</h2>
+      <h2>Análise da carteira</h2>
       <ul className="insights">
         {comments.map((c) => (
           <li key={c.title} className={`insight insight--${c.tone === "warning" ? "warning" : c.tone === "good" ? "praise" : "info"}`}>

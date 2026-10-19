@@ -114,7 +114,7 @@ export function ActivitySection() {
   if (events.isError) return <Alert tone="error">{errorMessage(events.error)}</Alert>;
   if (events.data.length === 0) return <p className="muted">Nenhuma atividade registrada.</p>;
   return (
-    <ul className="items items--scroll">
+    <ul className="items items--scroll" tabIndex={0} aria-label="Atividade recente da conta">
       {events.data.map((e, i) => (
         <li key={i} className="item">
           <span className="item__main">

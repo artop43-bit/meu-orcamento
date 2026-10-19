@@ -1,0 +1,52 @@
+MEU ORÇAMENTO · UPDATE LOG
+Versão 0.7.0 · Revisão profissional de layout e textos
+Data: 19/10/2026 às 13:30 (horário de Brasília)
+
+Layout (nada cortado, nada fora da caixa)
+- [x] Orçamento no celular corrigido: a coluna não passa mais da largura da tela
+- [x] Valores dos quadros sempre inteiros (o tamanho da fonte se ajusta ao espaço, sem "R$ 3.73…")
+- [x] Nomes e detalhes das despesas quebram linha em vez de serem cortados
+- [x] Dicas (ⓘ) sempre dentro da janela e da tela, também no celular
+- [x] Gráfico de "Disponível hoje" cabe inteiro no quadro, sem rolagem lateral
+- [x] Faixa de segurança (2FA) organizada no celular
+- [x] Teste automático de layout no CI: 33 telas e 10 formulários em monitor, notebook e celular
+
+Navegação
+- [x] Configurações reunidas em uma única tela "Ajustes" com sub-telas: Recorrências, Categorias,
+      Importar e exportar, Segurança, Preferências, Atalhos de teclado e Central de ajuda
+- [x] Endereços antigos (/fixas, /categorias, /dados...) redirecionam para o novo lugar
+- [x] Uma ação, um botão: "Nova receita" e "Nova despesa" no topo do Orçamento (também no celular)
+      e o lançamento rápido; botões repetidos removidos
+
+Formulários
+- [x] Despesa em etapas: tipo (Única, Parcelada, Recorrente) → valor → parcelas → pagamento → datas
+- [x] Parcelada: escolha "Total da compra | Valor da parcela" junto do campo de valor (padrão: total),
+      atalhos 2x/3x/6x/10x/12x e resumo em tempo real ("10x de R$ 180,00 · última parcela em ago/27")
+- [x] Todas as datas no padrão dd/mm/aaaa (e mm/aaaa onde é só o mês), digitáveis ou pelo calendário
+- [x] Datas irreais bloqueadas: ano entre 2000 e 2100, na tela e no servidor (nem pela API entram)
+- [x] Lançamento rápido: "1800 em 10x" agora é o total (10x de R$ 180); balão ⓘ com exemplos de frase
+
+Textos
+- [x] Revisão completa com guia de estilo: tom profissional, sem gírias nem diminutivos
+- [x] "Mercado" passou a "Cotações"; "bico" e "freela" saíram do app (agora "Freelance"/"Renda extra")
+- [x] Apresentação inicial, Central de ajuda, consultor, avisos e estados vazios reescritos
+
+Categoria automática
+- [x] Dicionário com mais de 1.200 termos (alimentos, bebidas, redes, apps, postos, farmácias, serviços),
+      com plural, sem acento e prefixos de extrato (ex.: "IFD*", "UBER *TRIP")
+- [x] Mesma sugestão no lançamento e na importação de extrato; teste de acerto ≥ 95% (medido: 99,5%)
+- [x] Novas categorias: Compras, Assinaturas e Pets (criadas também para quem já tem conta)
+
+Dinheiro de verdade
+- [x] Contas e saldos (corrente, poupança, carteira): saldo hoje e previsto, transferências entre contas
+- [x] Despesas e receitas vinculadas a uma conta; cartão vinculado à conta que paga a fatura
+- [x] "Para revisar": despesas importadas de extrato aguardam conferência da categoria
+- [x] Busca em todos os meses (texto, período, valor, forma de pagamento, categoria)
+- [x] "Simular despesa" no Disponível hoje; ritmo de gasto por categoria; copiar despesas do mês anterior
+
+Administração (só contas admin)
+- [x] Beta fechado: cadastro novo aguarda liberação; aprovar, bloquear, desbloquear, encerrar sessões,
+      confirmar e-mail, reenviar confirmação, tornar/remover admin e excluir conta
+- [x] E-mails enviados pelo sistema (confirmação, redefinição) visíveis no painel, com o link
+- [x] Feedback recebido e visão geral de uso (usuários, pendentes, ativos em 7 dias)
+- [x] Comandos de terminal: make-admin, approve e block

@@ -42,7 +42,7 @@ export function AuthLayout({ title, children }: { title: string; children: React
           <p className="auth__headline">Seu dinheiro organizado, mês a mês.</p>
           <ul className="auth__features">
             <li>
-              <Wallet size={20} /> Contas fixas, parcelas e metas num só lugar
+              <Wallet size={20} /> Orçamento, recorrências, cartões e metas em um só lugar
             </li>
             <li>
               <ChartPie size={20} /> Para onde vai cada real, por categoria

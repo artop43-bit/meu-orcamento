@@ -36,6 +36,7 @@ export type Income = {
   income_type: IncomeType;
   day: number | null;
   notes: string | null;
+  account_id: string | null;
   recurring_id: string | null;
 };
 
@@ -52,6 +53,8 @@ export type Expense = {
   payment_method: PaymentMethod | null;
   card_id: string | null;
   purchase_date: string | null;
+  account_id: string | null;
+  needs_review: boolean;
   installment_group_id: string | null;
   installment_number: number | null;
   installment_total: number | null;
@@ -138,6 +141,7 @@ export type ExpenseInput = {
   until_month?: string | null;
   card_id?: string | null;
   purchase_date?: string | null;
+  account_id?: string | null;
 };
 
 export type IncomeInput = {
@@ -148,6 +152,7 @@ export type IncomeInput = {
   notes?: string | null;
   repeat?: "once" | "monthly" | "period";
   until_month?: string | null;
+  account_id?: string | null;
 };
 
 export type Planned = {

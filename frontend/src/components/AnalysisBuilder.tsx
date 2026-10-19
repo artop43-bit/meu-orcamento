@@ -28,6 +28,7 @@ import { Chart } from "./chart/Chart";
 import { CHART_NAMES, chartsFor, formatValue } from "./chart/format";
 import { Alert, Button, LoadingRegion, Sheet, Skeleton } from "./ui";
 import { useUndo } from "./undo";
+import { DateField } from "./DateField";
 
 // ---------------------------------------------------------------- opções
 
@@ -42,7 +43,7 @@ export const DEFAULT_CONFIG: AnalysisConfig = {
 
 const METRICS: [Metric, string][] = [
   ["expenses", "Gastos"],
-  ["income", "Renda"],
+  ["income", "Receitas"],
   ["balance", "Sobra"],
   ["savings_rate", "Taxa de poupança"],
   ["investments", "Patrimônio"],
@@ -95,7 +96,7 @@ export const PRESETS: { title: string; hint: string; config: AnalysisConfig }[] 
   },
   {
     title: "Minha taxa de poupança",
-    hint: "Quanto da renda sobrou em 12 meses",
+    hint: "Percentual da receita poupado em 12 meses",
     config: { ...DEFAULT_CONFIG, metric: "savings_rate", period: "12m", chart: "line" },
   },
   {
@@ -288,11 +289,11 @@ function Control({ part, config, set, categories, idPrefix }: { part: Part; conf
           <div className="grid-2">
             <label className="month-picker">
               De
-              <input type="month" value={config.start ?? ""} onChange={(e) => e.target.value && set({ start: e.target.value })} />
+              <DateField month value={config.start ?? ""} onChange={(v) => v && set({ start: v })} />
             </label>
             <label className="month-picker">
               Até
-              <input type="month" value={config.end ?? ""} onChange={(e) => e.target.value && set({ end: e.target.value })} />
+              <DateField month value={config.end ?? ""} onChange={(v) => v && set({ end: v })} />
             </label>
           </div>
         )}
@@ -454,7 +455,7 @@ function SaveForm({ config, suggested, editing, onDone }: { config: AnalysisConf
       </label>
       <label className="check">
         <input type="checkbox" checked={pinned} onChange={(e) => setPinned(e.target.checked)} />
-        Fixar no Resumo da Análise financeira
+        Fixar no Resumo de Insights
       </label>
       <div className="form-actions">
         <Button type="button" variant="secondary" onClick={onDone}>

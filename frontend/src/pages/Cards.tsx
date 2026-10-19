@@ -6,6 +6,7 @@ import { useSearchParams } from "react-router";
 import { useBudgetMutation } from "../api/budget";
 import { errorMessage } from "../api/client";
 import { extrasApi, extrasKeys, useCards, type Card, type CardSummary, type Invoice } from "../api/extras";
+import { useAccounts } from "../api/money";
 import { Bar, FormActions, MoneyInput } from "../components/budget";
 import { EmptyGuide, Tip } from "../components/help";
 import { Alert, Button, LoadingRegion, PageHeader, Sheet, Skeleton } from "../components/ui";
@@ -26,6 +27,8 @@ function CardForm({ card, onDone }: { card?: Card; onDone: () => void }) {
   const [closing, setClosing] = useState(String(card?.closing_day ?? ""));
   const [due, setDue] = useState(String(card?.due_day ?? ""));
   const [color, setColor] = useState(card?.color ?? COLORS[0]);
+  const [accountId, setAccountId] = useState(card?.account_id ?? "");
+  const accounts = useAccounts();
   const [error, setError] = useState("");
   const save = useBudgetMutation(async () => {
     const data = {
@@ -34,6 +37,7 @@ function CardForm({ card, onDone }: { card?: Card; onDone: () => void }) {
       closing_day: Number(closing),
       due_day: Number(due),
       color,
+      account_id: accountId || null,
     };
     if (limit.trim() && !data.limit_amount) throw new Error("Limite inválido.");
     if (card) await extrasApi.updateCard(card.id, data);
@@ -63,7 +67,7 @@ function CardForm({ card, onDone }: { card?: Card; onDone: () => void }) {
         </label>
         <label>
           <span className="field-label">
-            Dia do fechamento <Tip>Quando a fatura fecha. Compras a partir desse dia vão para a fatura seguinte. Está no app do banco.</Tip>
+            Dia do fechamento <Tip>Dia de fechamento da fatura, informado pelo emissor. Compras a partir dele entram na fatura seguinte.</Tip>
           </span>
           <input type="number" inputMode="numeric" min={1} max={31} value={closing} onChange={(e) => setClosing(e.target.value)} placeholder="Ex.: 3" required />
         </label>
@@ -72,6 +76,21 @@ function CardForm({ card, onDone }: { card?: Card; onDone: () => void }) {
           <input type="number" inputMode="numeric" min={1} max={31} value={due} onChange={(e) => setDue(e.target.value)} placeholder="Ex.: 10" required />
         </label>
       </div>
+      {(accounts.data ?? []).length > 0 && (
+        <label>
+          <span className="field-label">
+            Conta que paga a fatura <Tip>Ao marcar a fatura como paga, o valor sai do saldo desta conta.</Tip>
+          </span>
+          <select value={accountId} onChange={(e) => setAccountId(e.target.value)}>
+            <option value="">Não informar</option>
+            {(accounts.data ?? []).map((b) => (
+              <option key={b.account.id} value={b.account.id}>
+                {b.account.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
       <fieldset className="radios">
         <legend className="field-label">Cor</legend>
         <div className="chips">
@@ -140,7 +159,7 @@ function InvoiceSheet({ summary, invoice, onClose }: { summary: CardSummary; inv
             </Button>
           )}
           <p className="muted small" style={{ margin: 0 }}>
-            Pagar a fatura marca as compras dela como pagas. Não lance o pagamento da fatura como outra conta: seria contar duas
+            O pagamento da fatura marca as compras como pagas. Não registre o pagamento da fatura como nova despesa, para não contabilizar duas
             vezes.
           </p>
         </div>
@@ -202,7 +221,7 @@ function CardTile({ summary, onEdit }: { summary: CardSummary; onEdit: () => voi
         )}
         <div className="stat">
           <span className="stat__label">
-            Melhor dia de compra <Tip>Comprando a partir deste dia, a compra só vai para a fatura seguinte: mais tempo para pagar.</Tip>
+            Melhor dia de compra <Tip>Compras feitas a partir deste dia entram na fatura seguinte, com prazo maior de pagamento.</Tip>
           </span>
           <strong className="stat__value">dia {summary.best_day}</strong>
           <span className="muted small">vence dia {card.due_day}</span>
@@ -239,7 +258,7 @@ export default function CardsPage() {
     <>
       <PageHeader
         title="Cartões de crédito"
-        subtitle="Limite, faturas e o melhor dia de compra. Lance a compra com a forma de pagamento Crédito."
+        subtitle="Limite, faturas e melhor dia de compra. Compras no crédito são vinculadas à fatura correspondente."
         actions={
           <Button type="button" onClick={() => setAdding(true)}>
             <Plus size={16} /> Novo cartão
@@ -257,7 +276,7 @@ export default function CardsPage() {
           <EmptyGuide
             icon={<CreditCard size={22} />}
             title="Nenhum cartão ainda"
-            text="Cadastre o cartão com o dia de fechamento e de vencimento. Cada compra no crédito vai para a fatura certa, e as parcelas para as faturas seguintes."
+            text="Cadastre o cartão com os dias de fechamento e vencimento. Cada compra no crédito é alocada na fatura correta; parcelas, nas faturas seguintes."
             example={<>Ex.: “Nubank”, fecha dia 3, vence dia 10, limite R$ 3.000</>}
             action={
               <Button type="button" onClick={() => setAdding(true)}>

@@ -28,6 +28,8 @@ export type ChartProps = {
   description: string;
   /** Ao clicar num rótulo (ex.: abrir o mês). */
   onSelect?: (key: string) => void;
+  /** Cabe sempre na largura do quadro, sem rolagem lateral (ex.: 31 dias do mês). */
+  fit?: boolean;
 };
 
 const PAD = { top: 16, right: 12, bottom: 30 };
@@ -65,7 +67,7 @@ export function Chart(props: ChartProps) {
 
 // ---------------------------------------------------------------- barras, empilhadas, linhas, área
 
-function XYChart({ type, labels, series, compare, unit = "money", monthLabels, height = 260, description, onSelect }: ChartProps) {
+function XYChart({ type, labels, series, compare, unit = "money", monthLabels, height = 260, description, onSelect, fit }: ChartProps) {
   const [boxRef, boxWidth] = useWidth<HTMLDivElement>();
   const scrollRef = useRef<HTMLDivElement>(null);
   const [active, setActive] = useState<number | null>(null);
@@ -90,7 +92,7 @@ function XYChart({ type, labels, series, compare, unit = "money", monthLabels, h
   // Margem esquerda do tamanho do maior rótulo da régua.
   const padLeft = Math.max(40, Math.max(...ticks.map((t) => compactValue(t, unit).length)) * 6.6 + 14);
   const minCol = type === "bar" && series.length > 1 ? MIN_COL_GROUPED : MIN_COL;
-  const scrollable = boxWidth > 0 && count * minCol + padLeft + PAD.right > boxWidth;
+  const scrollable = !fit && boxWidth > 0 && count * minCol + padLeft + PAD.right > boxWidth;
   const width = scrollable ? count * minCol + padLeft + PAD.right : Math.max(boxWidth, 200);
   const innerW = width - padLeft - PAD.right;
   const innerH = height - PAD.top - PAD.bottom;
