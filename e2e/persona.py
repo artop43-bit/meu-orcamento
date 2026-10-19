@@ -411,7 +411,7 @@ def consultant(page: Page, months: list[str]):
     else:
         assert not any("atraso" in t for t in titles), titles
     messages = [m["title"] for m in current["messages"]]
-    assert "Reserva ainda pequena" in messages, messages
+    assert "Reserva abaixo da referência" in messages, messages
     # Sobra do mês (~R$ 900) cobre os ~R$ 378/mês da meta: não deve haver alerta de ritmo.
     assert not any("Viagem" in t for t in titles), titles
 
