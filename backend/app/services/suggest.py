@@ -236,6 +236,13 @@ def suggest_category(
         return None
     categories = {c.id: c for c in db.scalars(select(Category).where(Category.user_id == user.id))}
 
+    # 0. Regra criada pelo usuário.
+    from app.services import rules
+
+    ruled = rules.matcher(db, user)(description)
+    if ruled is not None and ruled in categories:
+        return _out(categories[ruled], "rule")
+
     # 1. Histórico: o que você já usou para essa descrição (ou que começa igual).
     votes: Counter[uuid.UUID] = Counter()
     for expense in _recent_expenses(db, user, today or date.today()):

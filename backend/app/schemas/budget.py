@@ -112,6 +112,9 @@ class ExpenseIn(BaseModel):
     repeat: bool = False
     interval_months: Interval = 1
     until_month: MonthStr | None = None
+    # Compra no cartão: o mês e o vencimento vêm da fatura em que a compra cai.
+    card_id: uuid.UUID | None = None
+    purchase_date: Day | None = None
 
 
 class ExpensePatch(BaseModel):
@@ -134,6 +137,8 @@ class ExpenseOut(_MonthOut):
     paid_at: datetime | None
     notes: str | None
     payment_method: str | None
+    card_id: uuid.UUID | None
+    purchase_date: date | None
     installment_group_id: uuid.UUID | None
     installment_number: int | None
     installment_total: int | None
@@ -327,7 +332,7 @@ class CategorySuggestion(BaseModel):
     category_id: uuid.UUID
     name: str
     # history = aprendido com os seus lançamentos; keywords = palavra conhecida
-    source: Literal["history", "keywords"]
+    source: Literal["rule", "history", "keywords"]
 
 
 class DescriptionSuggestion(BaseModel):
@@ -336,3 +341,133 @@ class DescriptionSuggestion(BaseModel):
     category_id: uuid.UUID | None
     payment_method: str | None
     count: int
+
+
+# ---------------------------------------------------------------- v0.6
+
+
+class BulkIn(BaseModel):
+    ids: list[uuid.UUID] = Field(min_length=1, max_length=500)
+    action: Literal["pay", "unpay", "delete", "category"]
+    category_id: uuid.UUID | None = None
+
+
+CardName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=60)]
+
+
+class CardIn(BaseModel):
+    name: CardName
+    limit_amount: Money | None = None
+    closing_day: DueDay
+    due_day: DueDay
+    color: Color | None = None
+
+
+class CardPatch(BaseModel):
+    name: CardName | None = None
+    limit_amount: Money | None = None
+    closing_day: DueDay | None = None
+    due_day: DueDay | None = None
+    color: Color | None = None
+
+
+class CardOut(_Out):
+    id: uuid.UUID
+    name: str
+    limit_amount: Decimal | None
+    closing_day: int
+    due_day: int
+    color: str | None
+
+
+class InvoiceOut(_MonthOut):
+    closing_date: date
+    due_date: date
+    total: Decimal
+    paid_total: Decimal
+    count: int
+    status: Literal["open", "closed", "paid", "overdue"]
+
+
+class CardSummary(BaseModel):
+    card: CardOut
+    used: Decimal
+    available: Decimal | None
+    used_pct: float | None
+    best_day: int
+    open_invoice: InvoiceOut
+    closed_invoice: InvoiceOut | None
+
+
+class PayInvoiceIn(BaseModel):
+    paid: bool = True
+
+
+class RuleIn(BaseModel):
+    pattern: Annotated[str, StringConstraints(strip_whitespace=True, min_length=2, max_length=60)]
+    category_id: uuid.UUID
+
+
+class RuleOut(_Out):
+    id: uuid.UUID
+    pattern: str
+    category_id: uuid.UUID
+
+
+class DayPoint(BaseModel):
+    date: date
+    balance: Decimal
+    change: Decimal
+
+
+class CanSpend(BaseModel):
+    today: Decimal
+    rest_of_month: Decimal
+    days_left: int
+
+
+class LowestPoint(BaseModel):
+    date: date
+    balance: Decimal
+
+
+class DailyOut(_MonthOut):
+    days: list[DayPoint]
+    end_balance: Decimal
+    lowest: LowestPoint | None
+    first_negative: date | None
+    planned_total: Decimal
+    can_spend: CanSpend | None
+
+
+class FixedCost(BaseModel):
+    id: uuid.UUID
+    description: str
+    amount: Decimal
+    interval_months: int
+    category_id: uuid.UUID | None
+    monthly: Decimal
+    yearly: Decimal
+
+
+class SubscriptionCandidate(BaseModel):
+    description: str
+    amount: Decimal
+    category_id: uuid.UUID | None
+    due_day: int | None
+    months: list[str]
+    yearly: Decimal
+
+
+class SubscriptionsOut(BaseModel):
+    fixed: list[FixedCost]
+    candidates: list[SubscriptionCandidate]
+    monthly_total: Decimal
+    yearly_total: Decimal
+
+
+class PromoteIn(BaseModel):
+    description: Description
+    amount: Money
+    category_id: uuid.UUID | None = None
+    due_day: DueDay | None = None

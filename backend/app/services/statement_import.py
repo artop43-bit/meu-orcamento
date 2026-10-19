@@ -159,6 +159,20 @@ def _ref(*parts: object) -> str:
     return REF_PREFIX + hashlib.sha256(raw.encode()).hexdigest()[:40]
 
 
+CARD_PAYMENT_WORDS = (
+    "pagamento fatura",
+    "pgto fatura",
+    "pag fatura",
+    "pagto fatura",
+    "fatura cartao",
+)
+
+
+def is_card_payment(description: str) -> bool:
+    text = normalize_text(description).replace(" de ", " ").replace(" do ", " ")
+    return any(word in text for word in CARD_PAYMENT_WORDS)
+
+
 def _skip_description(description: str) -> bool:
     text = normalize_text(description)
     return text.startswith("saldo") or text in {"s a l d o", "saldo anterior"}
@@ -288,8 +302,15 @@ def _category_suggester(db: Session, user: User) -> Any:
     ):
         learned[normalize_text(description)] = category_id
 
+    from app.services import rules
+
+    ruled = rules.matcher(db, user)
+
     def suggest(description: str) -> Any:
         text = normalize_text(description)
+        by_rule = ruled(description)
+        if by_rule is not None:
+            return by_rule
         if text in learned:
             return learned[text]
         padded = f" {text} "
@@ -316,6 +337,9 @@ def preview(db: Session, user: User, filename: str, content: str, invert: bool) 
 
     existing = _existing_refs(db, user, [t.ref for t in transactions])
     suggest = _category_suggester(db, user)
+    from app.services import cards
+
+    has_cards = bool(cards.list_cards(db, user))
     items = []
     for t in sorted(transactions, key=lambda t: t.date):
         kind = "income" if t.amount > 0 else "expense"
@@ -328,6 +352,7 @@ def preview(db: Session, user: User, filename: str, content: str, invert: bool) 
                 "kind": kind,
                 "category_id": suggest(t.description) if kind == "expense" else None,
                 "duplicate": t.ref in existing,
+                "card_payment": has_cards and kind == "expense" and is_card_payment(t.description),
             }
         )
     return {"format": "ofx" if is_ofx else "csv", "transactions": items}

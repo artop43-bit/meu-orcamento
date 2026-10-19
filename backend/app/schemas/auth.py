@@ -2,7 +2,9 @@ import uuid
 from datetime import datetime
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator
+
+from app.core.config import get_settings
 
 Password = Annotated[str, Field(min_length=10, max_length=128)]
 Code = Annotated[str, Field(min_length=6, max_length=32)]
@@ -18,6 +20,13 @@ class UserOut(BaseModel):
     totp_enabled: bool
     twofa_prompt_dismissed: bool
     created_at: datetime
+    # Vê as sugestões enviadas pelo app (ADMIN_EMAILS no servidor).
+    is_admin: bool = False
+
+    @model_validator(mode="after")
+    def _admin(self) -> "UserOut":
+        self.is_admin = self.email.lower() in get_settings().admin_email_list()
+        return self
 
 
 class RegisterIn(BaseModel):

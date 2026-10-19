@@ -402,7 +402,19 @@ def create_expense(db: Session, user: User, month: date, data: dict[str, Any]) -
     repeat = data.pop("repeat", False)
     interval = data.pop("interval_months", 1)
     until = data.pop("until_month", None)
+    card_id = data.pop("card_id", None)
+    purchase_date = data.pop("purchase_date", None)
+    if data.get("category_id") is None:
+        # Regra automática do usuário ("contém uber → Transporte").
+        from app.services import rules
+
+        data["category_id"] = rules.matcher(db, user)(data["description"])
     _check_category(db, user, data.get("category_id"))
+
+    if card_id is not None:
+        return _create_card_expense(
+            db, user, data, card_id, purchase_date, installments, amount_mode, paid
+        )
 
     if repeat and not installments:
         end = parse_month(until) if until else None
@@ -474,6 +486,87 @@ def create_expense(db: Session, user: User, month: date, data: dict[str, Any]) -
         created.append(expense)
     db.commit()
     return created
+
+
+def _split_amount(value: Decimal, count: int, mode: str) -> list[Decimal]:
+    if mode != "total" or count <= 1:
+        return [value] * count
+    parcel = (value / count).quantize(Decimal("0.01"), rounding=ROUND_DOWN)
+    if parcel <= 0:
+        raise AppError(400, "invalid_amount", "O total é pequeno demais para tantas parcelas.")
+    return [value - parcel * (count - 1)] + [parcel] * (count - 1)
+
+
+def _create_card_expense(
+    db: Session,
+    user: User,
+    data: dict[str, Any],
+    card_id: uuid.UUID,
+    purchase_date: date | None,
+    installments: int | None,
+    amount_mode: str,
+    paid: bool,
+) -> list[Expense]:
+    """Compra no cartão: cada parcela vai para o mês da fatura em que cai."""
+    from app.services import cards
+
+    card = cards.get_card(db, user, card_id)
+    purchase = purchase_date or data.pop("due_date", None) or date.today()
+    data.pop("due_date", None)
+    count = installments or 1
+    amounts = _split_amount(data.pop("amount"), count, amount_mode)
+    group = uuid.uuid4() if count > 1 else None
+    data["payment_method"] = "credit"
+    created = []
+    for index, due in enumerate(cards.installment_dates(card, purchase, count)):
+        month = due.replace(day=1)
+        ensure_month(db, user, month)
+        expense = Expense(
+            user_id=user.id,
+            month=month,
+            amount=amounts[index],
+            due_date=due,
+            card_id=card.id,
+            purchase_date=purchase,
+            installment_group_id=group,
+            installment_number=index + 1 if group else None,
+            installment_total=count if group else None,
+            paid=paid and index == 0,
+            paid_at=utcnow() if paid and index == 0 else None,
+            **data,
+        )
+        db.add(expense)
+        created.append(expense)
+    db.commit()
+    return created
+
+
+BULK_ACTIONS = ("pay", "unpay", "delete", "category")
+
+
+def bulk_expenses(
+    db: Session,
+    user: User,
+    ids: list[uuid.UUID],
+    action: str,
+    category_id: uuid.UUID | None = None,
+) -> int:
+    """Mesma ação em várias contas de uma vez (só as do próprio usuário)."""
+    if action == "category":
+        _check_category(db, user, category_id)
+    items = list(db.scalars(select(Expense).where(Expense.user_id == user.id, Expense.id.in_(ids))))
+    now = utcnow()
+    for expense in items:
+        if action == "pay" and not expense.paid:
+            expense.paid, expense.paid_at = True, now
+        elif action == "unpay" and expense.paid:
+            expense.paid, expense.paid_at = False, None
+        elif action == "category":
+            expense.category_id = category_id
+        elif action == "delete":
+            db.delete(expense)
+    db.commit()
+    return len(items)
 
 
 def update_expense(

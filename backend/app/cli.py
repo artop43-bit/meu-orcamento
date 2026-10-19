@@ -72,9 +72,32 @@ def run_seed_demo(credentials_file: str | None, *, with_data: bool, reset: bool)
     print(f"Conta de demonstração {status}.\n{text}", flush=True)
 
 
+def run_feedback(limit: int = 30) -> None:
+    """Mostra as últimas sugestões enviadas pelo app (para ler pelo SSH)."""
+    from sqlalchemy import select
+
+    from app.db.session import SessionLocal
+    from app.models import Feedback, User
+
+    with SessionLocal() as db:
+        rows = db.execute(
+            select(Feedback, User.email)
+            .join(User, User.id == Feedback.user_id, isouter=True)
+            .order_by(Feedback.created_at.desc())
+            .limit(limit)
+        ).all()
+    if not rows:
+        print("Nenhuma sugestão ainda.", flush=True)
+    labels = {"bug": "PROBLEMA", "idea": "IDEIA", "other": "OUTRO"}
+    for item, email in rows:
+        when = item.created_at.strftime("%d/%m %H:%M")
+        print(f"[{when}] {labels.get(item.kind, item.kind)} · {email or '?'} · {item.page or ''}")
+        print(f"  {item.message}\n", flush=True)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(prog="python -m app.cli", description=__doc__)
-    parser.add_argument("command", choices=["cleanup", "schedule", "seed-demo"])
+    parser.add_argument("command", choices=["cleanup", "schedule", "seed-demo", "feedback"])
     parser.add_argument(
         "--credentials-file", help="seed-demo: também grava e-mail e senha neste arquivo"
     )
@@ -90,6 +113,8 @@ def main() -> None:
         run_cleanup()
     elif args.command == "schedule":
         schedule()
+    elif args.command == "feedback":
+        run_feedback()
     else:
         run_seed_demo(args.credentials_file, with_data=not args.vazia, reset=args.reset)
 

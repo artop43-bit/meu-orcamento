@@ -42,10 +42,15 @@ class Settings(BaseSettings):
     # Token grátis de https://brapi.dev (Ibovespa, IFIX e mais limites). Sem ele, o Mercado
     # mostra ações, cripto, moedas e renda fixa, mas não os índices.
     brapi_token: str = ""
+    # E-mails (separados por vírgula) que veem as sugestões enviadas pelo app.
+    admin_emails: str = ""
 
     @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+
+    def admin_email_list(self) -> set[str]:
+        return {e.strip().lower() for e in self.admin_emails.split(",") if e.strip()}
 
     @property
     def is_production(self) -> bool:
