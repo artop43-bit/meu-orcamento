@@ -29,8 +29,11 @@ export function Tip({ children, label = "Ajuda" }: { children: ReactNode; label?
 
   return (
     <span className="tip" ref={ref}>
-      <button
-        type="button"
+      {/* span com papel de botão (e não <button>): dentro de um <label>, um <button> passaria a ser
+          o campo rotulado e o input perderia o nome ("Vencimento", "Dia do recebimento"...). */}
+      <span
+        role="button"
+        tabIndex={0}
         className="tip__btn"
         aria-label={label}
         aria-expanded={open}
@@ -41,9 +44,16 @@ export function Tip({ children, label = "Ajuda" }: { children: ReactNode; label?
           e.stopPropagation();
           setOpen((v) => !v);
         }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            e.stopPropagation();
+            setOpen((v) => !v);
+          }
+        }}
       >
         <Info size={14} aria-hidden />
-      </button>
+      </span>
       {open && (
         <span id={id} className="tip__text" role="note">
           {children}
