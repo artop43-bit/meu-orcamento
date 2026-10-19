@@ -73,9 +73,7 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id", name=op.f("pk_support_threads")),
     )
     op.create_index(op.f("ix_support_threads_user_id"), "support_threads", ["user_id"])
-    op.create_index(
-        "ix_support_threads_last_message_at", "support_threads", ["last_message_at"]
-    )
+    op.create_index("ix_support_threads_last_message_at", "support_threads", ["last_message_at"])
 
     op.create_table(
         "support_messages",
@@ -182,7 +180,14 @@ def upgrade() -> None:
             old_feedback.c.app_version,
             old_feedback.c.status,
             old_feedback.c.created_at,
-        ).where(old_feedback.c.user_id.is_not(None))
+        )
+        .where(old_feedback.c.user_id.is_not(None))
+        # Só de quem ainda tem conta (no SQLite a exclusão em cascata pode não ter rodado).
+        .where(
+            old_feedback.c.user_id.in_(
+                sa.select(sa.table("users", sa.column("id", sa.Uuid())).c.id)
+            )
+        )
     ).all()
     for user_id, kind, message, page, user_agent, app_version, status, created_at in old:
         thread_id = uuid.uuid4()

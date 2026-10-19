@@ -267,11 +267,11 @@ def admin_by_user(db: Session, admin: User, query: str | None = None) -> list[di
 def admin_counts(db: Session, admin: User) -> dict[str, int]:
     _check_admin(admin)
     counts = {s: 0 for s in STATUSES}
-    for status, total in db.execute(
-        select(SupportThread.status, func.count()).group_by(SupportThread.status)
-    ):
+    owned = select(SupportThread).join(User, User.id == SupportThread.user_id).subquery()
+    for status, total in db.execute(select(owned.c.status, func.count()).group_by(owned.c.status)):
         counts[status] = total
     counts["unread"] = (
-        db.scalar(select(func.count()).where(SupportThread.admin_unread.is_(True))) or 0
+        db.scalar(select(func.count()).select_from(owned).where(owned.c.admin_unread.is_(True)))
+        or 0
     )
     return counts
