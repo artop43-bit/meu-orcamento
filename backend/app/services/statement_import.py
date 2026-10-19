@@ -249,7 +249,7 @@ def preview(db: Session, user: User, filename: str, content: str, invert: bool) 
     suggest = _category_suggester(db, user)
     from app.services import cards
 
-    has_cards = bool(cards.list_cards(db, user))
+    has_cards = bool(cards.credit_cards(db, user))
     items = []
     for t in sorted(transactions, key=lambda t: t.date):
         kind = "income" if t.amount > 0 else "expense"

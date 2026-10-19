@@ -76,26 +76,35 @@ def run_seed_demo(credentials_file: str | None, *, with_data: bool, reset: bool)
 
 
 def run_feedback(limit: int = 30) -> None:
-    """Mostra as últimas sugestões enviadas pelo app (para ler pelo SSH)."""
+    """Mostra as últimas solicitações recebidas pelo app (para ler pelo SSH)."""
     from sqlalchemy import select
 
     from app.db.session import SessionLocal
-    from app.models import Feedback, User
+    from app.models import SupportMessage, SupportThread, User
 
+    labels = {"bug": "PROBLEMA", "idea": "SUGESTÃO", "other": "OUTRO"}
     with SessionLocal() as db:
         rows = db.execute(
-            select(Feedback, User.email)
-            .join(User, User.id == Feedback.user_id, isouter=True)
-            .order_by(Feedback.created_at.desc())
+            select(SupportThread, User.email)
+            .join(User, User.id == SupportThread.user_id)
+            .order_by(SupportThread.last_message_at.desc())
             .limit(limit)
         ).all()
-    if not rows:
-        print("Nenhuma sugestão ainda.", flush=True)
-    labels = {"bug": "PROBLEMA", "idea": "IDEIA", "other": "OUTRO"}
-    for item, email in rows:
-        when = item.created_at.strftime("%d/%m %H:%M")
-        print(f"[{when}] {labels.get(item.kind, item.kind)} · {email or '?'} · {item.page or ''}")
-        print(f"  {item.message}\n", flush=True)
+        if not rows:
+            print("Nenhuma solicitação ainda.", flush=True)
+        for thread, email in rows:
+            last = db.scalar(
+                select(SupportMessage)
+                .where(SupportMessage.thread_id == thread.id)
+                .order_by(SupportMessage.created_at.desc())
+                .limit(1)
+            )
+            when = thread.last_message_at.strftime("%d/%m %H:%M")
+            kind = labels.get(thread.kind, thread.kind)
+            print(f"[{when}] {kind} · {thread.status} · {email} · {thread.title}")
+            if last is not None:
+                who = "admin" if last.from_admin else "usuário"
+                print(f"  ({who}) {last.body}\n", flush=True)
 
 
 def run_admin(command: str, email: str) -> None:

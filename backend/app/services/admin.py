@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from app.core.config import get_settings
 from app.core.errors import AppError
 from app.db.types import utcnow
-from app.models import EmailLog, Expense, Feedback, Income, User, UserSession
+from app.models import EmailLog, Expense, Income, SupportThread, User, UserSession
 from app.services import auth
 from app.services.auth import Mailer
 
@@ -34,7 +34,7 @@ def overview(db: Session) -> dict[str, Any]:
             .where(UserSession.last_seen_at >= week)
         ),
         "new_7d": count(select(func.count()).where(User.created_at >= week)),
-        "feedback_new": count(select(func.count()).where(Feedback.status == "new")),
+        "feedback_new": count(select(func.count()).where(SupportThread.admin_unread.is_(True))),
         "signup_approval": get_settings().signup_approval,
     }
 
@@ -59,11 +59,16 @@ def list_users(db: Session) -> list[dict[str, Any]]:
         db.execute(select(Expense.user_id, func.count()).group_by(Expense.user_id)).all()
     )
     incomes = dict(db.execute(select(Income.user_id, func.count()).group_by(Income.user_id)).all())
-    users = db.scalars(select(User).order_by(User.created_at.desc()))
+    users = list(db.scalars(select(User).order_by(User.created_at.desc())))
+    from app.services import files
+
+    avatars = files.latest_ids(db, [u.id for u in users], "avatar")
     return [
         {
             "id": u.id,
             "email": u.email,
+            "display_name": u.display_name,
+            "avatar_id": avatars.get(u.id),
             "created_at": u.created_at,
             "email_verified": u.email_verified,
             "access_status": u.access_status,

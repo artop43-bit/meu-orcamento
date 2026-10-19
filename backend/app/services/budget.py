@@ -3,6 +3,7 @@
 Toda consulta filtra por usuário; acessar item de outra pessoa responde "não encontrado".
 """
 
+import calendar
 import uuid
 from collections import defaultdict
 from dataclasses import dataclass
@@ -325,6 +326,39 @@ def _check_account(db: Session, user: User, account_id: uuid.UUID | None) -> Non
         _owned(db, MoneyAccount, account_id, user)
 
 
+MONTH_NAMES = (
+    "janeiro",
+    "fevereiro",
+    "março",
+    "abril",
+    "maio",
+    "junho",
+    "julho",
+    "agosto",
+    "setembro",
+    "outubro",
+    "novembro",
+    "dezembro",
+)
+
+
+def check_day_in_month(day: int | None, month: date) -> None:
+    """Lançamento só deste mês: o dia precisa existir no mês (31/02 não existe).
+
+    Nos lançamentos que se repetem vale 1 a 31: nos meses mais curtos cai no último dia.
+    """
+    if day is None:
+        return
+    last = calendar.monthrange(month.year, month.month)[1]
+    if day > last:
+        raise AppError(
+            400,
+            "invalid_day",
+            f"{MONTH_NAMES[month.month - 1].capitalize()} de {month.year} tem {last} dias. "
+            f"Informe um dia entre 1 e {last}.",
+        )
+
+
 def create_income(db: Session, user: User, month: date, data: dict[str, Any]) -> Income:
     """Lança a renda. Com repetição, cria uma fixa a partir deste mês e devolve a deste mês."""
     _check_account(db, user, data.get("account_id"))
@@ -332,6 +366,7 @@ def create_income(db: Session, user: User, month: date, data: dict[str, Any]) ->
     repeat = data.pop("repeat", "once")
     until = data.pop("until_month", None)
     if repeat == "once":
+        check_day_in_month(data.get("day"), month)
         income = Income(user_id=user.id, month=month, account_id=account_id, **data)
         db.add(income)
         db.commit()
@@ -394,6 +429,8 @@ def update_income(
         update_recurring(db, user, income.recurring_id, recurring, from_month=income.month)
         db.refresh(income)
         return income
+    if income.recurring_id is None and "day" in changes:
+        check_day_in_month(changes["day"], income.month)
     _apply(income, changes)
     db.commit()
     return income
@@ -420,6 +457,25 @@ def create_expense(db: Session, user: User, month: date, data: dict[str, Any]) -
     until = data.pop("until_month", None)
     card_id = data.pop("card_id", None)
     purchase_date = data.pop("purchase_date", None)
+    debit_card_id = data.pop("debit_card_id", None)
+    if card_id is not None and debit_card_id is not None:
+        raise AppError(400, "card_conflict", "Escolha crédito ou débito, não os dois.")
+    if card_id is not None and data.get("payment_method") not in (None, "credit"):
+        raise AppError(400, "card_needs_credit", "Compra no cartão de crédito usa a forma Crédito.")
+    if debit_card_id is not None:
+        from app.services import cards
+
+        debit_card = cards.get_debit_card(db, user, debit_card_id)
+        if installments:
+            raise AppError(400, "debit_no_installments", "Compra no débito não pode ser parcelada.")
+        # No débito o dinheiro sai na hora: entra paga, no dia da compra, da conta do cartão.
+        data["payment_method"] = "debit"
+        data["debit_card_id"] = debit_card.id
+        if data.get("account_id") is None:
+            data["account_id"] = debit_card.account_id
+        if data.get("due_date") is None:
+            data["due_date"] = purchase_date or date.today()
+        paid = True
     _check_account(db, user, data.get("account_id"))
     if data.get("category_id") is None:
         # Regra automática do usuário ("contém uber → Transporte").
@@ -460,6 +516,7 @@ def create_expense(db: Session, user: User, month: date, data: dict[str, Any]) -
         )
         assert expense is not None
         expense.account_id = data.get("account_id")
+        expense.debit_card_id = data.get("debit_card_id")
         if paid:
             expense.paid = True
             expense.paid_at = utcnow()
@@ -528,7 +585,7 @@ def _create_card_expense(
     """Compra no cartão: cada parcela vai para o mês da fatura em que cai."""
     from app.services import cards
 
-    card = cards.get_card(db, user, card_id)
+    card = cards.get_credit_card(db, user, card_id)
     purchase = purchase_date or data.pop("due_date", None) or date.today()
     data.pop("due_date", None)
     count = installments or 1

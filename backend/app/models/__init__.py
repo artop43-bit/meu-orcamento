@@ -4,7 +4,6 @@ from app.models.budget import (
     CategoryRule,
     CreditCard,
     Expense,
-    Feedback,
     Goal,
     Income,
     Investment,
@@ -15,6 +14,7 @@ from app.models.budget import (
     Transfer,
     WatchItem,
 )
+from app.models.support import StoredFile, SupportMessage, SupportThread
 from app.models.user import AuthToken, EmailLog, RecoveryCode, SecurityEvent, User, UserSession
 
 __all__ = [
@@ -25,7 +25,6 @@ __all__ = [
     "CreditCard",
     "EmailLog",
     "Expense",
-    "Feedback",
     "Goal",
     "Income",
     "Investment",
@@ -36,6 +35,9 @@ __all__ = [
     "SavedAnalysis",
     "WatchItem",
     "SecurityEvent",
+    "StoredFile",
+    "SupportMessage",
+    "SupportThread",
     "Transfer",
     "User",
     "UserSession",
