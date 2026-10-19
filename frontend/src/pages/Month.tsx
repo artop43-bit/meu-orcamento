@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import {
@@ -6,7 +6,9 @@ import {
   CalendarClock,
   ChevronLeft,
   ChevronRight,
+  Copy,
   Gauge,
+  Search,
   Pencil,
   Plus,
   Receipt,
@@ -24,24 +26,27 @@ import {
   useBudgetMutation,
   useCategories,
   useMonth,
+  paymentLabel,
   type Category,
   type DeleteScope,
   type Expense,
-  type ExpenseInput,
   type Income,
   type MonthData,
 } from "../api/budget";
 import { errorMessage } from "../api/client";
 import { announce } from "../lib/announce";
 import { haptic } from "../lib/haptics";
-import { Badge, Bar, CategorySelect, FormActions, MoneyInput, requireMoney } from "../components/budget";
+import { Badge, Bar } from "../components/budget";
+import { ExpenseForm, IncomeForm, type ExpenseDraft } from "../components/entryForms";
+import { EmptyGuide, Tip } from "../components/help";
 import { ConsultantTeaser } from "../components/consultant";
 import { Alert, Button, Kpi, LoadingRegion, PageHeader, Sheet, Skeleton } from "../components/ui";
 import { useUndo } from "../components/undo";
-import { addMonths, money, moneyInput, monthLabel, percent, shortDate, thisMonth, todayISO } from "../lib/format";
+import { addMonths, money, monthLabel, percent, shortDate, thisMonth, todayISO } from "../lib/format";
+import { normalizeText } from "../lib/text";
 
 type Editing =
-  | { type: "new-expense" }
+  | { type: "new-expense"; draft?: ExpenseDraft }
   | { type: "new-income" }
   | { type: "expense"; expense: Expense }
   | { type: "income"; income: Income }
@@ -107,11 +112,13 @@ function LedgerRow({
   category,
   onEdit,
   onDelete,
+  onDuplicate,
 }: {
   expense: Expense;
   category: Category | undefined;
   onEdit: () => void;
   onDelete: () => void;
+  onDuplicate: () => void;
 }) {
   const toggle = useBudgetMutation((paid: boolean) => budgetApi.updateExpense(expense.id, { paid }));
   // Resposta imediata: mostra o novo estado enquanto o servidor confirma.
@@ -155,6 +162,8 @@ function LedgerRow({
           {category?.name ?? "Sem categoria"}
           {" · "}
           {expense.due_date ? `vence ${shortDate(expense.due_date)}` : "sem vencimento"}
+          {expense.payment_method && ` · ${paymentLabel(expense.payment_method)}`}
+          {expense.notes && <span title={expense.notes}> · 📝</span>}
         </span>
       </button>
       <span className="ledger__status">
@@ -164,6 +173,9 @@ function LedgerRow({
       <span className="ledger__actions">
         <button type="button" className="icon-btn" aria-label={`Editar ${expense.description}`} title="Editar" onClick={onEdit}>
           <Pencil size={16} />
+        </button>
+        <button type="button" className="icon-btn" aria-label={`Duplicar ${expense.description}`} title="Duplicar" onClick={onDuplicate}>
+          <Copy size={16} />
         </button>
         <button type="button" className="icon-btn" aria-label={`Excluir ${expense.description}`} title="Excluir" onClick={onDelete}>
           <Trash2 size={16} />
@@ -184,6 +196,24 @@ function ExpensesCard({
 }) {
   const undo = useUndo();
   const byId = new Map(categories.map((c) => [c.id, c]));
+  const [query, setQuery] = useState("");
+  const [status, setStatus] = useState<StatusFilter>("all");
+  const [categoryFilter, setCategoryFilter] = useState("");
+  const filtering = query.trim() !== "" || status !== "all" || categoryFilter !== "";
+  const visible = useMemo(() => {
+    const q = normalizeText(query);
+    const today = todayISO();
+    return data.expenses.filter((e) => {
+      if (undo.isHidden(e.id)) return false;
+      if (q && !normalizeText(`${e.description} ${e.notes ?? ""}`).includes(q)) return false;
+      if (categoryFilter && (e.category_id ?? "none") !== categoryFilter) return false;
+      if (status === "paid") return e.paid;
+      if (status === "pending") return !e.paid;
+      if (status === "late") return !e.paid && !!e.due_date && e.due_date < today;
+      return true;
+    });
+  }, [data.expenses, query, status, categoryFilter, undo]);
+  const visibleTotal = visible.reduce((sum, e) => sum + Number(e.amount), 0);
   return (
     <section className="card stack">
       <div className="section-header">
@@ -194,10 +224,52 @@ function ExpensesCard({
           <Plus size={16} /> Conta
         </Button>
       </div>
+      {data.expenses.length > 3 && (
+        <div className="list-tools" role="search">
+          <label className="list-tools__search">
+            <Search size={16} aria-hidden />
+            <span className="sr-only">Buscar conta</span>
+            <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar (ex.: mercado)" />
+          </label>
+          <select value={status} onChange={(e) => setStatus(e.target.value as StatusFilter)} aria-label="Filtrar por situação">
+            <option value="all">Todas</option>
+            <option value="pending">A pagar</option>
+            <option value="late">Atrasadas</option>
+            <option value="paid">Pagas</option>
+          </select>
+          <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} aria-label="Filtrar por categoria">
+            <option value="">Todas as categorias</option>
+            <option value="none">Sem categoria</option>
+            {categories.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+      {filtering && (
+        <p className="muted small" style={{ margin: 0 }} role="status">
+          {visible.length} de {data.expenses.length} conta(s) · {money(visibleTotal)}{" "}
+          <button
+            type="button"
+            className="link-btn"
+            onClick={() => {
+              setQuery("");
+              setStatus("all");
+              setCategoryFilter("");
+            }}
+          >
+            Limpar filtros
+          </button>
+        </p>
+      )}
       {data.expenses.length === 0 ? (
-        <EmptyState
+        <EmptyGuide
           icon={<Receipt size={22} />}
-          text="Nenhuma conta lançada neste mês."
+          title="Nenhuma conta neste mês"
+          text="Lance o que você paga: contas da casa, compras, assinaturas. Dá para marcar como paga, parcelar e repetir."
+          example={<>Ex.: “Aluguel” R$ 1.200 vence dia 10 · “Mercado” R$ 350 já pago · “TV” 10x de R$ 199</>}
           action={
             <Button type="button" onClick={() => setEditing({ type: "new-expense" })}>
               <Plus size={16} /> Lançar conta
@@ -213,14 +285,24 @@ function ExpensesCard({
             <span style={{ textAlign: "right" }}>Valor</span>
             <span />
           </li>
-          {data.expenses
-            .filter((expense) => !undo.isHidden(expense.id))
-            .map((expense) => (
+          {visible.map((expense) => (
               <LedgerRow
                 key={expense.id}
                 expense={expense}
                 category={expense.category_id ? byId.get(expense.category_id) : undefined}
                 onEdit={() => setEditing({ type: "expense", expense })}
+                onDuplicate={() =>
+                  setEditing({
+                    type: "new-expense",
+                    draft: {
+                      description: expense.description,
+                      amount: expense.amount,
+                      category_id: expense.category_id,
+                      payment_method: expense.payment_method,
+                      notes: expense.notes,
+                    },
+                  })
+                }
                 onDelete={() =>
                   // Conta avulsa: exclui na hora (com Desfazer). Parcelada ou fixa: pergunta o alcance.
                   expense.installment_group_id || expense.recurring_id
@@ -235,52 +317,65 @@ function ExpensesCard({
   );
 }
 
-function EmptyState({ icon, text, action }: { icon: React.ReactNode; text: string; action?: React.ReactNode }) {
+type StatusFilter = "all" | "pending" | "late" | "paid";
+
+// ---------------------------------------------------------------- renda e categorias (coluna lateral)
+
+function IncomeGroup({ title, items, setEditing }: { title: string; items: Income[]; setEditing: (e: Editing) => void }) {
+  if (items.length === 0) return null;
+  const total = items.reduce((sum, i) => sum + Number(i.amount), 0);
   return (
-    <div className="stack" style={{ alignItems: "center", textAlign: "center", padding: "28px 8px" }}>
-      <span className="kpi__icon kpi__icon--neutral" style={{ width: 44, height: 44, borderRadius: 12 }}>
-        {icon}
-      </span>
-      <p className="muted" style={{ margin: 0 }}>
-        {text}
-      </p>
-      {action}
+    <div className="stack stack--tight">
+      <div className="split small">
+        <strong>{title}</strong>
+        <span className="num muted">{money(total)}</span>
+      </div>
+      <ul className="items">
+        {items.map((income) => (
+          <li key={income.id} className="item">
+            <button type="button" className="item__main" onClick={() => setEditing({ type: "income", income })} title="Editar">
+              <span className="item__title">{income.description}</span>
+              <span className="item__meta">
+                {[income.recurring_id ? "Todo mês" : null, income.day ? `dia ${income.day}` : null, income.notes ? "📝" : null]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </span>
+            </button>
+            <span className="item__amount tone--ok">{money(income.amount)}</span>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
 
-// ---------------------------------------------------------------- renda e categorias (coluna lateral)
-
 function IncomesCard({ data, setEditing }: { data: MonthData; setEditing: (e: Editing) => void }) {
   const undo = useUndo();
+  const incomes = data.incomes.filter((income) => !undo.isHidden(income.id));
+  const fixed = incomes.filter((i) => i.income_type !== "variable");
+  const variable = incomes.filter((i) => i.income_type === "variable");
   return (
     <section className="card stack">
       <div className="section-header">
         <h2>
           Renda <span className="muted section-header__total">· {money(data.summary.income_total)}</span>
+          <Tip label="O que é renda fixa e variável">
+            Fixa: o mesmo valor todo mês (salário). Variável: muda a cada mês (bicos, comissões). A previsão usa a média da variável.
+          </Tip>
         </h2>
         <Button type="button" variant="secondary" className="only-desktop" onClick={() => setEditing({ type: "new-income" })}>
           <Plus size={16} /> Renda
         </Button>
       </div>
-      {data.incomes.length === 0 ? (
+      {incomes.length === 0 ? (
         <p className="muted" style={{ margin: 0 }}>
-          Nenhuma renda lançada neste mês.
+          Nenhuma renda lançada neste mês. Ex.: “Salário” R$ 3.200 todo dia 5, ou “Freela” como variável.
         </p>
       ) : (
-        <ul className="items">
-          {data.incomes
-            .filter((income) => !undo.isHidden(income.id))
-            .map((income) => (
-            <li key={income.id} className="item">
-              <button type="button" className="item__main" onClick={() => setEditing({ type: "income", income })} title="Editar">
-                <span className="item__title">{income.description}</span>
-                {income.recurring_id && <span className="item__meta">Todo mês</span>}
-              </button>
-              <span className="item__amount tone--ok">{money(income.amount)}</span>
-            </li>
-          ))}
-        </ul>
+        <>
+          <IncomeGroup title="Fixas" items={fixed} setEditing={setEditing} />
+          <IncomeGroup title="Variáveis" items={variable} setEditing={setEditing} />
+        </>
       )}
     </section>
   );
@@ -341,196 +436,6 @@ function BreakdownCard({ data, categories }: { data: MonthData; categories: Cate
         ))}
       </ul>
     </section>
-  );
-}
-
-// ---------------------------------------------------------------- formulários (janelas)
-
-type ExpenseKind = "single" | "installments" | "recurring";
-
-function ExpenseForm({
-  month,
-  categories,
-  expense,
-  onDone,
-}: {
-  month: string;
-  categories: Category[];
-  expense?: Expense;
-  onDone: () => void;
-}) {
-  const [description, setDescription] = useState(expense?.description ?? "");
-  const [amount, setAmount] = useState(expense ? moneyInput(expense.amount) : "");
-  const [categoryId, setCategoryId] = useState(expense?.category_id ?? "");
-  const [dueDate, setDueDate] = useState(expense?.due_date ?? "");
-  const [kind, setKind] = useState<ExpenseKind>("single");
-  const [installments, setInstallments] = useState("2");
-  const [error, setError] = useState("");
-  // "Já está paga": compras do dia a dia costumam ser lançadas depois de pagas. Sugere marcado
-  // para conta avulsa sem data ou com data de hoje/passada, até a pessoa mexer na caixa.
-  const [paidChoice, setPaidChoice] = useState<boolean | null>(null);
-  const suggestedPaid = kind === "single" && (!dueDate || dueDate <= todayISO());
-  const paid = kind === "recurring" ? false : (paidChoice ?? suggestedPaid);
-
-  const save = useBudgetMutation(async () => {
-    const value = requireMoney(amount);
-    const category_id = categoryId || null;
-    if (expense) {
-      await budgetApi.updateExpense(expense.id, { description, amount: value, category_id, due_date: dueDate || null });
-      return;
-    }
-    if (kind === "recurring") {
-      await budgetApi.createRecurring({
-        kind: "expense",
-        description,
-        amount: value,
-        category_id,
-        due_day: dueDate ? Number(dueDate.split("-")[2]) : null,
-        start_month: month,
-      });
-      return;
-    }
-    const data: ExpenseInput = { description, amount: value, category_id, due_date: dueDate || null, paid };
-    if (kind === "installments") data.installments = Number(installments);
-    await budgetApi.createExpense(month, data);
-  });
-
-  async function submit(event: FormEvent) {
-    event.preventDefault();
-    setError("");
-    try {
-      await save.mutateAsync(undefined);
-      onDone();
-    } catch (err) {
-      setError(errorMessage(err));
-    }
-  }
-
-  return (
-    <form className="inline-form" onSubmit={submit}>
-      <Alert tone="error">{error}</Alert>
-      {expense?.recurring_id && (
-        <Alert tone="info">Isto altera só este mês. Para mudar todos os meses, edite em Contas fixas.</Alert>
-      )}
-      <label>
-        Descrição
-        <input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Ex.: Aluguel" required maxLength={120} autoFocus />
-      </label>
-      <div className="grid-2">
-        <label>
-          {kind === "installments" ? "Valor de cada parcela" : "Valor"}
-          <MoneyInput value={amount} onChange={setAmount} />
-        </label>
-        <label>
-          {kind === "recurring" ? "Vence todo dia (escolha uma data)" : "Vencimento"}
-          <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
-        </label>
-      </div>
-      <label>
-        Categoria
-        <CategorySelect categories={categories} value={categoryId} onChange={setCategoryId} />
-      </label>
-      {!expense && (
-        <fieldset className="radios">
-          <legend className="sr-only">Tipo de conta</legend>
-          <div className="segmented">
-            <label>
-              <input type="radio" name="kind" checked={kind === "single"} onChange={() => setKind("single")} />
-              Só neste mês
-            </label>
-            <label>
-              <input type="radio" name="kind" checked={kind === "installments"} onChange={() => setKind("installments")} />
-              Parcelada
-            </label>
-            <label>
-              <input type="radio" name="kind" checked={kind === "recurring"} onChange={() => setKind("recurring")} />
-              Todo mês
-            </label>
-          </div>
-        </fieldset>
-      )}
-      {kind === "installments" && (
-        <label className="narrow">
-          Número de parcelas
-          <input type="number" min={2} max={120} value={installments} onChange={(e) => setInstallments(e.target.value)} required />
-        </label>
-      )}
-      {!expense && kind !== "recurring" && (
-        <label className="check">
-          <input type="checkbox" checked={paid} onChange={(e) => setPaidChoice(e.target.checked)} />
-          {kind === "installments" ? "A 1ª parcela já está paga" : "Já está paga"}
-        </label>
-      )}
-      <FormActions loading={save.isPending} onCancel={onDone} label={expense ? "Salvar" : "Adicionar conta"} />
-    </form>
-  );
-}
-
-function IncomeForm({ month, income, onDone }: { month: string; income?: Income; onDone: () => void }) {
-  const [description, setDescription] = useState(income?.description ?? "");
-  const [amount, setAmount] = useState(income ? moneyInput(income.amount) : "");
-  const [everyMonth, setEveryMonth] = useState(false);
-  const [error, setError] = useState("");
-  const save = useBudgetMutation(async () => {
-    const value = requireMoney(amount);
-    if (income) await budgetApi.updateIncome(income.id, { description, amount: value });
-    else if (everyMonth) await budgetApi.createRecurring({ kind: "income", description, amount: value, start_month: month });
-    else await budgetApi.createIncome(month, { description, amount: value });
-  });
-  const undo = useUndo();
-
-  async function submit(event: FormEvent) {
-    event.preventDefault();
-    setError("");
-    try {
-      await save.mutateAsync(undefined);
-      onDone();
-    } catch (err) {
-      setError(errorMessage(err));
-    }
-  }
-
-  function del(scope: DeleteScope) {
-    const target = income!;
-    undo.remove({
-      ids: [target.id],
-      message: `"${target.description}" excluída`,
-      commit: () => budgetApi.deleteIncome(target.id, scope),
-    });
-    onDone();
-  }
-
-  return (
-    <form className="inline-form" onSubmit={submit}>
-      <Alert tone="error">{error}</Alert>
-      <label>
-        Descrição
-        <input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Ex.: Salário" required maxLength={120} autoFocus />
-      </label>
-      <label>
-        Valor
-        <MoneyInput value={amount} onChange={setAmount} />
-      </label>
-      {!income && (
-        <label className="check">
-          <input type="checkbox" checked={everyMonth} onChange={(e) => setEveryMonth(e.target.checked)} />
-          Recebo todo mês (renda fixa)
-        </label>
-      )}
-      <FormActions loading={save.isPending} onCancel={onDone} label={income ? "Salvar" : "Adicionar renda"} />
-      {income && (
-        <div className="stack stack--tight" style={{ borderTop: "1px solid var(--border)", paddingTop: 16 }}>
-          <Button type="button" variant="danger" onClick={() => del("one")}>
-            <Trash2 size={16} /> {income.recurring_id ? "Excluir só deste mês" : "Excluir"}
-          </Button>
-          {income.recurring_id && (
-            <Button type="button" variant="danger" onClick={() => del("following")}>
-              Excluir deste mês em diante
-            </Button>
-          )}
-        </div>
-      )}
-    </form>
   );
 }
 
@@ -678,8 +583,9 @@ export default function MonthPage() {
               <div>
                 <h2>Comece pela sua renda</h2>
                 <p>
-                  Lance quanto você recebe e depois as contas do mês. O que se repete todo mês (salário, aluguel,
-                  internet) pode ir em <Link to="/fixas">Contas fixas</Link>: aí ele aparece sozinho nos próximos meses.
+                  Lance quanto você recebe e depois as contas do mês. Ex.: “Salário” R$ 3.200 (fixa, todo mês, dia 5) e
+                  “Aluguel” R$ 1.200 (se repete, vence dia 10). O que se repete aparece sozinho nos próximos meses; os
+                  gastos futuros (aniversário, IPVA) vão no <Link to="/calendario">Calendário</Link>.
                 </p>
                 <div className="row" style={{ marginTop: 12 }}>
                   <Button type="button" onClick={() => setEditing({ type: "new-income" })}>
@@ -737,20 +643,37 @@ export default function MonthPage() {
       </Sheet>
 
       <Sheet open={editing?.type === "new-expense"} title={`Nova conta · ${monthLabel(month)}`} onClose={close}>
-        <ExpenseForm month={month} categories={cats} onDone={close} />
+        {editing?.type === "new-expense" && (
+          <ExpenseForm month={month} categories={cats} draft={editing.draft} onDone={close} />
+        )}
       </Sheet>
       <Sheet open={editing?.type === "expense"} title="Editar conta" onClose={close}>
         {editing?.type === "expense" && (
           <div className="stack">
             <ExpenseForm month={month} categories={cats} expense={editing.expense} onDone={close} />
-            <Button
-              type="button"
-              variant="danger"
-              className="only-mobile"
-              onClick={() => setEditing({ type: "delete-expense", expense: editing.expense })}
-            >
-              <Trash2 size={16} /> Excluir conta
-            </Button>
+            <div className="row only-mobile">
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() =>
+                  setEditing({
+                    type: "new-expense",
+                    draft: {
+                      description: editing.expense.description,
+                      amount: editing.expense.amount,
+                      category_id: editing.expense.category_id,
+                      payment_method: editing.expense.payment_method,
+                      notes: editing.expense.notes,
+                    },
+                  })
+                }
+              >
+                <Copy size={16} /> Duplicar
+              </Button>
+              <Button type="button" variant="danger" onClick={() => setEditing({ type: "delete-expense", expense: editing.expense })}>
+                <Trash2 size={16} /> Excluir conta
+              </Button>
+            </div>
           </div>
         )}
       </Sheet>
@@ -758,7 +681,7 @@ export default function MonthPage() {
         {editing?.type === "delete-expense" && <DeleteExpense expense={editing.expense} onDone={close} />}
       </Sheet>
       <Sheet open={editing?.type === "new-income"} title={`Nova renda · ${monthLabel(month)}`} onClose={close}>
-        <IncomeForm month={month} onDone={close} />
+        {editing?.type === "new-income" && <IncomeForm month={month} onDone={close} />}
       </Sheet>
       <Sheet open={editing?.type === "income"} title="Editar renda" onClose={close}>
         {editing?.type === "income" && <IncomeForm month={month} income={editing.income} onDone={close} />}

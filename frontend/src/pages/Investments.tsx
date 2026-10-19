@@ -1,6 +1,7 @@
-import { useState, type FormEvent } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useEffect, useState, type FormEvent } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Landmark, Plus, ShieldCheck, Trash2, TrendingUp } from "lucide-react";
+import { Link, useSearchParams } from "react-router";
 
 import {
   analysisApi,
@@ -10,12 +11,17 @@ import {
 } from "../api/analysis";
 import { useBudgetMutation } from "../api/budget";
 import { errorMessage } from "../api/client";
+import { marketApi } from "../api/market";
 import { Badge, Bar, FormActions, MoneyInput, requireMoney } from "../components/budget";
+import { EmptyGuide, Tip } from "../components/help";
+import { MarketSection, PortfolioComments } from "../components/market";
 import { Alert, Button, Kpi, PageHeader, Sheet } from "../components/ui";
 import { useUndo } from "../components/undo";
 import { money, moneyInput, parseMoney, percent } from "../lib/format";
 
 const KEY = ["budget", "investments"] as const;
+// Tipos que costumam ter código na bolsa (ou cripto): o valor atual vem da cotação.
+const QUOTED: InvestmentKind[] = ["acoes", "fiis", "cripto", "fundos"];
 const KIND_COLORS: Record<InvestmentKind, string> = {
   poupanca: "#bab0ac",
   renda_fixa: "#4e79a7",
@@ -71,14 +77,21 @@ function InvestmentForm({ investment, onDone }: { investment?: Investment; onDon
   const [invested, setInvested] = useState(investment ? moneyInput(investment.invested_amount) : "");
   const [current, setCurrent] = useState(investment ? moneyInput(investment.current_value) : "");
   const [reserve, setReserve] = useState(investment?.is_emergency_reserve ?? false);
+  const [ticker, setTicker] = useState(investment?.ticker ?? "");
+  const [quantity, setQuantity] = useState(investment?.quantity ? String(Number(investment.quantity)).replace(".", ",") : "");
   const [error, setError] = useState("");
+  const quoted = QUOTED.includes(kind);
 
   const save = useBudgetMutation(async () => {
     const investedValue = parseMoney(invested);
     if (investedValue === null) throw new Error("Informe quanto você investiu.");
     // Valor atual em branco = igual ao investido.
     const currentValue = current.trim() ? requireMoney(current) : investedValue;
+    const qty = quantity.trim() ? Number(quantity.replace(/\./g, "").replace(",", ".")) : null;
+    if (qty !== null && !(qty > 0)) throw new Error("Quantidade inválida.");
     const data = {
+      ticker: quoted && ticker.trim() ? ticker.trim().toUpperCase() : null,
+      quantity: quoted && qty ? String(qty) : null,
       name,
       kind,
       institution: institution.trim() || null,
@@ -107,7 +120,7 @@ function InvestmentForm({ investment, onDone }: { investment?: Investment; onDon
       <div className="grid-2">
         <label>
           Nome
-          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="CDB 110% CDI" required maxLength={80} autoFocus />
+          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex.: CDB 110% CDI, Petrobras" required maxLength={80} autoFocus />
         </label>
         <label>
           Tipo
@@ -121,15 +134,38 @@ function InvestmentForm({ investment, onDone }: { investment?: Investment; onDon
         </label>
         <label>
           Instituição (opcional)
-          <input value={institution} onChange={(e) => setInstitution(e.target.value)} placeholder="Banco, corretora…" maxLength={80} />
+          <input value={institution} onChange={(e) => setInstitution(e.target.value)} placeholder="Ex.: Nubank, XP, Inter" maxLength={80} />
         </label>
+        {quoted && (
+          <>
+            <label>
+              <span className="field-label">
+                Código (opcional){" "}
+                <Tip>
+                  Código na B3 (PETR4, MXRF11, BOVA11) ou da cripto (BTC, ETH). Com código e quantidade, o valor atual se atualiza sozinho
+                  pela cotação.
+                </Tip>
+              </span>
+              <input value={ticker} onChange={(e) => setTicker(e.target.value)} placeholder="Ex.: PETR4" maxLength={12} autoCapitalize="characters" />
+            </label>
+            <label>
+              Quantidade
+              <input inputMode="decimal" value={quantity} onChange={(e) => setQuantity(e.target.value)} placeholder="Ex.: 100 ou 0,005 (BTC)" />
+            </label>
+          </>
+        )}
         <label>
           Quanto investiu
-          <MoneyInput value={invested} onChange={setInvested} />
+          <MoneyInput value={invested} onChange={setInvested} placeholder="Ex.: 5.000,00" />
         </label>
         <label>
           Valor atual
-          <input inputMode="decimal" placeholder="Igual ao investido" value={current} onChange={(e) => setCurrent(e.target.value)} />
+          <input
+            inputMode="decimal"
+            placeholder={quoted && ticker ? "Vem da cotação" : "Igual ao investido"}
+            value={current}
+            onChange={(e) => setCurrent(e.target.value)}
+          />
         </label>
       </div>
       <label className="check">
@@ -158,6 +194,8 @@ function InvestmentRow({ investment }: { investment: Investment }) {
         </span>
         <span className="item__meta">
           {INVESTMENT_KINDS[investment.kind]}
+          {investment.ticker && ` · ${investment.ticker}`}
+          {investment.ticker && investment.quantity && ` × ${Number(investment.quantity).toLocaleString("pt-BR")}`}
           {investment.institution && ` · ${investment.institution}`}
           {" · investido "}
           {money(investment.invested_amount)}
@@ -195,7 +233,46 @@ function InvestmentRow({ investment }: { investment: Investment }) {
   );
 }
 
+/** Atualiza pela cotação os investimentos com código e quantidade (a cada 2 min com a tela aberta). */
+function usePortfolioRefresh(enabled: boolean) {
+  const queryClient = useQueryClient();
+  const refresh = useQuery({
+    queryKey: ["market", "portfolio"],
+    queryFn: marketApi.refreshPortfolio,
+    enabled,
+    staleTime: 60_000,
+    refetchInterval: 120_000,
+  });
+  const updated = refresh.data?.updated.length ?? 0;
+  useEffect(() => {
+    if (refresh.dataUpdatedAt && updated > 0) void queryClient.invalidateQueries({ queryKey: KEY });
+  }, [refresh.dataUpdatedAt, updated, queryClient]);
+  return refresh;
+}
+
 export default function Investments() {
+  const [params] = useSearchParams();
+  const tab = params.get("secao") === "mercado" ? "mercado" : "carteira";
+  return (
+    <>
+      <PageHeader
+        title="Investimentos"
+        subtitle={tab === "mercado" ? "Cotações, índices e renda fixa, para se informar." : "Onde seu dinheiro está guardado e quanto está rendendo."}
+      />
+      <nav className="page-tabs no-print" aria-label="Seções de investimentos" style={{ marginBottom: 20 }}>
+        <Link to="/investimentos" aria-current={tab === "carteira" ? "page" : undefined}>
+          Minha carteira
+        </Link>
+        <Link to="/investimentos?secao=mercado" aria-current={tab === "mercado" ? "page" : undefined}>
+          Mercado
+        </Link>
+      </nav>
+      {tab === "mercado" ? <MarketSection /> : <Portfolio />}
+    </>
+  );
+}
+
+function Portfolio() {
   const list = useQuery({ queryKey: KEY, queryFn: analysisApi.investments });
   const [adding, setAdding] = useState(false);
   const items = list.data ?? [];
@@ -212,18 +289,15 @@ export default function Investments() {
   ).sort((a, b) => b[1] - a[1]);
 
   const gain = current - invested;
+  const refresh = usePortfolioRefresh(items.length > 0);
 
   return (
     <>
-      <PageHeader
-        title="Investimentos"
-        subtitle="Onde seu dinheiro está guardado e quanto está rendendo."
-        actions={
-          <Button type="button" onClick={() => setAdding(true)}>
-            <Plus size={16} /> Novo investimento
-          </Button>
-        }
-      />
+      <div className="row" style={{ justifyContent: "flex-end", marginBottom: 16 }}>
+        <Button type="button" onClick={() => setAdding(true)}>
+          <Plus size={16} /> Novo investimento
+        </Button>
+      </div>
       {list.isError && <Alert tone="error">{errorMessage(list.error)}</Alert>}
 
       <div className="stack" style={{ gap: 20 }}>
@@ -247,10 +321,17 @@ export default function Investments() {
             <h2>Carteira</h2>
             {list.isPending && <p className="muted">Carregando…</p>}
             {items.length === 0 && !list.isPending && (
-              <p className="muted" style={{ margin: 0 }}>
-                Cadastre onde seu dinheiro está guardado. Marque o que é reserva de emergência para que conte no seu
-                score financeiro.
-              </p>
+              <EmptyGuide
+                icon={<Landmark size={22} />}
+                title="Sua carteira está vazia"
+                text="Cadastre onde seu dinheiro está guardado. Marque o que é reserva de emergência para contar no score financeiro."
+                example={<>Ex.: “Reserva no CDB” R$ 5.000 (reserva) · “Petrobras” PETR4 × 100 (valor pela cotação)</>}
+                action={
+                  <Button type="button" onClick={() => setAdding(true)}>
+                    <Plus size={16} /> Adicionar investimento
+                  </Button>
+                }
+              />
             )}
             <ul className="items">
               {items
@@ -260,8 +341,8 @@ export default function Investments() {
               ))}
             </ul>
             <p className="muted small" style={{ margin: 0 }}>
-              Os valores atuais são informados por você. Atualize de tempos em tempos com o saldo do banco ou da
-              corretora.
+              Com código e quantidade, o valor atual vem da cotação (atualiza sozinho). Os demais são informados por você:
+              atualize de tempos em tempos com o saldo do banco ou da corretora.
             </p>
           </section>
 
@@ -288,6 +369,7 @@ export default function Investments() {
                 </ul>
               </section>
             )}
+            {refresh.data && <PortfolioComments comments={refresh.data.comments} />}
             <Indicators />
           </div>
         </div>

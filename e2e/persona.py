@@ -104,8 +104,10 @@ def add_expense(page: Page, month: str, desc: str, amount: float, cat: str, day:
     d.get_by_label("Descrição").fill(desc)
     if kind == "installments":
         d.get_by_label("Parcelada").check()
-    elif kind == "recurring":
-        d.get_by_label("Todo mês").check()
+    elif kind in ("recurring", "recurring_quarterly"):
+        d.get_by_label("Se repete").check()
+        if kind == "recurring_quarterly":
+            d.get_by_label("Frequência").select_option(label="A cada 3 meses")
     d.get_by_label(re.compile(r"^Valor")).fill(money(amount))
     if day:
         d.locator('input[type="date"]').fill(f"{month}-{day:02d}")
@@ -123,7 +125,7 @@ def add_income(page: Page, desc: str, amount: float, every_month: bool = False):
     d.get_by_label("Descrição").fill(desc)
     d.get_by_label("Valor", exact=True).fill(money(amount))
     if every_month:
-        d.get_by_label("Recebo todo mês (renda fixa)").check()
+        d.get_by_label("Todo mês", exact=True).check()
     d.get_by_role("button", name="Adicionar renda").click()
     expect(d).to_have_count(0, timeout=8000)
     idle(page, 50)
@@ -551,6 +553,139 @@ def saved_analyses(page: Page):
     # Deixa salva (e fixada) para os prints
 
 
+def month_plus(month: str, count: int) -> str:
+    index = int(month[:4]) * 12 + int(month[5:]) - 1 + count
+    return f"{index // 12}-{index % 12 + 1:02d}"
+
+
+@step("v0.5: renda variável, sugestão de categoria, parcela pelo total, frequência e 'este e os próximos'")
+def flexible_entries(page: Page, months: list[str]):
+    month = months[-1]
+    open_month(page, month)
+    # Renda variável, agrupada à parte.
+    page.get_by_role("button", name="Nova renda", exact=True).click()
+    d = dialog(page)
+    d.get_by_label("Descrição").fill("Freela (logo)")
+    d.get_by_label("Variável").check()
+    d.get_by_label("Valor (deste mês)").fill(money(380))
+    d.get_by_label("Dia do recebimento").fill("25")
+    d.get_by_role("button", name="Adicionar renda").click()
+    expect(d).to_have_count(0, timeout=8000)
+    idle(page)
+    income = next(i for i in api(page, f"/months/{month}")["incomes"] if i["description"] == "Freela (logo)")
+    assert (income["income_type"], income["day"]) == ("variable", 25), income
+    expect(page.get_by_text("Variáveis", exact=True)).to_be_visible()
+
+    # Categoria sugerida pelo nome; forma de pagamento; "Salvar e adicionar outro".
+    page.get_by_role("button", name="Nova conta", exact=True).click()
+    d = dialog(page)
+    d.get_by_label("Descrição").fill("Uber para o trabalho")
+    expect(d.locator(".suggest-chip")).to_contain_text("Transporte", timeout=6000)
+    assert d.get_by_label("Categoria").evaluate("e => e.options[e.selectedIndex].text") == "Transporte"
+    d.get_by_label(re.compile(r"^Valor")).fill(money(23.50))
+    d.get_by_text("Mais detalhes").click()
+    d.get_by_label("Pix").check()
+    d.get_by_role("button", name="Salvar e adicionar outro").click()
+    expect(d.get_by_text("1 conta(s) salva(s)")).to_be_visible(timeout=8000)
+    expect(d.get_by_label("Descrição")).to_have_value("")
+    # Parcelada informando o total: 3x de R$ 1.000.
+    d.get_by_label("Descrição").fill("Geladeira")
+    d.get_by_label("Parcelada").check()
+    d.get_by_label("Número de parcelas").fill("3")
+    d.get_by_label("O total").check()
+    d.get_by_label(re.compile(r"^Valor")).fill(money(3000))
+    d.get_by_label("Categoria").select_option(label="Moradia")
+    d.get_by_role("button", name="Adicionar conta").click()
+    expect(d).to_have_count(0, timeout=8000)
+    idle(page)
+    uber = next(e for e in api(page, f"/months/{month}")["expenses"] if e["description"] == "Uber para o trabalho")
+    assert uber["payment_method"] == "pix", uber
+    parcels = [
+        e["amount"]
+        for m in (month, month_plus(month, 1), month_plus(month, 2))
+        for e in api(page, f"/months/{m}")["expenses"]
+        if e["description"] == "Geladeira"
+    ]
+    assert [p.split(".")[0] for p in parcels] == ["1000"] * 3, parcels
+
+    # Conta a cada 3 meses (IPTU).
+    add_expense(page, month, "IPTU", 120, "Moradia", 10, kind="recurring_quarterly")
+    names = lambda m: [e["description"] for e in api(page, f"/months/{m}")["expenses"]]  # noqa: E731
+    assert "IPTU" in names(month)
+    assert "IPTU" not in names(month_plus(month, 1))
+    assert "IPTU" in names(month_plus(month, 3))
+
+    # Editar "este e os próximos": a internet sobe a partir deste mês.
+    open_month(page, month)
+    page.locator(".ledger__row", has_text="Internet").locator(".ledger__open").click()
+    d = dialog(page)
+    d.get_by_label("Valor", exact=True).fill(money(109.90))
+    d.get_by_label("Este e os próximos meses").check()
+    d.get_by_role("button", name="Salvar").click()
+    expect(d).to_have_count(0, timeout=8000)
+    idle(page)
+    internet = lambda m: next(e for e in api(page, f"/months/{m}")["expenses"] if e["description"] == "Internet")["amount"]  # noqa: E731
+    assert internet(month).startswith("109.9"), internet(month)
+    assert internet(month_plus(month, 2)).startswith("109.9")
+    assert internet(months[-2]).startswith("99.9"), "mês passado não pode mudar"
+
+    # Busca e filtro na lista.
+    open_month(page, month)
+    page.get_by_placeholder("Buscar (ex.: mercado)").fill("geladeira")
+    expect(page.locator(".ledger__row")).to_have_count(1)
+    page.get_by_role("button", name="Limpar filtros").click()
+    page.screenshot(path=OUT / "v05-orcamento.png", full_page=True)
+
+
+@step("Calendário: gasto planejado entra na previsão e vira conta com um toque")
+def calendar(page: Page):
+    page.goto(f"{BASE}/calendario")
+    idle(page)
+    expect(page.locator("h1")).to_be_visible()
+    page.get_by_role("button", name="Planejar gasto").first.click()
+    d = dialog(page)
+    d.get_by_label("O que é").fill("Presente da Júlia")
+    d.get_by_label("Valor previsto").fill(money(150))
+    day = min(TODAY.day + 2, 28)
+    d.get_by_label("Data").fill(f"{CURRENT}-{day:02d}")
+    d.get_by_role("button", name="Planejar gasto").click()
+    expect(d).to_have_count(0, timeout=8000)
+    idle(page)
+    planned = api(page, f"/planned?month={CURRENT}")
+    assert [p["description"] for p in planned] == ["Presente da Júlia"], planned
+    projection = api(page, f"/analysis/projection?start={CURRENT}&months=1")[0]
+    assert float(projection["planned"]) >= 150, projection
+    page.screenshot(path=OUT / "v05-calendario.png", full_page=True)
+    page.get_by_role("button", name=re.compile("Abrir planejado Presente da Júlia")).first.click()
+    d = dialog(page)
+    d.get_by_role("button", name="Lançar já paga").click()
+    expect(d).to_have_count(0, timeout=8000)
+    idle(page)
+    expense = next(e for e in api(page, f"/months/{CURRENT}")["expenses"] if e["description"] == "Presente da Júlia")
+    assert expense["paid"] is True and expense["due_date"] == f"{CURRENT}-{day:02d}", expense
+    assert api(page, f"/planned?month={CURRENT}")[0]["expense_id"] == expense["id"]
+
+
+@step("Investimentos → Mercado: aviso fixo, abas e simulador; Ajuda e tour")
+def market_and_help(page: Page):
+    page.goto(f"{BASE}/investimentos?secao=mercado")
+    idle(page, 500)
+    expect(page.get_by_role("link", name="Mercado")).to_have_attribute("aria-current", "page")
+    expect(page.get_by_role("note").filter(has_text="não é recomendação")).to_be_visible()
+    expect(page.get_by_role("heading", name=re.compile("Simulador de renda fixa"))).to_be_visible()
+    page.screenshot(path=OUT / "v05-mercado.png", full_page=True)
+    page.goto(f"{BASE}/ajuda")
+    idle(page)
+    expect(page.get_by_role("heading", name="Calendário")).to_be_visible()
+    page.get_by_role("button", name="Rever o tour").click()
+    d = dialog(page)
+    expect(d).to_contain_text("Tour rápido")
+    d.get_by_role("button", name="Próximo").click()
+    expect(d).to_contain_text("Orçamento")
+    d.get_by_role("button", name="Pular tour").click()
+    expect(d).to_have_count(0)
+
+
 @step("Versão e data do update no fim do menu")
 def version(page: Page):
     page.goto(f"{BASE}/orcamento")
@@ -582,8 +717,8 @@ def mobile_sections(browser):
     page.goto(f"{BASE}/analises?secao=resumo")
     idle(page, 700)
     swipe(60, 330)
-    assert page.url.endswith("/metas"), page.url
-    # Tela curta (Metas): o gesto vale também na parte de baixo, onde não há conteúdo.
+    assert page.url.endswith("/calendario"), page.url
+    # O gesto vale também na parte de baixo da tela.
     idle(page, 500)
     swipe(330, 60, y=720)
     assert "/analises" in page.url, page.url
@@ -732,7 +867,7 @@ def mobile(browser):
     page.screenshot(path=OUT / "celular-categorias.png", full_page=True)
     overflow = page.evaluate("document.documentElement.scrollWidth > window.innerWidth")
     assert not overflow, "rolagem lateral no celular"
-    for path in ("/orcamento", "/metas", "/analises", "/investimentos", "/historico", "/fixas", "/dados", "/seguranca"):
+    for path in ("/orcamento", "/calendario", "/metas", "/analises", "/investimentos", "/investimentos?secao=mercado", "/historico", "/fixas", "/dados", "/seguranca", "/ajuda"):
         page.goto(BASE + path)
         idle(page, 300)
         wide = page.evaluate("document.documentElement.scrollWidth - window.innerWidth")
@@ -775,6 +910,9 @@ def main():
         chart_interaction(page)
         builder(page)
         saved_analyses(page)
+        flexible_entries(page, months)
+        calendar(page)
+        market_and_help(page)
         version(page)
         history_report(page, months)
         exports(page)

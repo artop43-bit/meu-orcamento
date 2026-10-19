@@ -3,9 +3,9 @@
  * do changelog (pasta changelog/), que tem a mesma versão, data e hora.
  */
 export const RELEASE = {
-  version: "0.4.4",
+  version: "0.5.0",
   // Data e hora (Brasília) em que o update foi publicado.
-  releasedAt: "2026-10-16T21:15:00-03:00",
+  releasedAt: "2026-10-19T00:30:00-03:00",
 };
 
 export function releaseLabel(): string {

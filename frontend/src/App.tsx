@@ -12,9 +12,11 @@ import ResetPassword from "./pages/ResetPassword";
 import VerifyEmail from "./pages/VerifyEmail";
 import {
   Analysis,
+  CalendarPage,
   Categories,
   DataPage,
   Goals,
+  HelpPage,
   History,
   Investments,
   Privacy,
@@ -68,6 +70,8 @@ export default function App() {
         <Route element={<RequireAuth />}>
           <Route path="/" element={<Navigate to="/orcamento" replace />} />
           <Route path="/orcamento/:month?" element={<MonthPage />} />
+          <Route path="/calendario/:month?" element={<CalendarPage />} />
+          <Route path="/ajuda" element={<HelpPage />} />
           <Route path="/metas" element={<Goals />} />
           <Route path="/historico" element={<History />} />
           <Route path="/analises" element={<Analysis />} />

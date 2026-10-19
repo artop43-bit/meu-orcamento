@@ -49,6 +49,7 @@ export type ProjectionPoint = {
   month: string;
   income: string;
   expenses: string;
+  planned?: string;
   non_essential: string;
   balance: string;
   cumulative: string;
@@ -86,6 +87,8 @@ export type Investment = {
   current_value: string;
   is_emergency_reserve: boolean;
   notes: string | null;
+  ticker: string | null;
+  quantity: string | null;
   updated_at: string;
   return_amount: string;
   return_pct: number | null;
@@ -98,6 +101,8 @@ export type InvestmentInput = {
   invested_amount: string;
   current_value: string;
   is_emergency_reserve: boolean;
+  ticker?: string | null;
+  quantity?: string | null;
 };
 
 type IndicatorValue = { value: number; date: string } | null;
