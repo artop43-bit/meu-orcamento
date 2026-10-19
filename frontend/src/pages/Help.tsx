@@ -1,5 +1,17 @@
 import type { ReactNode } from "react";
-import { CalendarDays, ChartPie, Landmark, PlayCircle, Repeat, Tags, Target, Upload, Wallet } from "lucide-react";
+import {
+  CalendarDays,
+  ChartPie,
+  CreditCard,
+  Landmark,
+  PlayCircle,
+  Repeat,
+  SlidersHorizontal,
+  Tags,
+  Target,
+  Upload,
+  Wallet,
+} from "lucide-react";
 import { Link } from "react-router";
 
 import { openTour } from "../components/help";
@@ -32,6 +44,21 @@ const TOPICS: Topic[] = [
         <strong>Mudou o valor?</strong> Edite e escolha “Só este mês” ou “Este e os próximos”.
       </>,
       <>Toque no ⧉ para duplicar uma conta, e use a busca e os filtros quando a lista crescer.</>,
+      <>
+        <strong>Lançar numa frase</strong>: no campo rápido do topo (ou Ctrl+K) escreva “mercado 120 pix ontem”, “tv 1990 10x
+        crédito” ou “+ freela 600” (renda).
+      </>,
+      <>
+        <strong>Várias de uma vez</strong>: “Selecionar” para pagar, mudar categoria ou excluir em lote; “Marcar todas como pagas”
+        resolve as vencidas.
+      </>,
+      <>
+        <strong>No celular</strong>: deslize a conta para a direita para pagar e para a esquerda para excluir (com Desfazer).
+      </>,
+      <>
+        <strong>Quanto posso gastar hoje</strong>: o quadro ao lado divide o que sobra do mês pelos dias que faltam, já tirando
+        contas e planejados.
+      </>,
     ],
   },
   {
@@ -68,6 +95,27 @@ const TOPICS: Topic[] = [
     ],
   },
   {
+    icon: <CreditCard size={20} />,
+    title: "Cartões de crédito",
+    to: "/cartoes",
+    items: [
+      "Cadastre o cartão com o dia de fechamento e o de vencimento (estão no app do banco).",
+      "Ao lançar com a forma de pagamento Crédito, escolha o cartão e a data da compra: ela vai para a fatura certa.",
+      "Parcelas vão uma para cada fatura seguinte. O melhor dia de compra é o do fechamento.",
+      "Pague a fatura marcando-a como paga; não lance o pagamento como outra conta (seria contar duas vezes).",
+    ],
+  },
+  {
+    icon: <SlidersHorizontal size={20} />,
+    title: "Preferências e atalhos",
+    to: "/preferencias",
+    items: [
+      "Tema claro ou escuro, cor de destaque, texto maior e modo compacto.",
+      "Tecla P (ou o olho no topo) esconde os valores. Ctrl+Z desfaz a última exclusão ou alteração.",
+      "Sugestões e problemas: “Enviar sugestão” no menu chega direto a quem faz o app.",
+    ],
+  },
+  {
     icon: <Target size={20} />,
     title: "Metas",
     to: "/metas",
@@ -77,13 +125,19 @@ const TOPICS: Topic[] = [
     icon: <Repeat size={20} />,
     title: "Contas fixas",
     to: "/fixas",
-    items: ["Lista tudo o que se repete. Daqui dá para encerrar, mudar valor ou frequência de uma vez."],
+    items: [
+      "Lista tudo o que se repete. Daqui dá para encerrar, mudar valor ou frequência de uma vez.",
+      "Mostra quanto as assinaturas custam por mês e por ano, e sugere virar fixa o que se repete todo mês.",
+    ],
   },
   {
     icon: <Tags size={20} />,
     title: "Categorias",
     to: "/categorias",
-    items: ["Crie as suas, marque o que é essencial e defina um limite por mês (o consultor avisa quando chega perto)."],
+    items: [
+      "Crie as suas, marque o que é essencial e defina um limite por mês (o consultor avisa quando chega perto).",
+      "Regras automáticas: “contém uber → Transporte” vale ao lançar, na sugestão e ao importar o extrato.",
+    ],
   },
   {
     icon: <Upload size={20} />,

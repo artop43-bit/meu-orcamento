@@ -14,13 +14,24 @@ import { haptic } from "../lib/haptics";
 const DELAY = 6000;
 
 type Pending = { key: number; ids: string[]; message: string; commit: () => Promise<unknown> };
+/** Ação já feita (ex.: edição) que pode ser revertida pelo aviso. */
+type Done = { key: number; message: string; revert: () => Promise<unknown> };
 
 type UndoApi = {
   remove: (options: { ids: string[]; message: string; commit: () => Promise<unknown> }) => void;
   isHidden: (id: string) => boolean;
+  /** Mostra "Salvo · Desfazer" depois de uma alteração. */
+  done: (options: { message: string; revert: () => Promise<unknown> }) => void;
+  /** Desfaz o que estiver no aviso (Ctrl+Z). Retorna se havia algo. */
+  undoLast: () => boolean;
 };
 
-const UndoContext = createContext<UndoApi>({ remove: () => undefined, isHidden: () => false });
+const UndoContext = createContext<UndoApi>({
+  remove: () => undefined,
+  isHidden: () => false,
+  done: () => undefined,
+  undoLast: () => false,
+});
 
 export function useUndo(): UndoApi {
   return useContext(UndoContext);
@@ -84,6 +95,50 @@ export function UndoProvider({ children }: { children: ReactNode }) {
     [commit, start],
   );
 
+  const [doneItem, setDoneItem] = useState<Done | null>(null);
+  const doneTimer = useRef<number | undefined>(undefined);
+  const doneRef = useRef<Done | null>(null);
+
+  const done = useCallback<UndoApi["done"]>(({ message, revert }) => {
+    const item = { key: Date.now(), message, revert };
+    doneRef.current = item;
+    setDoneItem(item);
+    announce(`${message}. Para desfazer, use o botão Desfazer.`);
+    window.clearTimeout(doneTimer.current);
+    doneTimer.current = window.setTimeout(() => {
+      doneRef.current = null;
+      setDoneItem(null);
+    }, DELAY);
+  }, []);
+
+  async function revertDone() {
+    const item = doneRef.current;
+    if (!item) return;
+    doneRef.current = null;
+    setDoneItem(null);
+    window.clearTimeout(doneTimer.current);
+    try {
+      await item.revert();
+      await queryClient.invalidateQueries({ queryKey: ["budget"] });
+      announce("Alteração desfeita");
+      haptic("tap");
+    } catch (err) {
+      setError(`Não foi possível desfazer: ${errorMessage(err)}`);
+    }
+  }
+
+  function undoLast(): boolean {
+    if (current.current) {
+      undo();
+      return true;
+    }
+    if (doneRef.current) {
+      void revertDone();
+      return true;
+    }
+    return false;
+  }
+
   function undo() {
     const item = current.current;
     if (!item) return;
@@ -106,7 +161,7 @@ export function UndoProvider({ children }: { children: ReactNode }) {
   const isHidden = useCallback((id: string) => hidden.has(id), [hidden]);
 
   return (
-    <UndoContext.Provider value={{ remove, isHidden }}>
+    <UndoContext.Provider value={{ remove, isHidden, done, undoLast }}>
       {children}
       {pending && (
         <div
@@ -123,7 +178,20 @@ export function UndoProvider({ children }: { children: ReactNode }) {
           </button>
         </div>
       )}
-      {!pending && error && (
+      {!pending && doneItem && (
+        <div className="toast toast--done no-print" role="status">
+          <span>
+            <span className="toast__check" aria-hidden>
+              ✓
+            </span>{" "}
+            {doneItem.message}
+          </span>
+          <button type="button" onClick={() => void revertDone()}>
+            Desfazer
+          </button>
+        </div>
+      )}
+      {!pending && !doneItem && error && (
         <div className="toast no-print" role="alert">
           <span>{error}</span>
           <button type="button" onClick={() => setError("")}>

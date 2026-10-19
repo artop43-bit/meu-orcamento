@@ -7,6 +7,9 @@ import { lazy } from "react";
 const loaders = {
   Analysis: () => import("./Analysis"),
   Calendar: () => import("./Calendar"),
+  Cards: () => import("./Cards"),
+  Preferences: () => import("./Preferences"),
+  AdminFeedback: () => import("./AdminFeedback"),
   Help: () => import("./Help"),
   Categories: () => import("./Categories"),
   Data: () => import("./Data"),
@@ -21,6 +24,9 @@ const loaders = {
 
 export const Analysis = lazy(loaders.Analysis);
 export const CalendarPage = lazy(loaders.Calendar);
+export const CardsPage = lazy(loaders.Cards);
+export const PreferencesPage = lazy(loaders.Preferences);
+export const AdminFeedbackPage = lazy(loaders.AdminFeedback);
 export const HelpPage = lazy(loaders.Help);
 export const Categories = lazy(loaders.Categories);
 export const DataPage = lazy(loaders.Data);

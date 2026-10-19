@@ -224,7 +224,8 @@ function StatementImport() {
     try {
       const result = await dataApi.statementPreview(target.name, await readTextFile(target), invertSigns);
       setPreview(result);
-      setSelected(new Set(result.transactions.filter((t) => !t.duplicate).map((t) => t.ref)));
+      // Já importados e pagamentos de fatura (as compras do cartão já estão no app) vêm desmarcados.
+      setSelected(new Set(result.transactions.filter((t) => !t.duplicate && !t.card_payment).map((t) => t.ref)));
       setCategoryOf(Object.fromEntries(result.transactions.map((t) => [t.ref, t.category_id ?? ""])));
     } catch (err) {
       setPreview(null);
@@ -246,7 +247,7 @@ function StatementImport() {
     if (!preview) return;
     const chosen = preview.transactions
       .filter((t) => selected.has(t.ref))
-      .map(({ duplicate: _duplicate, ...t }) => ({
+      .map(({ duplicate: _duplicate, card_payment: _card, ...t }) => ({
         ...t,
         category_id: t.kind === "expense" ? categoryOf[t.ref] || null : null,
       }));
@@ -330,6 +331,7 @@ function StatementImport() {
                     <td>{shortDate(t.date)}</td>
                     <td className="wrap">
                       {t.description} {t.duplicate && <Badge>já importado</Badge>}
+                      {t.card_payment && <Badge>pagamento de fatura</Badge>}
                     </td>
                     <td>
                       {t.kind === "expense" ? (

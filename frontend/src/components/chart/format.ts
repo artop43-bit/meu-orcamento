@@ -1,3 +1,4 @@
+import { getPrefs } from "../../lib/prefs";
 import { money } from "../../lib/format";
 
 export type ChartType = "bar" | "stacked" | "line" | "area" | "donut" | "hbar" | "table";
@@ -19,6 +20,7 @@ export function formatValue(value: number | null | undefined, unit: ChartUnit): 
 /** Valor curto para eixos e para o centro da rosca: "R$ 2,3 mil", "R$ 850", "12%". */
 export function compactValue(value: number, unit: ChartUnit): string {
   if (unit === "percent") return `${Math.round(value)}%`;
+  if (getPrefs().privacy) return "R$ ••";
   const abs = Math.abs(value);
   const sign = value < 0 ? "-" : "";
   if (abs >= 1_000_000) return `${sign}R$ ${(abs / 1_000_000).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} mi`;

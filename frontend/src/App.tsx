@@ -11,14 +11,17 @@ import Register from "./pages/Register";
 import ResetPassword from "./pages/ResetPassword";
 import VerifyEmail from "./pages/VerifyEmail";
 import {
+  AdminFeedbackPage,
   Analysis,
   CalendarPage,
+  CardsPage,
   Categories,
   DataPage,
   Goals,
   HelpPage,
   History,
   Investments,
+  PreferencesPage,
   Privacy,
   RecurringPage,
   Report,
@@ -72,6 +75,9 @@ export default function App() {
           <Route path="/orcamento/:month?" element={<MonthPage />} />
           <Route path="/calendario/:month?" element={<CalendarPage />} />
           <Route path="/ajuda" element={<HelpPage />} />
+          <Route path="/cartoes" element={<CardsPage />} />
+          <Route path="/preferencias" element={<PreferencesPage />} />
+          <Route path="/admin/sugestoes" element={<AdminFeedbackPage />} />
           <Route path="/metas" element={<Goals />} />
           <Route path="/historico" element={<History />} />
           <Route path="/analises" element={<Analysis />} />

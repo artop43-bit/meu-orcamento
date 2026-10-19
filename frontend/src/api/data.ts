@@ -42,7 +42,7 @@ export type StatementTransaction = {
 };
 export type StatementPreview = {
   format: "ofx" | "csv";
-  transactions: (StatementTransaction & { duplicate: boolean })[];
+  transactions: (StatementTransaction & { duplicate: boolean; card_payment?: boolean })[];
 };
 
 export const dataApi = {

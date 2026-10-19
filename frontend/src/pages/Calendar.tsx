@@ -7,12 +7,13 @@ import {
   ChevronLeft,
   ChevronRight,
   CreditCard,
+  Lock,
   Pencil,
   Receipt,
   Repeat,
   Trash2,
 } from "lucide-react";
-import { Link, useParams } from "react-router";
+import { Link, useParams, useSearchParams } from "react-router";
 
 import {
   budgetApi,
@@ -38,6 +39,8 @@ const KINDS: Record<CalendarKind, { label: string; icon: ReactNode; className: s
   recurring: { label: "Fixa", icon: <Repeat size={13} />, className: "ev--recurring" },
   installment: { label: "Parcela", icon: <CreditCard size={13} />, className: "ev--installment" },
   planned: { label: "Planejado", icon: <CalendarPlus size={13} />, className: "ev--planned" },
+  invoice: { label: "Fatura", icon: <CreditCard size={13} />, className: "ev--invoice" },
+  invoice_close: { label: "Fechamento", icon: <Lock size={13} />, className: "ev--invoice-close" },
 };
 const WEEKDAYS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 const WEEKDAYS_LONG = ["domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sábado"];
@@ -73,6 +76,8 @@ function dayLabel(iso: string): string {
 }
 
 function eventStatus(e: CalendarEvent): string {
+  if (e.kind === "invoice_close") return "compras a partir de hoje vão para a próxima fatura";
+  if (e.kind === "invoice") return e.paid ? "paga" : "a pagar";
   if (e.kind === "income") return e.income_type === "variable" ? "variável" : "";
   if (e.kind === "planned") return e.paid ? "lançado" : "previsto";
   if (e.paid) return "paga";
@@ -83,7 +88,7 @@ function eventStatus(e: CalendarEvent): string {
 function EventChip({ event, compact }: { event: CalendarEvent; compact?: boolean }) {
   const kind = KINDS[event.kind];
   const status = eventStatus(event);
-  const sign = event.kind === "income" ? "+" : "−";
+  const sign = event.kind === "income" ? "+" : event.kind === "invoice_close" ? "" : "−";
   return (
     <span className={`ev ${kind.className} ${event.paid ? "ev--done" : ""}`}>
       <span className="ev__icon" aria-hidden>
@@ -251,8 +256,14 @@ export default function CalendarPage() {
   const calendar = useCalendar(month);
   const planned = useQuery({ queryKey: ["budget", "planned", month], queryFn: () => budgetApi.planned(month) });
   const categories = useCategories();
-  const [editing, setEditing] = useState<Editing>(null);
-  const close = () => setEditing(null);
+  const [search, setSearch] = useSearchParams();
+  const [editing, setEditing] = useState<Editing>(() =>
+    search.get("novo") ? { type: "new-planned", date: todayISO() } : null,
+  );
+  const close = () => {
+    setEditing(null);
+    if (search.get("novo")) setSearch({}, { replace: true });
+  };
   const today = todayISO();
   const events = useMemo(() => calendar.data?.events ?? [], [calendar.data]);
 
@@ -273,7 +284,7 @@ export default function CalendarPage() {
       if (e.kind === "income") incoming += Number(e.amount);
       else if (e.kind === "planned") {
         if (!e.paid) plannedTotal += Number(e.amount);
-      } else outgoing += Number(e.amount);
+      } else if (e.kind !== "invoice_close") outgoing += Number(e.amount);
     }
     return { incoming, outgoing, plannedTotal };
   }, [events]);
@@ -283,7 +294,7 @@ export default function CalendarPage() {
     const limit = new Date();
     limit.setDate(limit.getDate() + 7);
     const end = `${limit.getFullYear()}-${String(limit.getMonth() + 1).padStart(2, "0")}-${String(limit.getDate()).padStart(2, "0")}`;
-    return events.filter((e) => e.kind !== "income" && !e.paid && e.date && e.date >= today && e.date <= end);
+    return events.filter((e) => e.kind !== "income" && e.kind !== "invoice_close" && !e.paid && e.date && e.date >= today && e.date <= end);
   }, [events, today]);
 
   const plannedById = new Map((planned.data ?? []).map((p) => [p.id, p]));

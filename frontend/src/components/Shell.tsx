@@ -5,6 +5,13 @@ import {
   CalendarDays,
   ChartPie,
   CircleHelp,
+  CreditCard,
+  Eye,
+  EyeOff,
+  Inbox,
+  MessageSquarePlus,
+  Search,
+  SlidersHorizontal,
   Ellipsis,
   History,
   Landmark,
@@ -25,6 +32,8 @@ import { neighbor } from "../lib/gestures";
 import { haptic } from "../lib/haptics";
 import { releaseLabel } from "../release";
 import { Tour } from "./help";
+import { openFeedback, openPalette, PowerLayer } from "./power";
+import { togglePrivacy, usePrefs } from "../lib/prefs";
 import { Brand, LoadingRegion, Sheet, Skeleton } from "./ui";
 import { UndoProvider } from "./undo";
 import { ErrorBoundary } from "./ErrorBoundary";
@@ -51,6 +60,7 @@ const MAIN: NavItem[] = [
   { to: "/calendario", label: "Calendário", icon: <CalendarDays size={20} /> },
   { to: "/analises", label: "Análise financeira", short: "Análises", icon: <ChartPie size={20} /> },
   { to: "/investimentos", label: "Investimentos", icon: <Landmark size={20} /> },
+  { to: "/cartoes", label: "Cartões", icon: <CreditCard size={20} /> },
   { to: "/metas", label: "Metas", icon: <Target size={20} /> },
   { to: "/historico", label: "Histórico", icon: <History size={20} /> },
 ];
@@ -60,8 +70,10 @@ const SETTINGS: NavItem[] = [
   { to: "/categorias", label: "Categorias", icon: <Tags size={20} /> },
   { to: "/dados", label: "Importar e exportar", icon: <ArrowLeftRight size={20} /> },
   { to: "/seguranca", label: "Segurança", icon: <ShieldCheck size={20} /> },
+  { to: "/preferencias", label: "Preferências", icon: <SlidersHorizontal size={20} /> },
   { to: "/ajuda", label: "Como usar", icon: <CircleHelp size={20} /> },
 ];
+const ADMIN: NavItem = { to: "/admin", label: "Sugestões recebidas", icon: <Inbox size={20} /> };
 
 // No celular, as 4 primeiras viram abas; o resto vai para "Mais".
 const TABS = MAIN.slice(0, 4);
@@ -99,6 +111,7 @@ export function Shell() {
   const location = useLocation();
   const navigate = useNavigate();
   const [moreOpen, setMoreOpen] = useState(false);
+  const prefs = usePrefs();
   const contentRef = useRef<HTMLElement>(null);
   const pageRef = useRef<HTMLDivElement>(null);
   const pullRef = useRef<HTMLDivElement>(null);
@@ -230,7 +243,31 @@ export function Shell() {
               {item.label}
             </NavLink>
           ))}
+          {user?.is_admin && (
+            <NavLink to="/admin/sugestoes" className="sidebar__link">
+              {ADMIN.icon}
+              {ADMIN.label}
+            </NavLink>
+          )}
         </nav>
+        <div className="sidebar__tools" role="toolbar" aria-label="Ferramentas">
+          <button type="button" className="sidebar__tool sidebar__tool--wide" onClick={openPalette} title="Buscar ou lançar (Ctrl+K)">
+            <Search size={17} aria-hidden /> <span>Buscar</span>
+          </button>
+          <button
+            type="button"
+            className="sidebar__tool"
+            onClick={() => togglePrivacy()}
+            aria-pressed={prefs.privacy}
+            aria-label={prefs.privacy ? "Mostrar valores" : "Esconder valores"}
+            title={prefs.privacy ? "Mostrar valores (P)" : "Esconder valores (P)"}
+          >
+            {prefs.privacy ? <Eye size={17} /> : <EyeOff size={17} />}
+          </button>
+          <button type="button" className="sidebar__tool" onClick={openFeedback} aria-label="Enviar sugestão" title="Enviar sugestão">
+            <MessageSquarePlus size={17} />
+          </button>
+        </div>
         <div className="sidebar__footer">
           <span className="sidebar__user" title={user?.email}>
             {user?.email}
@@ -255,9 +292,17 @@ export function Shell() {
       <div className="shell__main">
         <header className={`mobile-bar no-print ${condensed ? "is-condensed" : ""}`}>
           <strong style={{ fontSize: "1.1rem" }}>{title}</strong>
-          <Link to="/" className="brand__logo" aria-label="Meu Orçamento, início">
-            <Wallet size={18} />
-          </Link>
+          <span className="row" style={{ gap: 4 }}>
+            <button type="button" className="icon-btn" onClick={() => togglePrivacy()} aria-pressed={prefs.privacy} aria-label={prefs.privacy ? "Mostrar valores" : "Esconder valores"}>
+              {prefs.privacy ? <Eye size={18} /> : <EyeOff size={18} />}
+            </button>
+            <button type="button" className="icon-btn" onClick={openPalette} aria-label="Buscar ou lançar">
+              <Search size={18} />
+            </button>
+            <Link to="/" className="brand__logo" aria-label="Meu Orçamento, início">
+              <Wallet size={18} />
+            </Link>
+          </span>
         </header>
 
         <div ref={pullRef} className="pull no-print" aria-hidden>
@@ -282,7 +327,8 @@ export function Shell() {
                 </span>
               </div>
             )}
-            <ErrorBoundary key={location.pathname}>
+            {/* A chave inclui a privacidade: ao esconder/mostrar valores, a tela redesenha. */}
+            <ErrorBoundary key={`${location.pathname}-${prefs.privacy}`}>
               <Suspense fallback={<PageLoading />}>
                 <Outlet />
               </Suspense>
@@ -321,6 +367,19 @@ export function Shell() {
               </Link>
             </li>
           ))}
+          {user?.is_admin && (
+            <li>
+              <Link to="/admin/sugestoes">
+                {ADMIN.icon}
+                {ADMIN.label}
+              </Link>
+            </li>
+          )}
+          <li>
+            <button type="button" onClick={openFeedback}>
+              <MessageSquarePlus size={20} /> Enviar sugestão
+            </button>
+          </li>
           <li>
             <button type="button" onClick={logout}>
               <LogOut size={20} /> Sair
@@ -336,6 +395,7 @@ export function Shell() {
       </Sheet>
 
       <Tour />
+      <PowerLayer />
       <div id="sr-announcer" className="sr-only" role="status" aria-live="polite" />
     </div>
     </UndoProvider>

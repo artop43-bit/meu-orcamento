@@ -41,6 +41,8 @@ PAGES = [
     "/investimentos?secao=mercado",
     "/calendario",
     "/ajuda",
+    "/cartoes",
+    "/preferencias",
     "/historico",
     "/fixas",
     "/categorias",

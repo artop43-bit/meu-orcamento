@@ -7,6 +7,7 @@ export type User = {
   email: string;
   email_verified: boolean;
   totp_enabled: boolean;
+  is_admin?: boolean;
   twofa_prompt_dismissed: boolean;
   created_at: string;
 };

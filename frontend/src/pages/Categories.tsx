@@ -1,9 +1,12 @@
 import { useState, type FormEvent } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Plus, Trash2 } from "lucide-react";
 
 import { budgetApi, useBudgetMutation, useCategories, type Category } from "../api/budget";
 import { errorMessage } from "../api/client";
-import { FormActions, MoneyInput, requireMoney } from "../components/budget";
+import { extrasApi, extrasKeys } from "../api/extras";
+import { CategorySelect, FormActions, MoneyInput, requireMoney } from "../components/budget";
+import { Tip } from "../components/help";
 import { Alert, Button, PageHeader } from "../components/ui";
 import { money, moneyInput } from "../lib/format";
 
@@ -91,6 +94,63 @@ function CategoryRow({ category }: { category: Category }) {
   );
 }
 
+function Rules() {
+  const rules = useQuery({ queryKey: extrasKeys.rules, queryFn: extrasApi.rules });
+  const categories = useCategories();
+  const [pattern, setPattern] = useState("");
+  const [categoryId, setCategoryId] = useState("");
+  const [error, setError] = useState("");
+  const create = useBudgetMutation(() => extrasApi.createRule(pattern, categoryId));
+  const remove = useBudgetMutation((id: string) => extrasApi.deleteRule(id));
+  const names = new Map((categories.data ?? []).map((c) => [c.id, c.name]));
+
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    setError("");
+    try {
+      await create.mutateAsync(undefined);
+      setPattern("");
+    } catch (err) {
+      setError(errorMessage(err));
+    }
+  }
+
+  return (
+    <section className="card stack">
+      <h2>
+        Regras automáticas{" "}
+        <Tip>Quando a descrição tiver o texto, a categoria é escolhida sozinha: ao lançar, na sugestão e na importação do extrato.</Tip>
+      </h2>
+      <form className="row rule-form" onSubmit={submit}>
+        <input value={pattern} onChange={(e) => setPattern(e.target.value)} placeholder="Se a descrição tiver… (ex.: uber)" aria-label="Texto da regra" required minLength={2} maxLength={60} />
+        <CategorySelect categories={categories.data ?? []} value={categoryId} onChange={setCategoryId} label="Categoria da regra" />
+        <Button type="submit" variant="secondary" loading={create.isPending} disabled={!categoryId}>
+          Criar regra
+        </Button>
+      </form>
+      <Alert tone="error">{error}</Alert>
+      {rules.data && rules.data.length === 0 && (
+        <p className="muted small" style={{ margin: 0 }}>
+          Nenhuma regra ainda. Dica: ao corrigir a categoria de uma conta, marque “Sempre usar esta categoria”.
+        </p>
+      )}
+      <ul className="items">
+        {rules.data?.map((r) => (
+          <li key={r.id} className="item">
+            <span className="item__main">
+              <span className="item__title">contém “{r.pattern}”</span>
+              <span className="item__meta">→ {names.get(r.category_id) ?? "?"}</span>
+            </span>
+            <button type="button" className="icon-btn" aria-label={`Excluir regra ${r.pattern}`} onClick={() => remove.mutate(r.id)}>
+              <Trash2 size={16} />
+            </button>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 export default function Categories() {
   const categories = useCategories();
   const [adding, setAdding] = useState(false);
@@ -117,6 +177,7 @@ export default function Categories() {
           ))}
         </ul>
       </section>
+      <Rules />
     </div>
   );
 }

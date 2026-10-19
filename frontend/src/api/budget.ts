@@ -50,6 +50,8 @@ export type Expense = {
   paid_at: string | null;
   notes: string | null;
   payment_method: PaymentMethod | null;
+  card_id: string | null;
+  purchase_date: string | null;
   installment_group_id: string | null;
   installment_number: number | null;
   installment_total: number | null;
@@ -134,6 +136,8 @@ export type ExpenseInput = {
   repeat?: boolean;
   interval_months?: Interval;
   until_month?: string | null;
+  card_id?: string | null;
+  purchase_date?: string | null;
 };
 
 export type IncomeInput = {
@@ -158,7 +162,7 @@ export type Planned = {
 
 export type PlannedInput = Omit<Planned, "id" | "expense_id">;
 
-export type CalendarKind = "expense" | "installment" | "recurring" | "income" | "planned";
+export type CalendarKind = "expense" | "installment" | "recurring" | "income" | "planned" | "invoice" | "invoice_close";
 
 export type CalendarEvent = {
   id: string;
@@ -177,7 +181,7 @@ export type CalendarEvent = {
   notes: string | null;
 };
 
-export type CategorySuggestion = { category_id: string; name: string; source: "history" | "keywords" };
+export type CategorySuggestion = { category_id: string; name: string; source: "rule" | "history" | "keywords" };
 
 export type DescriptionSuggestion = {
   description: string;

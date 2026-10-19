@@ -61,11 +61,13 @@ export function MoneyInput({
   id,
   placeholder = "0,00",
   label,
+  required = true,
 }: {
   value: string;
   onChange: (value: string) => void;
   id?: string;
   placeholder?: string;
+  required?: boolean;
   /** Nome para leitores de tela quando não há <label> visível. */
   label?: string;
 }) {
@@ -77,7 +79,7 @@ export function MoneyInput({
       placeholder={placeholder}
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      required
+      required={required}
     />
   );
 }

@@ -157,7 +157,13 @@ export function Sheet({
     if (open) {
       setRendered(true);
       dialog.classList.remove("is-closing");
-      if (!dialog.open) dialog.showModal();
+      if (!dialog.open) {
+        // O campo com autoFocus já recebeu o foco ao montar; showModal() o levaria para o
+        // primeiro botão (o X). Devolve o foco a ele.
+        const focused = document.activeElement;
+        dialog.showModal();
+        if (focused instanceof HTMLElement && focused !== document.body && dialog.contains(focused)) focused.focus();
+      }
       return;
     }
     if (!dialog.open) return;

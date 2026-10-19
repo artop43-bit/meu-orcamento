@@ -1,9 +1,11 @@
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Sparkles, Trash2 } from "lucide-react";
 
 import {
   budgetApi,
   INTERVALS,
+  keys,
   PAYMENT_METHODS,
   useBudgetMutation,
   type Category,
@@ -16,11 +18,14 @@ import {
   type Income,
   type IncomeType,
   type Interval,
+  type MonthData,
   type PaymentMethod,
 } from "../api/budget";
+import { extrasApi, useCards, type Card } from "../api/extras";
+import { normalizeText } from "../lib/text";
 import { errorMessage } from "../api/client";
 import { announce } from "../lib/announce";
-import { addMonths, money, moneyInput, parseMoney, todayISO } from "../lib/format";
+import { addMonths, money, moneyInput, monthLabel, parseMoney, shortDate, todayISO } from "../lib/format";
 import { CategorySelect, MoneyInput, requireMoney } from "./budget";
 import { Tip } from "./help";
 import { Alert, Button } from "./ui";
@@ -31,6 +36,35 @@ function dateInMonth(month: string, day = new Date().getDate()): string {
   const [y, m] = month.split("-").map(Number);
   const last = new Date(y, m, 0).getDate();
   return `${month}-${String(Math.min(day, last)).padStart(2, "0")}`;
+}
+
+/** Vencimento da fatura em que cai uma compra (mesma regra do servidor). */
+export function invoiceDue(card: Card, purchase: string): string {
+  const [y, m, d] = purchase.split("-").map(Number);
+  const clamp = (year: number, month: number, day: number) => Math.min(day, new Date(year, month, 0).getDate());
+  let cy = y;
+  let cm = m;
+  if (d >= clamp(y, m, card.closing_day)) {
+    cm += 1;
+    if (cm > 12) {
+      cm = 1;
+      cy += 1;
+    }
+  }
+  if (card.due_day <= card.closing_day) {
+    cm += 1;
+    if (cm > 12) {
+      cm = 1;
+      cy += 1;
+    }
+  }
+  return `${cy}-${String(cm).padStart(2, "0")}-${String(clamp(cy, cm, card.due_day)).padStart(2, "0")}`;
+}
+
+/** Texto da regra sugerida: a primeira palavra "forte" da descrição (ex.: "uber" de "Uber *Trip"). */
+function rulePattern(description: string): string {
+  const words = normalizeText(description).split(/[^a-z0-9]+/).filter((w) => w.length >= 3);
+  return words[0] ?? normalizeText(description);
 }
 
 // ---------------------------------------------------------------- sugestões
@@ -231,9 +265,17 @@ export function ExpenseForm({
   const [interval, setInterval] = useState<Interval>(1);
   const [until, setUntil] = useState("");
   const [scope, setScope] = useState<EditScope>("one");
-  const [moreOpen, setMoreOpen] = useState(!!start?.notes || !!start?.payment_method);
+  const [moreOpen, setMoreOpen] = useState(!!start?.notes);
   const [error, setError] = useState("");
   const [savedCount, setSavedCount] = useState(0);
+  const [cardId, setCardId] = useState<string>(expense?.card_id ?? "");
+  const [purchase, setPurchase] = useState(expense?.purchase_date ?? todayISO());
+  const [duplicateOf, setDuplicateOf] = useState<string | null>(null);
+  const [makeRule, setMakeRule] = useState(false);
+  const [rulePatternText, setRulePatternText] = useState("");
+  const cards = useCards();
+  const queryClient = useQueryClient();
+  const undo = useUndo();
   const descRef = useRef<HTMLDivElement>(null);
   const descLabel = useId();
   // "Já está paga": compras do dia a dia costumam ser lançadas depois de pagas.
@@ -243,6 +285,16 @@ export function ExpenseForm({
   const repeats = !!expense && (expense.installment_group_id !== null || expense.recurring_id !== null);
 
   const help = useDescriptionHelp(description, !expense);
+  const cardList = cards.data ?? [];
+  const usesCard = !expense && kind !== "recurring" && payment === "credit" && cardList.length > 0;
+  const card = usesCard ? cardList.find((c) => c.card.id === cardId)?.card ?? null : null;
+  // Primeira vez escolhendo "Crédito": já sugere o (primeiro) cartão.
+  useEffect(() => {
+    if (usesCard && !cardId) setCardId(cardList[0].card.id);
+  }, [usesCard, cardId, cardList]);
+  // Oferece regra quando a pessoa escolhe uma categoria diferente da sugerida/original.
+  const originalCategory = expense?.category_id ?? help.category?.category_id ?? "";
+  const canOfferRule = categoryTouched && !!categoryId && categoryId !== originalCategory && description.trim().length >= 3;
   const suggestion = help.category && categories.some((c) => c.id === help.category!.category_id) ? help.category : null;
   // A sugestão preenche a categoria enquanto a pessoa não escolher outra.
   useEffect(() => {
@@ -262,12 +314,38 @@ export function ExpenseForm({
     const value = requireMoney(amount);
     const category_id = categoryId || null;
     const extra = { payment_method: payment || null, notes: notes.trim() || null };
+    if (makeRule && canOfferRule && rulePatternText.trim().length >= 2) {
+      await extrasApi.createRule(rulePatternText.trim(), categoryId);
+    }
     if (expense) {
+      const before = {
+        description: expense.description,
+        amount: expense.amount,
+        category_id: expense.category_id,
+        due_date: expense.due_date,
+        payment_method: expense.payment_method,
+        notes: expense.notes,
+      };
       await budgetApi.updateExpense(
         expense.id,
         { description, amount: value, category_id, due_date: dueDate || null, ...extra },
         scope,
       );
+      undo.done({ message: "Conta alterada", revert: () => budgetApi.updateExpense(expense.id, before, scope) });
+      return;
+    }
+    if (card) {
+      await budgetApi.createExpense(month, {
+        description,
+        amount: value,
+        category_id,
+        ...extra,
+        paid,
+        card_id: card.id,
+        purchase_date: purchase,
+        installments: kind === "installments" ? count : null,
+        amount_mode: amountMode,
+      });
       return;
     }
     const data: ExpenseInput = { description, amount: value, category_id, due_date: dueDate || null, paid, ...extra };
@@ -297,8 +375,26 @@ export function ExpenseForm({
     descRef.current?.querySelector("input")?.focus();
   }
 
+  /** Já existe uma conta igual (nome e valor) neste mês? Avisa antes de salvar. */
+  function findDuplicate(): string | null {
+    if (expense || kind !== "single") return null;
+    const data = queryClient.getQueryData<MonthData>(keys.month(month));
+    const value = parseMoney(amount);
+    const name = normalizeText(description);
+    const twin = data?.expenses.find((e) => normalizeText(e.description) === name && Number(e.amount) === Number(value));
+    return twin ? `${twin.description} · ${money(twin.amount)}${twin.due_date ? ` · ${shortDate(twin.due_date)}` : ""}` : null;
+  }
+
   async function run(another: boolean) {
     setError("");
+    if (duplicateOf === null) {
+      const twin = findDuplicate();
+      if (twin) {
+        setDuplicateOf(twin);
+        return;
+      }
+    }
+    setDuplicateOf(null);
     try {
       await save.mutateAsync(undefined);
       announce(`${description} salva`);
@@ -317,6 +413,11 @@ export function ExpenseForm({
   return (
     <form className="inline-form entry-form" onSubmit={submit}>
       <Alert tone="error">{error}</Alert>
+      {duplicateOf && (
+        <Alert tone="info">
+          Parece repetida: já existe “{duplicateOf}” neste mês. Toque em salvar de novo para lançar mesmo assim.
+        </Alert>
+      )}
       {savedCount > 0 && <Alert tone="success">{savedCount} conta(s) salva(s). Lance a próxima.</Alert>}
 
       <div className="field" ref={descRef}>
@@ -392,7 +493,7 @@ export function ExpenseForm({
           <MoneyInput value={amount} onChange={setAmount} placeholder="Ex.: 150,00" />
           {installmentHint && <small className="muted">{installmentHint}</small>}
         </label>
-        <label>
+        <label hidden={!!card}>
           <span className="field-label">
             {kind === "installments" ? "Vencimento da 1ª parcela" : kind === "recurring" ? "1º vencimento" : "Vencimento"}
             <Tip>
@@ -404,6 +505,48 @@ export function ExpenseForm({
           <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} placeholder={dateInMonth(month)} />
         </label>
       </div>
+
+      <fieldset className="radios">
+        <legend className="field-label">Forma de pagamento</legend>
+        <div className="chips">
+          {PAYMENT_METHODS.map((p) => (
+            <label key={p.value} className="chip-radio">
+              <input type="radio" name="payment" checked={payment === p.value} onChange={() => setPayment(p.value)} />
+              {p.label}
+            </label>
+          ))}
+          {payment && (
+            <button type="button" className="link-btn small" onClick={() => setPayment("")}>
+              Limpar
+            </button>
+          )}
+        </div>
+      </fieldset>
+
+      {usesCard && (
+        <div className="grid-2 card-pick">
+          <label>
+            Cartão
+            <select value={cardId} onChange={(e) => setCardId(e.target.value)}>
+              {cardList.map((c) => (
+                <option key={c.card.id} value={c.card.id}>
+                  {c.card.name}
+                </option>
+              ))}
+              <option value="">Sem cartão (lançar como conta comum)</option>
+            </select>
+          </label>
+          {card && (
+            <label>
+              Data da compra
+              <input type="date" value={purchase} onChange={(e) => setPurchase(e.target.value)} required />
+              <small className="muted">
+                Vai para a fatura de {monthLabel(invoiceDue(card, purchase).slice(0, 7))} (vence {shortDate(invoiceDue(card, purchase))})
+              </small>
+            </label>
+          )}
+        </div>
+      )}
 
       {kind === "recurring" && (
         <div className="grid-2">
@@ -448,25 +591,30 @@ export function ExpenseForm({
         />
       </label>
 
+      {canOfferRule && (
+        <div className="rule-offer">
+          <label className="check">
+            <input type="checkbox" checked={makeRule} onChange={(e) => {
+              setMakeRule(e.target.checked);
+              if (e.target.checked && !rulePatternText) setRulePatternText(rulePattern(description));
+            }} />
+            Sempre usar esta categoria quando a descrição tiver…
+          </label>
+          {makeRule && (
+            <input
+              aria-label="Texto da regra"
+              value={rulePatternText}
+              onChange={(e) => setRulePatternText(e.target.value)}
+              maxLength={60}
+              placeholder="Ex.: uber"
+            />
+          )}
+        </div>
+      )}
+
       <details className="more" open={moreOpen} onToggle={(e) => setMoreOpen((e.target as HTMLDetailsElement).open)}>
-        <summary>Mais detalhes (forma de pagamento, observação)</summary>
+        <summary>Mais detalhes (observação)</summary>
         <div className="stack stack--tight" style={{ marginTop: 12 }}>
-          <fieldset className="radios">
-            <legend className="field-label">Forma de pagamento</legend>
-            <div className="chips">
-              {PAYMENT_METHODS.map((p) => (
-                <label key={p.value} className="chip-radio">
-                  <input type="radio" name="payment" checked={payment === p.value} onChange={() => setPayment(p.value)} />
-                  {p.label}
-                </label>
-              ))}
-              {payment && (
-                <button type="button" className="link-btn small" onClick={() => setPayment("")}>
-                  Limpar
-                </button>
-              )}
-            </div>
-          </fieldset>
           <label>
             Observação
             <textarea value={notes} onChange={(e) => setNotes(e.target.value)} maxLength={500} rows={2} placeholder="Ex.: dividido com a Ana; nota fiscal no e-mail" />
@@ -487,7 +635,7 @@ export function ExpenseForm({
       <SubmitRow
         loading={save.isPending}
         onCancel={onDone}
-        label={expense ? "Salvar" : "Adicionar conta"}
+        label={duplicateOf ? "Salvar mesmo assim" : expense ? "Salvar" : "Adicionar conta"}
         onAnother={expense ? undefined : () => void run(true)}
       />
     </form>
