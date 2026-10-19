@@ -3,17 +3,16 @@
  * do changelog (pasta changelog/), que tem a mesma versão, data e hora.
  */
 export const RELEASE = {
-  version: "0.7.5",
+  version: "0.7.6",
   // Data e hora (Brasília) em que o update foi publicado.
-  releasedAt: "2026-10-19T17:45:00-03:00",
+  releasedAt: "2026-10-19T19:00:00-03:00",
 };
 
 /** Mostrado uma vez em "Novidades" depois do update (curto: o detalhe fica no changelog). */
 export const RELEASE_NOTES: { title: string; text: string }[] = [
+  { title: "Foto e banner no celular.", text: "Correção: a prévia e o recorte da imagem não abriam no celular. Agora funcionam em todos os navegadores." },
   { title: "Minhas solicitações.", text: "Sugestões e problemas viram conversas com a administração, com imagens e aviso de resposta nova (Ajustes)." },
-  { title: "Perfil.", text: "Foto, banner, resumo pessoal e retrospectiva do mês ou do ano para baixar e compartilhar (Ajustes › Perfil)." },
-  { title: "Cartão de débito.", text: "Compras no débito saem na hora da conta vinculada, sem usar limite nem fatura." },
-  { title: "Formulários revisados.", text: "Campos alinhados, datas com mensagens claras e nada é salvo com data ou dia inválido." },
+  { title: "Perfil.", text: "Foto, banner, resumo pessoal e retrospectiva do mês ou do ano (Ajustes › Perfil)." },
 ];
 
 export function releaseLabel(): string {

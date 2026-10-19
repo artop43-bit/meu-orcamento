@@ -1,0 +1,14 @@
+MEU ORÇAMENTO · UPDATE LOG
+Versão 0.7.6 · Correção: foto e banner do perfil no celular
+Data: 19/10/2026 às 19:00 (horário de Brasília)
+
+Correção
+- [x] Foto e banner do perfil: no celular (e em qualquer navegador em produção) a prévia aparecia só como
+      "Prévia" e o salvar falhava com "Loading error.". Causa: a política de segurança do site bloqueava
+      a exibição da imagem escolhida antes do envio. Liberado só esse tipo de imagem local (blob:).
+- [x] A mesma correção vale para a prévia das imagens anexadas nas solicitações
+- [x] Mensagem clara em português quando uma imagem não pode ser aberta
+- [x] Safari: o recorte salvo segue o formato que o navegador gera (PNG), com o nome certo
+
+Prevenção
+- [x] O teste de produção do CI passa a conferir que a política de segurança permite a prévia de imagens

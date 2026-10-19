@@ -13,6 +13,8 @@ const SHAPES = {
 
 type Purpose = keyof typeof SHAPES;
 
+const UNREADABLE = "Não foi possível abrir esta imagem. Escolha outra foto (PNG, JPG, WebP ou GIF).";
+
 function canvasToBlob(canvas: HTMLCanvasElement): Promise<Blob> {
   return new Promise((resolve, reject) => {
     canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error("Não foi possível gerar a imagem."))), "image/webp", 0.9);
@@ -127,20 +129,25 @@ export function ImageEditor({
         await onSave(file, file.name);
       } else {
         const l = layout();
+        if (!l) throw new Error(UNREADABLE);
         const image = new Image();
         image.src = url!;
-        await image.decode();
+        await image.decode().catch(() => {
+          throw new Error(UNREADABLE);
+        });
         const canvas = document.createElement("canvas");
         canvas.width = shape.width;
         canvas.height = shape.height;
         const ctx = canvas.getContext("2d")!;
         // Recorta o trecho visível da moldura, na resolução final.
-        const scale = l!.scale;
-        const sx = (l!.w / 2 - l!.fw / 2 - offset.x) / scale;
-        const sy = (l!.h / 2 - l!.fh / 2 - offset.y) / scale;
+        const scale = l.scale;
+        const sx = (l.w / 2 - l.fw / 2 - offset.x) / scale;
+        const sy = (l.h / 2 - l.fh / 2 - offset.y) / scale;
         ctx.imageSmoothingQuality = "high";
-        ctx.drawImage(image, sx, sy, l!.fw / scale, l!.fh / scale, 0, 0, shape.width, shape.height);
-        await onSave(await canvasToBlob(canvas), `${purpose}.webp`);
+        ctx.drawImage(image, sx, sy, l.fw / scale, l.fh / scale, 0, 0, shape.width, shape.height);
+        const blob = await canvasToBlob(canvas);
+        // Safari não gera WebP: devolve PNG. O nome acompanha o tipo real.
+        await onSave(blob, `${purpose}.${blob.type === "image/webp" ? "webp" : blob.type === "image/jpeg" ? "jpg" : "png"}`);
       }
       onClose();
     } catch (err) {
@@ -172,6 +179,7 @@ export function ImageEditor({
                 alt="Prévia"
                 draggable={false}
                 onLoad={(e) => setNatural({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })}
+                onError={() => setError(UNREADABLE)}
                 style={
                   l && !animated
                     ? { width: l.w, height: l.h, transform: `translate(calc(-50% + ${offset.x}px), calc(-50% + ${offset.y}px))` }

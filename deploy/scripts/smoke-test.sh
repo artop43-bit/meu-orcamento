@@ -76,6 +76,8 @@ get -D "$WORK/h-api" -o /dev/null "$BASE/api/health"
 for header in "strict-transport-security:" "content-security-policy:" "x-frame-options: DENY" "x-content-type-options: nosniff"; do
   check "$header" grep -qi "^$header" "$WORK/h-site"
 done
+# Prévia e recorte de imagens (perfil, anexos) usam endereços blob: no navegador.
+check "CSP permite imagens blob: (prévia de fotos)" grep -qi "^content-security-policy:.*img-src[^;]*blob:" "$WORK/h-site"
 check "cabeçalho Server oculto" bash -c "! grep -qi '^server:' '$WORK/h-site'"
 check "API com Cache-Control: no-store" grep -qi "^cache-control: no-store" "$WORK/h-api"
 
