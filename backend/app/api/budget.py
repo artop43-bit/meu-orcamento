@@ -114,9 +114,10 @@ def create_income(month: str, body: IncomeIn, user: CurrentUser, db: DbSession) 
 
 @router.patch("/incomes/{income_id}")
 def update_income(
-    income_id: uuid.UUID, body: IncomePatch, user: CurrentUser, db: DbSession
+    income_id: uuid.UUID, body: IncomePatch, user: CurrentUser, db: DbSession, scope: Scope = "one"
 ) -> IncomeOut:
-    return IncomeOut.model_validate(service.update_income(db, user, income_id, _changes(body)))
+    changes = _changes(body, nullable={"day", "notes"})
+    return IncomeOut.model_validate(service.update_income(db, user, income_id, changes, scope))
 
 
 @router.delete("/incomes/{income_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -140,10 +141,15 @@ def create_expense(
 
 @router.patch("/expenses/{expense_id}")
 def update_expense(
-    expense_id: uuid.UUID, body: ExpensePatch, user: CurrentUser, db: DbSession
+    expense_id: uuid.UUID,
+    body: ExpensePatch,
+    user: CurrentUser,
+    db: DbSession,
+    scope: Scope = "one",
 ) -> ExpenseOut:
-    changes = _changes(body, nullable={"category_id", "due_date", "notes"})
-    return ExpenseOut.model_validate(service.update_expense(db, user, expense_id, changes))
+    changes = _changes(body, nullable={"category_id", "due_date", "notes", "payment_method"})
+    expense = service.update_expense(db, user, expense_id, changes, scope)
+    return ExpenseOut.model_validate(expense)
 
 
 @router.delete("/expenses/{expense_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -170,7 +176,9 @@ def create_recurring(body: RecurringIn, user: CurrentUser, db: DbSession) -> Rec
 def update_recurring(
     item_id: uuid.UUID, body: RecurringPatch, user: CurrentUser, db: DbSession
 ) -> RecurringOut:
-    changes = _changes(body, nullable={"category_id", "due_day", "end_month"})
+    changes = _changes(
+        body, nullable={"category_id", "due_day", "end_month", "payment_method", "notes"}
+    )
     return RecurringOut.model_validate(service.update_recurring(db, user, item_id, changes))
 
 

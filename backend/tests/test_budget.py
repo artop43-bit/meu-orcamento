@@ -393,3 +393,143 @@ def test_expense_can_be_created_already_paid(user: TestClient) -> None:
     body = {"description": "TV", "amount": "100", "installments": 3, "paid": True}
     parcels = user.post(url, json=body).json()
     assert [p["paid"] for p in parcels] == [True, False, False]
+
+
+# ---------------------------------------------------------------- v0.5: rendas e gastos flexíveis
+
+
+def add_income(client: TestClient, month_value: str = MONTH, **data: Any) -> dict[str, Any]:
+    payload = {"description": "Salário", "amount": "3000.00", **data}
+    response = client.post(f"/api/months/{month_value}/incomes", json=payload)
+    assert response.status_code == 201, response.text
+    return response.json()
+
+
+def test_income_type_day_and_notes(user: TestClient) -> None:
+    income = add_income(user, income_type="variable", day=10, notes="Freela de design")
+    assert income["income_type"] == "variable"
+    assert income["day"] == 10
+    assert income["notes"] == "Freela de design"
+    assert income["recurring_id"] is None
+    assert add_income(user, description="Outro")["income_type"] == "fixed"
+
+
+def test_income_repeats_every_month(user: TestClient) -> None:
+    add_income(user, repeat="monthly", day=5)
+    for value in ("2030-01", "2030-06", "2031-01"):
+        incomes = month(user, value)["incomes"]
+        assert [i["description"] for i in incomes] == ["Salário"]
+        assert incomes[0]["day"] == 5
+
+
+def test_income_repeats_for_a_period(user: TestClient) -> None:
+    add_income(user, repeat="period", until_month="2030-03", income_type="variable")
+    assert len(month(user, "2030-03")["incomes"]) == 1
+    assert month(user, "2030-03")["incomes"][0]["income_type"] == "variable"
+    assert month(user, "2030-04")["incomes"] == []
+    response = user.post(
+        f"/api/months/{MONTH}/incomes",
+        json={"description": "X", "amount": "1.00", "repeat": "period"},
+    )
+    assert response.status_code == 400
+
+
+def test_edit_income_this_and_following(user: TestClient) -> None:
+    add_income(user, repeat="monthly")
+    month(user, "2030-02")
+    march = month(user, "2030-03")["incomes"][0]
+    response = user.patch(f"/api/incomes/{march['id']}?scope=following", json={"amount": "3500.00"})
+    assert response.status_code == 200, response.text
+    assert month(user, "2030-02")["incomes"][0]["amount"] == "3000.00"
+    assert month(user, "2030-03")["incomes"][0]["amount"] == "3500.00"
+    assert month(user, "2030-05")["incomes"][0]["amount"] == "3500.00"
+    # Só este mês: não mexe nos próximos.
+    april = month(user, "2030-04")["incomes"][0]
+    user.patch(f"/api/incomes/{april['id']}", json={"amount": "100.00"})
+    assert month(user, "2030-04")["incomes"][0]["amount"] == "100.00"
+    assert month(user, "2030-05")["incomes"][0]["amount"] == "3500.00"
+
+
+def test_expense_payment_method(user: TestClient) -> None:
+    [expense] = add_expense(user, payment_method="pix")
+    assert expense["payment_method"] == "pix"
+    response = user.patch(f"/api/expenses/{expense['id']}", json={"payment_method": None})
+    assert response.json()["payment_method"] is None
+    bad = user.post(
+        f"/api/months/{MONTH}/expenses",
+        json={"description": "X", "amount": "1.00", "payment_method": "cheque"},
+    )
+    assert bad.status_code == 422
+
+
+def test_installments_from_total(user: TestClient) -> None:
+    parcels = add_expense(user, amount="100.00", installments=3, amount_mode="total")
+    assert [p["amount"] for p in parcels] == ["33.34", "33.33", "33.33"]
+    assert sum(Decimal(p["amount"]) for p in parcels) == Decimal("100.00")
+
+
+def test_expense_repeats_every_quarter(user: TestClient) -> None:
+    add_expense(
+        user,
+        description="IPTU",
+        repeat=True,
+        interval_months=3,
+        due_date="2030-01-15",
+        payment_method="boleto",
+    )
+    assert descriptions(month(user, "2030-01")) == ["IPTU"]
+    assert descriptions(month(user, "2030-02")) == []
+    assert descriptions(month(user, "2030-03")) == []
+    april = month(user, "2030-04")["expenses"]
+    assert [e["description"] for e in april] == ["IPTU"]
+    assert april[0]["due_date"] == "2030-04-15"
+    assert april[0]["payment_method"] == "boleto"
+
+
+def test_expense_repeats_yearly_until(user: TestClient) -> None:
+    add_expense(user, description="IPVA", repeat=True, interval_months=12, until_month="2031-12")
+    assert descriptions(month(user, "2031-01")) == ["IPVA"]
+    assert descriptions(month(user, "2031-06")) == []
+    assert descriptions(month(user, "2032-01")) == []
+
+
+def test_edit_expense_this_and_following_recurring(user: TestClient) -> None:
+    add_expense(user, description="Internet", repeat=True)
+    month(user, "2030-02")
+    feb = month(user, "2030-02")["expenses"][0]
+    user.patch(f"/api/expenses/{feb['id']}?scope=following", json={"amount": "120.00"})
+    assert month(user, "2030-01")["expenses"][0]["amount"] == "100.00"
+    assert month(user, "2030-02")["expenses"][0]["amount"] == "120.00"
+    assert month(user, "2030-07")["expenses"][0]["amount"] == "120.00"
+
+
+def test_edit_installments_this_and_following(user: TestClient) -> None:
+    parcels = add_expense(user, description="TV", installments=4)
+    second = parcels[1]
+    user.patch(
+        f"/api/expenses/{second['id']}?scope=following",
+        json={"description": "TV 50 polegadas", "payment_method": "credit"},
+    )
+    assert descriptions(month(user, "2030-01")) == ["TV"]
+    for value in ("2030-02", "2030-03", "2030-04"):
+        [expense] = month(user, value)["expenses"]
+        assert expense["description"] == "TV 50 polegadas"
+        assert expense["payment_method"] == "credit"
+
+
+def test_recurring_interval_change_rebuilds_months(user: TestClient) -> None:
+    created = user.post(
+        "/api/recurring",
+        json={
+            "kind": "expense",
+            "description": "Academia",
+            "amount": "90.00",
+            "start_month": MONTH,
+        },
+    ).json()
+    assert created["interval_months"] == 1
+    for value in ("2030-01", "2030-02", "2030-03"):
+        month(user, value)
+    user.patch(f"/api/recurring/{created['id']}", json={"interval_months": 2})
+    assert descriptions(month(user, "2030-02")) == []
+    assert descriptions(month(user, "2030-03")) == ["Academia"]

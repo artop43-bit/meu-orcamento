@@ -15,6 +15,12 @@ Notes = Annotated[str, StringConstraints(strip_whitespace=True, max_length=500)]
 Color = Annotated[str, Field(pattern=r"^#[0-9a-fA-F]{6}$")]
 MonthStr = Annotated[str, Field(pattern=r"^\d{4}-(0[1-9]|1[0-2])$")]
 DueDay = Annotated[int, Field(ge=1, le=31)]
+# Para campos chamados "date" (o nome do campo esconderia o tipo dentro da classe).
+Day = date
+IncomeType = Literal["fixed", "variable"]
+PaymentMethod = Literal["pix", "debit", "credit", "boleto", "cash"]
+# Repete a cada N meses: mensal, bimestral, trimestral, semestral ou anual.
+Interval = Literal[1, 2, 3, 6, 12]
 
 
 class _Out(BaseModel):
@@ -60,17 +66,29 @@ class CategoryOut(_Out):
 class IncomeIn(BaseModel):
     description: Description
     amount: Money
+    income_type: IncomeType = "fixed"
+    day: DueDay | None = None
+    notes: Notes | None = None
+    # once = só este mês; monthly = todo mês (sem fim); period = de este mês até `until_month`.
+    repeat: Literal["once", "monthly", "period"] = "once"
+    until_month: MonthStr | None = None
 
 
 class IncomePatch(BaseModel):
     description: Description | None = None
     amount: Money | None = None
+    income_type: IncomeType | None = None
+    day: DueDay | None = None
+    notes: Notes | None = None
 
 
 class IncomeOut(_MonthOut):
     id: uuid.UUID
     description: str
     amount: Decimal
+    income_type: str
+    day: int | None
+    notes: str | None
     recurring_id: uuid.UUID | None
 
 
@@ -85,8 +103,15 @@ class ExpenseIn(BaseModel):
     notes: Notes | None = None
     # Já paga ao lançar (compras do dia a dia). Na parcelada, vale para a 1ª parcela.
     paid: bool = False
+    payment_method: PaymentMethod | None = None
     # Compra parcelada: cria uma conta por mês, começando no mês informado.
     installments: Annotated[int, Field(ge=2, le=120)] | None = None
+    # Na parcelada, `amount` é o valor de cada parcela ("parcel") ou o total da compra ("total").
+    amount_mode: Literal["parcel", "total"] = "parcel"
+    # Conta que se repete: cria uma fixa a partir deste mês, a cada `interval_months`.
+    repeat: bool = False
+    interval_months: Interval = 1
+    until_month: MonthStr | None = None
 
 
 class ExpensePatch(BaseModel):
@@ -96,6 +121,7 @@ class ExpensePatch(BaseModel):
     due_date: date | None = None
     paid: bool | None = None
     notes: Notes | None = None
+    payment_method: PaymentMethod | None = None
 
 
 class ExpenseOut(_MonthOut):
@@ -107,6 +133,7 @@ class ExpenseOut(_MonthOut):
     paid: bool
     paid_at: datetime | None
     notes: str | None
+    payment_method: str | None
     installment_group_id: uuid.UUID | None
     installment_number: int | None
     installment_total: int | None
@@ -114,6 +141,7 @@ class ExpenseOut(_MonthOut):
 
 
 DeleteScope = Literal["one", "following"]
+EditScope = Literal["one", "following"]
 
 
 # ---------------------------------------------------------------- fixas (recorrentes)
@@ -127,6 +155,10 @@ class RecurringIn(BaseModel):
     due_day: DueDay | None = None
     start_month: MonthStr
     end_month: MonthStr | None = None
+    interval_months: Interval = 1
+    income_type: IncomeType | None = None
+    payment_method: PaymentMethod | None = None
+    notes: Notes | None = None
 
 
 class RecurringPatch(BaseModel):
@@ -135,6 +167,10 @@ class RecurringPatch(BaseModel):
     category_id: uuid.UUID | None = None
     due_day: DueDay | None = None
     end_month: MonthStr | None = None
+    interval_months: Interval | None = None
+    income_type: IncomeType | None = None
+    payment_method: PaymentMethod | None = None
+    notes: Notes | None = None
 
 
 class RecurringOut(_Out):
@@ -146,6 +182,10 @@ class RecurringOut(_Out):
     due_day: int | None
     start_month: date
     end_month: date | None
+    interval_months: int
+    income_type: str | None
+    payment_method: str | None
+    notes: str | None
 
     @field_serializer("start_month", "end_month")
     def _serialize_months(self, value: date | None) -> str | None:
@@ -222,3 +262,77 @@ class GoalOut(_Out):
     current_amount: Decimal
     target_date: date | None
     progress_pct: float
+
+
+# ---------------------------------------------------------------- planejados e calendário
+
+
+class PlannedIn(BaseModel):
+    date: Day
+    description: Description
+    amount: Money
+    category_id: uuid.UUID | None = None
+    notes: Notes | None = None
+
+
+class PlannedPatch(BaseModel):
+    date: Day | None = None
+    description: Description | None = None
+    amount: Money | None = None
+    category_id: uuid.UUID | None = None
+    notes: Notes | None = None
+
+
+class PlannedOut(_Out):
+    id: uuid.UUID
+    date: Day
+    description: str
+    amount: Decimal
+    category_id: uuid.UUID | None
+    notes: str | None
+    expense_id: uuid.UUID | None
+
+
+class ConfirmPlannedIn(BaseModel):
+    paid: bool = False
+
+
+class CalendarEvent(BaseModel):
+    id: uuid.UUID
+    date: Day | None
+    # expense | installment | recurring | income | planned
+    kind: str
+    description: str
+    amount: Decimal
+    paid: bool | None
+    category_id: uuid.UUID | None = None
+    category: str | None = None
+    color: str | None = None
+    installment_number: int | None = None
+    installment_total: int | None = None
+    income_type: str | None = None
+    expense_id: uuid.UUID | None = None
+    notes: str | None = None
+
+
+class CalendarOut(BaseModel):
+    month: str
+    events: list[CalendarEvent]
+
+
+# ---------------------------------------------------------------- sugestões
+
+
+class CategorySuggestion(BaseModel):
+    category_id: uuid.UUID
+    name: str
+    # history = aprendido com os seus lançamentos; keywords = palavra conhecida
+    source: Literal["history", "keywords"]
+
+
+class DescriptionSuggestion(BaseModel):
+    description: str
+    amount: Decimal
+    category_id: uuid.UUID | None
+    payment_method: str | None
+    count: int

@@ -73,6 +73,12 @@ class RecurringItem(Base):
     due_day: Mapped[int | None] = mapped_column(SmallInteger)
     start_month: Mapped[date] = mapped_column(Date)
     end_month: Mapped[date | None] = mapped_column(Date)
+    # Repete a cada N meses (1 = todo mês, 12 = anual).
+    interval_months: Mapped[int] = mapped_column(SmallInteger, default=1)
+    # Renda: "fixed" (salário, benefícios) ou "variable" (bicos, comissões).
+    income_type: Mapped[str | None] = mapped_column(String(10))
+    payment_method: Mapped[str | None] = mapped_column(String(12))
+    notes: Mapped[str | None] = mapped_column(String(500))
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
 
 
@@ -90,6 +96,10 @@ class Income(Base):
     description: Mapped[str] = mapped_column(String(120))
     amount: Mapped[Decimal] = mapped_column(Money)
     recurring_id: Mapped[uuid.UUID | None] = _recurring_fk()
+    income_type: Mapped[str] = mapped_column(String(10), default="fixed")
+    # Dia previsto do recebimento (opcional).
+    day: Mapped[int | None] = mapped_column(SmallInteger)
+    notes: Mapped[str | None] = mapped_column(String(500))
     # Identificador da origem (extrato bancário ou arquivo antigo), para não importar duas vezes.
     import_ref: Mapped[str | None] = mapped_column(String(80))
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
@@ -113,6 +123,8 @@ class Expense(Base):
     paid: Mapped[bool] = mapped_column(default=False)
     paid_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
     notes: Mapped[str | None] = mapped_column(String(500))
+    # "pix" | "debit" | "credit" | "boleto" | "cash"
+    payment_method: Mapped[str | None] = mapped_column(String(12))
 
     # Compra parcelada: todas as parcelas compartilham o mesmo grupo.
     installment_group_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, index=True)
@@ -147,6 +159,9 @@ class Investment(Base):
     name: Mapped[str] = mapped_column(String(80))
     kind: Mapped[str] = mapped_column(String(20))
     institution: Mapped[str | None] = mapped_column(String(80))
+    # Código na bolsa (ex.: PETR4) e quantidade: com os dois, o valor atual vem da cotação.
+    ticker: Mapped[str | None] = mapped_column(String(12))
+    quantity: Mapped[Decimal | None] = mapped_column(Numeric(18, 6))
     invested_amount: Mapped[Decimal] = mapped_column(Money)
     current_value: Mapped[Decimal] = mapped_column(Money)
     # Conta como reserva de emergência no score financeiro.
@@ -170,3 +185,34 @@ class SavedAnalysis(Base):
     position: Mapped[int] = mapped_column(SmallInteger, default=0)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, onupdate=utcnow)
+
+
+class PlannedExpense(Base):
+    """Gasto previsto numa data futura (calendário): entra na projeção até virar lançamento."""
+
+    __tablename__ = "planned_expenses"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = _user_fk()
+    date: Mapped[date] = mapped_column(Date, index=True)
+    description: Mapped[str] = mapped_column(String(120))
+    amount: Mapped[Decimal] = mapped_column(Money)
+    category_id: Mapped[uuid.UUID | None] = _category_fk()
+    notes: Mapped[str | None] = mapped_column(String(500))
+    # Preenchido quando o gasto acontece e vira uma conta de verdade.
+    expense_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("expenses.id", ondelete="SET NULL")
+    )
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+
+
+class WatchItem(Base):
+    """Ativo que o usuário acompanha na seção Mercado."""
+
+    __tablename__ = "watch_items"
+    __table_args__ = (UniqueConstraint("user_id", "symbol"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = _user_fk()
+    symbol: Mapped[str] = mapped_column(String(20))
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)

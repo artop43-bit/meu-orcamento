@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.core.months import add_months
 from app.models import BudgetMonth, Expense, Income, User
-from app.services import budget, investments
+from app.services import budget, investments, planned
 
 ZERO = Decimal("0.00")
 RESERVE_TARGET_MONTHS = 6
@@ -232,6 +232,8 @@ def projection(db: Session, user: User, start: date, months: int) -> list[dict[s
 
     Meses já abertos usam só os lançamentos reais (as fixas já foram lançadas neles).
     Meses ainda não abertos somam os lançamentos existentes às fixas ativas no período.
+    Rendas fixas variáveis (bicos, comissões) entram pela média do que já foi recebido.
+    Gastos planejados ainda não lançados entram no mês da data.
     """
     end = add_months(start, months - 1)
 
@@ -263,6 +265,14 @@ def projection(db: Session, user: User, start: date, months: int) -> list[dict[s
         )
     )
     recurring = budget.list_recurring(db, user)
+    variable_avg = _variable_income_average(db, user, recurring, start)
+    planned_by_month: dict[date, Decimal] = defaultdict(lambda: ZERO)
+    planned_wants: dict[date, Decimal] = defaultdict(lambda: ZERO)
+    for item in planned.pending_planned(db, user, start, planned.month_end(end)):
+        key = item.date.replace(day=1)
+        planned_by_month[key] += item.amount
+        if item.category_id not in essential_ids:
+            planned_wants[key] += item.amount
 
     points = []
     cumulative = ZERO
@@ -276,11 +286,13 @@ def projection(db: Session, user: User, start: date, months: int) -> list[dict[s
                 if not budget.active_in(item, month):
                     continue
                 if item.kind == "income":
-                    income += item.amount
+                    income += variable_avg.get(item.id, item.amount)
                 else:
                     expense += item.amount
                     if item.category_id not in essential_ids:
                         non_essential += item.amount
+        expense += planned_by_month[month]
+        non_essential += planned_wants[month]
         balance = income - expense
         cumulative += balance
         points.append(
@@ -288,9 +300,34 @@ def projection(db: Session, user: User, start: date, months: int) -> list[dict[s
                 "month": month,
                 "income": income,
                 "expenses": expense,
+                "planned": planned_by_month[month],
                 "non_essential": non_essential,
                 "balance": balance,
                 "cumulative": cumulative,
             }
         )
     return points
+
+
+def _variable_income_average(
+    db: Session, user: User, recurring: list[Any], before: date
+) -> dict[uuid.UUID, Decimal]:
+    """Média dos últimos recebimentos de cada renda fixa variável (até 6 meses)."""
+    result: dict[uuid.UUID, Decimal] = {}
+    for item in recurring:
+        if item.kind != "income" or item.income_type != "variable":
+            continue
+        amounts = list(
+            db.scalars(
+                select(Income.amount)
+                .where(
+                    Income.recurring_id == item.id,
+                    Income.month < before,
+                    Income.month >= add_months(before, -CONSISTENCY_WINDOW),
+                )
+                .order_by(Income.month.desc())
+            )
+        )
+        if amounts:
+            result[item.id] = (sum(amounts, ZERO) / len(amounts)).quantize(Decimal("0.01"))
+    return result
