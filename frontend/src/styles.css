@@ -479,12 +479,20 @@ svg {
 
 .layout-2 {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 20px;
 }
 
 .layout-main-side {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 20px;
+}
+
+.layout-2 > *,
+.layout-main-side > *,
+.stack > * {
+  min-width: 0;
 }
 
 .grid-cards {
@@ -547,6 +555,7 @@ svg {
 }
 
 .kpi {
+  container-type: inline-size;
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -567,7 +576,10 @@ svg {
 .kpi__head {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
+  min-width: 0;
+  overflow-wrap: anywhere;
   color: var(--muted);
   font-size: 0.85rem;
   font-weight: 550;
@@ -594,18 +606,16 @@ svg {
 }
 
 .kpi__value {
-  font-size: 1.3rem;
+  font-size: clamp(1rem, 10.5cqi, 1.3rem);
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.02em;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 @media (min-width: 1024px) {
   .kpi__value {
-    font-size: 1.6rem;
+    font-size: clamp(1rem, 10.5cqi, 1.6rem);
   }
 }
 
@@ -1186,9 +1196,7 @@ input.color {
 
 .item__title {
   font-weight: 550;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
 .item__meta {
@@ -1286,6 +1294,7 @@ input.color {
 
 .ledger__title {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 6px;
   min-width: 0;
@@ -1293,9 +1302,7 @@ input.color {
 }
 
 .ledger__title > span:first-child {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
   min-width: 0;
 }
 
@@ -3518,9 +3525,10 @@ legend.field-label {
   z-index: 30;
   top: calc(100% + 6px);
   left: 50%;
-  transform: translateX(-50%);
+  transform: translateX(calc(-50% + var(--tip-shift, 0px)));
   width: max-content;
-  max-width: min(300px, 80vw);
+  max-width: min(300px, calc(100vw - 32px));
+  white-space: normal;
   padding: 10px 12px;
   border-radius: var(--radius-sm);
   background: var(--fg);
@@ -3797,9 +3805,13 @@ ul.legend {
 }
 
 .ev__text {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  line-height: 1.25;
 }
 
 .ev__amount {
@@ -4101,9 +4113,7 @@ button.quote:hover {
   font-size: 0.82rem;
   color: var(--muted);
   max-width: calc(100% - 24px);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
 .quote__price {
@@ -4167,9 +4177,8 @@ button.quote:hover {
 }
 
 .rank__name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  line-height: 1.25;
 }
 
 .facts {
@@ -4735,4 +4744,267 @@ kbd {
 .rule-form select {
   flex: 1 1 160px;
   width: auto;
+}
+
+/* ================================================================ v0.7 */
+
+/* Campo de data dd/mm/aaaa com calendário. */
+.date-field {
+  position: relative;
+  display: block;
+}
+
+.date-field input[type="text"] {
+  width: 100%;
+  padding-right: 44px;
+  font-variant-numeric: tabular-nums;
+}
+
+.date-field__btn {
+  position: absolute;
+  top: 0;
+  right: 0;
+  height: var(--control-h);
+  width: 42px;
+  display: grid;
+  place-items: center;
+  border: none;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.date-field__btn:hover {
+  color: var(--accent);
+}
+
+.date-field__native {
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: 42px;
+  height: var(--control-h);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.date-field.is-invalid input[type="text"] {
+  border-color: var(--error);
+}
+
+.date-field__error {
+  display: block;
+  margin-top: 4px;
+  color: var(--error);
+  font-weight: 500;
+}
+
+/* Ajustes: lista de sub-telas */
+.settings-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+  gap: 12px;
+}
+
+.settings-list__item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: inherit;
+  text-decoration: none;
+  height: 100%;
+}
+
+.settings-list__item:hover {
+  border-color: var(--accent);
+}
+
+.settings-list__icon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.settings-list__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 8px;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.breadcrumb a {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  color: var(--accent);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+/* Formulário de despesa em etapas */
+.amount-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.segmented--compact label {
+  padding: 6px 12px;
+  font-size: 0.9rem;
+}
+
+.chip-btn {
+  padding: 6px 14px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--surface);
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.chip-btn.is-active,
+.chip-btn[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.summary-box {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--accent-soft);
+  color: var(--fg);
+  font-variant-numeric: tabular-nums;
+}
+
+.simulate {
+  max-width: 220px;
+}
+
+/* Orçamento */
+.month-actions {
+  flex-wrap: wrap;
+}
+
+@media (max-width: 1023px) {
+  .month-actions {
+    width: 100%;
+  }
+
+  .month-actions .btn {
+    flex: 1;
+  }
+}
+
+.review-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  background: var(--info-bg);
+  color: var(--fg);
+  text-decoration: none;
+  border: 1px solid var(--border);
+}
+
+.review-banner:hover {
+  border-color: var(--accent);
+}
+
+/* Administração */
+.admin-users {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.admin-user {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.admin-user__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.admin-user__email {
+  overflow-wrap: anywhere;
+}
+
+.admin-user__facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.admin-user__facts dt {
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.admin-user__facts dd {
+  margin: 0;
+  font-weight: 600;
+}
+
+.admin-user__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.item--stack {
+  flex-wrap: wrap;
+}
+
+.email-body {
+  flex-basis: 100%;
+  margin: 4px 0 0;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 0.85rem;
+}
+
+.review-table select {
+  min-width: 150px;
 }

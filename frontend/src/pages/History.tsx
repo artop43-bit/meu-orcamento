@@ -19,7 +19,7 @@ export default function History() {
 
   return (
     <div className="stack">
-      <PageHeader title="Histórico" subtitle="Renda, contas e saldo dos últimos 12 meses." />
+      <PageHeader title="Histórico" subtitle="Receitas, despesas e saldo dos últimos 12 meses." />
       {history.isPending && <p className="muted">Carregando…</p>}
       {history.isError && <Alert tone="error">{errorMessage(history.error)}</Alert>}
 
@@ -31,11 +31,11 @@ export default function History() {
               type="bar"
               labels={points.map((p) => ({ key: p.month, label: p.month }))}
               series={[
-                { key: "income", name: "Renda", color: "var(--accent)", values: points.map((p) => Number(p.income)) },
-                { key: "expenses", name: "Contas", color: "var(--expense)", values: points.map((p) => Number(p.expenses)) },
+                { key: "income", name: "Receitas", color: "var(--accent)", values: points.map((p) => Number(p.income)) },
+                { key: "expenses", name: "Despesas", color: "var(--expense)", values: points.map((p) => Number(p.expenses)) },
               ]}
               monthLabels
-              description="Renda e contas por mês nos últimos 12 meses"
+              description="Receitas e despesas por mês nos últimos 12 meses"
               onSelect={(key) => navigate(`/orcamento/${key}`)}
             />
             {avgBalance !== null && (
@@ -51,8 +51,8 @@ export default function History() {
                 <thead>
                   <tr>
                     <th>Mês</th>
-                    <th className="num">Renda</th>
-                    <th className="num">Contas</th>
+                    <th className="num">Receitas</th>
+                    <th className="num">Despesas</th>
                     <th className="num">Saldo</th>
                     <th className="num">Comprometido</th>
                   </tr>

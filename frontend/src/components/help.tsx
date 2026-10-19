@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { CalendarDays, ChartPie, Info, Landmark, Sparkles, Target, Wallet } from "lucide-react";
 
 import { Button, Sheet } from "./ui";
@@ -11,6 +11,22 @@ export function Tip({ children, label = "Ajuda" }: { children: ReactNode; label?
   const [open, setOpen] = useState(false);
   const id = useId();
   const ref = useRef<HTMLSpanElement>(null);
+  const textRef = useRef<HTMLSpanElement>(null);
+
+  // A dica nunca sai da janela nem da tela: desloca para o lado que tiver espaço.
+  useLayoutEffect(() => {
+    const el = textRef.current;
+    if (!open || !el) return;
+    el.style.setProperty("--tip-shift", "0px");
+    const box = el.getBoundingClientRect();
+    const area = (el.closest(".sheet__inner") ?? document.documentElement).getBoundingClientRect();
+    const left = Math.max(area.left, 0) + 8;
+    const right = Math.min(area.right, window.innerWidth) - 8;
+    let shift = 0;
+    if (box.left < left) shift = left - box.left;
+    else if (box.right > right) shift = right - box.right;
+    el.style.setProperty("--tip-shift", `${Math.round(shift)}px`);
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -55,7 +71,7 @@ export function Tip({ children, label = "Ajuda" }: { children: ReactNode; label?
         <Info size={14} aria-hidden />
       </span>
       {open && (
-        <span id={id} className="tip__text" role="note">
+        <span id={id} ref={textRef} className="tip__text" role="note">
           {children}
         </span>
       )}
@@ -101,38 +117,38 @@ const STEPS: Step[] = [
   {
     icon: <Sparkles size={22} />,
     title: "Bem-vindo ao Meu Orçamento",
-    text: "Um tour rápido de 5 passos. Pode pular quando quiser e rever depois em Ajuda.",
+    text: "Apresentação rápida dos recursos principais. Ela pode ser revista a qualquer momento em Ajustes › Central de ajuda.",
   },
   {
     icon: <Wallet size={22} />,
-    title: "Orçamento: renda e contas do mês",
+    title: "Orçamento",
     text: (
       <>
-        Lance quanto entra (salário, bicos) e o que sai. Ao digitar a descrição, a categoria é sugerida sozinha
-        (ex.: <em>“Uber”</em> → Transporte). Contas que se repetem, parcelas e frequência (mensal, anual…) ficam no mesmo
-        formulário.
+        Registre receitas e despesas do mês. A categoria é sugerida pela descrição (ex.: <em>“Uber”</em> → Transporte), e despesas
+        parceladas ou recorrentes são lançadas automaticamente nos meses seguintes. O lançamento rápido aceita frases como
+        “mercado 120 pix ontem”.
       </>
     ),
   },
   {
     icon: <CalendarDays size={22} />,
     title: "Calendário",
-    text: "Veja vencimentos, recebimentos e parcelas por dia. Planeje gastos futuros (aniversário, IPVA, viagem): eles entram na previsão e viram lançamento com um toque.",
+    text: "Vencimentos, recebimentos, parcelas e faturas por dia. Despesas previstas (IPVA, viagens) entram na projeção e são confirmadas quando ocorrem.",
   },
   {
     icon: <ChartPie size={22} />,
-    title: "Análise financeira e consultor",
-    text: "Score, regra 50/30/20, projeção dos próximos meses e um consultor que explica o mês em linguagem simples.",
+    title: "Insights",
+    text: "Score financeiro, regra 50/30/20, projeção de 12 meses e alertas objetivos sobre o mês.",
   },
   {
     icon: <Landmark size={22} />,
-    title: "Investimentos e Mercado",
-    text: "Registre sua carteira (com código e quantidade, o valor se atualiza pela cotação) e acompanhe índices, moedas, cripto e renda fixa. É informativo: o app não recomenda compra ou venda.",
+    title: "Investimentos e cotações",
+    text: "Carteira atualizada pela cotação e acompanhamento de índices, moedas, criptoativos e renda fixa. Conteúdo informativo, sem recomendação de compra ou venda.",
   },
   {
     icon: <Target size={22} />,
-    title: "Metas",
-    text: "Defina objetivos (reserva, viagem) e acompanhe quanto falta. Pronto! Em Ajuda há exemplos de cada tela.",
+    title: "Contas, cartões e metas",
+    text: "Saldos por conta, faturas de cartão com melhor dia de compra e metas com aporte mensal calculado.",
   },
 ];
 
@@ -178,7 +194,7 @@ export function Tour() {
   const current = STEPS[step];
   const last = step === STEPS.length - 1;
   return (
-    <Sheet open={open} title={`Tour rápido · ${step + 1} de ${STEPS.length}`} onClose={close}>
+    <Sheet open={open} title={`Apresentação · ${step + 1} de ${STEPS.length}`} onClose={close}>
       <div className="tour stack" aria-live="polite">
         <span className="kpi__icon tour__icon" aria-hidden>
           {current.icon}
@@ -192,7 +208,7 @@ export function Tour() {
         </div>
         <div className="form-actions">
           <Button type="button" variant="secondary" onClick={close}>
-            Pular tour
+            Pular
           </Button>
           {step > 0 && (
             <Button type="button" variant="secondary" onClick={() => setStep(step - 1)}>
@@ -200,7 +216,7 @@ export function Tour() {
             </Button>
           )}
           <Button type="button" onClick={() => (last ? close() : setStep(step + 1))}>
-            {last ? "Começar" : "Próximo"}
+            {last ? "Concluir" : "Próximo"}
           </Button>
         </div>
       </div>

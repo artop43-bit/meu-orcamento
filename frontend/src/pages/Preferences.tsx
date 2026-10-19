@@ -39,7 +39,7 @@ export default function Preferences() {
   const prefs = usePrefs();
   return (
     <>
-      <PageHeader title="Preferências" subtitle="Aparência e privacidade neste aparelho. Mudam na hora." />
+      <PageHeader title="Preferências" subtitle="Aparência e privacidade deste dispositivo." />
       <div className="layout-main-side">
         <div className="stack" style={{ gap: 20 }}>
           <section className="card stack">
@@ -49,7 +49,7 @@ export default function Preferences() {
               label="Tema"
               value={prefs.theme}
               options={[
-                ["system", "Igual ao aparelho"],
+                ["system", "Automático (sistema)"],
                 ["light", "Claro"],
                 ["dark", "Escuro"],
               ]}
@@ -81,7 +81,7 @@ export default function Preferences() {
               value={prefs.density}
               options={[
                 ["confortavel", "Confortável"],
-                ["compacta", "Compacto (mais coisa na tela)"],
+                ["compacta", "Compacto"],
               ]}
             />
           </section>
@@ -89,14 +89,14 @@ export default function Preferences() {
             <h2>Privacidade</h2>
             <label className="check">
               <input type="checkbox" checked={prefs.privacy} onChange={(e) => setPrefs({ privacy: e.target.checked })} />
-              Esconder os valores agora (atalho: tecla P)
+              Ocultar valores agora (atalho: P)
             </label>
             <label className="check">
               <input type="checkbox" checked={prefs.privacyOnStart} onChange={(e) => setPrefs({ privacyOnStart: e.target.checked })} />
-              Abrir o app sempre com os valores escondidos
+              Iniciar sempre com os valores ocultos
             </label>
             <p className="muted small" style={{ margin: 0 }}>
-              Útil no ônibus, no trabalho ou ao mostrar a tela para alguém. Os valores viram “R$ ••••” e os gráficos ficam borrados.
+              Oculta valores em locais públicos ou ao compartilhar a tela: valores exibidos como “R$ ••••” e gráficos desfocados.
             </p>
           </section>
         </div>
@@ -118,12 +118,12 @@ export default function Preferences() {
             </Button>
           </section>
           <section className="card stack">
-            <h2>Sugestões</h2>
+            <h2>Feedback</h2>
             <p className="muted" style={{ margin: 0 }}>
-              Achou um problema ou tem uma ideia? Mande direto para quem faz o app.
+              Relate problemas ou envie sugestões diretamente à equipe.
             </p>
             <Button type="button" variant="secondary" onClick={openFeedback}>
-              <MessageSquarePlus size={16} /> Enviar sugestão
+              <MessageSquarePlus size={16} /> Enviar feedback
             </Button>
           </section>
         </div>

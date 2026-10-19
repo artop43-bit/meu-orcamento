@@ -1,6 +1,6 @@
 import { api } from "./client";
 
-// Consultor financeiro e tendências (tela "Análise financeira").
+// Insights do mês e tendências (tela Insights).
 
 export type InsightTone = "praise" | "info" | "warning" | "danger";
 export type InsightMessage = { tone: InsightTone; title: string; text: string; category_id?: string | null };

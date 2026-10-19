@@ -60,12 +60,12 @@ function useWindowEvent(name: string, fn: () => void) {
 // ---------------------------------------------------------------- atalhos de teclado
 
 export const SHORTCUTS: [string, string][] = [
-  ["Ctrl + K", "Buscar comandos ou lançar numa frase"],
-  ["N", "Nova conta (no Orçamento)"],
-  ["/", "Ir para a busca da lista"],
-  ["P", "Esconder ou mostrar os valores"],
+  ["Ctrl + K", "Comandos e lançamento rápido"],
+  ["N", "Nova despesa"],
+  ["/", "Buscar na lista da tela"],
+  ["P", "Ocultar ou exibir valores"],
   ["Ctrl + Z", "Desfazer a última exclusão ou alteração"],
-  ["?", "Ver esta lista de atalhos"],
+  ["?", "Exibir a lista de atalhos"],
 ];
 
 /** Atalhos globais. Letras soltas só valem fora de campos de texto. */
@@ -132,18 +132,23 @@ type Command = { id: string; label: string; hint?: string; icon: ReactNode; keyw
 const PAGES: [string, string, string][] = [
   ["/orcamento", "Orçamento", "mes contas renda"],
   ["/calendario", "Calendário", "vencimentos agenda planejados"],
-  ["/analises", "Análise financeira", "consultor score graficos"],
+  ["/analises", "Insights", "analise consultor score graficos"],
   ["/investimentos", "Investimentos", "carteira"],
-  ["/investimentos?secao=mercado", "Mercado", "cotacoes dolar bitcoin bolsa"],
+  ["/investimentos?secao=cotacoes", "Cotações", "mercado dolar bitcoin bolsa"],
+  ["/contas", "Contas", "saldo banco transferencia"],
+  ["/revisar", "Para revisar", "importados extrato"],
+  ["/busca", "Busca", "procurar lancamentos"],
   ["/cartoes", "Cartões de crédito", "fatura limite"],
   ["/metas", "Metas", "objetivos guardar"],
   ["/historico", "Histórico", "meses anteriores"],
-  ["/fixas", "Contas fixas e assinaturas", "recorrentes"],
-  ["/categorias", "Categorias e regras", "limites"],
-  ["/dados", "Importar e exportar", "extrato ofx csv excel"],
-  ["/preferencias", "Preferências", "tema cor texto privacidade aparencia"],
-  ["/seguranca", "Segurança", "senha 2fa"],
-  ["/ajuda", "Como usar", "ajuda tour"],
+  ["/ajustes", "Ajustes", "configuracoes"],
+  ["/ajustes/recorrencias", "Recorrências e assinaturas", "fixas"],
+  ["/ajustes/categorias", "Categorias e regras", "limites"],
+  ["/ajustes/dados", "Importar e exportar", "extrato ofx csv excel"],
+  ["/ajustes/preferencias", "Preferências", "tema cor texto privacidade aparencia"],
+  ["/ajustes/seguranca", "Segurança", "senha 2fa"],
+  ["/ajustes/atalhos", "Atalhos de teclado", "teclas"],
+  ["/ajustes/ajuda", "Central de ajuda", "como usar tour"],
 ];
 
 export function CommandPalette() {
@@ -181,19 +186,19 @@ export function CommandPalette() {
   const commands = useMemo<Command[]>(() => {
     const go = (to: string) => () => navigate(to);
     const list: Command[] = [
-      { id: "nova-conta", label: "Nova conta", icon: <Plus size={16} />, keywords: "gasto despesa lancar", run: go("/orcamento?novo=conta") },
-      { id: "nova-renda", label: "Nova renda", icon: <Wallet size={16} />, keywords: "salario receita", run: go("/orcamento?novo=renda") },
-      { id: "planejar", label: "Planejar gasto", icon: <CalendarPlus size={16} />, keywords: "futuro calendario", run: go("/calendario?novo=1") },
+      { id: "nova-conta", label: "Nova despesa", icon: <Plus size={16} />, keywords: "gasto conta lancar", run: go("/orcamento?novo=conta") },
+      { id: "nova-renda", label: "Nova receita", icon: <Wallet size={16} />, keywords: "salario renda", run: go("/orcamento?novo=renda") },
+      { id: "planejar", label: "Agendar despesa prevista", icon: <CalendarPlus size={16} />, keywords: "futuro calendario planejar", run: go("/calendario?novo=1") },
       { id: "cartao", label: "Novo cartão de crédito", icon: <CreditCard size={16} />, run: go("/cartoes?novo=1") },
       {
         id: "privacidade",
-        label: getPrefs().privacy ? "Mostrar os valores" : "Esconder os valores",
+        label: getPrefs().privacy ? "Exibir valores" : "Ocultar valores",
         hint: "P",
         icon: getPrefs().privacy ? <Eye size={16} /> : <EyeOff size={16} />,
         keywords: "privacidade ocultar",
         run: () => void togglePrivacy(),
       },
-      { id: "sugestao", label: "Enviar sugestão ou problema", icon: <MessageSquarePlus size={16} />, keywords: "feedback bug", run: openFeedback },
+      { id: "sugestao", label: "Enviar feedback", icon: <MessageSquarePlus size={16} />, keywords: "sugestao problema bug", run: openFeedback },
       { id: "atalhos", label: "Atalhos de teclado", hint: "?", icon: <Keyboard size={16} />, run: openShortcuts },
       ...PAGES.map(([to, label, words]) => ({ id: to, label: `Ir para ${label}`, icon: <ArrowRight size={16} />, keywords: words, run: go(to) })),
     ];
@@ -205,7 +210,7 @@ export function CommandPalette() {
   const quick: Command | null = looksLikeEntry(entry)
     ? {
         id: "lancar",
-        label: `Lançar ${entry.kind === "income" ? "renda" : "conta"}: ${entry.description} · ${money(entry.amount)}`,
+        label: `Lançar ${entry.kind === "income" ? "receita" : "despesa"}: ${entry.description} · ${money(entry.amount)}${entry.installments ? ` em ${entry.installments}x` : ""}`,
         hint: [entry.payment && { pix: "Pix", debit: "Débito", credit: "Crédito", boleto: "Boleto", cash: "Dinheiro" }[entry.payment], entry.installments && `${entry.installments}x`, entry.date && entry.date.split("-").reverse().slice(0, 2).join("/")]
           .filter(Boolean)
           .join(" · "),
@@ -223,7 +228,16 @@ export function CommandPalette() {
         },
       }
     : null;
-  const results = quick ? [quick, ...filtered] : filtered;
+  const searchCommand: Command | null =
+    !quick && query.trim().length >= 2
+      ? {
+          id: "buscar",
+          label: `Buscar lançamentos: “${query.trim()}”`,
+          icon: <Search size={16} />,
+          run: () => navigate(`/busca?q=${encodeURIComponent(query.trim())}`),
+        }
+      : null;
+  const results = quick ? [quick, ...filtered] : searchCommand ? [...filtered, searchCommand] : filtered;
 
   async function run(command: Command | undefined) {
     if (!command) return;
@@ -242,7 +256,7 @@ export function CommandPalette() {
   }
 
   return (
-    <Sheet open={open} title="Buscar ou lançar" onClose={close}>
+    <Sheet open={open} title="Comandos" onClose={close}>
       <form className="palette" onSubmit={submit}>
         <label className="list-tools__search palette__input">
           <Search size={18} aria-hidden />
@@ -268,7 +282,7 @@ export function CommandPalette() {
                 setActive((a) => Math.max(a - 1, 0));
               }
             }}
-            placeholder="Ex.: mercado 120 pix ontem · ou: calendário"
+            placeholder="Ex.: mercado 120 pix ontem, ou o nome de uma tela"
             autoComplete="off"
           />
         </label>
@@ -291,10 +305,10 @@ export function CommandPalette() {
               {c.hint && <kbd>{c.hint}</kbd>}
             </li>
           ))}
-          {results.length === 0 && <li className="muted small">Nada encontrado. Para lançar, escreva o que foi e o valor.</li>}
+          {results.length === 0 && <li className="muted small">Nenhum resultado. Para lançar, informe a descrição e o valor.</li>}
         </ul>
         <p className="muted small" style={{ margin: 0 }}>
-          {busy ? "Salvando…" : "Enter executa · ↑↓ escolhem · Esc fecha"}
+          {busy ? "Salvando…" : "Enter executa · ↑↓ navegam · Esc fecha"}
         </p>
       </form>
     </Sheet>
@@ -340,7 +354,7 @@ export function WhatsNew() {
         </ul>
         <div className="form-actions">
           <Button type="button" onClick={close}>
-            Entendi
+            Continuar
           </Button>
         </div>
       </div>
@@ -381,10 +395,10 @@ export function FeedbackSheet() {
   }
 
   return (
-    <Sheet open={open} title="Enviar sugestão ou problema" onClose={() => setOpen(false)}>
+    <Sheet open={open} title="Enviar feedback" onClose={() => setOpen(false)}>
       {sent ? (
         <div className="stack">
-          <Alert tone="success">Recebido, obrigado! Cada mensagem é lida e ajuda a decidir o que vem nas próximas versões.</Alert>
+          <Alert tone="success">Feedback recebido. Obrigado pela contribuição.</Alert>
           <div className="form-actions">
             <Button type="button" onClick={() => setOpen(false)}>
               Pronto
@@ -395,11 +409,11 @@ export function FeedbackSheet() {
         <form className="inline-form" onSubmit={submit}>
           <Alert tone="error">{error}</Alert>
           <fieldset className="radios">
-            <legend className="field-label">É sobre</legend>
+            <legend className="field-label">Tipo</legend>
             <div className="segmented segmented--3">
               {(
                 [
-                  ["idea", "Ideia"],
+                  ["idea", "Sugestão"],
                   ["bug", "Problema"],
                   ["other", "Outro"],
                 ] as const
@@ -420,11 +434,11 @@ export function FeedbackSheet() {
               minLength={3}
               maxLength={4000}
               required
-              placeholder={kind === "bug" ? "O que você fez, o que esperava e o que aconteceu." : "Ex.: queria ver as faturas do cartão no calendário."}
+              placeholder={kind === "bug" ? "Passos realizados, resultado esperado e resultado obtido." : "Descreva a sugestão."}
             />
           </label>
           <p className="muted small" style={{ margin: 0 }}>
-            Vai junto: a tela em que você está ({location.pathname}) e a versão {RELEASE.version}. Nenhum valor seu é enviado.
+            São enviados também a tela atual ({location.pathname}) e a versão {RELEASE.version}. Nenhum valor financeiro é incluído.
           </p>
           <div className="form-actions">
             <Button type="button" variant="secondary" onClick={() => setOpen(false)}>

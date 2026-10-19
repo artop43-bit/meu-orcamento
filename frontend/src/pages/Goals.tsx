@@ -8,6 +8,7 @@ import { Bar, FormActions, MoneyInput, requireMoney } from "../components/budget
 import { Alert, Button, PageHeader, Sheet } from "../components/ui";
 import { useUndo } from "../components/undo";
 import { money, moneyInput, percent, shortDate } from "../lib/format";
+import { DateField } from "../components/DateField";
 
 function monthsUntil(isoDate: string): number {
   const [y, m] = isoDate.split("-").map(Number);
@@ -51,7 +52,7 @@ function GoalForm({ goal, onDone }: { goal?: Goal; onDone: () => void }) {
         </label>
         <label>
           Até quando (opcional)
-          <input type="date" value={targetDate} onChange={(e) => setTargetDate(e.target.value)} />
+          <DateField value={targetDate} onChange={setTargetDate} />
         </label>
       </div>
       <FormActions loading={save.isPending} onCancel={onDone} label={goal ? "Salvar" : "Criar meta"} />
@@ -120,9 +121,9 @@ function GoalCard({ goal }: { goal: Goal }) {
       <Bar pct={goal.progress_pct} />
       <p className="muted small" style={{ margin: 0 }}>
         {missing <= 0
-          ? "Meta alcançada! 🎉"
+          ? "Meta atingida."
           : `Faltam ${money(missing)}${goal.target_date ? ` até ${shortDate(goal.target_date)}/${goal.target_date.slice(0, 4)}` : ""}.`}
-        {perMonth && ` Guardando ${money(perMonth)} por mês você chega lá.`}
+        {perMonth && ` Aporte necessário: ${money(perMonth)} por mês.`}
       </p>
       <Alert tone="error">{error}</Alert>
       <div className="row" style={{ flexWrap: "nowrap" }}>

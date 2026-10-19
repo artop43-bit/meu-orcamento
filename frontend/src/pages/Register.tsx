@@ -43,7 +43,8 @@ export default function Register() {
       <AuthLayout title="Verifique seu e-mail">
         <Alert tone="success">{done}</Alert>
         <p className="muted">
-          Enviamos um link de confirmação para <strong>{email}</strong>. Ele vale por 24 horas.
+          Um link de confirmação foi enviado para <strong>{email}</strong> (válido por 24 horas). Durante o período de testes, o
+          acesso também precisa ser liberado pela administração; você receberá um e-mail quando isso acontecer.
         </p>
         <p className="links">
           <Link to="/entrar">Ir para o login</Link>

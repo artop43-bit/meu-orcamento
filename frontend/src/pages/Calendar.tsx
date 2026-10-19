@@ -31,14 +31,15 @@ import { EmptyGuide, Tip } from "../components/help";
 import { Alert, Button, LoadingRegion, PageHeader, Sheet, Skeleton } from "../components/ui";
 import { announce } from "../lib/announce";
 import { addMonths, money, moneyInput, monthLabel, thisMonth, todayISO } from "../lib/format";
+import { DateField } from "../components/DateField";
 
 // Cor + ícone + texto: o tipo nunca é indicado só pela cor (acessível a daltônicos).
 const KINDS: Record<CalendarKind, { label: string; icon: ReactNode; className: string }> = {
-  income: { label: "Renda", icon: <ArrowDownLeft size={13} />, className: "ev--income" },
-  expense: { label: "Conta", icon: <Receipt size={13} />, className: "ev--expense" },
-  recurring: { label: "Fixa", icon: <Repeat size={13} />, className: "ev--recurring" },
+  income: { label: "Receita", icon: <ArrowDownLeft size={13} />, className: "ev--income" },
+  expense: { label: "Despesa", icon: <Receipt size={13} />, className: "ev--expense" },
+  recurring: { label: "Recorrente", icon: <Repeat size={13} />, className: "ev--recurring" },
   installment: { label: "Parcela", icon: <CreditCard size={13} />, className: "ev--installment" },
-  planned: { label: "Planejado", icon: <CalendarPlus size={13} />, className: "ev--planned" },
+  planned: { label: "Prevista", icon: <CalendarPlus size={13} />, className: "ev--planned" },
   invoice: { label: "Fatura", icon: <CreditCard size={13} />, className: "ev--invoice" },
   invoice_close: { label: "Fechamento", icon: <Lock size={13} />, className: "ev--invoice-close" },
 };
@@ -176,7 +177,7 @@ function PlannedForm({
     setError("");
     try {
       await save.mutateAsync(undefined);
-      announce("Gasto planejado salvo");
+      announce("Despesa prevista salva");
       onDone();
     } catch (err) {
       setError(errorMessage(err));
@@ -201,7 +202,7 @@ function PlannedForm({
       {launched && <Alert tone="success">Já lançado como conta no mês {monthLabel(planned!.date.slice(0, 7))}.</Alert>}
       <label>
         <span className="field-label">
-          O que é <Tip>Um gasto que você sabe que vai acontecer. Ex.: aniversário da mãe, IPVA, viagem de férias, material escolar.</Tip>
+          Descrição <Tip>Despesa futura com data conhecida (IPVA, viagem, material escolar). Entra na projeção até ser confirmada.</Tip>
         </span>
         <input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Ex.: Presente de aniversário" required maxLength={120} autoFocus />
       </label>
@@ -212,7 +213,7 @@ function PlannedForm({
         </label>
         <label>
           Data
-          <input type="date" value={day} onChange={(e) => setDay(e.target.value)} required />
+          <DateField value={day} onChange={setDay} required />
         </label>
       </div>
       <label>
@@ -223,7 +224,7 @@ function PlannedForm({
         Observação
         <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} maxLength={500} placeholder="Ex.: dividir com os irmãos" />
       </label>
-      <FormActions loading={save.isPending} onCancel={onDone} label={planned ? "Salvar" : "Planejar gasto"} />
+      <FormActions loading={save.isPending} onCancel={onDone} label={planned ? "Salvar" : "Agendar despesa"} />
       {planned && !launched && (
         <div className="stack stack--tight" style={{ borderTop: "1px solid var(--border)", paddingTop: 16 }}>
           <p className="muted small" style={{ margin: 0 }}>
@@ -240,7 +241,7 @@ function PlannedForm({
         </div>
       )}
       {planned && (
-        <Button type="button" variant="danger" loading={remove.isPending} onClick={() => act(() => remove.mutateAsync(undefined), "Gasto planejado excluído")}>
+        <Button type="button" variant="danger" loading={remove.isPending} onClick={() => act(() => remove.mutateAsync(undefined), "Despesa prevista excluída")}>
           <Trash2 size={16} /> Excluir planejado
         </Button>
       )}
@@ -329,11 +330,11 @@ export default function CalendarPage() {
       <PageHeader
         title={title}
         subtitle={
-          month === thisMonth() ? "Vencimentos, recebimentos e gastos planejados" : <Link to="/calendario">Voltar para o mês atual</Link>
+          month === thisMonth() ? "Vencimentos, recebimentos e despesas previstas" : <Link to="/calendario">Voltar para o mês atual</Link>
         }
         actions={
           <Button type="button" onClick={() => setEditing({ type: "new-planned", date: defaultDate })}>
-            <CalendarPlus size={16} /> Planejar gasto
+            <CalendarPlus size={16} /> Agendar despesa prevista
           </Button>
         }
       />
@@ -349,14 +350,14 @@ export default function CalendarPage() {
         <div className={`stack ${calendar.isPlaceholderData ? "is-stale" : ""}`} style={{ gap: 16 }}>
           <div className="cal-summary">
             <span>
-              Entradas <strong className="tone--ok">{money(totals.incoming)}</strong>
+              Receitas <strong className="tone--ok">{money(totals.incoming)}</strong>
             </span>
             <span>
-              Contas <strong className="tone--error">{money(totals.outgoing)}</strong>
+              Despesas <strong className="tone--error">{money(totals.outgoing)}</strong>
             </span>
             <span>
-              Planejados <strong>{money(totals.plannedTotal)}</strong>
-              <Tip>Gastos previstos que ainda não viraram conta. Eles já entram na previsão e no consultor.</Tip>
+              Previstas <strong>{money(totals.plannedTotal)}</strong>
+              <Tip>Despesas previstas ainda não confirmadas. Já são consideradas na projeção e nos Insights.</Tip>
             </span>
           </div>
 
@@ -382,11 +383,11 @@ export default function CalendarPage() {
             <EmptyGuide
               icon={<CalendarPlus size={22} />}
               title="Nada com data neste mês"
-              text="Contas com vencimento, rendas com dia de recebimento e gastos planejados aparecem aqui."
+              text="Despesas com vencimento, receitas com dia de recebimento e despesas previstas aparecem aqui."
               example={<>Ex.: planeje “IPVA” R$ 1.200 em 15/03 ou “Aniversário da mãe” R$ 250 em 20/05.</>}
               action={
                 <Button type="button" onClick={() => setEditing({ type: "new-planned", date: defaultDate })}>
-                  <CalendarPlus size={16} /> Planejar gasto
+                  <CalendarPlus size={16} /> Agendar despesa prevista
                 </Button>
               }
             />
@@ -488,7 +489,7 @@ export default function CalendarPage() {
             )}
             <div className="row">
               <Button type="button" onClick={() => setEditing({ type: "new-planned", date: editing.date })}>
-                <CalendarPlus size={16} /> Planejar gasto neste dia
+                <CalendarPlus size={16} /> Agendar despesa neste dia
               </Button>
               <Link className="btn btn--secondary" to={`/orcamento/${month}`}>
                 <Pencil size={16} /> Ver contas do mês
@@ -497,10 +498,10 @@ export default function CalendarPage() {
           </div>
         )}
       </Sheet>
-      <Sheet open={editing?.type === "new-planned"} title="Planejar gasto" onClose={close}>
+      <Sheet open={editing?.type === "new-planned"} title="Agendar despesa prevista" onClose={close}>
         {editing?.type === "new-planned" && <PlannedForm categories={cats} date={editing.date} onDone={close} />}
       </Sheet>
-      <Sheet open={editing?.type === "planned"} title="Gasto planejado" onClose={close}>
+      <Sheet open={editing?.type === "planned"} title="Despesa prevista" onClose={close}>
         {editing?.type === "planned" && <PlannedForm categories={cats} planned={editing.planned} date={editing.planned.date} onDone={close} />}
       </Sheet>
     </>

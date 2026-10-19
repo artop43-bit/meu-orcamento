@@ -28,8 +28,10 @@ from app.models import (
     Goal,
     Income,
     Investment,
+    MoneyAccount,
     PlannedExpense,
     SavedAnalysis,
+    Transfer,
     User,
     WatchItem,
 )
@@ -342,6 +344,33 @@ def _fill(db: Session, user: User) -> None:
             expense.paid = True
             expense.paid_at = utcnow()
     db.add(CategoryRule(user_id=user.id, pattern="ifood", category_id=alimentacao.id))
+
+    # Conta corrente com saldo inicial; receitas, despesas e a fatura do cartão saem dela.
+    account = MoneyAccount(
+        user_id=user.id, name="Conta corrente", kind="checking", initial_balance=Decimal("1850.00")
+    )
+    savings = MoneyAccount(
+        user_id=user.id, name="Poupança", kind="savings", initial_balance=Decimal("3200.00")
+    )
+    db.add_all([account, savings])
+    db.flush()
+    card.account_id = account.id
+    for income in db.scalars(select(Income).where(Income.user_id == user.id)):
+        income.account_id = account.id
+    for expense in db.scalars(
+        select(Expense).where(Expense.user_id == user.id, Expense.card_id.is_(None))
+    ):
+        expense.account_id = account.id
+    db.add(
+        Transfer(
+            user_id=user.id,
+            from_account_id=account.id,
+            to_account_id=savings.id,
+            amount=Decimal("300.00"),
+            date=today.replace(day=6) if today.day >= 6 else today,
+            notes="Reserva mensal",
+        )
+    )
 
     # Gastos planejados (Calendário): entram na previsão até virarem conta.
     db.add_all(
