@@ -50,7 +50,11 @@ PAGES = [
     ("ajuda", "/ajustes/ajuda"),
     ("admin", "/admin"),
     ("admin-emails", "/admin?aba=emails"),
-    ("admin-feedback", "/admin?aba=feedback"),
+    ("admin-solicitacoes", "/admin?aba=solicitacoes"),
+    ("admin-solicitacoes-usuarios", "/admin?aba=solicitacoes&visao=usuarios"),
+    ("admin-solicitacoes-status", "/admin?aba=solicitacoes&visao=status"),
+    ("perfil", "/ajustes/perfil"),
+    ("solicitacoes", "/ajustes/solicitacoes"),
 ]
 
 VIEWPORTS = {
@@ -123,6 +127,56 @@ DETECT = r"""
 }
 """
 
+# Alinhamento das janelas: as bordas de campos, opções e formas de pagamento precisam cair
+# nas mesmas colunas (no máximo 3 posições de borda esquerda e 3 de direita, como numa grade
+# de 3 colunas), e campos lado a lado precisam começar na mesma altura.
+ALIGN = r"""
+() => {
+  const issues = [];
+  const form = document.querySelector('dialog[open] form.inline-form');
+  if (!form) return issues;
+  const visible = (el) => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
+  const cells = [
+    ...form.querySelectorAll('.grid-2 > *, .segmented > label, .chips > .chip-radio'),
+  ].filter(visible).filter((el) => !el.closest('details:not([open])'));
+  const cluster = (values) => {
+    const sorted = [...values].sort((a, b) => a - b);
+    const groups = [];
+    for (const v of sorted) {
+      if (groups.length && v - groups[groups.length - 1] <= 3) continue;
+      groups.push(v);
+    }
+    return groups;
+  };
+  const lefts = cluster(cells.map((el) => el.getBoundingClientRect().left));
+  const rights = cluster(cells.map((el) => el.getBoundingClientRect().right));
+  if (lefts.length > 3 || rights.length > 3) {
+    issues.push({ kind: 'desalinhado', text: `bordas: ${lefts.length} esquerdas, ${rights.length} direitas`, where: 'grade do formulário' });
+  }
+  for (const grid of form.querySelectorAll('.grid-2')) {
+    const tops = [...grid.children]
+      .map((child) => child.querySelector('input:not([type="hidden"]):not(.date-field__native), select, textarea'))
+      .filter((el) => el && visible(el))
+      .map((el) => Math.round(el.getBoundingClientRect().top));
+    const rows = {};
+    for (const child of grid.children) {
+      const c = child.getBoundingClientRect();
+      const key = Math.round(c.top / 8);
+      (rows[key] ||= []).push(child);
+    }
+    if (tops.length > 1 && grid.children.length > 1) {
+      const first = grid.children[0].getBoundingClientRect();
+      const second = grid.children[1].getBoundingClientRect();
+      const sameRow = Math.abs(first.top - second.top) < 4;
+      if (sameRow && Math.max(...tops.slice(0, 2)) - Math.min(...tops.slice(0, 2)) > 1) {
+        issues.push({ kind: 'desalinhado', text: `campos lado a lado em alturas diferentes (${tops.slice(0, 2).join(' / ')})`, where: 'grid-2' });
+      }
+    }
+  }
+  return issues;
+}
+"""
+
 TIP_OUT = """() => {
   const t = document.querySelector('dialog[open] .tip__text');
   const d = document.querySelector('dialog[open] .sheet__inner');
@@ -169,6 +223,8 @@ def check_tips(page: Page, device: str, name: str):
 def form(page: Page, device: str, name: str):
     page.wait_for_timeout(350)
     check(page, device, name, full=False, scope="dialog[open]")
+    for issue in page.evaluate(ALIGN):
+        results.append({"device": device, "screen": name, **issue})
     check_tips(page, device, name)
     page.keyboard.press("Escape")
     page.wait_for_timeout(250)
@@ -186,6 +242,10 @@ def dialogs(page: Page, device: str):
             d.get_by_label("Valor total da compra").fill("1.800,00")
         d.get_by_label("Crédito").check()
         form(page, device, f"form-despesa-{kind.lower()}")
+    # Débito com cartão e cartão só de débito.
+    page.get_by_role("button", name="Nova despesa", exact=True).click()
+    page.locator("dialog[open]").get_by_label("Débito").check()
+    form(page, device, "form-despesa-debito")
     page.get_by_role("button", name="Nova receita", exact=True).click()
     form(page, device, "form-receita")
     for url, button, name in (
@@ -195,12 +255,16 @@ def dialogs(page: Page, device: str):
         ("/cartoes", "Novo cartão", "form-cartao"),
         ("/investimentos", "Novo investimento", "form-investimento"),
         ("/metas", "Nova meta", "form-meta"),
+        ("/ajustes/solicitacoes", "Nova solicitação", "form-solicitacao"),
+        ("/ajustes/perfil", "Editar perfil", "form-perfil"),
     ):
         page.goto(BASE + url)
         settle(page, 500)
         btn = page.get_by_role("button", name=button).first
         if btn.count() and btn.is_visible():
             btn.click()
+            if name == "form-cartao":
+                page.locator("dialog[open]").get_by_label("Crédito e débito").check()
             form(page, device, name)
 
 

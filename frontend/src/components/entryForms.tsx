@@ -1,6 +1,6 @@
-import { useEffect, useId, useRef, useState, type FormEvent } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type FormEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Sparkles, Trash2 } from "lucide-react";
+import { CreditCard, Sparkles, Trash2 } from "lucide-react";
 
 import {
   budgetApi,
@@ -21,16 +21,17 @@ import {
   type MonthData,
   type PaymentMethod,
 } from "../api/budget";
-import { extrasApi, useCards, type Card } from "../api/extras";
+import { extrasApi, hasCredit, hasDebit, useCards, type Card } from "../api/extras";
+import { CardForm } from "./CardForm";
 import { useAccounts } from "../api/money";
-import { DateField } from "./DateField";
+import { DateField, DayField } from "./DateField";
 import { normalizeText } from "../lib/text";
 import { errorMessage } from "../api/client";
 import { announce } from "../lib/announce";
 import { addMonths, money, moneyInput, monthLabel, parseMoney, shortDate, todayISO } from "../lib/format";
 import { CategorySelect, MoneyInput, requireMoney } from "./budget";
 import { Tip } from "./help";
-import { Alert, Button } from "./ui";
+import { Alert, Button, Sheet } from "./ui";
 import { useUndo } from "./undo";
 
 /** Vencimento da fatura em que cai uma compra (mesma regra do servidor). */
@@ -39,21 +40,23 @@ export function invoiceDue(card: Card, purchase: string): string {
   const clamp = (year: number, month: number, day: number) => Math.min(day, new Date(year, month, 0).getDate());
   let cy = y;
   let cm = m;
-  if (d >= clamp(y, m, card.closing_day)) {
+  const closing = card.closing_day ?? 1;
+  const dueDay = card.due_day ?? 1;
+  if (d >= clamp(y, m, closing)) {
     cm += 1;
     if (cm > 12) {
       cm = 1;
       cy += 1;
     }
   }
-  if (card.due_day <= card.closing_day) {
+  if (dueDay <= closing) {
     cm += 1;
     if (cm > 12) {
       cm = 1;
       cy += 1;
     }
   }
-  return `${cy}-${String(cm).padStart(2, "0")}-${String(clamp(cy, cm, card.due_day)).padStart(2, "0")}`;
+  return `${cy}-${String(cm).padStart(2, "0")}-${String(clamp(cy, cm, dueDay)).padStart(2, "0")}`;
 }
 
 /** Texto da regra sugerida: a primeira palavra "forte" da descrição (ex.: "uber" de "Uber *Trip"). */
@@ -265,6 +268,7 @@ export function ExpenseForm({
   const [error, setError] = useState("");
   const [savedCount, setSavedCount] = useState(0);
   const [cardId, setCardId] = useState<string>(expense?.card_id ?? "");
+  const [debitCardId, setDebitCardId] = useState<string>(expense?.debit_card_id ?? "");
   const [purchase, setPurchase] = useState(expense?.purchase_date ?? todayISO());
   const [duplicateOf, setDuplicateOf] = useState<string | null>(null);
   const [makeRule, setMakeRule] = useState(false);
@@ -284,13 +288,18 @@ export function ExpenseForm({
   const repeats = !!expense && (expense.installment_group_id !== null || expense.recurring_id !== null);
 
   const help = useDescriptionHelp(description, !expense);
-  const cardList = cards.data ?? [];
-  const usesCard = !expense && kind !== "recurring" && payment === "credit" && cardList.length > 0;
-  const card = usesCard ? cardList.find((c) => c.card.id === cardId)?.card ?? null : null;
-  // Primeira vez escolhendo "Crédito": já sugere o (primeiro) cartão.
-  useEffect(() => {
-    if (usesCard && !cardId) setCardId(cardList[0].card.id);
-  }, [usesCard, cardId, cardList]);
+  const allCards = useMemo(() => (cards.data ?? []).map((s) => s.card), [cards.data]);
+  const creditCards = allCards.filter(hasCredit);
+  const debitCards = allCards.filter(hasDebit);
+  // Crédito: a compra é sempre de um cartão (sem opção vazia). Débito: idem, exceto parcelada.
+  const wantsCredit = !expense && kind !== "recurring" && payment === "credit";
+  const wantsDebit = !expense && kind !== "installments" && payment === "debit";
+  const usesCard = wantsCredit && creditCards.length > 0;
+  const usesDebit = wantsDebit && debitCards.length > 0;
+  const card = usesCard ? creditCards.find((c) => c.id === cardId) ?? creditCards[0] ?? null : null;
+  const debitCard = usesDebit ? debitCards.find((c) => c.id === debitCardId) ?? debitCards[0] ?? null : null;
+  const missingCard = (wantsCredit && creditCards.length === 0) || (wantsDebit && debitCards.length === 0);
+  const [addingCard, setAddingCard] = useState(false);
   // Oferece regra quando a pessoa escolhe uma categoria diferente da sugerida/original.
   const originalCategory = expense?.category_id ?? help.category?.category_id ?? "";
   const canOfferRule = categoryTouched && !!categoryId && categoryId !== originalCategory && description.trim().length >= 3;
@@ -315,7 +324,11 @@ export function ExpenseForm({
   const save = useBudgetMutation(async () => {
     const value = requireMoney(amount);
     const category_id = categoryId || null;
-    const extra = { payment_method: payment || null, notes: notes.trim() || null, account_id: card ? null : accountId || null };
+    const extra = {
+      payment_method: payment || null,
+      notes: notes.trim() || null,
+      account_id: card || debitCard ? null : accountId || null,
+    };
     if (makeRule && canOfferRule && rulePatternText.trim().length >= 2) {
       await extrasApi.createRule(rulePatternText.trim(), categoryId);
     }
@@ -349,6 +362,26 @@ export function ExpenseForm({
         installments: kind === "installments" ? count : null,
         amount_mode: amountMode,
       });
+      return;
+    }
+    if (debitCard) {
+      // Débito: entra paga na data da compra e sai da conta vinculada ao cartão.
+      const data: ExpenseInput = {
+        description,
+        amount: value,
+        category_id,
+        ...extra,
+        paid: true,
+        debit_card_id: debitCard.id,
+        purchase_date: dueDate || todayISO(),
+        due_date: dueDate || todayISO(),
+      };
+      if (kind === "recurring") {
+        data.repeat = true;
+        data.interval_months = interval;
+        data.until_month = until || null;
+      }
+      await budgetApi.createExpense(kind === "recurring" && dueDate ? dueDate.slice(0, 7) : month, data);
       return;
     }
     const data: ExpenseInput = { description, amount: value, category_id, due_date: dueDate || null, paid, ...extra };
@@ -413,8 +446,15 @@ export function ExpenseForm({
     void run(false);
   }
 
-  const dateLabel =
-    kind === "installments" ? "Vencimento da 1ª parcela" : kind === "recurring" ? "Primeiro vencimento" : "Vencimento (opcional)";
+  const dateLabel = debitCard
+    ? kind === "recurring"
+      ? "Primeira compra"
+      : "Data da compra"
+    : kind === "installments"
+      ? "Vencimento da 1ª parcela"
+      : kind === "recurring"
+        ? "Primeiro vencimento"
+        : "Vencimento (opcional)";
 
   return (
     <form className="inline-form entry-form" onSubmit={submit}>
@@ -561,17 +601,44 @@ export function ExpenseForm({
         </div>
       </fieldset>
 
+      {missingCard && (
+        <div className="card-missing">
+          <p className="muted small">
+            {payment === "credit" ? "Nenhum cartão de crédito cadastrado." : "Nenhum cartão de débito cadastrado."} Cadastre o cartão para
+            {payment === "credit" ? " alocar a compra na fatura certa." : " descontar a compra da conta certa."}
+          </p>
+          <Button type="button" variant="secondary" onClick={() => setAddingCard(true)}>
+            <CreditCard size={16} /> Cadastrar cartão
+          </Button>
+        </div>
+      )}
+
+      {usesDebit && (
+        <div className="grid-2 card-pick">
+          <label>
+            Cartão de débito
+            <select value={debitCard?.id ?? ""} onChange={(e) => setDebitCardId(e.target.value)} required>
+              {debitCards.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <p className="muted small card-pick__note">Entra como paga e sai da conta vinculada ao cartão. Não usa limite nem fatura.</p>
+        </div>
+      )}
+
       {usesCard && (
         <div className="grid-2 card-pick">
           <label>
-            Cartão
-            <select value={cardId} onChange={(e) => setCardId(e.target.value)}>
-              {cardList.map((c) => (
-                <option key={c.card.id} value={c.card.id}>
-                  {c.card.name}
+            Cartão de crédito
+            <select value={card?.id ?? ""} onChange={(e) => setCardId(e.target.value)} required>
+              {creditCards.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
                 </option>
               ))}
-              <option value="">Sem cartão (despesa comum)</option>
             </select>
           </label>
           {card && (
@@ -599,7 +666,7 @@ export function ExpenseForm({
             </span>
             <DateField value={dueDate} onChange={setDueDate} />
           </label>
-          {accountList.length > 0 && (
+          {accountList.length > 0 && !debitCard && (
             <label>
               Conta de pagamento
               <select value={accountId} onChange={(e) => setAccountId(e.target.value)}>
@@ -670,7 +737,7 @@ export function ExpenseForm({
         <ScopeChoice scope={scope} setScope={setScope} what={expense!.installment_group_id ? "Esta e as próximas parcelas" : "Este mês e os seguintes"} />
       )}
 
-      {!expense && kind !== "recurring" && (
+      {!expense && kind !== "recurring" && !debitCard && (
         <label className="check">
           <input type="checkbox" checked={paid} onChange={(e) => setPaidChoice(e.target.checked)} />
           {kind === "installments" ? "Primeira parcela já paga" : "Já paga"}
@@ -682,6 +749,18 @@ export function ExpenseForm({
         label={duplicateOf ? "Salvar mesmo assim" : expense ? "Salvar" : "Adicionar despesa"}
         onAnother={expense ? undefined : () => void run(true)}
       />
+      <Sheet open={addingCard} title="Novo cartão" onClose={() => setAddingCard(false)}>
+        {addingCard && (
+          <CardForm
+            defaultKind={payment === "debit" ? "debit" : "credit"}
+            onDone={(created) => {
+              setAddingCard(false);
+              if (created && payment === "debit") setDebitCardId(created.id);
+              if (created && payment === "credit") setCardId(created.id);
+            }}
+          />
+        )}
+      </Sheet>
     </form>
   );
 }
@@ -777,7 +856,12 @@ export function IncomeForm({ month, income, onDone }: { month: string; income?: 
           <span className="field-label">
             Dia do recebimento <Tip>Opcional. Exibe a receita no dia correspondente do Calendário.</Tip>
           </span>
-          <input type="number" inputMode="numeric" min={1} max={31} value={day} onChange={(e) => setDay(e.target.value)} placeholder="1 a 31" />
+          <DayField
+            value={day}
+            onChange={setDay}
+            month={income?.month?.slice(0, 7) ?? month}
+            recurring={income ? Boolean(income.recurring_id) : repeat !== "once"}
+          />
         </label>
       </div>
       {!income && (

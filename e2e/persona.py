@@ -791,7 +791,7 @@ def credit_card(page: Page):
     page.screenshot(path=OUT / "v06-cartoes.png", full_page=True)
 
 
-@step("v0.6: regra de categoria, assinaturas, privacidade, preferências e sugestão")
+@step("v0.6: regra de categoria, assinaturas, privacidade e preferências")
 def rules_privacy_feedback(page: Page):
     page.goto(f"{BASE}/categorias")
     idle(page)
@@ -819,16 +819,217 @@ def rules_privacy_feedback(page: Page):
     assert page.evaluate("document.documentElement.dataset.theme") == "dark"
     page.get_by_label("Automático (sistema)").check()
 
+
+
+# ---------------------------------------------------------------- v0.7.5
+
+
+def png_bytes(width: int = 32, height: int = 24, rgb: tuple[int, int, int] = (31, 122, 98)) -> bytes:
+    """PNG de verdade, gerado sem bibliotecas (o e2e não depende de Pillow)."""
+    import struct
+    import zlib
+
+    row = b"\x00" + bytes(rgb) * width
+    raw = row * height
+
+    def chunk(kind: bytes, data: bytes) -> bytes:
+        return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data) & 0xFFFFFFFF)
+
+    header = struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0)
+    return b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", header) + chunk(b"IDAT", zlib.compress(raw)) + chunk(b"IEND", b"")
+
+
+def image_loaded(page: Page, selector: str) -> bool:
+    return page.locator(selector).first.evaluate("img => img.complete && img.naturalWidth > 0")
+
+
+@step("v0.7.5: solicitação com print, resposta da administração e aviso de resposta nova")
+def support_requests(page: Page):
+    open_month(page, CURRENT)
     page.keyboard.press("Control+k")
     d = dialog(page)
-    d.get_by_role("combobox").fill("feedback")
+    d.get_by_role("combobox").fill("solicitação")
     page.keyboard.press("Enter")
-    page.wait_for_timeout(500)
-    d = page.locator("dialog[open]", has_text="Enviar feedback")
-    d.get_by_label("Mensagem").fill("Teste da persona: gostei do lançamento rápido.")
-    d.get_by_role("button", name="Enviar").click()
-    expect(d).to_contain_text("Feedback recebido")
-    d.get_by_role("button", name="Pronto").click()
+    d = page.locator("dialog[open]", has_text="Nova solicitação")
+    d.get_by_label("Problema").check()
+    d.get_by_label("Assunto").fill("Gráfico de Insights não carrega")
+    d.get_by_label("Mensagem").fill("Ao abrir Insights › Tendências o gráfico fica em branco. Segue o print.")
+    d.locator("[data-testid=image-input]").set_input_files(
+        [{"name": "print.png", "mimeType": "image/png", "buffer": png_bytes(320, 200)}]
+    )
+    expect(d.get_by_role("img", name="Prévia: print.png")).to_be_visible()
+    d.get_by_role("button", name="Enviar solicitação").click()
+    expect(d).to_contain_text("Solicitação enviada", timeout=8000)
+    d.get_by_role("button", name="Acompanhar solicitação").click()
+    page.wait_for_url("**/ajustes/solicitacoes/**")
+    idle(page)
+    expect(page.get_by_role("heading", name="Gráfico de Insights não carrega")).to_be_visible()
+    expect(page.get_by_role("img", name="Imagem anexada 1")).to_be_visible()
+    assert image_loaded(page, ".attachments img"), "a imagem enviada não abriu"
+    [thread] = api(page, "/support/threads")
+    assert (thread["status"], thread["kind"]) == ("open", "bug"), thread
+
+    # Administração: aba Solicitações, abre a conversa e responde.
+    page.goto(f"{BASE}/admin?aba=solicitacoes")
+    idle(page)
+    page.get_by_role("button", name=re.compile("Gráfico de Insights não carrega")).click()
+    idle(page)
+    expect(page.get_by_role("heading", name="Gráfico de Insights não carrega")).to_be_visible()
+    page.get_by_label("Mensagem", exact=True).fill("Corrigido na próxima versão. Obrigado pelo print.")
+    page.get_by_role("button", name="Enviar mensagem").click()
+    expect(page.locator(".bubble--mine")).to_contain_text("Corrigido na próxima versão", timeout=8000)
+    expect(page.get_by_label("Status")).to_have_value("answered")
+    # Visões: por usuário e por status.
+    page.get_by_role("tab", name="Por status").click()
+    idle(page)
+    expect(page.get_by_role("button", name=re.compile(r"Respondida \(1\)"))).to_be_visible()
+    page.get_by_role("tab", name="Por usuário").click()
+    idle(page)
+    expect(page.locator(".thread-list__item").first).to_contain_text("1 solicitação(ões)")
+    page.get_by_role("tab", name="Recentes").click()
+    page.get_by_placeholder("Buscar por assunto, mensagem ou e-mail").fill("print")
+    page.wait_for_timeout(700)
+    expect(page.locator(".thread-list__item")).to_have_count(1)
+    page.screenshot(path=OUT / "v075-admin-solicitacoes.png", full_page=True)
+
+    # Usuário: aviso de resposta nova em Ajustes; ao abrir, fica lida.
+    assert api(page, "/support/unread")["unread"] == 1
+    page.goto(f"{BASE}/ajustes")
+    idle(page)
+    expect(page.get_by_text("1 resposta(s) nova(s)")).to_be_visible()
+    page.locator(".settings-list").get_by_role("link", name=re.compile("Minhas solicitações")).click()
+    idle(page)
+    page.get_by_role("link", name=re.compile("Gráfico de Insights não carrega")).click()
+    idle(page)
+    expect(page.locator(".bubble--other")).to_contain_text("Corrigido na próxima versão")
+    assert api(page, "/support/unread")["unread"] == 0
+    page.screenshot(path=OUT / "v075-minhas-solicitacoes.png", full_page=True)
+
+
+@step("v0.7.5: perfil com foto, dados opcionais, resumo e retrospectiva com imagem para baixar")
+def profile(page: Page):
+    page.goto(f"{BASE}/ajustes/perfil")
+    idle(page)
+    page.get_by_role("button", name="Adicionar foto").click()
+    d = dialog(page)
+    d.locator("[data-testid=avatar-input]").set_input_files(
+        [{"name": "foto.png", "mimeType": "image/png", "buffer": png_bytes(600, 400, (200, 80, 60))}]
+    )
+    expect(d.get_by_label("Zoom")).to_be_visible()
+    d.get_by_label("Zoom").fill("1.4")
+    d.get_by_role("button", name="Salvar").click()
+    expect(d).to_have_count(0, timeout=8000)
+    idle(page)
+    assert api(page, "/profile")["avatar_id"], "a foto não foi salva"
+    assert image_loaded(page, ".profile-hero__avatar img"), "a foto não aparece no perfil"
+
+    page.get_by_role("button", name="Editar perfil").click()
+    d = dialog(page)
+    d.get_by_label("Nome de exibição").fill("Carla Souza")
+    d.get_by_label("Cidade").fill("Belo Horizonte")
+    d.get_by_label("Profissão").fill("Assistente administrativa")
+    d.get_by_label("Média de receitas").uncheck()
+    d.get_by_role("button", name="Salvar").click()
+    expect(d).to_have_count(0, timeout=8000)
+    idle(page)
+    expect(page.get_by_role("heading", name="Carla Souza")).to_be_visible()
+    expect(page.locator(".profile-stats")).not_to_contain_text("Média de receitas")
+    expect(page.locator(".profile-stats")).to_contain_text("Taxa de poupança")
+    expect(page.locator(".sidebar__profile")).to_contain_text("Carla Souza")
+
+    page.get_by_role("button", name="Ver retrospectiva").click()
+    story = page.locator("dialog.story[open]")
+    expect(story).to_be_visible(timeout=8000)
+    expect(story).to_contain_text("Retrospectiva")
+    for _ in range(12):
+        page.keyboard.press("ArrowRight")
+    with page.expect_download() as download:
+        story.get_by_role("button", name="Baixar feed (1:1)").click()
+    file = download.value
+    assert file.suggested_filename.endswith("-feed.png"), file.suggested_filename
+    path = OUT / "v075-retrospectiva-feed.png"
+    file.save_as(path)
+    assert path.read_bytes()[:8] == b"\x89PNG\r\n\x1a\n" and path.stat().st_size > 5000
+    page.keyboard.press("Escape")
+    expect(story).to_have_count(0)
+    page.screenshot(path=OUT / "v075-perfil.png", full_page=True)
+
+
+@step("v0.7.5: cartão de débito (sem limite e sem fatura) e crédito sem a opção 'Sem cartão'")
+def debit_card(page: Page):
+    page.goto(f"{BASE}/cartoes")
+    idle(page)
+    page.get_by_role("button", name="Novo cartão").first.click()
+    d = dialog(page)
+    d.get_by_label("Nome do cartão").fill("Débito Inter")
+    d.get_by_label("Débito", exact=True).check()
+    expect(d.get_by_text("Dia do fechamento")).to_have_count(0)
+    d.get_by_role("button", name="Adicionar cartão").click()
+    expect(d).to_have_count(0, timeout=8000)
+    idle(page)
+    cards = {c["card"]["name"]: c for c in api(page, "/cards")}
+    debit = cards["Débito Inter"]
+    assert debit["card"]["kind"] == "debit" and debit["open_invoice"] is None, debit
+    used_before = {name: c["used"] for name, c in cards.items()}
+
+    open_month(page, CURRENT)
+    page.get_by_role("button", name="Nova despesa", exact=True).click()
+    d = dialog(page)
+    d.get_by_label("Descrição").fill("Farmácia Araujo")
+    d.get_by_role("textbox", name="Valor", exact=True).fill(money(35.90))
+    d.get_by_label("Débito").check()
+    expect(d.get_by_label("Cartão de débito")).to_have_value(debit["card"]["id"])
+    d.get_by_role("button", name="Adicionar despesa").click()
+    expect(d).to_have_count(0, timeout=8000)
+    idle(page)
+    bought = next(e for e in api(page, f"/months/{CURRENT}")["expenses"] if e["description"] == "Farmácia Araujo")
+    assert bought["paid"] is True and bought["debit_card_id"] == debit["card"]["id"] and bought["card_id"] is None, bought
+    used_after = {c["card"]["name"]: c["used"] for c in api(page, "/cards")}
+    assert used_after == used_before, (used_before, used_after)
+
+    # Crédito: só os cartões de crédito, sem a opção vazia.
+    page.get_by_role("button", name="Nova despesa", exact=True).click()
+    d = dialog(page)
+    d.get_by_label("Crédito").check()
+    options = d.get_by_label("Cartão de crédito").locator("option").all_inner_texts()
+    assert options and not any("Sem cartão" in o for o in options) and "Débito Inter" not in options, options
+    page.keyboard.press("Escape")
+
+
+@step("v0.7.5: data que não existe, dia 31 de fevereiro e campo obrigatório bloqueiam o salvar")
+def validation(page: Page):
+    open_month(page, CURRENT)
+    page.get_by_role("button", name="Nova despesa", exact=True).click()
+    d = dialog(page)
+    # Campo obrigatório vazio: mensagem do app junto do campo (sem balão do navegador).
+    d.get_by_role("button", name="Adicionar despesa").click()
+    expect(d.locator(".field-error").first).to_contain_text("Preencha o campo")
+    d.get_by_label("Descrição").fill("Teste de data")
+    d.get_by_role("textbox", name="Valor", exact=True).fill(money(10))
+    d.get_by_placeholder("dd/mm/aaaa").first.fill("30/02/2027")
+    expect(d.get_by_text("Fevereiro de 2027 tem 28 dias.")).to_be_visible()
+    d.get_by_role("button", name="Adicionar despesa").click()
+    page.wait_for_timeout(600)
+    expect(d).to_be_visible()
+    assert not any(e["description"] == "Teste de data" for e in api(page, f"/months/{CURRENT}")["expenses"])
+    page.keyboard.press("Escape")
+
+    page.goto(f"{BASE}/orcamento/2027-02")
+    idle(page)
+    page.get_by_role("button", name="Nova receita", exact=True).click()
+    d = dialog(page)
+    d.get_by_label("Descrição").fill("Bônus")
+    d.get_by_label("Valor", exact=True).fill(money(100))
+    d.get_by_label("Dia do recebimento").fill("31")
+    expect(d.get_by_text("Fevereiro de 2027 tem 28 dias. Use um dia entre 1 e 28.")).to_be_visible()
+    d.get_by_role("button", name="Adicionar receita").click()
+    page.wait_for_timeout(600)
+    expect(d).to_be_visible()
+    assert not any(i["description"] == "Bônus" for i in api(page, "/months/2027-02")["incomes"])
+    # Que se repete: 31 vale (nos meses curtos cai no último dia).
+    d.get_by_label("Todo mês", exact=True).check()
+    expect(d.get_by_text("Em meses mais curtos, cai no último dia do mês.")).to_be_visible()
+    page.keyboard.press("Escape")
 
 
 @step("Versão e data do update no fim do menu")
@@ -1061,6 +1262,10 @@ def main():
         quick_and_bulk(page)
         credit_card(page)
         rules_privacy_feedback(page)
+        support_requests(page)
+        profile(page)
+        debit_card(page)
+        validation(page)
         version(page)
         history_report(page, months)
         exports(page)

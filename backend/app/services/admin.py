@@ -34,7 +34,12 @@ def overview(db: Session) -> dict[str, Any]:
             .where(UserSession.last_seen_at >= week)
         ),
         "new_7d": count(select(func.count()).where(User.created_at >= week)),
-        "feedback_new": count(select(func.count()).where(SupportThread.admin_unread.is_(True))),
+        "feedback_new": count(
+            select(func.count())
+            .select_from(SupportThread)
+            .join(User, User.id == SupportThread.user_id)
+            .where(SupportThread.admin_unread.is_(True))
+        ),
         "signup_approval": get_settings().signup_approval,
     }
 
