@@ -10,7 +10,7 @@ Nunca roda em produção. A senha é aleatória a cada execução e só é mostr
 
 import json
 import secrets
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 
 from sqlalchemy import select
@@ -20,7 +20,17 @@ from app.core import security
 from app.core.config import get_settings
 from app.core.months import add_months, current_month, format_month, with_day
 from app.db.types import utcnow
-from app.models import Category, Expense, Goal, Income, Investment, SavedAnalysis, User
+from app.models import (
+    Category,
+    Expense,
+    Goal,
+    Income,
+    Investment,
+    PlannedExpense,
+    SavedAnalysis,
+    User,
+    WatchItem,
+)
 from app.services import budget
 
 DEMO_EMAIL = "admin@example.com"
@@ -35,6 +45,8 @@ VARIABLE = [
     ("610.00", "140.00", "95.00"),  # mês atual, ainda em andamento
 ]
 PHARMACY = ["42.90", "118.40", "36.00", "64.70", "29.90", "51.20"]
+# Renda variável (freelas) de cada mês: a previsão usa a média.
+FREELAS = ["450.00", "820.00", "300.00", "950.00", "600.00", "380.00", "600.00"]
 
 
 class DemoNotAllowed(RuntimeError):
@@ -102,14 +114,27 @@ def _fill(db: Session, user: User) -> None:
 
     # Fixas (lançadas automaticamente em cada mês aberto).
     for data in (
-        {"kind": "income", "description": "Salário", "amount": Decimal("4500.00")},
-        {"kind": "income", "description": "Freelas", "amount": Decimal("600.00")},
+        {
+            "kind": "income",
+            "description": "Salário",
+            "amount": Decimal("4500.00"),
+            "income_type": "fixed",
+            "due_day": 5,
+        },
+        {
+            "kind": "income",
+            "description": "Freelas",
+            "amount": Decimal("600.00"),
+            "income_type": "variable",
+            "notes": "Design de logos e posts",
+        },
         {
             "kind": "expense",
             "description": "Aluguel",
             "amount": Decimal("1400.00"),
             "category_id": moradia.id,
             "due_day": 10,
+            "payment_method": "boleto",
         },
         {
             "kind": "expense",
@@ -117,6 +142,7 @@ def _fill(db: Session, user: User) -> None:
             "amount": Decimal("99.90"),
             "category_id": servicos.id,
             "due_day": 15,
+            "payment_method": "credit",
         },
         {
             "kind": "expense",
@@ -124,6 +150,7 @@ def _fill(db: Session, user: User) -> None:
             "amount": Decimal("563.00"),
             "category_id": educacao.id,
             "due_day": 5,
+            "payment_method": "pix",
         },
         {
             "kind": "expense",
@@ -131,6 +158,17 @@ def _fill(db: Session, user: User) -> None:
             "amount": Decimal("89.90"),
             "category_id": lazer.id,
             "due_day": 20,
+            "payment_method": "credit",
+        },
+        {
+            # Conta que não é mensal: seguro do carro a cada 6 meses.
+            "kind": "expense",
+            "description": "Seguro do carro",
+            "amount": Decimal("780.00"),
+            "category_id": transporte.id,
+            "due_day": 25,
+            "interval_months": 6,
+            "payment_method": "boleto",
         },
     ):
         budget.create_recurring(db, user, {**data, "start_month": start, "end_month": None})
@@ -145,6 +183,7 @@ def _fill(db: Session, user: User) -> None:
             if offset == 1:
                 # Um mês no vermelho: viagem no feriado (o consultor reage a isso).
                 extras.append(("Viagem do feriado", "1950.00", lazer, 21))
+            methods = {"Mercado": "debit", "Combustível e Uber": "pix", "Farmácia": "credit"}
             for description, amount, category, day in (
                 ("Mercado", market, alimentacao, 8),
                 ("Combustível e Uber", transport, transporte, 18),
@@ -159,8 +198,17 @@ def _fill(db: Session, user: User) -> None:
                         amount=Decimal(amount),
                         category_id=category.id,
                         due_date=with_day(month, day),
+                        payment_method=methods.get(description, "credit"),
                     )
                 )
+        # A renda variável muda de mês para mês.
+        db.flush()
+        for income in db.scalars(
+            select(Income).where(
+                Income.user_id == user.id, Income.month == month, Income.description == "Freelas"
+            )
+        ):
+            income.amount = Decimal(FREELAS[offset])
 
     # Compra parcelada em 10x, começando há 3 meses.
     budget.create_expense(
@@ -173,6 +221,7 @@ def _fill(db: Session, user: User) -> None:
             "category_id": educacao.id,
             "due_date": with_day(add_months(this_month, -3), 12),
             "installments": 10,
+            "payment_method": "credit",
         },
     )
     db.flush()
@@ -233,8 +282,33 @@ def _fill(db: Session, user: User) -> None:
                 name="ETF BOVA11",
                 kind="acoes",
                 institution="Corretora Z",
+                ticker="BOVA11",
+                quantity=Decimal("15"),
                 invested_amount=Decimal("2000.00"),
                 current_value=Decimal("1874.20"),
+            ),
+            WatchItem(user_id=user.id, symbol="PETR4"),
+            WatchItem(user_id=user.id, symbol="BTC"),
+        ]
+    )
+
+    # Gastos planejados (Calendário): entram na previsão até virarem conta.
+    db.add_all(
+        [
+            PlannedExpense(
+                user_id=user.id,
+                date=today + timedelta(days=4),
+                description="Presente de aniversário da mãe",
+                amount=Decimal("250.00"),
+                category_id=lazer.id,
+            ),
+            PlannedExpense(
+                user_id=user.id,
+                date=with_day(add_months(this_month, 2), 15),
+                description="IPVA (cota única)",
+                amount=Decimal("1380.00"),
+                category_id=transporte.id,
+                notes="Pagar à vista tem desconto",
             ),
         ]
     )

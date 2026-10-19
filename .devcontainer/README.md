@@ -49,5 +49,5 @@ em github.com/codespaces → **⋯ → Stop codespace** quando terminar.
 Para refazer a conta de demonstração do zero:
 
 ```bash
-rm .devcontainer/.demo-v043 && bash .devcontainer/start.sh
+rm .devcontainer/.demo-v050 && bash .devcontainer/start.sh
 ```

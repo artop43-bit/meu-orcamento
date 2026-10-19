@@ -85,6 +85,8 @@ class ProjectionPoint(BaseModel):
     month: date
     income: Decimal
     expenses: Decimal
+    # Parte dos gastos que vem de gastos planejados ainda não lançados.
+    planned: Decimal = Decimal("0")
     non_essential: Decimal
     balance: Decimal
     cumulative: Decimal
@@ -175,6 +177,13 @@ InvestmentKind = Literal[
     "poupanca", "renda_fixa", "tesouro", "fundos", "acoes", "fiis", "cripto", "previdencia", "outro"
 ]
 NonNegativeMoney = Annotated[Decimal, Field(ge=0, max_digits=12, decimal_places=2)]
+Ticker = Annotated[
+    str,
+    StringConstraints(
+        strip_whitespace=True, to_upper=True, pattern=r"^\^?[A-Za-z0-9]{2,10}(\.[Ss][Aa])?$"
+    ),
+]
+Quantity = Annotated[Decimal, Field(gt=0, max_digits=18, decimal_places=6)]
 Name = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=80)]
 Institution = Annotated[str, StringConstraints(strip_whitespace=True, max_length=80)]
 Notes = Annotated[str, StringConstraints(strip_whitespace=True, max_length=500)]
@@ -188,6 +197,9 @@ class InvestmentIn(BaseModel):
     current_value: NonNegativeMoney
     is_emergency_reserve: bool = False
     notes: Notes | None = None
+    # Código na bolsa ou cripto (PETR4, MXRF11, BTC) e quantidade: o valor atual vem da cotação.
+    ticker: Ticker | None = None
+    quantity: Quantity | None = None
 
 
 class InvestmentPatch(BaseModel):
@@ -198,6 +210,8 @@ class InvestmentPatch(BaseModel):
     current_value: NonNegativeMoney | None = None
     is_emergency_reserve: bool | None = None
     notes: Notes | None = None
+    ticker: Ticker | None = None
+    quantity: Quantity | None = None
 
 
 class InvestmentOut(BaseModel):
@@ -211,6 +225,8 @@ class InvestmentOut(BaseModel):
     current_value: Decimal
     is_emergency_reserve: bool
     notes: str | None
+    ticker: str | None
+    quantity: Decimal | None
     updated_at: datetime
 
     @computed_field  # type: ignore[prop-decorator]
@@ -325,3 +341,92 @@ class SavedAnalysisOut(BaseModel):
     @classmethod
     def _parse(cls, value: object) -> object:
         return json.loads(value) if isinstance(value, str) else value
+
+
+# ---------------------------------------------------------------- mercado
+
+
+class Quote(BaseModel):
+    symbol: str
+    name: str
+    kind: str
+    price: float | None
+    change_pct: float | None = None
+    day_high: float | None = None
+    day_low: float | None = None
+    volume: float | None = None
+    year_high: float | None = None
+    year_low: float | None = None
+    currency: str = "BRL"
+    logo: str | None = None
+    updated_at: str | None = None
+
+
+class MarketOverview(BaseModel):
+    indexes: list[Quote]
+    indexes_need_token: bool
+    currencies: list[Quote]
+    crypto: list[Quote]
+    gainers: list[Quote]
+    losers: list[Quote]
+    most_traded: list[Quote]
+    fixed_income: IndicatorsOut
+    disclaimer: str
+    fetched_at: datetime
+
+
+class PricePoint(BaseModel):
+    date: str
+    close: float | None
+
+
+class AssetOut(BaseModel):
+    quote: Quote
+    history: list[PricePoint]
+    range: str
+    disclaimer: str
+
+
+class WatchIn(BaseModel):
+    symbol: Ticker
+
+
+class SimulationRow(BaseModel):
+    key: str
+    name: str
+    annual_rate: float
+    ir_pct: float
+    gross: float
+    net: float
+    earnings_net: float
+    real_gain: float | None
+
+
+class SimulationOut(BaseModel):
+    amount: float
+    months: int
+    selic: float
+    cdi: float
+    ipca_12m: float | None
+    results: list[SimulationRow]
+    disclaimer: str
+
+
+class PortfolioUpdate(BaseModel):
+    id: uuid.UUID
+    ticker: str | None
+    price: float
+    change_pct: float | None
+    current_value: Decimal
+
+
+class PortfolioComment(BaseModel):
+    tone: str
+    title: str
+    text: str
+
+
+class PortfolioOut(BaseModel):
+    updated: list[PortfolioUpdate]
+    comments: list[PortfolioComment]
+    disclaimer: str

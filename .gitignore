@@ -34,7 +34,7 @@ age-key.txt
 backend/codespace.db
 .devcontainer/.deps-hash
 .devcontainer/.demo-vazia
-.devcontainer/.demo-v043
+.devcontainer/.demo-v050
 
 # Banco e credenciais de teste local
 backend/local-dev*

@@ -15,8 +15,8 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.months import add_months, format_month
-from app.models import Expense, User
-from app.services import analysis, budget, investments
+from app.models import Expense, Income, User
+from app.services import analysis, budget, investments, planned
 
 ZERO = Decimal("0.00")
 AVERAGE_WINDOW = 3
@@ -299,14 +299,60 @@ def consultant(db: Session, user: User, month: date, today: date | None = None) 
             )
         )
 
-    # 7. Próximo mês (fixas + parcelas já lançadas)
+    # 6b. Gastos planejados chegando (lembrete)
+    upcoming = planned.pending_planned(db, user, today, today + timedelta(days=DUE_SOON_DAYS))
+    if upcoming:
+        first = upcoming[0]
+        total = sum((p.amount for p in upcoming), ZERO)
+        alerts.append(
+            _message(
+                "info",
+                f"{len(upcoming)} gasto(s) planejado(s) nos próximos {DUE_SOON_DAYS} dias",
+                f"Dia {first.date.day:02d}: {first.description} ({brl(first.amount)})"
+                + (f" e mais {len(upcoming) - 1}" if len(upcoming) > 1 else "")
+                + f". Total previsto: {brl(total)}. Lance quando acontecer, no Calendário.",
+            )
+        )
+
+    # 6c. Renda variável: planejar pela média, não pelo melhor mês
+    variable = [i for i in data.incomes if i.income_type == "variable"]
+    if variable and income > 0:
+        variable_total = sum((i.amount for i in variable), ZERO)
+        share = float(variable_total / income * 100)
+        past = list(
+            db.execute(
+                select(Income.month, func.sum(Income.amount))
+                .where(
+                    Income.user_id == user.id,
+                    Income.income_type == "variable",
+                    Income.month < month,
+                    Income.month >= add_months(month, -6),
+                )
+                .group_by(Income.month)
+            )
+        )
+        avg = _average([Decimal(total) for _, total in past])
+        text = f"{pct(share)} da sua renda deste mês é variável ({brl(variable_total)})."
+        if avg is not None:
+            text += f" Sua média recente é {brl(avg)}"
+            text += (
+                ": este mês veio acima, bom momento para guardar a diferença."
+                if variable_total > avg
+                else ": planeje as contas fixas pela média, não pelo melhor mês."
+            )
+        else:
+            text += " Planeje as contas fixas contando só com a parte fixa."
+        alerts.append(_message("info", "Renda variável", text))
+
+    # 7. Próximo mês (fixas + parcelas já lançadas + planejados)
     nxt = analysis.projection(db, user, add_months(month, 1), 1)[0]
     if nxt["income"] > 0 and nxt["balance"] < 0:
         alerts.append(
             _message(
                 "warning",
                 "Próximo mês tende a fechar no vermelho",
-                f"Só com as contas fixas e parcelas já lançadas, faltariam {brl(nxt['balance'])}.",
+                "Só com as contas fixas, parcelas e gastos planejados, faltariam "
+                f"{brl(nxt['balance'])}.",
             )
         )
 

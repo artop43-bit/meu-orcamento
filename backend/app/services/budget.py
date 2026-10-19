@@ -7,7 +7,7 @@ import uuid
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import date
-from decimal import Decimal
+from decimal import ROUND_DOWN, Decimal
 from typing import Any
 
 from sqlalchemy import delete, func, select
@@ -124,6 +124,9 @@ def _materialize(db: Session, item: RecurringItem, month: date) -> None:
                 month=month,
                 description=item.description,
                 amount=item.amount,
+                income_type=item.income_type or "fixed",
+                day=item.due_day,
+                notes=item.notes,
                 recurring_id=item.id,
             )
         )
@@ -136,13 +139,33 @@ def _materialize(db: Session, item: RecurringItem, month: date) -> None:
                 amount=item.amount,
                 category_id=item.category_id,
                 due_date=with_day(month, item.due_day) if item.due_day else None,
+                payment_method=item.payment_method,
+                notes=item.notes,
                 recurring_id=item.id,
             )
         )
 
 
+def _months_between(start: date, end: date) -> int:
+    return (end.year - start.year) * 12 + end.month - start.month
+
+
 def active_in(item: RecurringItem, month: date) -> bool:
-    return item.start_month <= month and (item.end_month is None or month <= item.end_month)
+    """A fixa cai neste mês? Respeita o período e a frequência (a cada N meses)."""
+    if month < item.start_month or (item.end_month is not None and month > item.end_month):
+        return False
+    return _months_between(item.start_month, month) % (item.interval_months or 1) == 0
+
+
+def _materialize_opened(db: Session, user: User, item: RecurringItem, since: date) -> None:
+    """Lança a fixa nos meses já abertos a partir de `since`."""
+    for (month,) in db.execute(
+        select(BudgetMonth.month).where(BudgetMonth.user_id == user.id, BudgetMonth.month >= since)
+    ):
+        if active_in(item, month):
+            _materialize(db, item, month)
+    # A sessão não faz flush sozinha: sem isto, o lançamento do mês aberto seria criado duas vezes.
+    db.flush()
 
 
 def ensure_month(db: Session, user: User, month: date) -> None:
@@ -181,37 +204,43 @@ def create_recurring(db: Session, user: User, data: dict[str, Any]) -> Recurring
     _validate_period(start, end)
     if data["kind"] == "income":
         data["category_id"] = None
-        data["due_day"] = None
+        data["payment_method"] = None
+        data["income_type"] = data.get("income_type") or "fixed"
+    else:
+        data["income_type"] = None
     _check_category(db, user, data.get("category_id"))
 
     item = RecurringItem(user_id=user.id, start_month=start, end_month=end, **data)
     db.add(item)
     db.flush()
     # Meses já abertos dentro do período recebem o lançamento na hora.
-    for (month,) in db.execute(
-        select(BudgetMonth.month).where(BudgetMonth.user_id == user.id, BudgetMonth.month >= start)
-    ):
-        if active_in(item, month):
-            _materialize(db, item, month)
+    _materialize_opened(db, user, item, start)
     db.commit()
     return item
 
 
 def update_recurring(
-    db: Session, user: User, item_id: uuid.UUID, changes: dict[str, Any]
+    db: Session,
+    user: User,
+    item_id: uuid.UUID,
+    changes: dict[str, Any],
+    from_month: date | None = None,
 ) -> RecurringItem:
+    """Altera a fixa e os lançamentos não pagos a partir de `from_month` (padrão: mês atual)."""
     item = _owned(db, RecurringItem, item_id, user)
     if "end_month" in changes:
         changes["end_month"] = parse_month(changes["end_month"]) if changes["end_month"] else None
         _validate_period(item.start_month, changes["end_month"])
     if item.kind == "income":
         changes.pop("category_id", None)
-        changes.pop("due_day", None)
+        changes.pop("payment_method", None)
+    else:
+        changes.pop("income_type", None)
     _check_category(db, user, changes.get("category_id"))
     _apply(item, changes)
 
-    # Propaga para os lançamentos a partir do mês atual que ainda não foram pagos.
-    this_month = current_month()
+    # Propaga para os lançamentos a partir do mês escolhido que ainda não foram pagos.
+    this_month = from_month or current_month()
     if item.kind == "income":
         instances: list[Income | Expense] = list(
             db.scalars(
@@ -232,11 +261,22 @@ def update_recurring(
         if item.end_month is not None and instance.month > item.end_month:
             db.delete(instance)
             continue
+        if not active_in(item, instance.month):
+            db.delete(instance)
+            continue
         instance.description = item.description
         instance.amount = item.amount
+        instance.notes = item.notes
         if isinstance(instance, Expense):
             instance.category_id = item.category_id
+            instance.payment_method = item.payment_method
             instance.due_date = with_day(instance.month, item.due_day) if item.due_day else None
+        else:
+            instance.income_type = item.income_type or "fixed"
+            instance.day = item.due_day
+    db.flush()
+    # Meses já abertos que passaram a ter o lançamento (ex.: mudou a frequência).
+    _materialize_opened(db, user, item, this_month)
     db.commit()
     return item
 
@@ -276,14 +316,68 @@ def _end_recurrence_before(db: Session, item_id: uuid.UUID | None, month: date) 
 
 
 def create_income(db: Session, user: User, month: date, data: dict[str, Any]) -> Income:
-    income = Income(user_id=user.id, month=month, **data)
-    db.add(income)
+    """Lança a renda. Com repetição, cria uma fixa a partir deste mês e devolve a deste mês."""
+    repeat = data.pop("repeat", "once")
+    until = data.pop("until_month", None)
+    if repeat == "once":
+        income = Income(user_id=user.id, month=month, **data)
+        db.add(income)
+        db.commit()
+        return income
+
+    end = parse_month(until) if repeat == "period" and until else None
+    if repeat == "period" and end is None:
+        raise AppError(400, "invalid_period", "Informe até que mês a renda se repete.")
+    _validate_period(month, end)
+    item = RecurringItem(
+        user_id=user.id,
+        kind="income",
+        description=data["description"],
+        amount=data["amount"],
+        income_type=data.get("income_type") or "fixed",
+        due_day=data.get("day"),
+        notes=data.get("notes"),
+        start_month=month,
+        end_month=end,
+    )
+    db.add(item)
+    db.flush()
+    _materialize_opened(db, user, item, month)
+    _materialize(db, item, month)
+    db.flush()
+    income = db.scalar(select(Income).where(Income.recurring_id == item.id, Income.month == month))
     db.commit()
+    assert income is not None
     return income
 
 
-def update_income(db: Session, user: User, income_id: uuid.UUID, changes: dict[str, Any]) -> Income:
+# Campos do lançamento que também existem na fixa (nome no lançamento → nome na fixa).
+_INCOME_TO_RECURRING = {
+    "description": "description",
+    "amount": "amount",
+    "income_type": "income_type",
+    "day": "due_day",
+    "notes": "notes",
+}
+_EXPENSE_TO_RECURRING = {
+    "description": "description",
+    "amount": "amount",
+    "category_id": "category_id",
+    "notes": "notes",
+    "payment_method": "payment_method",
+}
+
+
+def update_income(
+    db: Session, user: User, income_id: uuid.UUID, changes: dict[str, Any], scope: str = "one"
+) -> Income:
+    """Altera a renda. Com scope="following", vale também para os próximos meses da fixa."""
     income = _owned(db, Income, income_id, user)
+    if scope == "following" and income.recurring_id is not None:
+        recurring = {_INCOME_TO_RECURRING[k]: v for k, v in changes.items()}
+        update_recurring(db, user, income.recurring_id, recurring, from_month=income.month)
+        db.refresh(income)
+        return income
     _apply(income, changes)
     db.commit()
     return income
@@ -304,7 +398,43 @@ def delete_income(db: Session, user: User, income_id: uuid.UUID, scope: str) -> 
 def create_expense(db: Session, user: User, month: date, data: dict[str, Any]) -> list[Expense]:
     installments = data.pop("installments", None)
     paid = data.pop("paid", False)
+    amount_mode = data.pop("amount_mode", "parcel")
+    repeat = data.pop("repeat", False)
+    interval = data.pop("interval_months", 1)
+    until = data.pop("until_month", None)
     _check_category(db, user, data.get("category_id"))
+
+    if repeat and not installments:
+        end = parse_month(until) if until else None
+        _validate_period(month, end)
+        due = data.get("due_date")
+        item = RecurringItem(
+            user_id=user.id,
+            kind="expense",
+            description=data["description"],
+            amount=data["amount"],
+            category_id=data.get("category_id"),
+            due_day=due.day if due else None,
+            payment_method=data.get("payment_method"),
+            notes=data.get("notes"),
+            start_month=month,
+            end_month=end,
+            interval_months=interval,
+        )
+        db.add(item)
+        db.flush()
+        _materialize_opened(db, user, item, month)
+        _materialize(db, item, month)
+        db.flush()
+        expense = db.scalar(
+            select(Expense).where(Expense.recurring_id == item.id, Expense.month == month)
+        )
+        assert expense is not None
+        if paid:
+            expense.paid = True
+            expense.paid_at = utcnow()
+        db.commit()
+        return [expense]
 
     if not installments:
         expense = Expense(
@@ -316,10 +446,20 @@ def create_expense(db: Session, user: User, month: date, data: dict[str, Any]) -
 
     group = uuid.uuid4()
     due = data.pop("due_date", None)
+    value = data.pop("amount")
+    if amount_mode == "total":
+        # Divide o total; os centavos que sobram vão para a 1ª parcela.
+        parcel = (value / installments).quantize(Decimal("0.01"), rounding=ROUND_DOWN)
+        if parcel <= 0:
+            raise AppError(400, "invalid_amount", "O total é pequeno demais para tantas parcelas.")
+        amounts = [value - parcel * (installments - 1)] + [parcel] * (installments - 1)
+    else:
+        amounts = [value] * installments
     created = []
     for index in range(installments):
         installment_month = add_months(month, index)
         expense = Expense(
+            amount=amounts[index],
             user_id=user.id,
             month=installment_month,
             due_date=with_day(installment_month, due.day) if due else None,
@@ -337,11 +477,27 @@ def create_expense(db: Session, user: User, month: date, data: dict[str, Any]) -
 
 
 def update_expense(
-    db: Session, user: User, expense_id: uuid.UUID, changes: dict[str, Any]
+    db: Session, user: User, expense_id: uuid.UUID, changes: dict[str, Any], scope: str = "one"
 ) -> Expense:
+    """Altera a conta. Com scope="following", vale também para as próximas parcelas ou meses."""
     expense = _owned(db, Expense, expense_id, user)
     if "category_id" in changes:
         _check_category(db, user, changes["category_id"])
+    shared = {k: v for k, v in changes.items() if k in _EXPENSE_TO_RECURRING}
+    if scope == "following" and shared:
+        if expense.installment_group_id is not None:
+            for other in db.scalars(
+                select(Expense).where(
+                    Expense.user_id == user.id,
+                    Expense.installment_group_id == expense.installment_group_id,
+                    Expense.installment_number > (expense.installment_number or 1),
+                    Expense.paid.is_(False),
+                )
+            ):
+                _apply(other, shared)
+        elif expense.recurring_id is not None:
+            update_recurring(db, user, expense.recurring_id, dict(shared), from_month=expense.month)
+            db.refresh(expense)
     if "paid" in changes and changes["paid"] is not None and changes["paid"] != expense.paid:
         expense.paid_at = utcnow() if changes["paid"] else None
     if changes.get("paid") is None:
