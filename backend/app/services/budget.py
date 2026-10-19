@@ -164,6 +164,8 @@ def _materialize_opened(db: Session, user: User, item: RecurringItem, since: dat
     ):
         if active_in(item, month):
             _materialize(db, item, month)
+    # A sessão não faz flush sozinha: sem isto, o lançamento do mês aberto seria criado duas vezes.
+    db.flush()
 
 
 def ensure_month(db: Session, user: User, month: date) -> None:

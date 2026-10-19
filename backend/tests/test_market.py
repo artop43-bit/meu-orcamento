@@ -158,3 +158,18 @@ def test_portfolio_refresh_prices_tickers(user: TestClient) -> None:
     texts = " ".join(c["text"] for c in data["comments"]).lower()
     # CVM: descreve, nunca manda comprar/vender.
     assert "compre" not in texts and "venda " not in texts
+
+
+def test_indicators_keep_last_good_value(monkeypatch: pytest.MonkeyPatch) -> None:
+    first = indicators.get_indicators()
+    assert first["available"] is True
+
+    def down(code: int) -> tuple[float, str]:
+        raise TimeoutError("BCB fora do ar")
+
+    monkeypatch.setattr(indicators, "fetch_series", down)
+    indicators._cache["expires"] = 0  # cache vencido
+    again = indicators.get_indicators()
+    # Usa o último valor bom em vez de deixar a tela vazia.
+    assert again["selic"] == first["selic"]
+    assert again["available"] is True

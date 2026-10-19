@@ -16,6 +16,7 @@ import logging
 import re
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
@@ -243,16 +244,22 @@ def _ranking(sort_by: str) -> list[dict[str, Any]]:
 def overview() -> dict[str, Any]:
     """Painel do Mercado: índices, moedas, cripto, rankings do dia e renda fixa."""
     has_token = bool(get_settings().brapi_token)
-    indexes = list(stock_quotes(list(INDEXES)).values()) if has_token else []
+    # Fontes diferentes em paralelo: a tela espera só pela mais lenta.
+    jobs = {
+        "indexes": (lambda: list(stock_quotes(list(INDEXES)).values())) if has_token else list,
+        "currencies": currencies,
+        "crypto": lambda: list(crypto_quotes(["BTC", "ETH", "SOL"]).values()),
+        "gainers": lambda: _ranking("change"),
+        "losers": lambda: _ranking("change_asc"),
+        "most_traded": lambda: _ranking("volume"),
+        "fixed_income": indicators.get_indicators,
+    }
+    with ThreadPoolExecutor(max_workers=len(jobs)) as pool:
+        futures = {key: pool.submit(job) for key, job in jobs.items()}
+        result = {key: future.result() for key, future in futures.items()}
     return {
-        "indexes": indexes,
+        **result,
         "indexes_need_token": not has_token,
-        "currencies": currencies(),
-        "crypto": list(crypto_quotes(["BTC", "ETH", "SOL"]).values()),
-        "gainers": _ranking("change"),
-        "losers": _ranking("change_asc"),
-        "most_traded": _ranking("volume"),
-        "fixed_income": indicators.get_indicators(),
         "disclaimer": DISCLAIMER,
         "fetched_at": datetime.now(UTC),
     }

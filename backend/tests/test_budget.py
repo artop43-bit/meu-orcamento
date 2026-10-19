@@ -533,3 +533,13 @@ def test_recurring_interval_change_rebuilds_months(user: TestClient) -> None:
     user.patch(f"/api/recurring/{created['id']}", json={"interval_months": 2})
     assert descriptions(month(user, "2030-02")) == []
     assert descriptions(month(user, "2030-03")) == ["Academia"]
+
+
+def test_repeat_in_month_already_open(user: TestClient) -> None:
+    # O mês já foi aberto na tela antes de lançar a renda ou a conta que se repete.
+    month(user)
+    add_income(user, repeat="monthly")
+    add_expense(user, description="Internet", repeat=True)
+    data = month(user)
+    assert descriptions(data, "incomes") == ["Salário"]
+    assert descriptions(data) == ["Internet"]

@@ -64,11 +64,11 @@ uv run alembic upgrade head > /tmp/migrations.log 2>&1
 # v0.4.3: a conta de demonstração vem preenchida (6 meses de exemplo). Na primeira vez com
 # esta versão ela é refeita; depois disso, o que você lançar fica guardado.
 RESET=""
-if [ ! -f "$ROOT/.devcontainer/.demo-v043" ]; then
+if [ ! -f "$ROOT/.devcontainer/.demo-v050" ]; then
   RESET="--reset"
 fi
 uv run python -m app.cli seed-demo $RESET --credentials-file "$ROOT/.devcontainer/credenciais.txt" > /tmp/seed.log 2>&1
-touch "$ROOT/.devcontainer/.demo-v043"
+touch "$ROOT/.devcontainer/.demo-v050"
 chmod 600 "$ROOT/.devcontainer/credenciais.txt"
 
 # setsid -f: os processos ficam numa sessão própria e continuam rodando depois que este

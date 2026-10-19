@@ -40,7 +40,10 @@ def test_demo_account_with_sample_data(client: TestClient, db: Session) -> None:
     month = client.get(f"/api/months/{format_month(current_month())}").json()
     descriptions = {e["description"] for e in month["expenses"]}
     assert {"Aluguel", "Internet", "Mercado", "Notebook"} <= descriptions
-    assert Decimal(month["summary"]["income_total"]) == Decimal("5100.00")
+    # Salário fixo + freelas (renda variável) do mês.
+    assert Decimal(month["summary"]["income_total"]) == Decimal("4880.00")
+    types = {i["description"]: i["income_type"] for i in month["incomes"]}
+    assert types == {"Salário": "fixed", "Freelas": "variable"}
 
     history = client.get("/api/history?months=6").json()
     assert all(p["has_data"] for p in history)
