@@ -656,7 +656,7 @@ def calendar(page: Page):
     projection = api(page, f"/analysis/projection?start={CURRENT}&months=1")[0]
     assert float(projection["planned"]) >= 150, projection
     page.screenshot(path=OUT / "v05-calendario.png", full_page=True)
-    page.get_by_role("button", name=re.compile("Abrir planejado Presente da Júlia")).first.click()
+    page.locator(".ev-btn:visible", has_text="Presente da Júlia").first.click()
     d = dialog(page)
     d.get_by_role("button", name="Lançar já paga").click()
     expect(d).to_have_count(0, timeout=8000)

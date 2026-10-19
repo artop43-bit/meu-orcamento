@@ -67,8 +67,9 @@ function QuoteCard({ q, onOpen }: { q: Quote; onOpen?: (s: string) => void }) {
     </>
   );
   return onOpen ? (
-    <button type="button" className="quote" onClick={() => onOpen(q.symbol)} aria-label={`${q.name}: abrir ficha`}>
+    <button type="button" className="quote" onClick={() => onOpen(q.symbol)}>
       {body}
+      <span className="sr-only">(abrir ficha)</span>
     </button>
   ) : (
     <div className="quote">{body}</div>

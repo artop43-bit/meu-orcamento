@@ -1,0 +1,212 @@
+{
+  "persona": "Carla, 34, BH, salário R$ 3.200 → 3.350",
+  "months": [
+    "2026-02",
+    "2026-03",
+    "2026-04",
+    "2026-05",
+    "2026-06",
+    "2026-07",
+    "2026-08",
+    "2026-09",
+    "2026-10"
+  ],
+  "passed": 7,
+  "failed": 22,
+  "results": [
+    {
+      "step": "Login com a conta de demonstração (vazia)",
+      "ok": true,
+      "s": 1.6
+    },
+    {
+      "step": "Conta nova: orçamento vazio mostra orientação",
+      "ok": true,
+      "s": 1.1
+    },
+    {
+      "step": "Faixa do 2FA: 'Agora não' esconde até fechar o navegador",
+      "ok": true,
+      "s": 1.1
+    },
+    {
+      "step": "Categorias: limites de Lazer (R$ 300) e Alimentação (R$ 1.000)",
+      "ok": true,
+      "s": 1.6
+    },
+    {
+      "step": "Primeiro mês: salário fixo e 6 contas fixas",
+      "ok": false,
+      "error": "AssertionError: Locator expected to have count '0'\nActual value: 1 \nCall log:\n  - Expect \"to_have_count\" locator(\"dialog[open]\") with timeout 8000ms\n  - waiting for locator(\"dialog[open]\")\n    20 × locator resolved to 1 element\n       - unexpected value \"1\"\n",
+      "shot": "e2e\\saida-local\\falha-04.png"
+    },
+    {
+      "step": "Lançar 8 meses completos (variáveis, parcelas, freelas) e marcar tudo como pago",
+      "ok": false,
+      "error": "AssertionError: salário fixo não apareceu",
+      "shot": "e2e\\saida-local\\falha-05.png"
+    },
+    {
+      "step": "Mês atual: aumento de salário em Contas fixas (R$ 3.350) e gastos até hoje",
+      "ok": false,
+      "error": "TimeoutError: Locator.click: Timeout 30000ms exceeded.\nCall log:\n  - waiting for locator(\".item__main\").filter(has_text=\"Salário\").first\n",
+      "shot": "e2e\\saida-local\\falha-06.png"
+    },
+    {
+      "step": "Parcelas: celular aparece de 1/10 a 10/10 e dentista de 1/3 a 3/3",
+      "ok": false,
+      "error": "StopIteration: ",
+      "shot": "e2e\\saida-local\\falha-07.png"
+    },
+    {
+      "step": "Excluir com Desfazer: some na hora, volta ao desfazer, sai de vez depois",
+      "ok": true,
+      "s": 8.8
+    },
+    {
+      "step": "Editar conta: valor do mercado corrigido",
+      "ok": false,
+      "error": "TimeoutError: Locator.click: Timeout 30000ms exceeded.\nCall log:\n  - waiting for locator(\".ledger__row\").filter(has_text=\"Mercado\").locator(\".ledger__open\")\n",
+      "shot": "e2e\\saida-local\\falha-09.png"
+    },
+    {
+      "step": "Investimentos: reserva no Tesouro Selic e CDB",
+      "ok": false,
+      "error": "AssertionError: Locator expected to have count '0'\nActual value: 1 \nCall log:\n  - Expect \"to_have_count\" locator(\"dialog[open]\") with timeout 5000ms\n  - waiting for locator(\"dialog[open]\")\n    14 × locator resolved to 1 element\n       - unexpected value \"1\"\n",
+      "shot": "e2e\\saida-local\\falha-10.png"
+    },
+    {
+      "step": "Metas: viagem para o Nordeste com prazo e primeiro depósito",
+      "ok": true,
+      "s": 2.1
+    },
+    {
+      "step": "Consultor: tom correto em cada mês",
+      "ok": false,
+      "error": "AssertionError: mês da viagem deveria ser vermelho: ('empty', 'Vamos começar?', None)",
+      "shot": "e2e\\saida-local\\falha-12.png"
+    },
+    {
+      "step": "Análise financeira: seções com navegação e conteúdo (desktop)",
+      "ok": false,
+      "error": "AssertionError: Locator expected to be visible\nActual value: None\nError: element(s) not found \nCall log:\n  - Expect \"to_be_visible\" get_by_role(\"heading\", name=re.compile(r\"^Alertas\")) with timeout 5000ms\n  - waiting for get_by_role(\"heading\", name=re.compile(r\"^Alertas\"))\n\nAria snapshot:\n- link \"Pular para o conteúdo\":\n  - /url: \"#conteudo\"\n- complementary \"Menu principal\":\n  - link \"Meu Orçamento\":\n    - /url: /\n  - navigation \"Seções\":\n    - link \"Orçamento\":\n      - /url: /orcamento\n    - link \"Calendário\":\n      - /url: /calendario\n    - link \"Análise financeira\":\n      - /url: /analises\n",
+      "shot": "e2e\\saida-local\\falha-13.png"
+    },
+    {
+      "step": "Comparar meses, projeção e simulador (seções Ferramentas)",
+      "ok": true,
+      "s": 1.3
+    },
+    {
+      "step": "Gráfico: dica com o mouse e leitura pelo teclado (setas)",
+      "ok": false,
+      "error": "TimeoutError: Locator.bounding_box: Timeout 30000ms exceeded.\nCall log:\n  - waiting for locator(\"svg.chart2__svg\").first\n",
+      "shot": "e2e\\saida-local\\falha-15.png"
+    },
+    {
+      "step": "Monte sua análise: sugestão, filtros, tipo de gráfico, comparação",
+      "ok": false,
+      "error": "TimeoutError: Locator.click: Timeout 30000ms exceeded.\nCall log:\n  - waiting for get_by_role(\"button\", name=re.compile(r\"Onde gastei no ano\"))\n",
+      "shot": "e2e\\saida-local\\falha-16.png"
+    },
+    {
+      "step": "Salvar análise, fixar no Resumo, editar e excluir com Desfazer",
+      "ok": false,
+      "error": "TimeoutError: Locator.click: Timeout 30000ms exceeded.\nCall log:\n  - waiting for get_by_role(\"button\", name=re.compile(r\"Categorias mês a mês\"))\n",
+      "shot": "e2e\\saida-local\\falha-17.png"
+    },
+    {
+      "step": "v0.5: renda variável, sugestão de categoria, parcela pelo total, frequência e 'este e os próximos'",
+      "ok": false,
+      "error": "TimeoutError: Locator.click: Timeout 30000ms exceeded.\nCall log:\n  - waiting for get_by_role(\"button\", name=\"Nova renda\", exact=True)\n",
+      "shot": "e2e\\saida-local\\falha-18.png"
+    },
+    {
+      "step": "Calendário: gasto planejado entra na previsão e vira conta com um toque",
+      "ok": false,
+      "error": "TimeoutError: Locator.click: Timeout 30000ms exceeded.\nCall log:\n  - waiting for get_by_role(\"button\", name=\"Planejar gasto\").first\n",
+      "shot": "e2e\\saida-local\\falha-19.png"
+    },
+    {
+      "step": "Investimentos → Mercado: aviso fixo, abas e simulador; Ajuda e tour",
+      "ok": false,
+      "error": "AssertionError: Locator expected to have attribute 'page'\nActual value: None\nError: element(s) not found \nCall log:\n  - Expect \"to_have_attribute\" get_by_role(\"link\", name=\"Mercado\") with timeout 5000ms\n  - waiting for get_by_role(\"link\", name=\"Mercado\")\n\nAria snapshot:\n- main:\n  - complementary:\n    - paragraph: Meu Orçamento\n    - paragraph: Seu dinheiro organizado, mês a mês.\n    - list:\n      - listitem: Contas fixas, parcelas e metas num só lugar\n      - listitem: Para onde vai cada real, por categoria\n      - listitem: Score, projeção de 12 meses e simulador\n      - listitem: Metas com q",
+      "shot": "e2e\\saida-local\\falha-20.png"
+    },
+    {
+      "step": "Versão e data do update no fim do menu",
+      "ok": false,
+      "error": "AssertionError: Locator expected to contain text 're.compile('Versão \\\\d+\\\\.\\\\d+\\\\.\\\\d+ · \\\\d{2}/\\\\d{2}/\\\\d{4} às \\\\d{2}:\\\\d{2}')'\nActual value: None\nError: element(s) not found \nCall log:\n  - Expect \"to_contain_text\" locator(\".sidebar .app-version\") with timeout 5000ms\n  - waiting for locator(\".sidebar .app-version\")\n\nAria snapshot:\n- main:\n  - complementary:\n    - paragraph: Meu Orçamento\n    - paragraph: Seu dinheiro organizado, mês a mês.\n    - list:\n      - listitem: Contas fixas, parcelas e metas num só lugar\n      - listitem: Para onde vai cada real, por categoria\n      - listitem: Scor",
+      "shot": "e2e\\saida-local\\falha-21.png"
+    },
+    {
+      "step": "Histórico e relatório do mês",
+      "ok": false,
+      "error": "AssertionError: Locator expected to be visible\nActual value: None\nError: element(s) not found \nCall log:\n  - Expect \"to_be_visible\" locator(\".chart, table\").first with timeout 5000ms\n  - waiting for locator(\".chart, table\").first\n\nAria snapshot:\n- main:\n  - complementary:\n    - paragraph: Meu Orçamento\n    - paragraph: Seu dinheiro organizado, mês a mês.\n    - list:\n      - listitem: Contas fixas, parcelas e metas num só lugar\n      - listitem: Para onde vai cada real, por categoria\n      - listitem: Score, projeção de 12 meses e simulador\n      - listitem: Metas com quanto falta e quanto guar",
+      "shot": "e2e\\saida-local\\falha-22.png"
+    },
+    {
+      "step": "Exportar CSV, Excel e backup JSON",
+      "ok": false,
+      "error": "TimeoutError: Locator.click: Timeout 30000ms exceeded.\nCall log:\n  - waiting for get_by_role(\"button\", name=\"CSV\")\n",
+      "shot": "e2e\\saida-local\\falha-23.png"
+    },
+    {
+      "step": "Importar extrato OFX no mês atual (prévia, importa e não duplica)",
+      "ok": false,
+      "error": "AssertionError: /months/2026-10: 401",
+      "shot": "e2e\\saida-local\\falha-24.png"
+    },
+    {
+      "step": "Segurança: ativar 2FA, sair, entrar com código, desativar",
+      "ok": false,
+      "error": "TimeoutError: Locator.click: Timeout 30000ms exceeded.\nCall log:\n  - waiting for get_by_role(\"button\", name=\"Ativar verificação em duas etapas\")\n",
+      "shot": "e2e\\saida-local\\falha-25.png"
+    },
+    {
+      "step": "Faixa do 2FA: 'Não mostrar mais' fica salvo na conta",
+      "ok": false,
+      "error": "AssertionError: Locator expected to be visible\nActual value: None\nError: element(s) not found \nCall log:\n  - Expect \"to_be_visible\" get_by_role(\"region\", name=\"Sugestão de segurança\") with timeout 5000ms\n  - waiting for get_by_role(\"region\", name=\"Sugestão de segurança\")\n\nAria snapshot:\n- main:\n  - complementary:\n    - paragraph: Meu Orçamento\n    - paragraph: Seu dinheiro organizado, mês a mês.\n    - list:\n      - listitem: Contas fixas, parcelas e metas num só lugar\n      - listitem: Para onde vai cada real, por categoria\n      - listitem: Score, projeção de 12 meses e simulador\n      - list",
+      "shot": "e2e\\saida-local\\falha-26.png"
+    },
+    {
+      "step": "Celular: painel, orçamento e gesto de troca de aba",
+      "ok": false,
+      "error": "AssertionError: Locator expected to be visible\nActual value: None\nError: element(s) not found \nCall log:\n  - Expect \"to_be_visible\" locator(\".teaser\") with timeout 5000ms\n  - waiting for locator(\".teaser\")\n\nAria snapshot:\n- main:\n  - paragraph: Meu Orçamento\n  - heading \"Entrar\" [level=1]\n  - text: E-mail\n  - textbox \"E-mail\"\n  - text: Senha\n  - textbox \"Senha\"\n  - button \"Entrar\"\n  - paragraph:\n    - link \"Esqueci minha senha\":\n      - /url: /esqueci-senha\n    - link \"Criar conta\":\n      - /url: /cadastro\n  - link \"Privacidade\":\n    - /url: /privacidade\n  - link \"Termos de uso\":\n    - /url: /",
+      "shot": "None"
+    },
+    {
+      "step": "Celular: deslizar troca só as abas principais, em qualquer ponto da tela",
+      "ok": false,
+      "error": "AssertionError: http://localhost:5173/entrar",
+      "shot": "None"
+    }
+  ],
+  "console_errors": [
+    "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+    "Failed to load resource: the server responded with a status of 500 (Internal Server Error)",
+    "Failed to load resource: the server responded with a status of 502 (Bad Gateway)",
+    "Failed to load resource: the server responded with a status of 502 (Bad Gateway)",
+    "Failed to load resource: the server responded with a status of 502 (Bad Gateway)",
+    "Failed to load resource: the server responded with a status of 502 (Bad Gateway)",
+    "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+    "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+    "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+    "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+    "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+    "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+    "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+    "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+    "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+    "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+    "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+    "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+  ],
+  "http_errors": [
+    "500 POST http://localhost:5173/api/months/2026-02/incomes",
+    "502 GET http://localhost:5173/api/indicators",
+    "502 GET http://localhost:5173/api/indicators",
+    "502 POST http://localhost:5173/api/investments",
+    "502 GET http://localhost:5173/api/indicators"
+  ]
+}

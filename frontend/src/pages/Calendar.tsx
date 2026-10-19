@@ -110,7 +110,8 @@ function EventChip({ event, compact }: { event: CalendarEvent; compact?: boolean
 function EventButton({ e, compact, onOpen }: { e: CalendarEvent; compact?: boolean; onOpen: (e: CalendarEvent) => void }) {
   if (e.kind !== "planned") return <EventChip event={e} compact={compact} />;
   return (
-    <button type="button" className="ev-btn" onClick={() => onOpen(e)} aria-label={`Abrir planejado ${e.description}, ${money(e.amount)}`}>
+    <button type="button" className="ev-btn" onClick={() => onOpen(e)}>
+      <span className="sr-only">Abrir </span>
       <EventChip event={e} compact={compact} />
     </button>
   );
@@ -402,9 +403,11 @@ export default function CalendarPage() {
                       type="button"
                       className="cal-day__num"
                       onClick={() => setEditing({ type: "day", date: iso })}
-                      aria-label={`${dayLabel(iso)}: ${list.length ? `${list.length} item(ns)` : "nada"}. Abrir dia`}
                     >
                       {Number(iso.slice(8))}
+                      <span className="sr-only">
+                        , {dayLabel(iso)}: {list.length ? `${list.length} item(ns)` : "nada"}. Abrir dia
+                      </span>
                     </button>
                     <div className="cal-day__events">
                       {shown.map((e) => (
