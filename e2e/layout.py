@@ -191,6 +191,9 @@ results: list[dict] = []
 def login(page: Page):
     page.goto(f"{BASE}/entrar")
     page.evaluate("() => { localStorage.setItem('tour-v05-visto', '1'); localStorage.setItem('novidades-vistas', '9.9.9'); }")
+    # QA_TEXT=grande repete a checagem com o texto ampliado (rótulos quebram em mais linhas).
+    if os.environ.get("QA_TEXT"):
+        page.evaluate("t => localStorage.setItem('preferencias-v1', JSON.stringify({ text: t }))", os.environ["QA_TEXT"])
     page.get_by_label("E-mail").fill(EMAIL)
     page.get_by_label("Senha").fill(PASSWORD)
     page.get_by_role("button", name="Entrar").click()
