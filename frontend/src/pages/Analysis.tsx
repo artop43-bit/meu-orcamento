@@ -42,8 +42,8 @@ import { cumulativeBalance, simulate, ZERO_SIM, type Sim } from "../lib/simulate
 const SCORE_COLORS: Record<string, string> = {
   Excelente: "var(--ok)",
   Boa: "var(--ok)",
-  Regular: "#d98c3f",
-  Atenção: "#d98c3f",
+  Regular: "var(--warn)",
+  Atenção: "var(--warn)",
   Crítica: "var(--error)",
 };
 

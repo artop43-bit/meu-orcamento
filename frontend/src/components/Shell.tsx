@@ -2,7 +2,9 @@ import { Suspense, useEffect, useLayoutEffect, useRef, useState, type MouseEvent
 import { useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeftRight,
+  CalendarDays,
   ChartPie,
+  CircleHelp,
   Ellipsis,
   History,
   Landmark,
@@ -22,6 +24,7 @@ import { announce, prefersReducedMotion } from "../lib/announce";
 import { neighbor } from "../lib/gestures";
 import { haptic } from "../lib/haptics";
 import { releaseLabel } from "../release";
+import { Tour } from "./help";
 import { Brand, LoadingRegion, Sheet, Skeleton } from "./ui";
 import { UndoProvider } from "./undo";
 import { ErrorBoundary } from "./ErrorBoundary";
@@ -45,9 +48,10 @@ type NavItem = { to: string; label: string; icon: ReactNode; short?: string };
 
 const MAIN: NavItem[] = [
   { to: "/orcamento", label: "Orçamento", icon: <Wallet size={20} /> },
-  { to: "/metas", label: "Metas", icon: <Target size={20} /> },
+  { to: "/calendario", label: "Calendário", icon: <CalendarDays size={20} /> },
   { to: "/analises", label: "Análise financeira", short: "Análises", icon: <ChartPie size={20} /> },
   { to: "/investimentos", label: "Investimentos", icon: <Landmark size={20} /> },
+  { to: "/metas", label: "Metas", icon: <Target size={20} /> },
   { to: "/historico", label: "Histórico", icon: <History size={20} /> },
 ];
 
@@ -56,6 +60,7 @@ const SETTINGS: NavItem[] = [
   { to: "/categorias", label: "Categorias", icon: <Tags size={20} /> },
   { to: "/dados", label: "Importar e exportar", icon: <ArrowLeftRight size={20} /> },
   { to: "/seguranca", label: "Segurança", icon: <ShieldCheck size={20} /> },
+  { to: "/ajuda", label: "Como usar", icon: <CircleHelp size={20} /> },
 ];
 
 // No celular, as 4 primeiras viram abas; o resto vai para "Mais".
@@ -330,6 +335,7 @@ export function Shell() {
         </p>
       </Sheet>
 
+      <Tour />
       <div id="sr-announcer" className="sr-only" role="status" aria-live="polite" />
     </div>
     </UndoProvider>

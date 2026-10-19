@@ -4,11 +4,38 @@ import { api } from "./client";
 
 export type Category = { id: string; name: string; is_essential: boolean; color: string | null; monthly_limit: string | null };
 
+export type IncomeType = "fixed" | "variable";
+export type PaymentMethod = "pix" | "debit" | "credit" | "boleto" | "cash";
+export type Interval = 1 | 2 | 3 | 6 | 12;
+
+export const PAYMENT_METHODS: { value: PaymentMethod; label: string }[] = [
+  { value: "pix", label: "Pix" },
+  { value: "debit", label: "Débito" },
+  { value: "credit", label: "Crédito" },
+  { value: "boleto", label: "Boleto" },
+  { value: "cash", label: "Dinheiro" },
+];
+
+export const INTERVALS: { value: Interval; label: string }[] = [
+  { value: 1, label: "Todo mês" },
+  { value: 2, label: "A cada 2 meses" },
+  { value: 3, label: "A cada 3 meses" },
+  { value: 6, label: "A cada 6 meses" },
+  { value: 12, label: "Uma vez por ano" },
+];
+
+export function paymentLabel(value: string | null | undefined): string | null {
+  return PAYMENT_METHODS.find((p) => p.value === value)?.label ?? null;
+}
+
 export type Income = {
   id: string;
   month: string;
   description: string;
   amount: string;
+  income_type: IncomeType;
+  day: number | null;
+  notes: string | null;
   recurring_id: string | null;
 };
 
@@ -22,6 +49,7 @@ export type Expense = {
   paid: boolean;
   paid_at: string | null;
   notes: string | null;
+  payment_method: PaymentMethod | null;
   installment_group_id: string | null;
   installment_number: number | null;
   installment_total: number | null;
@@ -65,6 +93,10 @@ export type Recurring = {
   due_day: number | null;
   start_month: string;
   end_month: string | null;
+  interval_months: Interval;
+  income_type: IncomeType | null;
+  payment_method: PaymentMethod | null;
+  notes: string | null;
 };
 
 export type Goal = {
@@ -87,6 +119,7 @@ export type HistoryPoint = {
 };
 
 export type DeleteScope = "one" | "following";
+export type EditScope = DeleteScope;
 
 export type ExpenseInput = {
   description: string;
@@ -96,6 +129,62 @@ export type ExpenseInput = {
   notes?: string | null;
   installments?: number | null;
   paid?: boolean;
+  payment_method?: PaymentMethod | null;
+  amount_mode?: "parcel" | "total";
+  repeat?: boolean;
+  interval_months?: Interval;
+  until_month?: string | null;
+};
+
+export type IncomeInput = {
+  description: string;
+  amount: string;
+  income_type?: IncomeType;
+  day?: number | null;
+  notes?: string | null;
+  repeat?: "once" | "monthly" | "period";
+  until_month?: string | null;
+};
+
+export type Planned = {
+  id: string;
+  date: string;
+  description: string;
+  amount: string;
+  category_id: string | null;
+  notes: string | null;
+  expense_id: string | null;
+};
+
+export type PlannedInput = Omit<Planned, "id" | "expense_id">;
+
+export type CalendarKind = "expense" | "installment" | "recurring" | "income" | "planned";
+
+export type CalendarEvent = {
+  id: string;
+  date: string | null;
+  kind: CalendarKind;
+  description: string;
+  amount: string;
+  paid: boolean | null;
+  category_id: string | null;
+  category: string | null;
+  color: string | null;
+  installment_number: number | null;
+  installment_total: number | null;
+  income_type: IncomeType | null;
+  expense_id: string | null;
+  notes: string | null;
+};
+
+export type CategorySuggestion = { category_id: string; name: string; source: "history" | "keywords" };
+
+export type DescriptionSuggestion = {
+  description: string;
+  amount: string;
+  category_id: string | null;
+  payment_method: PaymentMethod | null;
+  count: number;
 };
 
 export type RecurringInput = {
@@ -106,6 +195,10 @@ export type RecurringInput = {
   due_day?: number | null;
   start_month: string;
   end_month?: string | null;
+  interval_months?: Interval;
+  income_type?: IncomeType | null;
+  payment_method?: PaymentMethod | null;
+  notes?: string | null;
 };
 
 export const budgetApi = {
@@ -119,17 +212,19 @@ export const budgetApi = {
     api.patch<Category>(`/categories/${id}`, data),
   deleteCategory: (id: string) => api.delete(`/categories/${id}`),
 
-  createIncome: (month: string, data: { description: string; amount: string }) =>
-    api.post<Income>(`/months/${month}/incomes`, data),
-  updateIncome: (id: string, data: Partial<{ description: string; amount: string }>) =>
-    api.patch<Income>(`/incomes/${id}`, data),
+  createIncome: (month: string, data: IncomeInput) => api.post<Income>(`/months/${month}/incomes`, data),
+  updateIncome: (
+    id: string,
+    data: Partial<Omit<IncomeInput, "repeat" | "until_month">>,
+    scope: EditScope = "one",
+  ) => api.patch<Income>(`/incomes/${id}?scope=${scope}`, data),
   deleteIncome: (id: string, scope: DeleteScope = "one") =>
     api.delete(`/incomes/${id}?scope=${scope}`),
 
   createExpense: (month: string, data: ExpenseInput) =>
     api.post<Expense[]>(`/months/${month}/expenses`, data),
-  updateExpense: (id: string, data: Partial<ExpenseInput & { paid: boolean }>) =>
-    api.patch<Expense>(`/expenses/${id}`, data),
+  updateExpense: (id: string, data: Partial<ExpenseInput & { paid: boolean }>, scope: EditScope = "one") =>
+    api.patch<Expense>(`/expenses/${id}?scope=${scope}`, data),
   deleteExpense: (id: string, scope: DeleteScope = "one") =>
     api.delete(`/expenses/${id}?scope=${scope}`),
 
@@ -147,6 +242,18 @@ export const budgetApi = {
   contribute: (id: string, amount: string) =>
     api.post<Goal>(`/goals/${id}/contributions`, { amount }),
   deleteGoal: (id: string) => api.delete(`/goals/${id}`),
+
+  planned: (month?: string) => api.get<Planned[]>(`/planned${month ? `?month=${month}` : ""}`),
+  createPlanned: (data: PlannedInput) => api.post<Planned>("/planned", data),
+  updatePlanned: (id: string, data: Partial<PlannedInput>) => api.patch<Planned>(`/planned/${id}`, data),
+  deletePlanned: (id: string) => api.delete(`/planned/${id}`),
+  confirmPlanned: (id: string, paid: boolean) => api.post<Expense>(`/planned/${id}/confirm`, { paid }),
+  calendar: (month: string) => api.get<{ month: string; events: CalendarEvent[] }>(`/calendar/${month}`),
+
+  suggestCategory: (description: string) =>
+    api.get<CategorySuggestion | null>(`/suggest/category?description=${encodeURIComponent(description)}`),
+  suggestDescriptions: (q: string) =>
+    api.get<DescriptionSuggestion[]>(`/suggest/descriptions?q=${encodeURIComponent(q)}`),
 };
 
 export const keys = {
@@ -155,6 +262,7 @@ export const keys = {
   categories: ["budget", "categories"] as const,
   recurring: ["budget", "recurring"] as const,
   goals: ["budget", "goals"] as const,
+  calendar: (month: string) => ["budget", "calendar", month] as const,
 };
 
 export function useMonth(month: string) {

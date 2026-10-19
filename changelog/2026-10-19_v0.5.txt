@@ -1,0 +1,64 @@
+MEU ORÇAMENTO · UPDATE LOG
+Versão 0.5.0 · Lançamentos flexíveis, Calendário, Mercado e Ajuda
+Data: 19/10/2026 às 00:30 (horário de Brasília)
+
+Rendas
+- [x] Tipo: Fixa (salário, aposentadoria) ou Variável (freelas, comissões), agrupadas com subtotais
+- [x] Repetição: só este mês, todo mês ou por um período (de/até)
+- [x] Dia do recebimento (aparece no Calendário) e observação
+- [x] Previsão e consultor usam a média da renda variável (e avisam: "planeje pela média")
+
+Gastos
+- [x] "Como é essa conta?": uma vez, parcelada ou se repete
+- [x] Frequência: todo mês, a cada 2, 3 ou 6 meses, ou uma vez por ano; "até" opcional
+- [x] Parcelada pelo total da compra ou pelo valor da parcela (mostra a conta: "3x de R$ 1.000");
+      a data da 1ª parcela define o mês de início
+- [x] Forma de pagamento (Pix, débito, crédito, boleto, dinheiro) e observação
+- [x] Editar "só este mês" ou "este e os próximos" direto na tela (fixas e parcelas)
+
+Sugestão de categoria
+- [x] Ao digitar a descrição, a categoria é sugerida ("Sugerido: Transporte"), dá para trocar
+- [x] Aprende com o que você já lançou; sem histórico, usa um dicionário de palavras comuns no Brasil
+- [x] Autocompletar: lançamentos parecidos com valor, categoria e forma de pagamento
+
+Formulário e lista
+- [x] Formulário redesenhado, com exemplos em cada campo e "Mais detalhes" recolhido
+- [x] "Salvar e adicionar outro"
+- [x] Duplicar conta (ícone na lista; no celular, dentro de "Editar")
+- [x] Busca e filtros (situação e categoria) com total do que está filtrado
+
+Calendário (aba nova)
+- [x] Grade do mês no desktop, agenda por dia no celular
+- [x] Vencimentos, recebimentos, parcelas, fixas e gastos planejados, com cor + ícone + texto por tipo
+- [x] Gastos planejados (aniversário, IPVA, viagem): entram na previsão e no consultor e viram conta
+      com um toque ("Lançar já paga" / "Lançar a pagar")
+- [x] Lembretes dos próximos 7 dias (no Calendário e nos alertas do consultor)
+
+Investimentos → Minha carteira | Mercado
+- [x] Carteira: código (PETR4, MXRF11, BTC) × quantidade atualiza o valor pela cotação, sozinho
+- [x] Leitura da carteira: concentração, renda variável, cripto e reserva (descreve, não recomenda)
+- [x] Mercado: dólar, euro, bitcoin, ethereum, solana; maiores altas, baixas e mais negociadas da B3
+- [x] Ficha do ativo com gráfico (5 dias, 1 mês, 3 meses, 1 ano), máximas/mínimas e volume
+- [x] "Acompanhando": sua lista de ativos
+- [x] Renda fixa hoje (Selic, CDI, IPCA) e simulador: poupança, Tesouro Selic, CDB e LCI/LCA, com IR e
+      ganho acima da inflação
+- [x] Aviso fixo "Informativo, não é recomendação de investimento" (CVM, Resolução 20)
+- [x] Cotações em cache de 2 a 15 minutos, consultas em paralelo, atualização automática a cada 2 min
+- [ ] Ibovespa e IFIX: aparecem quando a chave gratuita da brapi.dev for colocada no servidor (BRAPI_TOKEN)
+
+Ajuda em todo o app
+- [x] Dicas (i) nos campos, exemplos nos placeholders e estados vazios que ensinam
+- [x] Tour rápido no 1º acesso (pode pular e rever)
+- [x] Central "Como usar" com exemplos de cada tela (menu Configurações)
+
+Navegação
+- [x] Calendário entra nas abas do celular (Orçamento, Calendário, Análises, Investimentos);
+      Metas e Histórico ficam em "Mais"
+
+Qualidade
+- [x] Backend: migração 0008, 29 testes novos (181 no total), API de mercado testada sem internet
+- [x] Banco Central lento: usa o último valor bom em vez de deixar a tela vazia
+- [x] QA da persona com os fluxos novos (renda variável, sugestão, parcela pelo total, IPTU trimestral,
+      "este e os próximos", calendário, mercado, ajuda) e acessibilidade nas telas novas
+- [x] Conta de demonstração com os recursos novos (renda variável, seguro semestral, planejados,
+      carteira com código, lista "Acompanhando")
