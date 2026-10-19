@@ -1,0 +1,47 @@
+MEU ORÇAMENTO · UPDATE LOG
+Versão 0.6.0 · Conforto de uso (QOL)
+Data: 19/10/2026 às 09:00 (horário de Brasília)
+
+Lançar mais rápido
+- [x] Lançamento numa frase: "mercado 120 pix ontem", "tv 1990 10x crédito", "+ freela 600" (renda)
+      — no campo rápido do Orçamento ou na busca de comandos
+- [x] Busca de comandos (Ctrl+K ou lupa no topo): lançar, ir a qualquer tela, planejar, novo cartão
+- [x] Atalhos: N (nova conta), / (buscar), P (esconder valores), Ctrl+Z (desfazer), ? (lista de atalhos)
+- [x] Ações em lote: selecionar várias contas para pagar, voltar para "a pagar", mudar categoria ou excluir
+- [x] "Marcar todas como pagas" para as contas vencidas
+- [x] Celular: deslizar a conta para a direita paga; para a esquerda exclui (com Desfazer)
+- [x] Desfazer também edições e lançamentos rápidos; confirmação animada ao salvar
+
+Cartões de crédito (tela nova)
+- [x] Vários cartões com limite total, usado e disponível
+- [x] Compra no crédito vai para a fatura certa pelo dia de fechamento; parcelas uma por fatura
+- [x] Faturas aberta, fechada, paga e atrasada; ver as compras e marcar a fatura como paga
+- [x] Melhor dia de compra de cada cartão
+- [x] Pagar a fatura não lança nada em dobro; na importação do extrato, "pagamento de fatura" vem desmarcado
+- [x] Fatura e fechamento no Calendário (no lugar de cada compra)
+
+Planejamento do dia a dia
+- [x] "Quanto posso gastar hoje": o que sobra do mês dividido pelos dias que faltam (já tirando contas e planejados)
+- [x] Saldo previsto dia a dia, com aviso do dia em que fica negativo
+
+Organização automática
+- [x] Regras: "contém uber → Transporte", criadas em Categorias ou ao corrigir a categoria de uma conta
+      (valem ao lançar, na sugestão e na importação)
+- [x] Aviso de conta repetida (mesmo nome e valor no mês) antes de salvar
+- [x] Assinaturas: custo por mês e por ano das fixas; gastos que se repetem viram fixa com um toque
+
+Do seu jeito
+- [x] Modo privacidade: valores viram "R$ ••••" e gráficos ficam borrados (tecla P ou olho no topo)
+- [x] Preferências: tema claro/escuro/do aparelho, cor de destaque, texto maior e modo compacto
+- [x] "Novidades" aparece uma vez depois de cada update
+
+Fale com a gente
+- [x] "Enviar sugestão" no menu (ideia, problema ou outro), com a tela e a versão
+- [x] Tela "Sugestões recebidas" para a administração (ADMIN_EMAILS no servidor)
+- [ ] Ativar a tela de sugestões: colocar o seu e-mail em ADMIN_EMAILS no .env.production
+      (até lá, dá para ler pelo servidor: python -m app.cli feedback)
+
+Qualidade
+- [x] Backend: migração 0009, 197 testes (15 novos)
+- [x] Frontend: testes do lançamento numa frase; janela foca o campo certo ao abrir
+- [x] QA da persona com os fluxos novos e acessibilidade nas telas novas

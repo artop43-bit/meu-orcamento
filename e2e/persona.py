@@ -686,6 +686,144 @@ def market_and_help(page: Page):
     expect(d).to_have_count(0)
 
 
+@step("v0.6: lançar numa frase (campo rápido e Ctrl+K), lote, vencidas e quanto posso gastar")
+def quick_and_bulk(page: Page):
+    open_month(page, CURRENT)
+    page.get_by_placeholder(re.compile("Lançar rápido")).fill("padaria 18,50 pix hoje")
+    page.get_by_role("button", name="Lançar", exact=True).click()
+    expect(page.locator(".toast")).to_contain_text("Padaria", timeout=8000)
+    idle(page)
+    padaria = next(e for e in api(page, f"/months/{CURRENT}")["expenses"] if e["description"] == "Padaria")
+    assert (padaria["amount"], padaria["payment_method"], padaria["paid"]) == ("18.50", "pix", True), padaria
+    # Ctrl+K: frase com renda.
+    page.keyboard.press("Control+k")
+    d = dialog(page)
+    d.get_by_role("combobox").fill("+ bico de garçom 150")
+    expect(d.get_by_role("option").first).to_contain_text("Lançar renda")
+    page.keyboard.press("Enter")
+    expect(d).to_have_count(0, timeout=8000)
+    idle(page)
+    bico = next(i for i in api(page, f"/months/{CURRENT}")["incomes"] if i["description"].startswith("Bico"))
+    assert (bico["amount"], bico["income_type"]) == ("150.00", "variable"), bico
+    # Ctrl+Z desfaz o último lançamento rápido.
+    page.keyboard.press("Control+z")
+    page.wait_for_timeout(800)
+    assert not any(i["description"].startswith("Bico") for i in api(page, f"/months/{CURRENT}")["incomes"])
+
+    # Quanto posso gastar hoje.
+    expect(page.get_by_text("Quanto posso gastar hoje")).to_be_visible()
+
+    # Lote: seleciona 2 contas e muda a categoria.
+    page.get_by_role("button", name="Selecionar", exact=True).click()
+    page.get_by_role("checkbox", name="Selecionar Padaria").check()
+    page.get_by_role("checkbox", name=re.compile("^Selecionar Uber para o trabalho")).check()
+    page.get_by_label("Nova categoria").select_option(label="Lazer")
+    page.get_by_role("button", name="Aplicar").click()
+    idle(page)
+    lazer = next(c["id"] for c in api(page, "/categories") if c["name"] == "Lazer")
+    cats = {e["description"]: e["category_id"] for e in api(page, f"/months/{CURRENT}")["expenses"]}
+    assert cats["Padaria"] == lazer and cats["Uber para o trabalho"] == lazer, cats
+
+    # Vencidas: marcar todas como pagas (a internet ficou em atraso de propósito).
+    bar = page.get_by_role("button", name="Marcar todas como pagas")
+    if bar.count():
+        bar.click()
+        idle(page)
+        today = TODAY.isoformat()
+        late = [e for e in api(page, f"/months/{CURRENT}")["expenses"] if not e["paid"] and e["due_date"] and e["due_date"] < today]
+        assert late == [], late
+    page.screenshot(path=OUT / "v06-orcamento.png", full_page=True)
+
+
+@step("v0.6: cartão de crédito — compra cai na fatura certa e a fatura é paga")
+def credit_card(page: Page):
+    page.goto(f"{BASE}/cartoes")
+    idle(page)
+    page.get_by_role("button", name="Novo cartão").first.click()
+    d = dialog(page)
+    d.get_by_label("Nome do cartão").fill("Roxinho")
+    d.get_by_label("Limite (opcional)").fill(money(2500))
+    d.get_by_label("Dia do fechamento").fill("3")
+    d.get_by_label("Dia do vencimento").fill("10")
+    d.get_by_role("button", name="Adicionar cartão").click()
+    expect(d).to_have_count(0, timeout=8000)
+    idle(page)
+    [card] = api(page, "/cards")
+    assert card["best_day"] == 3
+
+    open_month(page, CURRENT)
+    page.get_by_role("button", name="Nova conta", exact=True).click()
+    d = dialog(page)
+    d.get_by_label("Descrição").fill("Tênis de corrida")
+    d.get_by_label("Parcelada").check()
+    d.get_by_label("Número de parcelas").fill("2")
+    d.get_by_label("O total").check()
+    d.get_by_label(re.compile(r"^Valor")).fill(money(400))
+    d.get_by_label("Crédito").check()
+    expect(d.get_by_role("combobox", name=re.compile("^Cartão"))).to_have_value(card["card"]["id"])
+    purchase = f"{CURRENT}-05"
+    d.get_by_label("Data da compra").fill(purchase)
+    expect(d.get_by_text(re.compile("Vai para a fatura de"))).to_be_visible()
+    d.get_by_role("button", name="Adicionar conta").click()
+    expect(d).to_have_count(0, timeout=8000)
+    idle(page)
+    invoices = {i["month"]: i for i in api(page, f"/cards/{card['card']['id']}/invoices")}
+    # Compra no dia 5 (depois do fechamento dia 3): 1ª parcela na fatura que vence no mês seguinte.
+    first = month_plus(CURRENT, 1)
+    assert invoices[first]["total"] == "200.00", invoices[first]
+    assert invoices[month_plus(CURRENT, 2)]["total"] == "200.00"
+
+    page.goto(f"{BASE}/cartoes")
+    idle(page)
+    page.locator(".invoice-chip").first.click()
+    d = dialog(page)
+    d.get_by_role("button", name="Marcar fatura como paga").click()
+    expect(d).to_have_count(0, timeout=8000)
+    idle(page)
+    assert api(page, f"/cards/{card['card']['id']}/invoices/{first}")[0]["paid"] is True
+    page.screenshot(path=OUT / "v06-cartoes.png", full_page=True)
+
+
+@step("v0.6: regra de categoria, assinaturas, privacidade, preferências e sugestão")
+def rules_privacy_feedback(page: Page):
+    page.goto(f"{BASE}/categorias")
+    idle(page)
+    page.get_by_label("Texto da regra").fill("cinema")
+    page.get_by_label("Categoria da regra").select_option(label="Lazer")
+    page.get_by_role("button", name="Criar regra").click()
+    idle(page)
+    assert [r["pattern"] for r in api(page, "/rules")] == ["cinema"]
+    found = api(page, "/suggest/category?description=Cinema%20com%20a%20Ju")
+    assert (found["name"], found["source"]) == ("Lazer", "rule"), found
+
+    page.goto(f"{BASE}/fixas")
+    idle(page)
+    expect(page.get_by_role("heading", name=re.compile("Assinaturas e contas fixas"))).to_be_visible()
+
+    open_month(page, CURRENT)
+    page.locator("body").press("p")
+    expect(page.locator(".kpi").first).to_contain_text("R$ ••••")
+    page.locator("body").press("p")
+    expect(page.locator(".kpi").first).not_to_contain_text("R$ ••••")
+
+    page.goto(f"{BASE}/preferencias")
+    idle(page)
+    page.get_by_label("Escuro").check()
+    assert page.evaluate("document.documentElement.dataset.theme") == "dark"
+    page.get_by_label("Igual ao aparelho").check()
+
+    page.keyboard.press("Control+k")
+    d = dialog(page)
+    d.get_by_role("combobox").fill("sugest")
+    page.keyboard.press("Enter")
+    page.wait_for_timeout(500)
+    d = page.locator("dialog[open]", has_text="Enviar sugestão ou problema")
+    d.get_by_label("Mensagem").fill("Teste da persona: gostei do lançamento rápido.")
+    d.get_by_role("button", name="Enviar").click()
+    expect(d).to_contain_text("Recebido")
+    d.get_by_role("button", name="Pronto").click()
+
+
 @step("Versão e data do update no fim do menu")
 def version(page: Page):
     page.goto(f"{BASE}/orcamento")
@@ -867,7 +1005,7 @@ def mobile(browser):
     page.screenshot(path=OUT / "celular-categorias.png", full_page=True)
     overflow = page.evaluate("document.documentElement.scrollWidth > window.innerWidth")
     assert not overflow, "rolagem lateral no celular"
-    for path in ("/orcamento", "/calendario", "/metas", "/analises", "/investimentos", "/investimentos?secao=mercado", "/historico", "/fixas", "/dados", "/seguranca", "/ajuda"):
+    for path in ("/orcamento", "/calendario", "/metas", "/analises", "/investimentos", "/investimentos?secao=mercado", "/historico", "/fixas", "/dados", "/seguranca", "/ajuda", "/cartoes", "/preferencias"):
         page.goto(BASE + path)
         idle(page, 300)
         wide = page.evaluate("document.documentElement.scrollWidth - window.innerWidth")
@@ -913,6 +1051,9 @@ def main():
         flexible_entries(page, months)
         calendar(page)
         market_and_help(page)
+        quick_and_bulk(page)
+        credit_card(page)
+        rules_privacy_feedback(page)
         version(page)
         history_report(page, months)
         exports(page)

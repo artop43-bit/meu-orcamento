@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent, type PointerEvent } from "react";
 import { createPortal } from "react-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import {
@@ -6,7 +6,11 @@ import {
   CalendarClock,
   ChevronLeft,
   ChevronRight,
+  CheckCheck,
   Copy,
+  ListChecks,
+  TrendingDown,
+  Zap,
   Gauge,
   Search,
   Pencil,
@@ -18,7 +22,7 @@ import {
   Sparkles,
   Wallet,
 } from "lucide-react";
-import { Link, useParams } from "react-router";
+import { Link, useParams, useSearchParams } from "react-router";
 
 import {
   budgetApi,
@@ -40,6 +44,8 @@ import { Badge, Bar } from "../components/budget";
 import { ExpenseForm, IncomeForm, type ExpenseDraft } from "../components/entryForms";
 import { EmptyGuide, Tip } from "../components/help";
 import { ConsultantTeaser } from "../components/consultant";
+import { Chart } from "../components/chart/Chart";
+import { extrasApi, saveQuickEntry, useCards, useDaily } from "../api/extras";
 import { Alert, Button, Kpi, LoadingRegion, PageHeader, Sheet, Skeleton } from "../components/ui";
 import { useUndo } from "../components/undo";
 import { addMonths, money, monthLabel, percent, shortDate, thisMonth, todayISO } from "../lib/format";
@@ -113,12 +119,18 @@ function LedgerRow({
   onEdit,
   onDelete,
   onDuplicate,
+  selecting,
+  selected,
+  onSelect,
 }: {
   expense: Expense;
   category: Category | undefined;
   onEdit: () => void;
   onDelete: () => void;
   onDuplicate: () => void;
+  selecting: boolean;
+  selected: boolean;
+  onSelect: (value: boolean) => void;
 }) {
   const toggle = useBudgetMutation((paid: boolean) => budgetApi.updateExpense(expense.id, { paid }));
   // Resposta imediata: mostra o novo estado enquanto o servidor confirma.
@@ -136,18 +148,85 @@ function LedgerRow({
     });
   }
 
+  // Celular: deslizar a linha para a direita marca como paga; para a esquerda, exclui.
+  const rowRef = useRef<HTMLLIElement>(null);
+  const drag = useRef<{ x: number; y: number; dx: number; axis: "x" | "y" | null } | null>(null);
+  const LIMIT = 72;
+
+  function onPointerDown(e: PointerEvent<HTMLLIElement>) {
+    if (e.pointerType !== "touch" || selecting) return;
+    drag.current = { x: e.clientX, y: e.clientY, dx: 0, axis: null };
+  }
+
+  function onPointerMove(e: PointerEvent<HTMLLIElement>) {
+    const state = drag.current;
+    const row = rowRef.current;
+    if (!state || !row) return;
+    const dx = e.clientX - state.x;
+    const dy = e.clientY - state.y;
+    if (!state.axis) {
+      if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
+      state.axis = Math.abs(dx) > Math.abs(dy) * 1.2 ? "x" : "y";
+      if (state.axis === "x") row.setPointerCapture(e.pointerId);
+    }
+    if (state.axis !== "x") return;
+    state.dx = dx;
+    row.style.transition = "none";
+    row.style.transform = `translateX(${dx * 0.85}px)`;
+    row.dataset.swipe = dx > LIMIT ? "pay" : dx < -LIMIT ? "delete" : "";
+  }
+
+  function onPointerEnd() {
+    const state = drag.current;
+    const row = rowRef.current;
+    drag.current = null;
+    if (!state || !row || state.axis !== "x") return;
+    row.style.transition = "transform 0.2s ease-out";
+    row.style.transform = "";
+    delete row.dataset.swipe;
+    if (state.dx > LIMIT) onToggle(!paid);
+    else if (state.dx < -LIMIT) {
+      haptic("tap");
+      onDelete();
+    }
+  }
+
   return (
-    <li className={`ledger__row ${paid ? "ledger__row--paid" : ""}`} aria-busy={toggle.isPending || undefined}>
+    <li
+      ref={rowRef}
+      className={`ledger__row ${paid ? "ledger__row--paid" : ""} ${selected ? "is-selected" : ""}`}
+      aria-busy={toggle.isPending || undefined}
+      data-no-swipe
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerEnd}
+      onPointerCancel={onPointerEnd}
+    >
       <label className="ledger__check">
-        <input
-          type="checkbox"
-          className="item__check"
-          checked={paid}
-          onChange={(e) => onToggle(e.target.checked)}
-          aria-label={`${expense.description} paga`}
-        />
+        {selecting ? (
+          <input
+            type="checkbox"
+            className="item__check item__check--select"
+            checked={selected}
+            onChange={(e) => onSelect(e.target.checked)}
+            aria-label={`Selecionar ${expense.description}`}
+          />
+        ) : (
+          <input
+            type="checkbox"
+            className="item__check"
+            checked={paid}
+            onChange={(e) => onToggle(e.target.checked)}
+            aria-label={`${expense.description} paga`}
+          />
+        )}
       </label>
-      <button type="button" className="ledger__open ledger__desc" onClick={onEdit} title="Editar">
+      <button
+        type="button"
+        className="ledger__open ledger__desc"
+        onClick={() => (selecting ? onSelect(!selected) : onEdit())}
+        title={selecting ? "Selecionar" : "Editar"}
+      >
         <span className="ledger__title">
           <span>{expense.description}</span>
           {expense.installment_total && (
@@ -214,16 +293,124 @@ function ExpensesCard({
     });
   }, [data.expenses, query, status, categoryFilter, undo]);
   const visibleTotal = visible.reduce((sum, e) => sum + Number(e.amount), 0);
+  const [selecting, setSelecting] = useState(false);
+  const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
+  const [bulkCategory, setBulkCategory] = useState("");
+  const today = todayISO();
+  const overdue = data.expenses.filter((e) => !e.paid && e.due_date && e.due_date < today && !undo.isHidden(e.id));
+  const bulk = useBudgetMutation(
+    ({ ids, action, category }: { ids: string[]; action: "pay" | "unpay" | "category"; category?: string }) =>
+      extrasApi.bulk(ids, action, category ?? null),
+  );
+
+  function stopSelecting() {
+    setSelecting(false);
+    setSelected(new Set());
+  }
+
+  function select(id: string, value: boolean) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (value) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  }
+
+  async function runBulk(action: "pay" | "unpay" | "category" | "delete") {
+    const ids = [...selected];
+    if (ids.length === 0) return;
+    if (action === "delete") {
+      undo.remove({
+        ids,
+        message: `${ids.length} conta(s) excluída(s)`,
+        commit: () => extrasApi.bulk(ids, "delete"),
+      });
+      stopSelecting();
+      return;
+    }
+    if (action === "category" && !bulkCategory) return;
+    await bulk.mutateAsync({ ids, action, category: bulkCategory || undefined });
+    haptic("success");
+    announce(`${ids.length} conta(s) atualizada(s)`);
+    stopSelecting();
+  }
+
+  async function payOverdue() {
+    const ids = overdue.map((e) => e.id);
+    await bulk.mutateAsync({ ids, action: "pay" });
+    haptic("success");
+    undo.done({ message: `${ids.length} conta(s) vencida(s) marcada(s) como paga(s)`, revert: () => extrasApi.bulk(ids, "unpay") });
+  }
+
   return (
     <section className="card stack">
       <div className="section-header">
         <h2>
           Contas <span className="muted section-header__total">· {money(data.summary.expense_total)}</span>
         </h2>
-        <Button type="button" variant="secondary" className="only-desktop" onClick={() => setEditing({ type: "new-expense" })}>
-          <Plus size={16} /> Conta
-        </Button>
+        <span className="row" style={{ gap: 8 }}>
+          {data.expenses.length > 1 && !selecting && (
+            <Button type="button" variant="secondary" onClick={() => setSelecting(true)}>
+              <ListChecks size={16} /> Selecionar
+            </Button>
+          )}
+          <Button type="button" variant="secondary" className="only-desktop" onClick={() => setEditing({ type: "new-expense" })}>
+            <Plus size={16} /> Conta
+          </Button>
+        </span>
       </div>
+      {overdue.length > 0 && !selecting && (
+        <div className="overdue-bar" role="status">
+          <span>
+            {overdue.length} conta(s) vencida(s) sem marcar · {money(overdue.reduce((sum, e) => sum + Number(e.amount), 0))}
+          </span>
+          <Button type="button" variant="secondary" loading={bulk.isPending} onClick={() => void payOverdue()}>
+            <CheckCheck size={16} /> Marcar todas como pagas
+          </Button>
+        </div>
+      )}
+      {selecting && (
+        <div className="bulk-bar" role="toolbar" aria-label="Ações com as selecionadas">
+          <span className="bulk-bar__count">
+            <strong>{selected.size}</strong> selecionada(s)
+          </span>
+          <button
+            type="button"
+            className="link-btn"
+            onClick={() => setSelected(selected.size === visible.length ? new Set() : new Set(visible.map((e) => e.id)))}
+          >
+            {selected.size === visible.length ? "Limpar seleção" : "Selecionar todas"}
+          </button>
+          <span className="bulk-bar__actions">
+            <Button type="button" variant="secondary" disabled={!selected.size} loading={bulk.isPending} onClick={() => void runBulk("pay")}>
+              Marcar pagas
+            </Button>
+            <Button type="button" variant="secondary" disabled={!selected.size} onClick={() => void runBulk("unpay")}>
+              A pagar
+            </Button>
+            <span className="row" style={{ gap: 4 }}>
+              <select value={bulkCategory} onChange={(e) => setBulkCategory(e.target.value)} aria-label="Nova categoria">
+                <option value="">Mudar categoria…</option>
+                {categories.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+              <Button type="button" variant="secondary" disabled={!selected.size || !bulkCategory} onClick={() => void runBulk("category")}>
+                Aplicar
+              </Button>
+            </span>
+            <Button type="button" variant="danger" disabled={!selected.size} onClick={() => void runBulk("delete")}>
+              <Trash2 size={16} /> Excluir
+            </Button>
+            <Button type="button" variant="secondary" onClick={stopSelecting}>
+              Concluir
+            </Button>
+          </span>
+        </div>
+      )}
       {data.expenses.length > 3 && (
         <div className="list-tools" role="search">
           <label className="list-tools__search">
@@ -291,6 +478,9 @@ function ExpensesCard({
                 expense={expense}
                 category={expense.category_id ? byId.get(expense.category_id) : undefined}
                 onEdit={() => setEditing({ type: "expense", expense })}
+                selecting={selecting}
+                selected={selected.has(expense.id)}
+                onSelect={(value) => select(expense.id, value)}
                 onDuplicate={() =>
                   setEditing({
                     type: "new-expense",
@@ -318,6 +508,100 @@ function ExpensesCard({
 }
 
 type StatusFilter = "all" | "pending" | "late" | "paid";
+
+/** Campo "lançar numa frase": "mercado 120 pix ontem". */
+function QuickBar({ categories }: { categories: Category[] }) {
+  const [text, setText] = useState("");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const cards = useCards();
+  const undo = useUndo();
+  const save = useBudgetMutation((value: string) => saveQuickEntry(value, categories, cards.data ?? []));
+
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    if (!text.trim()) return;
+    setError("");
+    setBusy(true);
+    try {
+      const saved = await save.mutateAsync(text);
+      setText("");
+      haptic("success");
+      undo.done(saved);
+    } catch (err) {
+      setError(errorMessage(err));
+      haptic("error");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <form className="quick-bar" onSubmit={submit} role="search" aria-label="Lançamento rápido">
+      <label className="list-tools__search quick-bar__input">
+        <Zap size={16} aria-hidden />
+        <span className="sr-only">Lançar numa frase</span>
+        <input
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder="Lançar rápido: mercado 120 pix ontem · + freela 600"
+          autoComplete="off"
+          enterKeyHint="send"
+        />
+      </label>
+      <Button type="submit" loading={busy} disabled={!text.trim()}>
+        Lançar
+      </Button>
+      {error && (
+        <p className="tone--error small quick-bar__error" role="alert">
+          {error}
+        </p>
+      )}
+    </form>
+  );
+}
+
+/** "Quanto posso gastar hoje" e o saldo previsto dia a dia. */
+function DailyCard({ month }: { month: string }) {
+  const daily = useDaily(month);
+  const data = daily.data;
+  if (!data || data.days.length === 0) return null;
+  const can = data.can_spend;
+  const negative = data.first_negative;
+  return (
+    <section className="card stack daily-card" aria-label="Saldo previsto do mês">
+      {can ? (
+        <div>
+          <span className="stat__label">Quanto posso gastar hoje</span>
+          <strong className={`daily-card__value ${Number(can.today) <= 0 ? "tone--error" : "tone--ok"}`}>{money(can.today)}</strong>
+          <span className="muted small">
+            {Number(can.rest_of_month) > 0
+              ? `${money(can.rest_of_month)} livres até o fim do mês (${can.days_left} dia(s)), já tirando as contas e os planejados.`
+              : "Nada livre até o fim do mês: as contas previstas já usam toda a renda."}
+          </span>
+        </div>
+      ) : (
+        <div>
+          <span className="stat__label">Saldo previsto no fim do mês</span>
+          <strong className={`daily-card__value ${Number(data.end_balance) < 0 ? "tone--error" : "tone--ok"}`}>{money(data.end_balance)}</strong>
+        </div>
+      )}
+      <Chart
+        type="line"
+        labels={data.days.map((d) => ({ key: d.date, label: d.date.slice(8) }))}
+        series={[{ key: "saldo", name: "Saldo previsto", color: "#1f7a62", values: data.days.map((d) => Number(d.balance)) }]}
+        description={`Saldo previsto dia a dia em ${monthLabel(month)}`}
+        height={140}
+      />
+      {negative && (
+        <p className="tone--error small row" style={{ margin: 0, gap: 6 }}>
+          <TrendingDown size={15} aria-hidden /> O saldo fica negativo a partir do dia {negative.slice(8)}
+          {data.lowest && ` (chega a ${money(data.lowest.balance)})`}. Veja o que dá para adiar.
+        </p>
+      )}
+    </section>
+  );
+}
 
 // ---------------------------------------------------------------- renda e categorias (coluna lateral)
 
@@ -522,7 +806,18 @@ export default function MonthPage() {
   const data = useMonth(month);
   usePrefetchNeighbors(month);
   const categories = useCategories();
-  const [editing, setEditing] = useState<Editing>(null);
+  const [search, setSearch] = useSearchParams();
+  const [editing, setEditing] = useState<Editing>(() => {
+    const novo = search.get("novo");
+    return novo === "conta" ? { type: "new-expense" } : novo === "renda" ? { type: "new-income" } : null;
+  });
+  // Atalho "N" e Ctrl+K chegam com ?novo=…; abre o formulário e limpa o endereço.
+  useEffect(() => {
+    const novo = search.get("novo");
+    if (!novo) return;
+    setEditing(novo === "renda" ? { type: "new-income" } : { type: "new-expense" });
+    setSearch({}, { replace: true });
+  }, [search, setSearch]);
   const cats = categories.data ?? [];
   const close = () => setEditing(null);
   const isCurrent = month === thisMonth();
@@ -575,6 +870,7 @@ export default function MonthPage() {
           style={{ gap: 20 }}
           aria-busy={data.isPlaceholderData || undefined}
         >
+          <QuickBar categories={cats} />
           {data.data.incomes.length === 0 && data.data.expenses.length === 0 ? (
             <div className="empty-hint">
               <span className="kpi__icon" aria-hidden>
@@ -606,6 +902,7 @@ export default function MonthPage() {
           <div className="layout-main-side">
             <ExpensesCard data={data.data} categories={cats} setEditing={setEditing} />
             <div className="stack" style={{ gap: 20 }}>
+              <DailyCard month={month} />
               <IncomesCard data={data.data} setEditing={setEditing} />
               <BreakdownCard data={data.data} categories={cats} />
             </div>

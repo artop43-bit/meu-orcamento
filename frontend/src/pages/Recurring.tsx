@@ -15,7 +15,9 @@ import {
 } from "../api/budget";
 import { errorMessage } from "../api/client";
 import { CategorySelect, FormActions, MoneyInput, requireMoney } from "../components/budget";
-import { Alert, PageHeader } from "../components/ui";
+import { Alert, Button, PageHeader } from "../components/ui";
+import { extrasApi, extrasKeys } from "../api/extras";
+import { Tip } from "../components/help";
 import { money, moneyInput, monthLabel } from "../lib/format";
 
 function RecurringEdit({ item, categories, onDone }: { item: Recurring; categories: Category[]; onDone: () => void }) {
@@ -140,6 +142,77 @@ function RecurringRow({ item, categories }: { item: Recurring; categories: Categ
   );
 }
 
+/** Quanto as contas fixas custam por mês e por ano, e gastos que parecem assinatura. */
+function Subscriptions() {
+  const data = useQuery({ queryKey: extrasKeys.subscriptions, queryFn: extrasApi.subscriptions });
+  const promote = useBudgetMutation(extrasApi.promote);
+  const info = data.data;
+  if (!info || (info.fixed.length === 0 && info.candidates.length === 0)) return null;
+  return (
+    <section className="card stack">
+      <div className="section-header">
+        <h2>
+          Assinaturas e contas fixas{" "}
+          <Tip>Soma do que é cobrado todo mês (ou a cada N meses). Contas a cada 6 meses ou anuais entram pelo valor equivalente por mês.</Tip>
+        </h2>
+      </div>
+      <div className="stats">
+        <div className="stat">
+          <span className="stat__label">Por mês</span>
+          <strong className="stat__value">{money(info.monthly_total)}</strong>
+        </div>
+        <div className="stat">
+          <span className="stat__label">Por ano</span>
+          <strong className="stat__value">{money(info.yearly_total)}</strong>
+        </div>
+      </div>
+      {info.fixed.length > 0 && (
+        <ul className="breakdown">
+          {info.fixed.slice(0, 8).map((f) => (
+            <li key={f.id} className="split small">
+              <span>{f.description}</span>
+              <span className="num">
+                {money(f.yearly)} <span className="muted">/ano</span>
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {info.candidates.length > 0 && (
+        <div className="stack stack--tight">
+          <h3 style={{ margin: 0 }}>Parecem se repetir</h3>
+          <p className="muted small" style={{ margin: 0 }}>
+            Lançados quase todo mês com valor parecido. Virar fixa faz eles aparecerem sozinhos a partir do mês que vem.
+          </p>
+          <ul className="items">
+            {info.candidates.map((c) => (
+              <li key={c.description} className="item">
+                <span className="item__main">
+                  <span className="item__title">{c.description}</span>
+                  <span className="item__meta">
+                    {c.months.length} meses · {money(c.yearly)} por ano
+                  </span>
+                </span>
+                <span className="item__amount">{money(c.amount)}</span>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  loading={promote.isPending && promote.variables?.description === c.description}
+                  onClick={() =>
+                    promote.mutate({ description: c.description, amount: c.amount, category_id: c.category_id, due_day: c.due_day })
+                  }
+                >
+                  Virar fixa
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </section>
+  );
+}
+
 export default function RecurringPage() {
   const items = useQuery({ queryKey: keys.recurring, queryFn: budgetApi.recurring });
   const categories = useCategories();
@@ -153,6 +226,7 @@ export default function RecurringPage() {
         title="Contas e rendas fixas"
         subtitle={`Lançadas automaticamente todo mês. Para criar uma, marque "Todo mês" ao lançar no orçamento.`}
       />
+      <Subscriptions />
       {items.isPending && <p className="muted">Carregando…</p>}
       {items.isError && <Alert tone="error">{errorMessage(items.error)}</Alert>}
       {items.data && (

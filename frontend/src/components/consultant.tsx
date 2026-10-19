@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { maskMoney } from "../lib/format";
 import {
   ChevronRight,
   CircleAlert,
@@ -44,8 +45,8 @@ function MessageItem({ message }: { message: InsightMessage }) {
       </span>
       <span>
         <span className="sr-only">{label}: </span>
-        <strong className="insight__title">{message.title}</strong>
-        <span className="insight__text">{message.text}</span>
+        <strong className="insight__title">{maskMoney(message.title)}</strong>
+        <span className="insight__text">{maskMoney(message.text)}</span>
       </span>
     </li>
   );
@@ -65,7 +66,7 @@ export function ConsultantCard({ data }: { data: Insights }) {
           <h2 id="consultor-titulo">{data.headline}</h2>
         </div>
       </div>
-      <p className="consultant__summary">{data.summary}</p>
+      <p className="consultant__summary">{maskMoney(data.summary)}</p>
       {data.messages.length > 0 && (
         <ul className="insights" aria-label="Observações do mês">
           {data.messages.map((m) => (
@@ -113,7 +114,7 @@ export function ConsultantTeaser({ month }: { month: string }) {
       <span className="grow">
         <strong>{data.headline}</strong>
         <span className="teaser__text">
-          {urgent.length > 0 ? `${urgent[0].title}${urgent.length > 1 ? ` e mais ${urgent.length - 1} alerta(s)` : ""}` : "Veja a análise completa do mês"}
+          {urgent.length > 0 ? `${maskMoney(urgent[0].title)}${urgent.length > 1 ? ` e mais ${urgent.length - 1} alerta(s)` : ""}` : "Veja a análise completa do mês"}
         </span>
       </span>
       <ChevronRight size={18} aria-hidden />

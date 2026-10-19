@@ -1,8 +1,17 @@
+import { getPrefs } from "./prefs";
+
 const brl = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 
 /** Valores chegam da API como texto ("1234.50") para não perder centavos. */
 export function money(value: string | number | null | undefined): string {
+  // Modo privacidade: a tela mostra só "R$ ••••" (o leitor de tela também).
+  if (getPrefs().privacy) return "R$ ••••";
   return brl.format(Number(value ?? 0));
+}
+
+/** Textos prontos (ex.: do consultor) com valores dentro: no modo privacidade, os valores somem. */
+export function maskMoney(text: string): string {
+  return getPrefs().privacy ? text.replace(/-?R\$\s?-?[\d.]+(,\d{2})?/g, "R$ ••••") : text;
 }
 
 /** Converte o que o usuário digitou ("1.234,50", "1234.5", "R$ 30") para "1234.50". */
