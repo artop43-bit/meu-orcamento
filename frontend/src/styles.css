@@ -5084,3 +5084,14 @@ kbd {
     min-width: 0;
   }
 }
+
+/* Atalhos: a descrição quebra linha; só a tecla fica numa linha. */
+.shortcuts-table td,
+.shortcuts-table th {
+  white-space: normal;
+}
+
+.shortcuts-table td:first-child {
+  width: 1%;
+  white-space: nowrap;
+}

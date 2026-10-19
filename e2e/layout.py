@@ -83,11 +83,19 @@ DETECT = r"""
     }
     return false;
   };
+  // Conteúdo "só para leitor de tela" (recortado de propósito) não conta.
+  const visuallyHidden = (el) => {
+    for (let e = el; e && e !== document.body; e = e.parentElement) {
+      const st = getComputedStyle(e);
+      if (st.position === 'absolute' && st.clip && st.clip !== 'auto') return true;
+    }
+    return false;
+  };
   for (const el of root.querySelectorAll('*')) {
     const r = el.getBoundingClientRect();
     const s = getComputedStyle(el);
     if (r.width <= 0 || r.height <= 0 || s.visibility === 'hidden' || s.display === 'none') continue;
-    if (el.closest('svg, .chart, [aria-hidden="true"], .sr-only, .visually-hidden')) continue;
+    if (el.closest('svg, .chart, [aria-hidden="true"], .sr-only, .visually-hidden') || visuallyHidden(el)) continue;
     const hasText = [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim());
     const hidden = s.overflowX === 'hidden' || s.overflow === 'hidden' || s.textOverflow === 'ellipsis';
     if (hasText && hidden && el.scrollWidth > el.clientWidth + 1) {
