@@ -94,6 +94,8 @@ class StatementTransaction(BaseModel):
 
 class StatementPreviewItem(StatementTransaction):
     duplicate: bool
+    # Pagamento da fatura do cartão: as compras já estão no app, então vem desmarcado.
+    card_payment: bool = False
 
 
 class StatementPreviewOut(BaseModel):

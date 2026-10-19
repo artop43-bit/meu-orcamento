@@ -22,6 +22,8 @@ from app.core.months import add_months, current_month, format_month, with_day
 from app.db.types import utcnow
 from app.models import (
     Category,
+    CategoryRule,
+    CreditCard,
     Expense,
     Goal,
     Income,
@@ -291,6 +293,55 @@ def _fill(db: Session, user: User) -> None:
             WatchItem(user_id=user.id, symbol="BTC"),
         ]
     )
+
+    # Cartão de crédito: compras do mês e um celular parcelado, cada um na fatura certa.
+    card = CreditCard(
+        user_id=user.id,
+        name="Cartão Roxo",
+        limit_amount=Decimal("4000.00"),
+        closing_day=3,
+        due_day=10,
+        color="#8a05be",
+    )
+    db.add(card)
+    db.flush()
+    for description, amount, days_ago, category in (
+        ("iFood", "58.90", 2, alimentacao),
+        ("Uber", "23.40", 5, transporte),
+        ("Farmácia Pague Menos", "37.80", 9, saude),
+    ):
+        budget.create_expense(
+            db,
+            user,
+            this_month,
+            {
+                "description": description,
+                "amount": Decimal(amount),
+                "category_id": category.id,
+                "card_id": card.id,
+                "purchase_date": today - timedelta(days=days_ago),
+            },
+        )
+    budget.create_expense(
+        db,
+        user,
+        this_month,
+        {
+            "description": "Fone Bluetooth",
+            "amount": Decimal("420.00"),
+            "category_id": lazer.id,
+            "card_id": card.id,
+            "purchase_date": today - timedelta(days=20),
+            "installments": 3,
+            "amount_mode": "total",
+        },
+    )
+    # Faturas que já venceram estão pagas.
+    for expense in db.scalars(select(Expense).where(Expense.card_id == card.id)):
+        if expense.due_date is not None and expense.due_date < today:
+            expense.paid = True
+            expense.paid_at = utcnow()
+    db.add(CategoryRule(user_id=user.id, pattern="ifood", category_id=alimentacao.id))
 
     # Gastos planejados (Calendário): entram na previsão até virarem conta.
     db.add_all(

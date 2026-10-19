@@ -106,6 +106,9 @@ def month_calendar(db: Session, user: User, month: date) -> list[dict[str, Any]]
         }
 
     for expense in data.expenses:
+        # Compras no cartão aparecem juntas, como a fatura (abaixo).
+        if expense.card_id is not None:
+            continue
         if expense.installment_group_id is not None:
             kind = "installment"
         elif expense.recurring_id is not None:
@@ -152,6 +155,9 @@ def month_calendar(db: Session, user: User, month: date) -> list[dict[str, Any]]
                 **category(planned.category_id),
             }
         )
+    from app.services import cards
+
+    events.extend(cards.calendar_events(db, user, month, date.today()))
     # Primeiro os com data (em ordem), depois os sem data.
     events.sort(key=lambda e: (e["date"] is None, e["date"] or month, e["kind"] != "income"))
     return events
