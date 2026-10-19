@@ -2,7 +2,17 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Trash2 } from "lucide-react";
 
-import { budgetApi, keys, useBudgetMutation, useCategories, type Category, type Recurring } from "../api/budget";
+import {
+  budgetApi,
+  INTERVALS,
+  keys,
+  paymentLabel,
+  useBudgetMutation,
+  useCategories,
+  type Category,
+  type Interval,
+  type Recurring,
+} from "../api/budget";
 import { errorMessage } from "../api/client";
 import { CategorySelect, FormActions, MoneyInput, requireMoney } from "../components/budget";
 import { Alert, PageHeader } from "../components/ui";
@@ -14,6 +24,7 @@ function RecurringEdit({ item, categories, onDone }: { item: Recurring; categori
   const [categoryId, setCategoryId] = useState(item.category_id ?? "");
   const [dueDay, setDueDay] = useState(item.due_day ? String(item.due_day) : "");
   const [endMonth, setEndMonth] = useState(item.end_month ?? "");
+  const [interval, setInterval] = useState<Interval>(item.interval_months ?? 1);
   const [error, setError] = useState("");
   const save = useBudgetMutation(() =>
     budgetApi.updateRecurring(item.id, {
@@ -21,7 +32,7 @@ function RecurringEdit({ item, categories, onDone }: { item: Recurring; categori
       amount: requireMoney(amount),
       end_month: endMonth || null,
       ...(item.kind === "expense"
-        ? { category_id: categoryId || null, due_day: dueDay ? Number(dueDay) : null }
+        ? { category_id: categoryId || null, due_day: dueDay ? Number(dueDay) : null, interval_months: interval }
         : {}),
     }),
   );
@@ -63,6 +74,16 @@ function RecurringEdit({ item, categories, onDone }: { item: Recurring; categori
               Dia do vencimento
               <input type="number" min={1} max={31} value={dueDay} onChange={(e) => setDueDay(e.target.value)} />
             </label>
+            <label>
+              Frequência
+              <select value={interval} onChange={(e) => setInterval(Number(e.target.value) as Interval)}>
+                {INTERVALS.map((i) => (
+                  <option key={i.value} value={i.value}>
+                    {i.label}
+                  </option>
+                ))}
+              </select>
+            </label>
           </>
         )}
         <label>
@@ -93,8 +114,10 @@ function RecurringRow({ item, categories }: { item: Recurring; categories: Categ
       <button type="button" className="item__main" onClick={() => setEditing(true)} title="Editar">
         <span className="item__title">{item.description}</span>
         <span className="item__meta">
-          {item.kind === "expense" && (category?.name ?? "Sem categoria")}
-          {item.due_day && ` · todo dia ${item.due_day}`}
+          {item.kind === "expense" ? (category?.name ?? "Sem categoria") : item.income_type === "variable" ? "Renda variável" : "Renda fixa"}
+          {item.interval_months > 1 && ` · ${INTERVALS.find((i) => i.value === item.interval_months)?.label.toLowerCase()}`}
+          {item.due_day && ` · dia ${item.due_day}`}
+          {item.payment_method && ` · ${paymentLabel(item.payment_method)}`}
           {` · desde ${monthLabel(item.start_month, true)}`}
           {item.end_month && ` até ${monthLabel(item.end_month, true)}`}
         </span>
