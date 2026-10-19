@@ -38,3 +38,4 @@ backend/codespace.db
 
 # Banco e credenciais de teste local
 backend/local-dev*
+e2e/saida-*/
