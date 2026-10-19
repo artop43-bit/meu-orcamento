@@ -9,7 +9,7 @@ QA_BROWSER (chromium ou msedge). Precisa de uma conta de demonstração VAZIA.
 Persona: Carla, 34 anos, assistente administrativa em Belo Horizonte.
 Salário líquido de R$ 3.200 (perto do rendimento médio do trabalho no Brasil, IBGE/PNAD),
 aluguel, contas da casa, transporte público, mercado e lazer moderado. Celular novo
-parcelado, dentista parcelado, uma viagem que deixa um mês no vermelho, freelas
+parcelado, dentista parcelado, uma viagem que deixa um mês no vermelho, trabalhos de freelance
 eventuais, um aumento em outubro, reserva pequena e uma meta de viagem.
 
 Cada passo é verificado; falhas viram FAIL com print e o roteiro continua.
@@ -74,6 +74,12 @@ def money(value: float) -> str:
     return f"{value:,.2f}".replace(",", "_").replace(".", ",").replace("_", ".")
 
 
+def br_date(iso: str) -> str:
+    """AAAA-MM-DD → dd/mm/aaaa (os campos de data do app são digitados nesse formato)."""
+    y, m, d = iso.split("-")
+    return f"{d}/{m}/{y}"
+
+
 def months_back(n: int) -> str:
     y, m = TODAY.year, TODAY.month - n
     while m <= 0:
@@ -98,35 +104,37 @@ def open_month(page: Page, month: str):
 
 
 def add_expense(page: Page, month: str, desc: str, amount: float, cat: str, day: int | None = None, kind: str = "single", parcelas: int | None = None):
-    page.get_by_role("button", name="Nova conta", exact=True).click()
+    page.get_by_role("button", name="Nova despesa", exact=True).click()
     d = dialog(page)
     expect(d).to_be_visible()
     d.get_by_label("Descrição").fill(desc)
     if kind == "installments":
         d.get_by_label("Parcelada").check()
+        # Aqui o valor informado é o de cada parcela.
+        d.get_by_label("Valor da parcela").check()
     elif kind in ("recurring", "recurring_quarterly"):
-        d.get_by_label("Se repete").check()
+        d.get_by_label("Recorrente").check()
         if kind == "recurring_quarterly":
             d.get_by_label("Frequência").select_option(label="A cada 3 meses")
-    d.get_by_label(re.compile(r"^Valor")).fill(money(amount))
+    d.get_by_role("textbox", name=re.compile(r"^Valor")).fill(money(amount))
     if day:
-        d.locator('input[type="date"]').fill(f"{month}-{day:02d}")
+        d.get_by_placeholder("dd/mm/aaaa").first.fill(br_date(f"{month}-{day:02d}"))
     d.get_by_label("Categoria").select_option(label=cat)
     if parcelas:
         d.get_by_label("Número de parcelas").fill(str(parcelas))
-    d.get_by_role("button", name="Adicionar conta").click()
+    d.get_by_role("button", name="Adicionar despesa").click()
     expect(d).to_have_count(0, timeout=8000)
     idle(page, 50)
 
 
 def add_income(page: Page, desc: str, amount: float, every_month: bool = False):
-    page.get_by_role("button", name="Nova renda", exact=True).click()
+    page.get_by_role("button", name="Nova receita", exact=True).click()
     d = dialog(page)
     d.get_by_label("Descrição").fill(desc)
     d.get_by_label("Valor", exact=True).fill(money(amount))
     if every_month:
         d.get_by_label("Todo mês", exact=True).check()
-    d.get_by_role("button", name="Adicionar renda").click()
+    d.get_by_role("button", name="Adicionar receita").click()
     expect(d).to_have_count(0, timeout=8000)
     idle(page, 50)
 
@@ -205,7 +213,7 @@ def login(page: Page):
 
 @step("Conta nova: orçamento vazio mostra orientação")
 def empty_state(page: Page):
-    expect(page.get_by_role("heading", name="Comece pela sua renda")).to_be_visible()
+    expect(page.get_by_role("heading", name="Nenhuma despesa no mês")).to_be_visible()
     page.goto(f"{BASE}/analises")
     idle(page)
     expect(page.get_by_role("heading", name="Sem lançamentos no período")).to_be_visible()
@@ -257,16 +265,16 @@ def fill_month(page: Page, index: int, month: str, current: bool):
     if index == 2:
         add_expense(page, month, "Celular novo (Samsung A55)", 159.90, "Outros", 12, kind="installments", parcelas=10)
     if index == 3:
-        add_income(page, "Freela (planilhas)", 400)
+        add_income(page, "Freelance (planilhas)", 400)
     if index == 4:
         add_expense(page, month, "Dentista (canal)", 200, "Saúde", 15, kind="installments", parcelas=3)
     if index == 6:
-        add_income(page, "Freela (site)", 450)
+        add_income(page, "Freelance (site)", 450)
     if not current:
         pay_all(page, month)
 
 
-@step("Lançar 8 meses completos (variáveis, parcelas, freelas) e marcar tudo como pago")
+@step("Lançar 8 meses completos (variáveis, parcelas, freelance) e marcar tudo como pago")
 def history(page: Page, months: list[str]):
     for index, month in enumerate(months[:-1]):
         fill_month(page, index, month, current=False)
@@ -274,7 +282,7 @@ def history(page: Page, months: list[str]):
         assert summary["pending_total"] in ("0.00", "0"), f"{month}: pendente {summary['pending_total']}"
 
 
-@step("Mês atual: aumento de salário em Contas fixas (R$ 3.350) e gastos até hoje")
+@step("Mês atual: aumento de salário em Recorrências (R$ 3.350) e gastos até hoje")
 def current_month(page: Page, months: list[str]):
     page.goto(f"{BASE}/fixas")
     idle(page)
@@ -360,7 +368,7 @@ def investments(page: Page):
         d.get_by_label("Quanto investiu").fill(money(invested))
         d.get_by_label("Valor atual").fill(money(current))
         if reserve:
-            d.get_by_label("Faz parte da minha reserva de emergência").check()
+            d.get_by_label("Compõe a reserva de emergência").check()
         d.get_by_role("button", name="Adicionar").click()
         expect(d).to_have_count(0)
         idle(page)
@@ -376,7 +384,7 @@ def goals(page: Page):
     d.get_by_label("Nome da meta").fill("Viagem para o Nordeste")
     d.get_by_label("Quanto quer juntar").fill(money(4000))
     target = f"{TODAY.year + 1}-07-01"
-    d.get_by_label("Até quando (opcional)").fill(target)
+    d.get_by_label("Até quando (opcional)").fill(br_date(target))
     d.get_by_role("button", name="Criar meta").click()
     expect(d).to_have_count(0)
     idle(page)
@@ -411,22 +419,22 @@ def consultant(page: Page, months: list[str]):
     else:
         assert not any("atraso" in t for t in titles), titles
     messages = [m["title"] for m in current["messages"]]
-    assert "Reserva ainda pequena" in messages, messages
+    assert "Reserva abaixo da referência" in messages, messages
     # Sobra do mês (~R$ 900) cobre os ~R$ 378/mês da meta: não deve haver alerta de ritmo.
     assert not any("Viagem" in t for t in titles), titles
 
 
-@step("Análise financeira: seções com navegação e conteúdo (desktop)")
+@step("Insights: seções com navegação e conteúdo (desktop)")
 def dashboard(page: Page, months: list[str]):
     page.goto(f"{BASE}/analises")
     idle(page, 600)
-    expect(page.get_by_role("heading", name="Análise financeira", level=1)).to_be_visible()
+    expect(page.get_by_role("heading", name="Insights", level=1)).to_be_visible()
     nav = page.get_by_role("navigation", name="Seções da análise")
-    expect(page.get_by_text("Seu consultor", exact=True)).to_be_visible()
+    expect(page.get_by_text("Insights do mês", exact=True)).to_be_visible()
     expect(page.get_by_role("heading", name=re.compile("^Alertas"))).to_be_visible()
     page.screenshot(path=OUT / "resumo-desktop.png", full_page=True)
     checks = {
-        "Tendências": "Renda × gastos",
+        "Tendências": "Receitas × despesas",
         "Categorias": "Limites do mês",
         "Saúde financeira": "Score financeiro",
         "Patrimônio e metas": "Metas",
@@ -439,7 +447,7 @@ def dashboard(page: Page, months: list[str]):
     # Mês da viagem: o consultor muda o tom
     nav.get_by_role("link", name="Resumo").click()
     idle(page, 400)
-    page.get_by_label("Mês", exact=True).fill(months[5])
+    page.get_by_label("Mês", exact=True).fill(f"{months[5][5:]}/{months[5][:4]}")
     idle(page, 600)
     expect(page.get_by_role("heading", name="Resultado negativo no mês")).to_be_visible()
 
@@ -466,7 +474,7 @@ def chart_interaction(page: Page):
     box = svg.bounding_box()
     page.mouse.move(box["x"] + box["width"] * 0.9, box["y"] + box["height"] / 2)
     expect(page.locator(".chart2__tip").first).to_be_visible()
-    expect(page.locator(".chart2__tip").first).to_contain_text("Renda")
+    expect(page.locator(".chart2__tip").first).to_contain_text("Receitas")
     page.mouse.move(0, 0)
     svg.focus()
     page.keyboard.press("ArrowLeft")
@@ -503,7 +511,7 @@ def builder(page: Page):
     expect(page.locator(".builder__title")).to_contain_text("Gastos (Lazer) por mês")
     expect(page.locator(".builder__total").first).to_be_visible()
     # Renda só pode ser vista por mês: agrupamentos por categoria ficam desativados
-    panel.get_by_text("Renda", exact=True).click()
+    panel.get_by_text("Receitas", exact=True).click()
     idle(page, 500)
     assert panel.get_by_role("radio", name="Por categoria").is_disabled()
     # Tabela
@@ -523,7 +531,7 @@ def saved_analyses(page: Page):
     page.get_by_role("button", name="Salvar análise").click()
     d = dialog(page)
     d.get_by_label("Nome").fill("Meus gastos por categoria")
-    expect(d.get_by_label("Fixar no Resumo da Análise financeira")).to_be_checked()
+    expect(d.get_by_label("Fixar no Resumo de Insights")).to_be_checked()
     d.get_by_role("button", name="Salvar").click()
     expect(d).to_have_count(0)
     idle(page, 600)
@@ -563,39 +571,39 @@ def flexible_entries(page: Page, months: list[str]):
     month = months[-1]
     open_month(page, month)
     # Renda variável, agrupada à parte.
-    page.get_by_role("button", name="Nova renda", exact=True).click()
+    page.get_by_role("button", name="Nova receita", exact=True).click()
     d = dialog(page)
-    d.get_by_label("Descrição").fill("Freela (logo)")
+    d.get_by_label("Descrição").fill("Freelance (logo)")
     d.get_by_label("Variável").check()
-    d.get_by_label("Valor (deste mês)").fill(money(380))
+    d.get_by_label("Valor no mês").fill(money(380))
     d.get_by_label("Dia do recebimento").fill("25")
-    d.get_by_role("button", name="Adicionar renda").click()
+    d.get_by_role("button", name="Adicionar receita").click()
     expect(d).to_have_count(0, timeout=8000)
     idle(page)
-    income = next(i for i in api(page, f"/months/{month}")["incomes"] if i["description"] == "Freela (logo)")
+    income = next(i for i in api(page, f"/months/{month}")["incomes"] if i["description"] == "Freelance (logo)")
     assert (income["income_type"], income["day"]) == ("variable", 25), income
     expect(page.get_by_text("Variáveis", exact=True)).to_be_visible()
 
     # Categoria sugerida pelo nome; forma de pagamento; "Salvar e adicionar outro".
-    page.get_by_role("button", name="Nova conta", exact=True).click()
+    page.get_by_role("button", name="Nova despesa", exact=True).click()
     d = dialog(page)
     d.get_by_label("Descrição").fill("Uber para o trabalho")
     expect(d.locator(".suggest-chip")).to_contain_text("Transporte", timeout=6000)
     assert d.get_by_label("Categoria").evaluate("e => e.options[e.selectedIndex].text") == "Transporte"
-    d.get_by_label(re.compile(r"^Valor")).fill(money(23.50))
-    d.get_by_text("Mais detalhes").click()
+    d.get_by_role("textbox", name="Valor", exact=True).fill(money(23.50))
     d.get_by_label("Pix").check()
     d.get_by_role("button", name="Salvar e adicionar outro").click()
-    expect(d.get_by_text("1 conta(s) salva(s)")).to_be_visible(timeout=8000)
+    expect(d.get_by_text("1 despesa(s) salva(s)")).to_be_visible(timeout=8000)
     expect(d.get_by_label("Descrição")).to_have_value("")
     # Parcelada informando o total: 3x de R$ 1.000.
     d.get_by_label("Descrição").fill("Geladeira")
     d.get_by_label("Parcelada").check()
     d.get_by_label("Número de parcelas").fill("3")
-    d.get_by_label("O total").check()
-    d.get_by_label(re.compile(r"^Valor")).fill(money(3000))
+    # O padrão da parcelada é o total da compra.
+    d.get_by_label("Valor total da compra").fill(money(3000))
+    expect(d.locator(".summary-box")).to_contain_text("3x de R$")
     d.get_by_label("Categoria").select_option(label="Moradia")
-    d.get_by_role("button", name="Adicionar conta").click()
+    d.get_by_role("button", name="Adicionar despesa").click()
     expect(d).to_have_count(0, timeout=8000)
     idle(page)
     uber = next(e for e in api(page, f"/months/{month}")["expenses"] if e["description"] == "Uber para o trabalho")
@@ -619,8 +627,8 @@ def flexible_entries(page: Page, months: list[str]):
     open_month(page, month)
     page.locator(".ledger__row", has_text="Internet").locator(".ledger__open").click()
     d = dialog(page)
-    d.get_by_label("Valor", exact=True).fill(money(109.90))
-    d.get_by_label("Este e os próximos meses").check()
+    d.get_by_role("textbox", name="Valor", exact=True).fill(money(109.90))
+    d.get_by_label("Este mês e os seguintes").check()
     d.get_by_role("button", name="Salvar").click()
     expect(d).to_have_count(0, timeout=8000)
     idle(page)
@@ -631,24 +639,24 @@ def flexible_entries(page: Page, months: list[str]):
 
     # Busca e filtro na lista.
     open_month(page, month)
-    page.get_by_placeholder("Buscar (ex.: mercado)").fill("geladeira")
+    page.get_by_placeholder("Buscar no mês").fill("geladeira")
     expect(page.locator(".ledger__row")).to_have_count(1)
     page.get_by_role("button", name="Limpar filtros").click()
     page.screenshot(path=OUT / "v05-orcamento.png", full_page=True)
 
 
-@step("Calendário: gasto planejado entra na previsão e vira conta com um toque")
+@step("Calendário: despesa prevista entra na projeção e é confirmada com um toque")
 def calendar(page: Page):
     page.goto(f"{BASE}/calendario")
     idle(page)
     expect(page.locator("h1")).to_be_visible()
-    page.get_by_role("button", name="Planejar gasto").first.click()
+    page.get_by_role("button", name="Agendar despesa prevista").first.click()
     d = dialog(page)
-    d.get_by_label("O que é").fill("Presente da Júlia")
+    d.get_by_label("Descrição").fill("Presente da Júlia")
     d.get_by_label("Valor previsto").fill(money(150))
     day = min(TODAY.day + 2, 28)
-    d.get_by_label("Data").fill(f"{CURRENT}-{day:02d}")
-    d.get_by_role("button", name="Planejar gasto").click()
+    d.get_by_label("Data", exact=True).fill(br_date(f"{CURRENT}-{day:02d}"))
+    d.get_by_role("button", name=re.compile("Agendar")).last.click()
     expect(d).to_have_count(0, timeout=8000)
     idle(page)
     planned = api(page, f"/planned?month={CURRENT}")
@@ -666,30 +674,30 @@ def calendar(page: Page):
     assert api(page, f"/planned?month={CURRENT}")[0]["expense_id"] == expense["id"]
 
 
-@step("Investimentos → Mercado: aviso fixo, abas e simulador; Ajuda e tour")
+@step("Investimentos → Cotações: aviso fixo, abas e simulador; Central de ajuda e apresentação")
 def market_and_help(page: Page):
-    page.goto(f"{BASE}/investimentos?secao=mercado")
+    page.goto(f"{BASE}/investimentos?secao=cotacoes")
     idle(page, 500)
-    expect(page.get_by_role("link", name="Mercado")).to_have_attribute("aria-current", "page")
+    expect(page.get_by_role("link", name="Cotações")).to_have_attribute("aria-current", "page")
     expect(page.get_by_role("note").filter(has_text="não é recomendação")).to_be_visible()
     expect(page.get_by_role("heading", name=re.compile("Simulador de renda fixa"))).to_be_visible()
-    page.screenshot(path=OUT / "v05-mercado.png", full_page=True)
-    page.goto(f"{BASE}/ajuda")
+    page.screenshot(path=OUT / "v07-cotacoes.png", full_page=True)
+    page.goto(f"{BASE}/ajustes/ajuda")
     idle(page)
     expect(page.get_by_role("heading", name="Calendário")).to_be_visible()
-    page.get_by_role("button", name="Rever o tour").click()
+    page.get_by_role("button", name="Ver apresentação").click()
     d = dialog(page)
-    expect(d).to_contain_text("Tour rápido")
+    expect(d).to_contain_text("Apresentação")
     d.get_by_role("button", name="Próximo").click()
     expect(d).to_contain_text("Orçamento")
-    d.get_by_role("button", name="Pular tour").click()
+    d.get_by_role("button", name="Pular").click()
     expect(d).to_have_count(0)
 
 
 @step("v0.6: lançar numa frase (campo rápido e Ctrl+K), lote, vencidas e quanto posso gastar")
 def quick_and_bulk(page: Page):
     open_month(page, CURRENT)
-    page.get_by_placeholder(re.compile("Lançar rápido")).fill("padaria 18,50 pix hoje")
+    page.get_by_placeholder(re.compile("mercado 120")).fill("padaria 18,50 pix hoje")
     page.get_by_role("button", name="Lançar", exact=True).click()
     expect(page.locator(".toast")).to_contain_text("Padaria", timeout=8000)
     idle(page)
@@ -698,20 +706,20 @@ def quick_and_bulk(page: Page):
     # Ctrl+K: frase com renda.
     page.keyboard.press("Control+k")
     d = dialog(page)
-    d.get_by_role("combobox").fill("+ bico de garçom 150")
-    expect(d.get_by_role("option").first).to_contain_text("Lançar renda")
+    d.get_by_role("combobox").fill("+ consultoria avulsa 150")
+    expect(d.get_by_role("option").first).to_contain_text("Lançar receita")
     page.keyboard.press("Enter")
     expect(d).to_have_count(0, timeout=8000)
     idle(page)
-    bico = next(i for i in api(page, f"/months/{CURRENT}")["incomes"] if i["description"].startswith("Bico"))
-    assert (bico["amount"], bico["income_type"]) == ("150.00", "variable"), bico
+    extra = next(i for i in api(page, f"/months/{CURRENT}")["incomes"] if i["description"].startswith("Consultoria"))
+    assert (extra["amount"], extra["income_type"]) == ("150.00", "variable"), extra
     # Ctrl+Z desfaz o último lançamento rápido.
     page.keyboard.press("Control+z")
     page.wait_for_timeout(800)
-    assert not any(i["description"].startswith("Bico") for i in api(page, f"/months/{CURRENT}")["incomes"])
+    assert not any(i["description"].startswith("Consultoria") for i in api(page, f"/months/{CURRENT}")["incomes"])
 
-    # Quanto posso gastar hoje.
-    expect(page.get_by_text("Quanto posso gastar hoje")).to_be_visible()
+    # Disponível hoje.
+    expect(page.get_by_text("Disponível hoje", exact=True)).to_be_visible()
 
     # Lote: seleciona 2 contas e muda a categoria.
     page.get_by_role("button", name="Selecionar", exact=True).click()
@@ -752,19 +760,18 @@ def credit_card(page: Page):
     assert card["best_day"] == 3
 
     open_month(page, CURRENT)
-    page.get_by_role("button", name="Nova conta", exact=True).click()
+    page.get_by_role("button", name="Nova despesa", exact=True).click()
     d = dialog(page)
     d.get_by_label("Descrição").fill("Tênis de corrida")
     d.get_by_label("Parcelada").check()
     d.get_by_label("Número de parcelas").fill("2")
-    d.get_by_label("O total").check()
-    d.get_by_label(re.compile(r"^Valor")).fill(money(400))
+    d.get_by_label("Valor total da compra").fill(money(400))
     d.get_by_label("Crédito").check()
     expect(d.get_by_role("combobox", name=re.compile("^Cartão"))).to_have_value(card["card"]["id"])
     purchase = f"{CURRENT}-05"
-    d.get_by_label("Data da compra").fill(purchase)
-    expect(d.get_by_text(re.compile("Vai para a fatura de"))).to_be_visible()
-    d.get_by_role("button", name="Adicionar conta").click()
+    d.get_by_label("Data da compra").fill(br_date(purchase))
+    expect(d.get_by_text(re.compile("Fatura de .*, vencimento em"))).to_be_visible()
+    d.get_by_role("button", name="Adicionar despesa").click()
     expect(d).to_have_count(0, timeout=8000)
     idle(page)
     invoices = {i["month"]: i for i in api(page, f"/cards/{card['card']['id']}/invoices")}
@@ -798,7 +805,7 @@ def rules_privacy_feedback(page: Page):
 
     page.goto(f"{BASE}/fixas")
     idle(page)
-    expect(page.get_by_role("heading", name=re.compile("Assinaturas e contas fixas"))).to_be_visible()
+    expect(page.get_by_role("heading", name=re.compile("Assinaturas e recorrências"))).to_be_visible()
 
     open_month(page, CURRENT)
     page.locator("body").press("p")
@@ -810,17 +817,17 @@ def rules_privacy_feedback(page: Page):
     idle(page)
     page.get_by_label("Escuro").check()
     assert page.evaluate("document.documentElement.dataset.theme") == "dark"
-    page.get_by_label("Igual ao aparelho").check()
+    page.get_by_label("Automático (sistema)").check()
 
     page.keyboard.press("Control+k")
     d = dialog(page)
-    d.get_by_role("combobox").fill("sugest")
+    d.get_by_role("combobox").fill("feedback")
     page.keyboard.press("Enter")
     page.wait_for_timeout(500)
-    d = page.locator("dialog[open]", has_text="Enviar sugestão ou problema")
+    d = page.locator("dialog[open]", has_text="Enviar feedback")
     d.get_by_label("Mensagem").fill("Teste da persona: gostei do lançamento rápido.")
     d.get_by_role("button", name="Enviar").click()
-    expect(d).to_contain_text("Recebido")
+    expect(d).to_contain_text("Feedback recebido")
     d.get_by_role("button", name="Pronto").click()
 
 
@@ -1005,7 +1012,7 @@ def mobile(browser):
     page.screenshot(path=OUT / "celular-categorias.png", full_page=True)
     overflow = page.evaluate("document.documentElement.scrollWidth > window.innerWidth")
     assert not overflow, "rolagem lateral no celular"
-    for path in ("/orcamento", "/calendario", "/metas", "/analises", "/investimentos", "/investimentos?secao=mercado", "/historico", "/fixas", "/dados", "/seguranca", "/ajuda", "/cartoes", "/preferencias"):
+    for path in ("/orcamento", "/calendario", "/metas", "/analises", "/investimentos", "/investimentos?secao=cotacoes", "/historico", "/ajustes", "/ajustes/recorrencias", "/ajustes/dados", "/ajustes/seguranca", "/ajustes/ajuda", "/ajustes/atalhos", "/cartoes", "/contas", "/revisar", "/busca", "/ajustes/preferencias"):
         page.goto(BASE + path)
         idle(page, 300)
         wide = page.evaluate("document.documentElement.scrollWidth - window.innerWidth")

@@ -29,9 +29,9 @@ def overview(db: Session) -> dict[str, Any]:
         "blocked": count(select(func.count()).where(User.access_status == "blocked")),
         "unverified": count(select(func.count()).where(User.email_verified_at.is_(None))),
         "active_7d": count(
-            select(func.count(func.distinct(UserSession.user_id))).where(
-                UserSession.last_seen_at >= week
-            )
+            select(func.count(func.distinct(UserSession.user_id)))
+            .join(User, User.id == UserSession.user_id)
+            .where(UserSession.last_seen_at >= week)
         ),
         "new_7d": count(select(func.count()).where(User.created_at >= week)),
         "feedback_new": count(select(func.count()).where(Feedback.status == "new")),

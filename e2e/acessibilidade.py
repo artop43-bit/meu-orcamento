@@ -38,16 +38,22 @@ PAGES = [
     "/analises?secao=simulador",
     "/analises?secao=monte",
     "/investimentos",
-    "/investimentos?secao=mercado",
+    "/investimentos?secao=cotacoes",
     "/calendario",
-    "/ajuda",
+    "/contas",
     "/cartoes",
-    "/preferencias",
     "/historico",
-    "/fixas",
-    "/categorias",
-    "/dados",
-    "/seguranca",
+    "/revisar",
+    "/busca?q=mercado",
+    "/admin",
+    "/ajustes",
+    "/ajustes/recorrencias",
+    "/ajustes/categorias",
+    "/ajustes/dados",
+    "/ajustes/seguranca",
+    "/ajustes/preferencias",
+    "/ajustes/atalhos",
+    "/ajustes/ajuda",
 ]
 DEVICES = {
     "desktop": dict(viewport={"width": 1366, "height": 900}),
@@ -104,17 +110,18 @@ def main() -> int:
                     page.goto(BASE + path)
                     settle(page)
                     audit(page, f"{label} {path}", found)
-                # Janelas: nova conta (e menu "Mais" no celular)
+                # Janelas: nova despesa (parcelada, com todos os passos) e nova receita; menu "Mais" no celular
                 page.goto(f"{BASE}/orcamento")
                 settle(page)
-                if device == "desktop":
-                    page.get_by_role("button", name="Nova conta", exact=True).click()
-                else:
-                    page.get_by_role("button", name="Adicionar conta ou renda").click()
-                    page.wait_for_timeout(300)
-                    page.locator("dialog[open]").get_by_role("button", name="Nova conta").click()
+                page.get_by_role("button", name="Nova despesa", exact=True).click()
+                page.locator("dialog[open]").get_by_label("Parcelada").check()
                 page.wait_for_timeout(400)
-                audit(page, f"{label} janela Nova conta", found)
+                audit(page, f"{label} janela Nova despesa", found)
+                page.keyboard.press("Escape")
+                page.wait_for_timeout(300)
+                page.get_by_role("button", name="Nova receita", exact=True).click()
+                page.wait_for_timeout(400)
+                audit(page, f"{label} janela Nova receita", found)
                 page.keyboard.press("Escape")
                 if device == "celular":
                     page.wait_for_timeout(300)

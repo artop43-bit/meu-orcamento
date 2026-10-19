@@ -606,22 +606,23 @@ svg {
 }
 
 .kpi__value {
-  font-size: clamp(1rem, 10.5cqi, 1.3rem);
+  font-size: clamp(0.9rem, 9cqi, 1.3rem);
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.02em;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
 @media (min-width: 1024px) {
   .kpi__value {
-    font-size: clamp(1rem, 10.5cqi, 1.6rem);
+    font-size: clamp(0.9rem, 9cqi, 1.6rem);
   }
 }
 
 .kpi__foot {
   font-size: 0.8rem;
   color: var(--subtle);
+  overflow-wrap: anywhere;
 }
 
 /* Compatibilidade com telas que usam .stats/.stat */
@@ -1307,14 +1308,15 @@ input.color {
 }
 
 .ledger__sub {
+  display: block;
   font-size: 0.8rem;
   color: var(--subtle);
-  display: flex;
-  align-items: center;
   min-width: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
+}
+
+.ledger__sub .dot {
+  margin-right: 6px;
 }
 
 .ledger__cat {
@@ -2539,6 +2541,23 @@ body:has(dialog[open]) {
   flex-wrap: wrap;
 }
 
+/* No celular, as ações descem para uma linha própria em vez de espremer o texto. */
+@media (max-width: 600px) {
+  .banner {
+    flex-wrap: wrap;
+  }
+
+  .banner > :nth-child(2) {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .banner__actions {
+    flex-basis: 100%;
+    justify-content: flex-end;
+  }
+}
+
 .banner__actions button {
   font: inherit;
   font-size: 0.85rem;
@@ -3605,10 +3624,15 @@ legend.field-label {
 }
 
 /* ---------------------------------------------------------------- formulário de lançamento */
+.segmented--3 {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .segmented--3 label {
-  flex: 1 1 0;
   justify-content: center;
-  min-width: max-content;
+  min-width: 0;
+  padding-inline: 8px;
 }
 
 .segmented button {
@@ -5007,4 +5031,56 @@ kbd {
 
 .review-table select {
   min-width: 150px;
+}
+
+/* Para revisar no celular: cada despesa vira um bloco (sem tabela larga rolando de lado). */
+@media (max-width: 640px) {
+  .review-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+
+  .review-table,
+  .review-table tbody {
+    display: block;
+  }
+
+  .review-table tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 6px 12px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .review-table td {
+    display: block;
+    padding: 0;
+    border: 0;
+    min-width: 0;
+  }
+
+  .review-table td:nth-child(1) {
+    font-size: 0.8rem;
+    color: var(--subtle);
+  }
+
+  .review-table td:nth-child(3),
+  .review-table td:nth-child(5) {
+    grid-column: 1 / -1;
+  }
+
+  .review-table td:nth-child(4) {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    align-self: center;
+  }
+
+  .review-table select {
+    width: 100%;
+    min-width: 0;
+  }
 }

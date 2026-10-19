@@ -540,7 +540,7 @@ function QuickBar({ categories }: { categories: Category[] }) {
         <input
           value={text}
           onChange={(e) => setText(e.target.value)}
-          placeholder="Lançamento rápido — ex.: mercado 120 pix ontem"
+          placeholder="Ex.: mercado 120 pix ontem"
           autoComplete="off"
           enterKeyHint="send"
         />
