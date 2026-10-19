@@ -5,17 +5,25 @@ import { api } from "./client";
 import { parseQuickEntry, type QuickEntry } from "../lib/quickEntry";
 import { todayISO } from "../lib/format";
 
+export type CardKind = "credit" | "debit" | "both";
+
 export type Card = {
   id: string;
   name: string;
+  /** Crédito (fatura e limite), débito (sai na hora da conta vinculada) ou os dois. */
+  kind: CardKind;
   limit_amount: string | null;
-  closing_day: number;
-  due_day: number;
+  closing_day: number | null;
+  due_day: number | null;
   color: string | null;
   account_id?: string | null;
 };
 
 export type CardInput = Omit<Card, "id">;
+
+export const CARD_KIND_LABEL: Record<CardKind, string> = { credit: "Crédito", debit: "Débito", both: "Crédito e débito" };
+export const hasCredit = (card: Card) => card.kind === "credit" || card.kind === "both";
+export const hasDebit = (card: Card) => card.kind === "debit" || card.kind === "both";
 
 export type Invoice = {
   month: string;
@@ -32,8 +40,8 @@ export type CardSummary = {
   used: string;
   available: string | null;
   used_pct: number | null;
-  best_day: number;
-  open_invoice: Invoice;
+  best_day: number | null;
+  open_invoice: Invoice | null;
   closed_invoice: Invoice | null;
 };
 
@@ -54,18 +62,6 @@ export type Subscriptions = {
   candidates: { description: string; amount: string; category_id: string | null; due_day: number | null; months: string[]; yearly: string }[];
   monthly_total: string;
   yearly_total: string;
-};
-
-export type FeedbackItem = {
-  id: string;
-  kind: "bug" | "idea" | "other";
-  message: string;
-  page: string | null;
-  user_agent: string | null;
-  app_version: string | null;
-  status: "new" | "read" | "done";
-  created_at: string;
-  email: string | null;
 };
 
 export type BulkAction = "pay" | "unpay" | "delete" | "category";
@@ -91,11 +87,6 @@ export const extrasApi = {
   subscriptions: () => api.get<Subscriptions>("/subscriptions"),
   promote: (data: { description: string; amount: string; category_id: string | null; due_day: number | null }) =>
     api.post<Recurring>("/subscriptions/promote", data),
-
-  sendFeedback: (data: { kind: FeedbackItem["kind"]; message: string; page: string; app_version: string }) =>
-    api.post<{ status: string }>("/feedback", data),
-  feedback: () => api.get<FeedbackItem[]>("/admin/feedback"),
-  feedbackStatus: (id: string, status: FeedbackItem["status"]) => api.patch(`/admin/feedback/${id}`, { status }),
 };
 
 export const extrasKeys = {
@@ -140,8 +131,11 @@ export async function saveQuickEntry(
   }
   const suggestion = await budgetApi.suggestCategory(entry.description).catch(() => null);
   const category_id = suggestion && categories.some((c) => c.id === suggestion.category_id) ? suggestion.category_id : null;
-  // No crédito com um cartão só cadastrado, a compra vai direto para a fatura dele.
-  const card = entry.payment === "credit" && cards.length === 1 ? cards[0].card : null;
+  // Com um único cartão da função usada, a compra vai direto para ele (crédito: fatura; débito: conta).
+  const credit = cards.map((c) => c.card).filter(hasCredit);
+  const debit = cards.map((c) => c.card).filter(hasDebit);
+  const card = entry.payment === "credit" && credit.length === 1 ? credit[0] : null;
+  const debitCard = entry.payment === "debit" && debit.length === 1 && !entry.installments ? debit[0] : null;
   const created = await budgetApi.createExpense(month, {
     description: entry.description,
     amount: entry.amount,
@@ -151,12 +145,13 @@ export async function saveQuickEntry(
     // Na frase, o valor com parcelas é o total da compra ("1800 em 10x" = 10x de 180).
     amount_mode: "total",
     due_date: card ? null : date,
-    paid: !entry.installments && !card && date <= todayISO(),
+    paid: Boolean(debitCard) || (!entry.installments && !card && date <= todayISO()),
     ...(card ? { card_id: card.id, purchase_date: date } : {}),
+    ...(debitCard ? { debit_card_id: debitCard.id, purchase_date: date } : {}),
   });
   const cat = suggestion?.name ? ` em ${suggestion.name}` : "";
   return {
-    message: `"${entry.description}" lançada${cat}${card ? ` na fatura do ${card.name}` : ""}`,
+    message: `"${entry.description}" lançada${cat}${card ? ` na fatura do ${card.name}` : debitCard ? ` no débito do ${debitCard.name}` : ""}`,
     revert: () => (created.length > 1 ? budgetApi.deleteExpense(created[0].id, "following") : budgetApi.deleteExpense(created[0].id)),
   };
 }

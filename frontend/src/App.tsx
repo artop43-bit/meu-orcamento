@@ -23,11 +23,13 @@ import {
   History,
   Investments,
   PreferencesPage,
+  ProfilePage,
   Privacy,
   RecurringPage,
   Report,
   ReviewPage,
   SearchPage,
+  SupportPage,
   Security,
   SettingsHub,
   SettingsLayout,
@@ -85,7 +87,7 @@ export default function App() {
           <Route path="/revisar" element={<ReviewPage />} />
           <Route path="/busca" element={<SearchPage />} />
           <Route path="/admin" element={<AdminPage />} />
-          <Route path="/admin/sugestoes" element={<Navigate to="/admin?aba=feedback" replace />} />
+          <Route path="/admin/sugestoes" element={<Navigate to="/admin?aba=solicitacoes" replace />} />
           <Route path="/metas" element={<Goals />} />
           <Route path="/historico" element={<History />} />
           <Route path="/analises" element={<Analysis />} />
@@ -98,6 +100,9 @@ export default function App() {
             <Route path="seguranca" element={<Security />} />
             <Route path="preferencias" element={<PreferencesPage />} />
             <Route path="atalhos" element={<ShortcutsPage />} />
+            <Route path="perfil" element={<ProfilePage />} />
+            <Route path="solicitacoes" element={<SupportPage />} />
+            <Route path="solicitacoes/:id" element={<SupportPage />} />
             <Route path="ajuda" element={<HelpPage />} />
           </Route>
           {/* Endereços antigos continuam funcionando. */}

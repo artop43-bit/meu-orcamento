@@ -7,12 +7,12 @@ import { errorMessage } from "../api/client";
 import { moneyApi, type AdminAction, type AdminUser } from "../api/money";
 import { Alert, Button, Kpi, LoadingRegion, PageHeader, Skeleton } from "../components/ui";
 import { announce } from "../lib/announce";
-import AdminFeedback from "./AdminFeedback";
+import AdminSupport from "./AdminSupport";
 
 const TABS = [
   { key: "usuarios", label: "Usuários", icon: <Users size={16} /> },
   { key: "emails", label: "E-mails enviados", icon: <Mail size={16} /> },
-  { key: "feedback", label: "Feedback", icon: <MessageSquare size={16} /> },
+  { key: "solicitacoes", label: "Solicitações", icon: <MessageSquare size={16} /> },
 ] as const;
 type Tab = (typeof TABS)[number]["key"];
 
@@ -159,12 +159,14 @@ function EmailsTab() {
 
 export default function AdminPage() {
   const [params, setParams] = useSearchParams();
-  const tab = (TABS.find((t) => t.key === params.get("aba"))?.key ?? "usuarios") as Tab;
+  // "feedback" é o endereço antigo da aba (links e favoritos de antes da v0.7.5).
+  const requested = params.get("aba") === "feedback" ? "solicitacoes" : params.get("aba");
+  const tab = (TABS.find((t) => t.key === requested)?.key ?? "usuarios") as Tab;
   const overview = useQuery({ queryKey: ["admin", "overview"], queryFn: moneyApi.adminOverview, refetchInterval: 60_000 });
   const data = overview.data;
   return (
     <>
-      <PageHeader title="Administração" subtitle="Usuários, liberação de acesso, e-mails e feedback." />
+      <PageHeader title="Administração" subtitle="Usuários, liberação de acesso, e-mails e solicitações." />
       {overview.isError && <Alert tone="error">{errorMessage(overview.error)}</Alert>}
       {overview.isPending && (
         <LoadingRegion label="Carregando">
@@ -176,7 +178,7 @@ export default function AdminPage() {
           <Kpi icon={<Users size={17} />} label="Usuários" value={String(data.users)} foot={`${data.new_7d} novo(s) em 7 dias`} />
           <Kpi icon={<ShieldAlert size={17} />} tone="expense" label="Aguardando liberação" value={String(data.pending)} foot={data.signup_approval ? "Beta fechado ativo" : "Cadastro livre"} />
           <Kpi icon={<Users size={17} />} tone="neutral" label="Ativos em 7 dias" value={String(data.active_7d)} foot={`${data.blocked} bloqueado(s)`} />
-          <Kpi icon={<Inbox size={17} />} tone="neutral" label="Feedback novo" value={String(data.feedback_new)} foot={`${data.unverified} e-mail(s) sem confirmação`} />
+          <Kpi icon={<Inbox size={17} />} tone="neutral" label="Solicitações não lidas" value={String(data.feedback_new)} foot={`${data.unverified} e-mail(s) sem confirmação`} />
         </div>
       )}
       <nav className="page-tabs no-print" aria-label="Seções da administração" style={{ marginBottom: 20 }}>
@@ -196,7 +198,7 @@ export default function AdminPage() {
       </nav>
       {tab === "usuarios" && <UsersTab />}
       {tab === "emails" && <EmailsTab />}
-      {tab === "feedback" && <AdminFeedback embedded />}
+      {tab === "solicitacoes" && <AdminSupport />}
     </>
   );
 }

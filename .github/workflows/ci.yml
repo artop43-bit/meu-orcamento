@@ -117,6 +117,8 @@ jobs:
       ENVIRONMENT: development
       DATABASE_URL: sqlite+pysqlite:///${{ github.workspace }}/backend/e2e.db
       EMAIL_BACKEND: console
+      # A conta de demonstração também é admin no e2e (testa o painel de solicitações).
+      ADMIN_EMAILS: admin@example.com
       SECRET_KEY: e2e-ci-somente-teste
       FRONTEND_URL: http://localhost:5173
       QA_CREDENTIALS: ${{ github.workspace }}/backend/e2e-cred.txt

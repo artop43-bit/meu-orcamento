@@ -53,6 +53,7 @@ export type Expense = {
   payment_method: PaymentMethod | null;
   card_id: string | null;
   purchase_date: string | null;
+  debit_card_id?: string | null;
   account_id: string | null;
   needs_review: boolean;
   installment_group_id: string | null;
@@ -141,6 +142,7 @@ export type ExpenseInput = {
   until_month?: string | null;
   card_id?: string | null;
   purchase_date?: string | null;
+  debit_card_id?: string | null;
   account_id?: string | null;
 };
 
