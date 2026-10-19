@@ -760,7 +760,7 @@ def credit_card(page: Page):
     d.get_by_label("O total").check()
     d.get_by_label(re.compile(r"^Valor")).fill(money(400))
     d.get_by_label("Crédito").check()
-    expect(d.get_by_label("Cartão", exact=True)).to_have_value(card["card"]["id"])
+    expect(d.get_by_role("combobox", name=re.compile("^Cartão"))).to_have_value(card["card"]["id"])
     purchase = f"{CURRENT}-05"
     d.get_by_label("Data da compra").fill(purchase)
     expect(d.get_by_text(re.compile("Vai para a fatura de"))).to_be_visible()
@@ -821,7 +821,7 @@ def rules_privacy_feedback(page: Page):
     d.get_by_label("Mensagem").fill("Teste da persona: gostei do lançamento rápido.")
     d.get_by_role("button", name="Enviar").click()
     expect(d).to_contain_text("Recebido")
-    d.get_by_role("button", name="Fechar").click()
+    d.get_by_role("button", name="Pronto").click()
 
 
 @step("Versão e data do update no fim do menu")

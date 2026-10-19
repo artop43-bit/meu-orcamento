@@ -387,7 +387,7 @@ export function FeedbackSheet() {
           <Alert tone="success">Recebido, obrigado! Cada mensagem é lida e ajuda a decidir o que vem nas próximas versões.</Alert>
           <div className="form-actions">
             <Button type="button" onClick={() => setOpen(false)}>
-              Fechar
+              Pronto
             </Button>
           </div>
         </div>
