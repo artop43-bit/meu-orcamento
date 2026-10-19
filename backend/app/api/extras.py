@@ -50,7 +50,7 @@ def create_card(body: CardIn, user: CurrentUser, db: DbSession) -> CardOut:
 
 @router.patch("/cards/{card_id}")
 def update_card(card_id: uuid.UUID, body: CardPatch, user: CurrentUser, db: DbSession) -> CardOut:
-    changes = _changes(body, nullable={"limit_amount", "color"})
+    changes = _changes(body, nullable={"limit_amount", "color", "account_id"})
     return CardOut.model_validate(cards.update_card(db, user, card_id, changes))
 
 
@@ -109,7 +109,7 @@ def delete_rule(rule_id: uuid.UUID, user: CurrentUser, db: DbSession) -> None:
 
 @router.get("/daily")
 def daily_forecast(user: CurrentUser, db: DbSession, month: str | None = None) -> DailyOut:
-    """Saldo dia a dia do mês e quanto dá para gastar por dia até o fim do mês."""
+    """Saldo dia a dia do mês e o valor disponível por dia até o fim do mês."""
     target = parse_month(month) if month else current_month()
     return DailyOut.model_validate(daily.forecast(db, user, target))
 

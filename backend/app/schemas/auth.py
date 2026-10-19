@@ -25,7 +25,7 @@ class UserOut(BaseModel):
 
     @model_validator(mode="after")
     def _admin(self) -> "UserOut":
-        self.is_admin = self.email.lower() in get_settings().admin_email_list()
+        self.is_admin = self.is_admin or self.email.lower() in get_settings().admin_email_list()
         return self
 
 

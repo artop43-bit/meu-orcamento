@@ -109,7 +109,7 @@ jobs:
         run: docker buildx build --platform linux/arm64 -f deploy/caddy/Dockerfile .
 
   # Usa o app pela interface como uma pessoa de verdade (persona com 9 meses de dados) e
-  # audita a acessibilidade de todas as telas. Ver e2e/persona.py e e2e/acessibilidade.py.
+  # confere o layout e audita a acessibilidade de todas as telas. Ver e2e/persona.py, e2e/layout.py e e2e/acessibilidade.py.
   e2e:
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -145,6 +145,9 @@ jobs:
           for _ in $(seq 1 60); do curl -fsS -o /dev/null http://localhost:5173/ && curl -fsS -o /dev/null http://127.0.0.1:8000/api/health && break; sleep 1; done
       - name: Persona (QA pela interface)
         run: uv run --no-project --with playwright --with pyotp python e2e/persona.py
+      - name: Layout (texto cortado ou fora da caixa, 3 tamanhos de tela)
+        if: always()
+        run: uv run --no-project --with playwright python e2e/layout.py
       - name: Acessibilidade (axe, WCAG 2.1 AA)
         if: always()
         run: uv run --no-project --with playwright python e2e/acessibilidade.py

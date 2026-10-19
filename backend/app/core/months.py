@@ -9,12 +9,25 @@ from app.core.config import get_settings
 from app.core.errors import AppError
 
 MONTH_RE = re.compile(r"^(\d{4})-(0[1-9]|1[0-2])$")
+# Datas aceitas no app: nada de "08/08/888888".
+MIN_YEAR = 2000
+MAX_YEAR = 2100
+DATE_RANGE_MESSAGE = f"Data inválida: use um ano entre {MIN_YEAR} e {MAX_YEAR}."
+
+
+def check_date(value: date) -> date:
+    """Validação usada nos schemas: recusa anos fora do intervalo realista."""
+    if not MIN_YEAR <= value.year <= MAX_YEAR:
+        raise ValueError(DATE_RANGE_MESSAGE)
+    return value
 
 
 def parse_month(value: str) -> date:
     match = MONTH_RE.match(value)
     if not match:
         raise AppError(400, "invalid_month", "Mês inválido. Use o formato AAAA-MM.")
+    if not MIN_YEAR <= int(match[1]) <= MAX_YEAR:
+        raise AppError(400, "invalid_month", DATE_RANGE_MESSAGE)
     return date(int(match[1]), int(match[2]), 1)
 
 

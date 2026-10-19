@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import BigInteger, ForeignKey, String, Uuid
+from sqlalchemy import BigInteger, ForeignKey, String, Text, Uuid
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -29,6 +29,14 @@ class User(Base):
     # Aceite dos Termos de uso e da Política de privacidade (LGPD): quando e qual versão.
     terms_accepted_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
     terms_version: Mapped[str | None] = mapped_column(String(20))
+
+    # Beta fechado: "pending" (aguardando liberação), "approved" ou "blocked".
+    access_status: Mapped[str] = mapped_column(
+        String(10), default="approved", server_default="approved"
+    )
+    approved_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    # Administração (painel). ADMIN_EMAILS no servidor também dá acesso.
+    is_admin: Mapped[bool] = mapped_column(default=False, server_default="0")
 
     # O usuário pediu para não ver mais o convite para ativar a verificação em duas etapas.
     twofa_prompt_dismissed_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
@@ -99,4 +107,16 @@ class SecurityEvent(Base):
     event: Mapped[str] = mapped_column(String(40))
     ip: Mapped[str | None] = mapped_column(String(45))
     user_agent: Mapped[str | None] = mapped_column(String(255))
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, index=True)
+
+
+class EmailLog(Base):
+    """Cópia dos e-mails enviados (painel admin): confirmação, senha etc. Guardada 30 dias."""
+
+    __tablename__ = "email_log"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    to: Mapped[str] = mapped_column(String(320), index=True)
+    subject: Mapped[str] = mapped_column(String(200))
+    body: Mapped[str] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, index=True)

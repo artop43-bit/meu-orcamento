@@ -22,6 +22,8 @@ import {
   type PaymentMethod,
 } from "../api/budget";
 import { extrasApi, useCards, type Card } from "../api/extras";
+import { useAccounts } from "../api/money";
+import { DateField } from "./DateField";
 import { normalizeText } from "../lib/text";
 import { errorMessage } from "../api/client";
 import { announce } from "../lib/announce";
@@ -30,13 +32,6 @@ import { CategorySelect, MoneyInput, requireMoney } from "./budget";
 import { Tip } from "./help";
 import { Alert, Button } from "./ui";
 import { useUndo } from "./undo";
-
-/** Primeiro dia útil do mês do formulário, para sugerir datas dentro do mês aberto. */
-function dateInMonth(month: string, day = new Date().getDate()): string {
-  const [y, m] = month.split("-").map(Number);
-  const last = new Date(y, m, 0).getDate();
-  return `${month}-${String(Math.min(day, last)).padStart(2, "0")}`;
-}
 
 /** Vencimento da fatura em que cai uma compra (mesma regra do servidor). */
 export function invoiceDue(card: Card, purchase: string): string {
@@ -191,7 +186,7 @@ function ScopeChoice({ scope, setScope, what }: { scope: EditScope; setScope: (s
       <div className="segmented">
         <label>
           <input type="radio" name="scope" checked={scope === "one"} onChange={() => setScope("one")} />
-          Só este mês
+          Apenas este mês
         </label>
         <label>
           <input type="radio" name="scope" checked={scope === "following"} onChange={() => setScope("following")} />
@@ -261,7 +256,8 @@ export function ExpenseForm({
   const [notes, setNotes] = useState(start?.notes ?? "");
   const [kind, setKind] = useState<ExpenseKind>("single");
   const [installments, setInstallments] = useState("2");
-  const [amountMode, setAmountMode] = useState<"parcel" | "total">("parcel");
+  // Padrão: o valor digitado é o total da compra (é o número que a pessoa tem na mão).
+  const [amountMode, setAmountMode] = useState<"parcel" | "total">("total");
   const [interval, setInterval] = useState<Interval>(1);
   const [until, setUntil] = useState("");
   const [scope, setScope] = useState<EditScope>("one");
@@ -273,6 +269,9 @@ export function ExpenseForm({
   const [duplicateOf, setDuplicateOf] = useState<string | null>(null);
   const [makeRule, setMakeRule] = useState(false);
   const [rulePatternText, setRulePatternText] = useState("");
+  const [accountId, setAccountId] = useState(expense?.account_id ?? "");
+  const accounts = useAccounts();
+  const accountList = (accounts.data ?? []).map((b) => b.account);
   const cards = useCards();
   const queryClient = useQueryClient();
   const undo = useUndo();
@@ -303,17 +302,20 @@ export function ExpenseForm({
 
   const parsed = Number(parseMoney(amount) ?? 0);
   const count = Number(installments) || 0;
-  const installmentHint =
+  const startMonth = (card ? invoiceDue(card, purchase) : dueDate || `${month}-01`).slice(0, 7);
+  const installmentSummary =
     kind === "installments" && parsed > 0 && count >= 2
-      ? amountMode === "total"
-        ? `${count}x de ${money(parsed / count)}`
-        : `Total da compra: ${money(parsed * count)}`
+      ? {
+          parcel: amountMode === "total" ? parsed / count : parsed,
+          total: amountMode === "total" ? parsed : parsed * count,
+          last: monthLabel(addMonths(startMonth, count - 1), true),
+        }
       : null;
 
   const save = useBudgetMutation(async () => {
     const value = requireMoney(amount);
     const category_id = categoryId || null;
-    const extra = { payment_method: payment || null, notes: notes.trim() || null };
+    const extra = { payment_method: payment || null, notes: notes.trim() || null, account_id: card ? null : accountId || null };
     if (makeRule && canOfferRule && rulePatternText.trim().length >= 2) {
       await extrasApi.createRule(rulePatternText.trim(), categoryId);
     }
@@ -325,13 +327,14 @@ export function ExpenseForm({
         due_date: expense.due_date,
         payment_method: expense.payment_method,
         notes: expense.notes,
+        account_id: expense.account_id,
       };
       await budgetApi.updateExpense(
         expense.id,
         { description, amount: value, category_id, due_date: dueDate || null, ...extra },
         scope,
       );
-      undo.done({ message: "Conta alterada", revert: () => budgetApi.updateExpense(expense.id, before, scope) });
+      undo.done({ message: "Despesa alterada", revert: () => budgetApi.updateExpense(expense.id, before, scope) });
       return;
     }
     if (card) {
@@ -397,7 +400,7 @@ export function ExpenseForm({
     setDuplicateOf(null);
     try {
       await save.mutateAsync(undefined);
-      announce(`${description} salva`);
+      announce(`Despesa “${description}” salva`);
       if (another) reset();
       else onDone();
     } catch (err) {
@@ -410,20 +413,23 @@ export function ExpenseForm({
     void run(false);
   }
 
+  const dateLabel =
+    kind === "installments" ? "Vencimento da 1ª parcela" : kind === "recurring" ? "Primeiro vencimento" : "Vencimento (opcional)";
+
   return (
     <form className="inline-form entry-form" onSubmit={submit}>
       <Alert tone="error">{error}</Alert>
       {duplicateOf && (
         <Alert tone="info">
-          Parece repetida: já existe “{duplicateOf}” neste mês. Toque em salvar de novo para lançar mesmo assim.
+          Possível duplicidade: já existe “{duplicateOf}” neste mês. Salve novamente para confirmar o lançamento.
         </Alert>
       )}
-      {savedCount > 0 && <Alert tone="success">{savedCount} conta(s) salva(s). Lance a próxima.</Alert>}
+      {savedCount > 0 && <Alert tone="success">{savedCount} despesa(s) salva(s). Preencha a próxima.</Alert>}
 
       <div className="field" ref={descRef}>
         <span className="field-label">
           <span id={descLabel}>Descrição</span>
-          <Tip>Escreva como você reconhece a conta. Ex.: “Aluguel”, “Mercado Assaí”, “Uber”. A categoria é sugerida pelo nome.</Tip>
+          <Tip>Nome da despesa, como aparece para você ou no extrato. A categoria é sugerida automaticamente.</Tip>
         </span>
         <DescriptionInput
           value={description}
@@ -445,11 +451,11 @@ export function ExpenseForm({
 
       {!expense && (
         <fieldset className="radios">
-          <legend className="field-label">Como é essa conta?</legend>
+          <legend className="field-label">Tipo de despesa</legend>
           <div className="segmented segmented--3">
             <label>
               <input type="radio" name="kind" checked={kind === "single"} onChange={() => setKind("single")} />
-              Uma vez
+              Única
             </label>
             <label>
               <input type="radio" name="kind" checked={kind === "installments"} onChange={() => setKind("installments")} />
@@ -457,54 +463,86 @@ export function ExpenseForm({
             </label>
             <label>
               <input type="radio" name="kind" checked={kind === "recurring"} onChange={() => setKind("recurring")} />
-              Se repete
+              Recorrente
             </label>
           </div>
         </fieldset>
       )}
 
+      {/* Passo 1: valor — na parcelada, a escolha total × parcela fica junto do campo. */}
+      <fieldset className="radios amount-block">
+        <legend className="field-label">Valor</legend>
+        {kind === "installments" && (
+          <div className="segmented segmented--compact" role="radiogroup" aria-label="O valor informado é">
+            <label>
+              <input type="radio" name="mode" checked={amountMode === "total"} onChange={() => setAmountMode("total")} />
+              Total da compra
+            </label>
+            <label>
+              <input type="radio" name="mode" checked={amountMode === "parcel"} onChange={() => setAmountMode("parcel")} />
+              Valor da parcela
+            </label>
+          </div>
+        )}
+        <MoneyInput
+          value={amount}
+          onChange={setAmount}
+          placeholder="0,00"
+          label={kind === "installments" ? (amountMode === "total" ? "Valor total da compra" : "Valor de cada parcela") : "Valor"}
+        />
+      </fieldset>
+
+      {/* Passo 2: parcelas, com atalhos e resumo ao vivo. */}
       {kind === "installments" && (
-        <div className="grid-2">
-          <label>
+        <div className="stack stack--tight">
+          <label className="narrow">
             Número de parcelas
             <input type="number" inputMode="numeric" min={2} max={120} value={installments} onChange={(e) => setInstallments(e.target.value)} required />
           </label>
-          <fieldset className="radios">
-            <legend className="field-label">O valor digitado é</legend>
-            <div className="segmented">
-              <label>
-                <input type="radio" name="mode" checked={amountMode === "parcel"} onChange={() => setAmountMode("parcel")} />
-                De cada parcela
-              </label>
-              <label>
-                <input type="radio" name="mode" checked={amountMode === "total"} onChange={() => setAmountMode("total")} />
-                O total
-              </label>
-            </div>
-          </fieldset>
+          <div className="chips" role="group" aria-label="Atalhos de parcelas">
+            {[2, 3, 6, 10, 12].map((n) => (
+              <button
+                key={n}
+                type="button"
+                className={`chip-btn ${count === n ? "is-active" : ""}`}
+                aria-pressed={count === n}
+                onClick={() => setInstallments(String(n))}
+              >
+                {n}x
+              </button>
+            ))}
+          </div>
+          {installmentSummary && (
+            <p className="summary-box" aria-live="polite">
+              <strong>
+                {count}x de {money(installmentSummary.parcel)}
+              </strong>{" "}
+              · total {money(installmentSummary.total)} · última parcela em {installmentSummary.last}
+            </p>
+          )}
         </div>
       )}
 
-      <div className="grid-2">
-        <label>
-          <span className="field-label">
-            {kind === "installments" ? (amountMode === "total" ? "Valor total da compra" : "Valor de cada parcela") : "Valor"}
-          </span>
-          <MoneyInput value={amount} onChange={setAmount} placeholder="Ex.: 150,00" />
-          {installmentHint && <small className="muted">{installmentHint}</small>}
-        </label>
-        <label hidden={!!card}>
-          <span className="field-label">
-            {kind === "installments" ? "Vencimento da 1ª parcela" : kind === "recurring" ? "1º vencimento" : "Vencimento"}
-            <Tip>
-              {kind === "recurring"
-                ? "O dia escolhido se repete nos próximos lançamentos. Ex.: 10/01 → vence todo dia 10."
-                : "Opcional. Com data, a conta aparece no Calendário e você recebe aviso quando estiver perto de vencer."}
-            </Tip>
-          </span>
-          <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} placeholder={dateInMonth(month)} />
-        </label>
-      </div>
+      {kind === "recurring" && (
+        <div className="grid-2">
+          <label>
+            Frequência
+            <select value={interval} onChange={(e) => setInterval(Number(e.target.value) as Interval)}>
+              {INTERVALS.map((i) => (
+                <option key={i.value} value={i.value}>
+                  {i.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span className="field-label">
+              Até (opcional) <Tip>Último mês da recorrência. Deixe em branco para manter sem data de término.</Tip>
+            </span>
+            <DateField month value={until} min={dueDate ? dueDate.slice(0, 7) : month} onChange={setUntil} />
+          </label>
+        </div>
+      )}
 
       <fieldset className="radios">
         <legend className="field-label">Forma de pagamento</legend>
@@ -533,39 +571,47 @@ export function ExpenseForm({
                   {c.card.name}
                 </option>
               ))}
-              <option value="">Sem cartão (lançar como conta comum)</option>
+              <option value="">Sem cartão (despesa comum)</option>
             </select>
           </label>
           {card && (
             <label>
               Data da compra
-              <input type="date" value={purchase} onChange={(e) => setPurchase(e.target.value)} required />
+              <DateField value={purchase} onChange={setPurchase} required />
               <small className="muted">
-                Vai para a fatura de {monthLabel(invoiceDue(card, purchase).slice(0, 7))} (vence {shortDate(invoiceDue(card, purchase))})
+                Fatura de {monthLabel(invoiceDue(card, purchase).slice(0, 7))}, vencimento em {shortDate(invoiceDue(card, purchase))}
               </small>
             </label>
           )}
         </div>
       )}
 
-      {kind === "recurring" && (
+      {!card && (
         <div className="grid-2">
           <label>
-            Frequência
-            <select value={interval} onChange={(e) => setInterval(Number(e.target.value) as Interval)}>
-              {INTERVALS.map((i) => (
-                <option key={i.value} value={i.value}>
-                  {i.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
             <span className="field-label">
-              Até (opcional) <Tip>Último mês da conta. Deixe vazio se não tem fim (ex.: internet). Ex.: academia com plano até dezembro.</Tip>
+              {dateLabel}
+              <Tip>
+                {kind === "recurring"
+                  ? "O dia informado se repete nos lançamentos seguintes."
+                  : "Com vencimento, a despesa aparece no Calendário e nos lembretes."}
+              </Tip>
             </span>
-            <input type="month" value={until} min={dueDate ? dueDate.slice(0, 7) : month} onChange={(e) => setUntil(e.target.value)} />
+            <DateField value={dueDate} onChange={setDueDate} />
           </label>
+          {accountList.length > 0 && (
+            <label>
+              Conta de pagamento
+              <select value={accountId} onChange={(e) => setAccountId(e.target.value)}>
+                <option value="">Não informar</option>
+                {accountList.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
         </div>
       )}
 
@@ -574,9 +620,9 @@ export function ExpenseForm({
           Categoria
           {suggestion && !expense && (
             <span className={`suggest-chip ${categoryId === suggestion.category_id ? "is-applied" : ""}`}>
-              <Sparkles size={12} aria-hidden /> Sugerido: {suggestion.name}
+              <Sparkles size={12} aria-hidden /> Sugestão: {suggestion.name}
               <span className="sr-only">
-                {suggestion.source === "history" ? " (pelo que você já lançou)" : " (pelo nome)"}
+                {suggestion.source === "rule" ? " (regra)" : suggestion.source === "history" ? " (histórico)" : " (descrição)"}
               </span>
             </span>
           )}
@@ -594,48 +640,46 @@ export function ExpenseForm({
       {canOfferRule && (
         <div className="rule-offer">
           <label className="check">
-            <input type="checkbox" checked={makeRule} onChange={(e) => {
-              setMakeRule(e.target.checked);
-              if (e.target.checked && !rulePatternText) setRulePatternText(rulePattern(description));
-            }} />
-            Sempre usar esta categoria quando a descrição tiver…
+            <input
+              type="checkbox"
+              checked={makeRule}
+              onChange={(e) => {
+                setMakeRule(e.target.checked);
+                if (e.target.checked && !rulePatternText) setRulePatternText(rulePattern(description));
+              }}
+            />
+            Criar regra: usar esta categoria sempre que a descrição contiver
           </label>
           {makeRule && (
-            <input
-              aria-label="Texto da regra"
-              value={rulePatternText}
-              onChange={(e) => setRulePatternText(e.target.value)}
-              maxLength={60}
-              placeholder="Ex.: uber"
-            />
+            <input aria-label="Texto da regra" value={rulePatternText} onChange={(e) => setRulePatternText(e.target.value)} maxLength={60} placeholder="Ex.: uber" />
           )}
         </div>
       )}
 
       <details className="more" open={moreOpen} onToggle={(e) => setMoreOpen((e.target as HTMLDetailsElement).open)}>
-        <summary>Mais detalhes (observação)</summary>
+        <summary>Observação</summary>
         <div className="stack stack--tight" style={{ marginTop: 12 }}>
           <label>
-            Observação
-            <textarea value={notes} onChange={(e) => setNotes(e.target.value)} maxLength={500} rows={2} placeholder="Ex.: dividido com a Ana; nota fiscal no e-mail" />
+            <span className="sr-only">Observação</span>
+            <textarea value={notes} onChange={(e) => setNotes(e.target.value)} maxLength={500} rows={2} placeholder="Informações adicionais" />
           </label>
         </div>
       </details>
 
       {repeats && (
-        <ScopeChoice scope={scope} setScope={setScope} what={expense!.installment_group_id ? "Esta e as próximas parcelas" : "Este e os próximos meses"} />
+        <ScopeChoice scope={scope} setScope={setScope} what={expense!.installment_group_id ? "Esta e as próximas parcelas" : "Este mês e os seguintes"} />
       )}
 
       {!expense && kind !== "recurring" && (
         <label className="check">
           <input type="checkbox" checked={paid} onChange={(e) => setPaidChoice(e.target.checked)} />
-          {kind === "installments" ? "A 1ª parcela já está paga" : "Já está paga"}
+          {kind === "installments" ? "Primeira parcela já paga" : "Já paga"}
         </label>
       )}
       <SubmitRow
         loading={save.isPending}
         onCancel={onDone}
-        label={duplicateOf ? "Salvar mesmo assim" : expense ? "Salvar" : "Adicionar conta"}
+        label={duplicateOf ? "Salvar mesmo assim" : expense ? "Salvar" : "Adicionar despesa"}
         onAnother={expense ? undefined : () => void run(true)}
       />
     </form>
@@ -653,6 +697,9 @@ export function IncomeForm({ month, income, onDone }: { month: string; income?: 
   const [repeat, setRepeat] = useState<"once" | "monthly" | "period">("once");
   const [until, setUntil] = useState(addMonths(month, 2));
   const [scope, setScope] = useState<EditScope>("one");
+  const [accountId, setAccountId] = useState(income?.account_id ?? "");
+  const accounts = useAccounts();
+  const accountList = (accounts.data ?? []).map((b) => b.account);
   const [error, setError] = useState("");
   const undo = useUndo();
 
@@ -664,6 +711,7 @@ export function IncomeForm({ month, income, onDone }: { month: string; income?: 
       income_type: type,
       day: day ? Number(day) : null,
       notes: notes.trim() || null,
+      account_id: accountId || null,
     };
     if (income) await budgetApi.updateIncome(income.id, data, scope);
     else await budgetApi.createIncome(month, { ...data, repeat, until_month: repeat === "period" ? until : null });
@@ -698,7 +746,7 @@ export function IncomeForm({ month, income, onDone }: { month: string; income?: 
         <input
           value={description}
           onChange={(e) => setDescription(e.target.value)}
-          placeholder={type === "fixed" ? "Ex.: Salário, Aposentadoria" : "Ex.: Freela, Comissão, Uber"}
+          placeholder={type === "fixed" ? "Ex.: Salário, Aposentadoria" : "Ex.: Freelance, Comissão"}
           required
           maxLength={120}
           autoFocus
@@ -706,11 +754,8 @@ export function IncomeForm({ month, income, onDone }: { month: string; income?: 
       </label>
       <fieldset className="radios">
         <legend className="field-label">
-          Tipo de renda{" "}
-          <Tip>
-            Fixa: o mesmo valor todo mês (salário, aposentadoria). Variável: muda de mês para mês (bicos, comissões, vendas). Na
-            previsão, a variável conta pela sua média.
-          </Tip>
+          Tipo de receita{" "}
+          <Tip>Fixa: mesmo valor todo mês. Variável: valor muda a cada mês; na projeção, conta pela média.</Tip>
         </legend>
         <div className="segmented">
           <label>
@@ -725,23 +770,23 @@ export function IncomeForm({ month, income, onDone }: { month: string; income?: 
       </fieldset>
       <div className="grid-2">
         <label>
-          {type === "variable" ? "Valor (deste mês)" : "Valor"}
-          <MoneyInput value={amount} onChange={setAmount} placeholder="Ex.: 3.200,00" />
+          {type === "variable" ? "Valor no mês" : "Valor"}
+          <MoneyInput value={amount} onChange={setAmount} placeholder="0,00" />
         </label>
         <label>
           <span className="field-label">
-            Dia do recebimento <Tip>Opcional. Aparece no Calendário. Ex.: 5 para quem recebe no 5º dia.</Tip>
+            Dia do recebimento <Tip>Opcional. Exibe a receita no dia correspondente do Calendário.</Tip>
           </span>
-          <input type="number" inputMode="numeric" min={1} max={31} value={day} onChange={(e) => setDay(e.target.value)} placeholder="Ex.: 5" />
+          <input type="number" inputMode="numeric" min={1} max={31} value={day} onChange={(e) => setDay(e.target.value)} placeholder="1 a 31" />
         </label>
       </div>
       {!income && (
         <fieldset className="radios">
-          <legend className="field-label">Repetir</legend>
+          <legend className="field-label">Recorrência</legend>
           <div className="segmented segmented--3">
             <label>
               <input type="radio" name="repeat" checked={repeat === "once"} onChange={() => setRepeat("once")} />
-              Só este mês
+              Apenas este mês
             </label>
             <label>
               <input type="radio" name="repeat" checked={repeat === "monthly"} onChange={() => setRepeat("monthly")} />
@@ -749,31 +794,44 @@ export function IncomeForm({ month, income, onDone }: { month: string; income?: 
             </label>
             <label>
               <input type="radio" name="repeat" checked={repeat === "period"} onChange={() => setRepeat("period")} />
-              Por um período
+              Por período
             </label>
           </div>
         </fieldset>
       )}
       {!income && repeat === "period" && (
         <label className="narrow">
-          Até o mês
-          <input type="month" value={until} min={month} onChange={(e) => setUntil(e.target.value)} required />
+          Até
+          <DateField month value={until} min={month} onChange={setUntil} required />
+        </label>
+      )}
+      {accountList.length > 0 && (
+        <label>
+          Conta de recebimento
+          <select value={accountId} onChange={(e) => setAccountId(e.target.value)}>
+            <option value="">Não informar</option>
+            {accountList.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.name}
+              </option>
+            ))}
+          </select>
         </label>
       )}
       <label>
         Observação
-        <textarea value={notes} onChange={(e) => setNotes(e.target.value)} maxLength={500} rows={2} placeholder="Ex.: 13º em dezembro; adiantamento dia 20" />
+        <textarea value={notes} onChange={(e) => setNotes(e.target.value)} maxLength={500} rows={2} placeholder="Informações adicionais" />
       </label>
-      {income?.recurring_id && <ScopeChoice scope={scope} setScope={setScope} what="Este e os próximos meses" />}
-      <SubmitRow loading={save.isPending} onCancel={onDone} label={income ? "Salvar" : "Adicionar renda"} />
+      {income?.recurring_id && <ScopeChoice scope={scope} setScope={setScope} what="Este mês e os seguintes" />}
+      <SubmitRow loading={save.isPending} onCancel={onDone} label={income ? "Salvar" : "Adicionar receita"} />
       {income && (
         <div className="stack stack--tight" style={{ borderTop: "1px solid var(--border)", paddingTop: 16 }}>
           <Button type="button" variant="danger" onClick={() => del("one")}>
-            <Trash2 size={16} /> {income.recurring_id ? "Excluir só deste mês" : "Excluir"}
+            <Trash2 size={16} /> {income.recurring_id ? "Excluir apenas este mês" : "Excluir"}
           </Button>
           {income.recurring_id && (
             <Button type="button" variant="danger" onClick={() => del("following")}>
-              Excluir deste mês em diante
+              Excluir este mês e os seguintes
             </Button>
           )}
         </div>

@@ -38,6 +38,7 @@ import { useUndo } from "../components/undo";
 import { prefersReducedMotion } from "../lib/announce";
 import { addMonths, money, monthLabel, percent, thisMonth } from "../lib/format";
 import { cumulativeBalance, simulate, ZERO_SIM, type Sim } from "../lib/simulate";
+import { DateField } from "../components/DateField";
 
 const SCORE_COLORS: Record<string, string> = {
   Excelente: "var(--ok)",
@@ -51,7 +52,7 @@ function MonthPicker({ value, onChange, label }: { value: string; onChange: (v: 
   return (
     <label className="month-picker">
       {label}
-      <input type="month" value={value} onChange={(e) => e.target.value && onChange(e.target.value)} />
+      <DateField month value={value} onChange={(v) => v && onChange(v)} />
     </label>
   );
 }
@@ -113,7 +114,7 @@ function RuleCard({ rule }: { rule: Rule }) {
     return (
       <section className="card stack">
         <h2>Regra 50/30/20</h2>
-        <p className="muted">Lance a renda do mês para comparar com a regra.</p>
+        <p className="muted">Registre as receitas do mês para comparar com a regra.</p>
       </section>
     );
   }
@@ -122,7 +123,7 @@ function RuleCard({ rule }: { rule: Rule }) {
     <section className="card stack">
       <h2>Regra 50/30/20</h2>
       <p className="muted small">
-        Uma divisão clássica da renda: até 50% para necessidades, até 30% para desejos e pelo menos 20% para
+        Referência de distribuição da receita: até 50% para necessidades, até 30% para desejos e ao menos 20% para
         poupar ou investir. Necessidades são as contas em categorias essenciais.
       </p>
       <div className="stacked-bar" aria-hidden>
@@ -136,7 +137,7 @@ function RuleCard({ rule }: { rule: Rule }) {
         <RuleLine label="Poupança" value={rule.savings} pct={rule.savings_pct} target="20% ou mais" ok={rule.savings_ok} />
       </ul>
       {Number(rule.deficit) > 0 && (
-        <Alert tone="error">As contas passam a renda em {money(rule.deficit)}.</Alert>
+        <Alert tone="error">As despesas superam as receitas em {money(rule.deficit)}.</Alert>
       )}
     </section>
   );
@@ -214,7 +215,7 @@ function SummarySection({ month, setMonth, goTo }: { month: string; setMonth: (m
             <h2>Como começar</h2>
             <ol className="steps">
               <li>
-                Cadastre o que se repete todo mês (salário, aluguel, internet) em <Link to="/fixas">Contas fixas</Link>.
+                Configure lançamentos mensais (salário, aluguel, internet) em <Link to="/ajustes/recorrencias">Recorrências</Link>.
               </li>
               <li>
                 Lance os gastos do mês no <Link to={`/orcamento/${month}`}>Orçamento</Link>.
@@ -320,18 +321,18 @@ function TrendsSection({ month, setMonth }: { month: string; setMonth: (m: strin
 
   return (
     <>
-      <SectionTitle title="Tendências" text="Como renda, gastos e sobra evoluíram até o mês escolhido." month={month} setMonth={setMonth} />
+      <SectionTitle title="Tendências" text="Evolução de receitas, despesas e saldo até o mês selecionado." month={month} setMonth={setMonth} />
       <section className="card stack">
-        <h3 className="builder__title">Renda × gastos</h3>
+        <h3 className="builder__title">Receitas × despesas</h3>
         <Chart
           type="bar"
           labels={labels}
           series={[
-            { key: "income", name: "Renda", color: "var(--accent)", values: points.map((p) => Number(p.income)) },
+            { key: "income", name: "Receitas", color: "var(--accent)", values: points.map((p) => Number(p.income)) },
             { key: "expenses", name: "Gastos", color: "var(--expense)", values: points.map((p) => Number(p.expenses)) },
           ]}
           monthLabels
-          description="Renda e gastos por mês"
+          description="Receitas e despesas por mês"
           onSelect={open}
         />
       </section>
@@ -365,7 +366,7 @@ function TrendsSection({ month, setMonth }: { month: string; setMonth: (m: strin
         </section>
       </div>
       <div className="kpis">
-        <Kpi icon={<ArrowDownLeft size={18} />} label="Renda média (6 meses)" value={money(t.averages.income_6m)} foot={`3 meses: ${money(t.averages.income_3m)}`} />
+        <Kpi icon={<ArrowDownLeft size={18} />} label="Receita média (6 meses)" value={money(t.averages.income_6m)} foot={`3 meses: ${money(t.averages.income_3m)}`} />
         <Kpi icon={<Receipt size={18} />} tone="expense" label="Gasto médio (6 meses)" value={money(t.averages.expenses_6m)} foot={`3 meses: ${money(t.averages.expenses_3m)}`} />
         <Kpi icon={<Scale size={18} />} tone="neutral" label="Sobra média (6 meses)" value={money(t.averages.balance_6m)} foot={`3 meses: ${money(t.averages.balance_3m)}`} />
         <Kpi
@@ -649,7 +650,7 @@ function CompareTab({ month }: { month: string }) {
               </thead>
               <tbody>
                 <tr>
-                  <td><strong>Renda</strong></td>
+                  <td><strong>Receitas</strong></td>
                   <td className="num">{money(data.income.a)}</td>
                   <td className="num">{money(data.income.b)}</td>
                   <td className="num"><Delta value={data.income.delta} /></td>
@@ -728,7 +729,7 @@ function ProjectionTab() {
           <section className="card stack">
             <div className="stats">
               <div className="stat">
-                <span className="stat__label">Renda prevista</span>
+                <span className="stat__label">Receita prevista</span>
                 <strong className="stat__value">{money(totals.income)}</strong>
               </div>
               <div className="stat">
@@ -756,7 +757,7 @@ function ProjectionTab() {
                 <thead>
                   <tr>
                     <th>Mês</th>
-                    <th className="num">Renda</th>
+                    <th className="num">Receitas</th>
                     <th className="num">Contas</th>
                     <th className="num">Saldo</th>
                     <th className="num">Acumulado</th>
@@ -830,15 +831,15 @@ function SimulatorTab() {
   return (
     <div className="stack">
       <p className="muted">
-        E se a renda ou as contas mudassem? Ajuste os controles e compare com {monthLabel(month).toLowerCase()} e
+        Simule variações de receita e despesa e compare com {monthLabel(month).toLowerCase()} e
         com a projeção dos próximos 12 meses. Nada aqui altera seus dados.
       </p>
       <section className="card stack">
-        <Slider label="Renda" value={sim.incomePct} min={-50} max={50} onChange={(v) => set({ incomePct: v })} />
+        <Slider label="Receitas" value={sim.incomePct} min={-50} max={50} onChange={(v) => set({ incomePct: v })} />
         <Slider label="Todas as contas" value={sim.expensePct} min={-50} max={50} onChange={(v) => set({ expensePct: v })} />
         <Slider label="Corte nos gastos não essenciais" value={-sim.cutWantsPct} min={-100} max={0} onChange={(v) => set({ cutWantsPct: -v })} />
         <label className="slider">
-          <span>Nova conta mensal (ex.: financiamento, plano de saúde)</span>
+          <span>Nova despesa mensal (ex.: financiamento, plano de saúde)</span>
           <input
             type="number"
             min={0}
@@ -860,7 +861,7 @@ function SimulatorTab() {
         <h2>Resultado no mês</h2>
         <div className="stats">
           <div className="stat">
-            <span className="stat__label">Renda</span>
+            <span className="stat__label">Receitas</span>
             <strong className="stat__value">{money(simulated.income)}</strong>
           </div>
           <div className="stat">
@@ -947,7 +948,7 @@ export default function Analysis() {
   let group = "";
   return (
     <div className="stack">
-      <PageHeader title="Análise financeira" subtitle="Seu consultor: como foi o mês, tendências, comparações e análises do seu jeito." />
+      <PageHeader title="Insights" subtitle="Resultado do mês, tendências, comparações e análises personalizadas." />
       <div className="analysis">
         <nav className="analysis__nav no-print" aria-label="Seções da análise" ref={navRef}>
           {SECTIONS.map((s) => {
@@ -986,13 +987,13 @@ export default function Analysis() {
           )}
           {section === "projecao" && (
             <>
-              <SectionTitle title="Projeção" text="Os próximos 12 meses com as contas fixas e parcelas que você já tem." />
+              <SectionTitle title="Projeção" text="Próximos 12 meses considerando recorrências, parcelas e despesas previstas." />
               <ProjectionTab />
             </>
           )}
           {section === "simulador" && (
             <>
-              <SectionTitle title="Simulador" text="E se você cortasse gastos ou ganhasse mais? Veja o efeito em 12 meses." />
+              <SectionTitle title="Simulador" text="Efeito de reduções de despesa ou aumento de receita em 12 meses." />
               <SimulatorTab />
             </>
           )}

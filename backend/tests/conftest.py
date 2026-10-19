@@ -7,6 +7,8 @@ os.environ.update(
         "EMAIL_BACKEND": "memory",
         "SECRET_KEY": "chave-de-teste",
         "FRONTEND_URL": "http://web.local",
+        # Os testes de cadastro entram direto; a aprovação tem testes próprios.
+        "SIGNUP_APPROVAL": "false",
     }
 )
 

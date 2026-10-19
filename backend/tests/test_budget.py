@@ -52,13 +52,13 @@ def descriptions(data: dict[str, Any], kind: str = "expenses") -> list[str]:
 def test_new_account_gets_default_categories(user: TestClient) -> None:
     categories = user.get("/api/categories").json()
     names = {c["name"]: c["is_essential"] for c in categories}
-    assert len(names) == 8
+    assert len(names) == 11
     assert names["Moradia"] is True
     assert names["Lazer"] is False
 
 
 def test_category_crud(user: TestClient) -> None:
-    created = user.post("/api/categories", json={"name": "Pets", "is_essential": True})
+    created = user.post("/api/categories", json={"name": "Viagens", "is_essential": True})
     assert created.status_code == 201
 
     duplicate = user.post("/api/categories", json={"name": "pets"})

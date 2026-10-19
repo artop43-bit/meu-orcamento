@@ -11,7 +11,8 @@ import Register from "./pages/Register";
 import ResetPassword from "./pages/ResetPassword";
 import VerifyEmail from "./pages/VerifyEmail";
 import {
-  AdminFeedbackPage,
+  AccountsPage,
+  AdminPage,
   Analysis,
   CalendarPage,
   CardsPage,
@@ -25,7 +26,12 @@ import {
   Privacy,
   RecurringPage,
   Report,
+  ReviewPage,
+  SearchPage,
   Security,
+  SettingsHub,
+  SettingsLayout,
+  ShortcutsPage,
   Terms,
 } from "./pages/lazy";
 
@@ -74,19 +80,34 @@ export default function App() {
           <Route path="/" element={<Navigate to="/orcamento" replace />} />
           <Route path="/orcamento/:month?" element={<MonthPage />} />
           <Route path="/calendario/:month?" element={<CalendarPage />} />
-          <Route path="/ajuda" element={<HelpPage />} />
           <Route path="/cartoes" element={<CardsPage />} />
-          <Route path="/preferencias" element={<PreferencesPage />} />
-          <Route path="/admin/sugestoes" element={<AdminFeedbackPage />} />
+          <Route path="/contas" element={<AccountsPage />} />
+          <Route path="/revisar" element={<ReviewPage />} />
+          <Route path="/busca" element={<SearchPage />} />
+          <Route path="/admin" element={<AdminPage />} />
+          <Route path="/admin/sugestoes" element={<Navigate to="/admin?aba=feedback" replace />} />
           <Route path="/metas" element={<Goals />} />
           <Route path="/historico" element={<History />} />
           <Route path="/analises" element={<Analysis />} />
           <Route path="/investimentos" element={<Investments />} />
-          <Route path="/fixas" element={<RecurringPage />} />
-          <Route path="/categorias" element={<Categories />} />
-          <Route path="/dados" element={<DataPage />} />
+          <Route path="/ajustes" element={<SettingsLayout />}>
+            <Route index element={<SettingsHub />} />
+            <Route path="recorrencias" element={<RecurringPage />} />
+            <Route path="categorias" element={<Categories />} />
+            <Route path="dados" element={<DataPage />} />
+            <Route path="seguranca" element={<Security />} />
+            <Route path="preferencias" element={<PreferencesPage />} />
+            <Route path="atalhos" element={<ShortcutsPage />} />
+            <Route path="ajuda" element={<HelpPage />} />
+          </Route>
+          {/* Endereços antigos continuam funcionando. */}
+          <Route path="/fixas" element={<Navigate to="/ajustes/recorrencias" replace />} />
+          <Route path="/categorias" element={<Navigate to="/ajustes/categorias" replace />} />
+          <Route path="/dados" element={<Navigate to="/ajustes/dados" replace />} />
+          <Route path="/seguranca" element={<Navigate to="/ajustes/seguranca" replace />} />
+          <Route path="/preferencias" element={<Navigate to="/ajustes/preferencias" replace />} />
+          <Route path="/ajuda" element={<Navigate to="/ajustes/ajuda" replace />} />
           <Route path="/relatorio/:month?" element={<Report />} />
-          <Route path="/seguranca" element={<Security />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

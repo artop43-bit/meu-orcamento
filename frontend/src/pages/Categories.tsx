@@ -49,7 +49,7 @@ function CategoryForm({ category, onDone }: { category?: Category; onDone: () =>
         <span className="limit-input">
           <MoneyInput value={limit} onChange={setLimit} />
         </span>
-        <small className="muted">Você recebe um alerta ao chegar em 80% e ao passar do limite.</small>
+        <small className="muted">Alertas em 80% e ao exceder o limite.</small>
       </label>
       <FormActions loading={save.isPending} onCancel={onDone} />
     </form>
@@ -84,7 +84,7 @@ function CategoryRow({ category }: { category: Category }) {
         aria-label="Excluir"
         title="Excluir"
         onClick={() =>
-          window.confirm(`Excluir a categoria "${category.name}"? As contas dela ficarão sem categoria.`) &&
+          window.confirm(`Excluir a categoria "${category.name}"? As despesas vinculadas ficarão sem categoria.`) &&
           remove.mutate(undefined)
         }
       >
@@ -131,7 +131,7 @@ function Rules() {
       <Alert tone="error">{error}</Alert>
       {rules.data && rules.data.length === 0 && (
         <p className="muted small" style={{ margin: 0 }}>
-          Nenhuma regra ainda. Dica: ao corrigir a categoria de uma conta, marque “Sempre usar esta categoria”.
+          Nenhuma regra cadastrada. Também é possível criar uma regra ao alterar a categoria de uma despesa.
         </p>
       )}
       <ul className="items">
@@ -159,7 +159,7 @@ export default function Categories() {
     <div className="stack">
       <PageHeader
         title="Categorias"
-        subtitle="Essenciais contam como necessidades na regra 50/30/20. Defina limites para receber alertas antes de estourar."
+        subtitle="Categorias essenciais entram como necessidades na regra 50/30/20. Limites mensais geram alertas."
         actions={
           !adding && (
             <Button type="button" onClick={() => setAdding(true)}>

@@ -490,9 +490,8 @@ def portfolio_comments(items: list[Investment]) -> list[dict[str, str]]:
             {
                 "tone": "info",
                 "title": "Carteira concentrada",
-                "text": f"{share:.0f}% do total está em {biggest.name}. Concentração aumenta o "
-                "impacto de um único ativo no seu patrimônio; diversificar é uma forma de "
-                "reduzir esse risco.",
+                "text": f"{share:.0f}% do total está em {biggest.name}. A concentração amplia o "
+                "impacto de um único ativo sobre o patrimônio; a diversificação reduz esse risco.",
             }
         )
     variable = sum((v for k, v in by_kind.items() if k in VARIABLE_KINDS), Decimal("0"))
@@ -503,8 +502,8 @@ def portfolio_comments(items: list[Investment]) -> list[dict[str, str]]:
                 "tone": "info",
                 "title": "Renda variável",
                 "text": f"{variable_pct:.0f}% da carteira está em renda variável (ações, FIIs, "
-                "cripto). Esses valores sobem e descem todo dia; o que importa é o prazo e o "
-                "quanto você aguenta ver oscilar.",
+                "cripto), sujeita a oscilação diária. Avalie a exposição conforme o prazo e o "
+                "perfil de risco.",
             }
         )
     crypto_pct = float(by_kind.get("cripto", Decimal("0")) / total * 100)
@@ -512,7 +511,7 @@ def portfolio_comments(items: list[Investment]) -> list[dict[str, str]]:
         comments.append(
             {
                 "tone": "warning",
-                "title": "Cripto tem oscilação alta",
+                "title": "Alta volatilidade em cripto",
                 "text": f"{crypto_pct:.0f}% está em cripto, que pode variar mais de 10% num dia.",
             }
         )
@@ -522,8 +521,8 @@ def portfolio_comments(items: list[Investment]) -> list[dict[str, str]]:
             {
                 "tone": "info",
                 "title": "Reserva de emergência",
-                "text": "Nenhum investimento está marcado como reserva. Reserva costuma ficar "
-                "onde dá para resgatar rápido e com pouco risco; marque-a para o score contar.",
+                "text": "Nenhum investimento está marcado como reserva. A reserva deve ter "
+                "liquidez imediata e baixo risco; marque-a para que entre no score.",
             }
         )
     largest_kind = max(by_kind, key=lambda k: by_kind[k])

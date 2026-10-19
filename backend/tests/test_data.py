@@ -337,7 +337,7 @@ def test_credit_card_csv_with_inverted_signs(user: TestClient) -> None:
         ("Netflix.com", "expense"),
         ("Estorno compra", "income"),
     ]
-    assert category_name(user, items[0]["category_id"]) == "Serviços"
+    assert category_name(user, items[0]["category_id"]) == "Assinaturas"
 
 
 def test_csv_with_credit_and_debit_columns(user: TestClient) -> None:
@@ -457,7 +457,7 @@ def test_backup(user: TestClient) -> None:
     assert response.status_code == 200
     data = json.loads(response.content)
     assert data["account"]["email"] == "ana@example.com"
-    assert len(data["categories"]) == 8
+    assert len(data["categories"]) == 11
     assert len(data["incomes"]) == 1
     assert len(data["expenses"]) == 3
     assert data["goals"][0]["name"] == "Viagem"

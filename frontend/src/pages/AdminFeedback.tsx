@@ -6,10 +6,10 @@ import { extrasApi, type FeedbackItem } from "../api/extras";
 import { EmptyGuide } from "../components/help";
 import { Alert, LoadingRegion, PageHeader, Skeleton } from "../components/ui";
 
-const KIND: Record<FeedbackItem["kind"], string> = { idea: "Ideia", bug: "Problema", other: "Outro" };
+const KIND: Record<FeedbackItem["kind"], string> = { idea: "Sugestão", bug: "Problema", other: "Outro" };
 const STATUS: Record<FeedbackItem["status"], string> = { new: "Nova", read: "Lida", done: "Resolvida" };
 
-export default function AdminFeedback() {
+export default function AdminFeedback({ embedded = false }: { embedded?: boolean }) {
   const queryClient = useQueryClient();
   const list = useQuery({ queryKey: ["admin", "feedback"], queryFn: extrasApi.feedback });
 
@@ -22,16 +22,22 @@ export default function AdminFeedback() {
   const fresh = items.filter((i) => i.status === "new").length;
   return (
     <>
-      <PageHeader title="Sugestões recebidas" subtitle={list.data ? `${items.length} no total · ${fresh} nova(s)` : undefined} />
+      {embedded ? (
+        <p className="muted" style={{ margin: "0 0 12px" }}>
+          {list.data ? `${items.length} mensagem(ns) · ${fresh} nova(s)` : ""}
+        </p>
+      ) : (
+        <PageHeader title="Feedback" subtitle={list.data ? `${items.length} no total · ${fresh} nova(s)` : undefined} />
+      )}
       {list.isPending && (
-        <LoadingRegion label="Carregando as sugestões">
+        <LoadingRegion label="Carregando o feedback">
           <Skeleton height={200} />
         </LoadingRegion>
       )}
       {list.isError && <Alert tone="error">{errorMessage(list.error)}</Alert>}
       {list.data && items.length === 0 && (
         <section className="card">
-          <EmptyGuide icon={<Inbox size={22} />} title="Nenhuma sugestão ainda" text="O que as pessoas mandarem pelo botão “Enviar sugestão” aparece aqui." />
+          <EmptyGuide icon={<Inbox size={22} />} title="Nenhum feedback recebido" text="Mensagens enviadas pelo botão “Enviar feedback” aparecem aqui." />
         </section>
       )}
       <ul className="feedback-list">

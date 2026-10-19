@@ -68,17 +68,17 @@ def test_mood_follows_how_much_was_saved(user: TestClient, spent: str, mood: str
     data = insights(user)
     assert data["mood"] == mood
     if mood == "great":
-        assert data["headline"] == "Mês excelente!"
+        assert data["headline"] == "Taxa de poupança acima da meta"
         assert "40%" in data["summary"]
     if mood == "concern":
-        assert "vermelho" in data["headline"]
+        assert "negativo" in data["headline"]
         assert "R$ 600,00" in data["summary"]
 
 
 def test_almost_all_income_committed_raises_alert(user: TestClient) -> None:
     income(user, "5000")
     expense(user, "4750", "Moradia")
-    assert "Orçamento quase estourado" in titles(insights(user))
+    assert "Orçamento próximo do limite" in titles(insights(user))
 
 
 def test_income_missing_is_a_concern(user: TestClient) -> None:
@@ -104,8 +104,8 @@ def test_praise_for_spending_less_than_average_and_streak(user: TestClient) -> N
     expense(user, "3000", "Alimentação")
     data = insights(user)
     praise = titles(data, "messages")
-    assert "Gastou 25% menos que a média" in praise
-    assert "4 meses seguidos no azul" in praise
+    assert "Despesas 25% abaixo da média" in praise
+    assert "4 meses consecutivos com saldo positivo" in praise
 
 
 def test_spending_above_average_and_category_jump(user: TestClient) -> None:
@@ -113,8 +113,8 @@ def test_spending_above_average_and_category_jump(user: TestClient) -> None:
     income(user, "5000")
     expense(user, "900", "Alimentação")
     data = insights(user)
-    assert "Gastos 50% acima da sua média" in titles(data, "messages")
-    assert "Alimentação acima do normal" in titles(data)
+    assert "Despesas 50% acima da média" in titles(data, "messages")
+    assert "Alimentação acima da média" in titles(data)
 
 
 def test_repeated_red_months_get_a_stronger_message(user: TestClient) -> None:
@@ -122,7 +122,7 @@ def test_repeated_red_months_get_a_stronger_message(user: TestClient) -> None:
     expense(user, "3500", "Moradia", before(1))
     income(user, "3000")
     expense(user, "3400", "Moradia")
-    assert "Mais de um mês negativo recentemente" in titles(insights(user), "messages")
+    assert "Resultados negativos recorrentes" in titles(insights(user), "messages")
 
 
 # ---------------------------------------------------------------- limites por categoria
@@ -141,7 +141,7 @@ def test_category_limit_near_and_over(user: TestClient) -> None:
     income(user, "5000")
     expense(user, "250", "Lazer")
     data = insights(user)
-    assert "Lazer perto do limite" in titles(data)
+    assert "Lazer: limite próximo" in titles(data)
 
     month = user.get(f"/api/months/{MONTH}").json()
     lazer = next(c for c in month["summary"]["by_category"] if c["name"] == "Lazer")
@@ -149,7 +149,7 @@ def test_category_limit_near_and_over(user: TestClient) -> None:
 
     expense(user, "100", "Lazer")
     alerts = insights(user)["alerts"]
-    assert alerts[0]["title"] == "Limite de Lazer estourado"  # perigo vem primeiro
+    assert alerts[0]["title"] == "Limite de Lazer excedido"  # perigo vem primeiro
     assert alerts[0]["tone"] == "danger"
 
     # Tirar o limite volta a deixar a categoria livre.
@@ -190,7 +190,7 @@ def test_next_month_in_the_red_is_predicted(user: TestClient) -> None:
             },
         )
         assert response.status_code == 201, response.text
-    assert "Próximo mês tende a fechar no vermelho" in titles(insights(user))
+    assert "Projeção negativa para o próximo mês" in titles(insights(user))
 
 
 # ---------------------------------------------------------------- reserva e metas
@@ -199,7 +199,7 @@ def test_next_month_in_the_red_is_predicted(user: TestClient) -> None:
 def test_reserve_advice(user: TestClient) -> None:
     income(user, "5000")
     expense(user, "3000", "Moradia")
-    assert "Comece sua reserva de emergência" in titles(insights(user), "messages")
+    assert "Reserva de emergência não iniciada" in titles(insights(user), "messages")
 
     investment(user, current_value="20000", invested_amount="18000", is_emergency_reserve=True)
     assert "Reserva de emergência completa" in titles(insights(user), "messages")
@@ -215,7 +215,7 @@ def test_goal_out_of_pace(user: TestClient) -> None:
     )
     assert response.status_code == 201
     alert = next(a for a in insights(user)["alerts"] if "Viagem" in a["title"])
-    assert alert["title"] == 'Meta "Viagem" fora do ritmo'
+    assert alert["title"] == 'Meta "Viagem" abaixo do ritmo necessário'
     assert "R$ 1.000,00 por mês" in alert["text"]
 
 
@@ -266,9 +266,9 @@ def test_two_factor_prompt_can_be_dismissed(user: TestClient) -> None:
 def test_security_tip_is_last_and_respects_dismissal(user: TestClient) -> None:
     income(user, "5000")
     expense(user, "3000", "Moradia")
-    assert insights(user)["messages"][-1]["title"] == "Dica de segurança"
+    assert insights(user)["messages"][-1]["title"] == "Segurança da conta"
     user.post("/api/auth/2fa/prompt", json={"dismissed": True})
-    assert "Dica de segurança" not in titles(insights(user), "messages")
+    assert "Segurança da conta" not in titles(insights(user), "messages")
 
 
 def test_current_month_is_described_as_in_progress(user: TestClient) -> None:
@@ -277,5 +277,5 @@ def test_current_month_is_described_as_in_progress(user: TestClient) -> None:
     expense(user, "1000", "Moradia", month)
     data = insights(user, month)
     assert data["in_progress"] is True
-    assert data["headline"] == "Mês indo muito bem"
-    assert data["summary"].startswith("Até agora, você guardou")
+    assert data["headline"] == "Desempenho acima da meta"
+    assert data["summary"].startswith("Parcial do mês: poupança de")

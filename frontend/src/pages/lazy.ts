@@ -10,6 +10,11 @@ const loaders = {
   Cards: () => import("./Cards"),
   Preferences: () => import("./Preferences"),
   AdminFeedback: () => import("./AdminFeedback"),
+  Admin: () => import("./Admin"),
+  Accounts: () => import("./Accounts"),
+  Review: () => import("./Review"),
+  Search: () => import("./Search"),
+  Settings: () => import("./Settings"),
   Help: () => import("./Help"),
   Categories: () => import("./Categories"),
   Data: () => import("./Data"),
@@ -27,6 +32,13 @@ export const CalendarPage = lazy(loaders.Calendar);
 export const CardsPage = lazy(loaders.Cards);
 export const PreferencesPage = lazy(loaders.Preferences);
 export const AdminFeedbackPage = lazy(loaders.AdminFeedback);
+export const AdminPage = lazy(loaders.Admin);
+export const AccountsPage = lazy(loaders.Accounts);
+export const ReviewPage = lazy(loaders.Review);
+export const SearchPage = lazy(loaders.Search);
+export const SettingsHub = lazy(loaders.Settings);
+export const SettingsLayout = lazy(() => loaders.Settings().then((m) => ({ default: m.SettingsLayout })));
+export const ShortcutsPage = lazy(() => loaders.Settings().then((m) => ({ default: m.ShortcutsPage })));
 export const HelpPage = lazy(loaders.Help);
 export const Categories = lazy(loaders.Categories);
 export const DataPage = lazy(loaders.Data);

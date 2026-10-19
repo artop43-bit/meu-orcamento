@@ -98,7 +98,9 @@ def score(db: Session, user: User, month: date) -> dict[str, Any]:
         }
     )
     if committed > 70 and balance >= 0:
-        tips.append(f"{committed:.0f}% da renda está comprometida: pouca margem para imprevistos.")
+        tips.append(
+            f"{committed:.0f}% da receita está comprometida: margem reduzida para imprevistos."
+        )
 
     # 3. Reserva de emergência (25): 6 meses de gastos guardados vale tudo.
     reserve = investments.emergency_reserve_total(db, user)
@@ -128,7 +130,7 @@ def score(db: Session, user: User, month: date) -> dict[str, Any]:
             "para que contem no score."
         )
     elif reserve_months is not None and reserve_months < 3:
-        tips.append("Sua reserva cobre menos de 3 meses de gastos. Vale fortalecê-la.")
+        tips.append("A reserva cobre menos de 3 meses de despesas; a referência é de 3 a 6.")
 
     # 4. Consistência (15): meses recentes fechados no positivo.
     months_with_data = [p for p in history if p["has_data"]]
@@ -144,14 +146,14 @@ def score(db: Session, user: User, month: date) -> dict[str, Any]:
         }
     )
     if months_with_data and ratio < 0.5:
-        tips.append("Mais da metade dos últimos meses fechou no negativo.")
+        tips.append("Mais da metade dos últimos meses teve resultado negativo.")
 
     total = round(max(0.0, min(100.0, sum(c["points"] for c in components))))
     for component in components:
         component["points"] = round(component["points"], 1)
     label = next(name for threshold, name in SCORE_LABELS if total >= threshold)
     if not tips:
-        tips.append("Seus indicadores estão equilibrados. Continue assim!")
+        tips.append("Indicadores equilibrados no período.")
 
     return {
         "score": total,
@@ -232,7 +234,7 @@ def projection(db: Session, user: User, start: date, months: int) -> list[dict[s
 
     Meses já abertos usam só os lançamentos reais (as fixas já foram lançadas neles).
     Meses ainda não abertos somam os lançamentos existentes às fixas ativas no período.
-    Rendas fixas variáveis (bicos, comissões) entram pela média do que já foi recebido.
+    Receitas recorrentes variáveis (freelance, comissões) entram pela média do que já foi recebido.
     Gastos planejados ainda não lançados entram no mês da data.
     """
     end = add_months(start, months - 1)

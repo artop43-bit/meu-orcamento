@@ -12,6 +12,7 @@ export type Card = {
   closing_day: number;
   due_day: number;
   color: string | null;
+  account_id?: string | null;
 };
 
 export type CardInput = Omit<Card, "id">;
@@ -147,6 +148,8 @@ export async function saveQuickEntry(
     category_id,
     payment_method: entry.payment,
     installments: entry.installments,
+    // Na frase, o valor com parcelas é o total da compra ("1800 em 10x" = 10x de 180).
+    amount_mode: "total",
     due_date: card ? null : date,
     paid: !entry.installments && !card && date <= todayISO(),
     ...(card ? { card_id: card.id, purchase_date: date } : {}),

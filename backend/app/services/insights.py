@@ -1,4 +1,4 @@
-"""Consultor financeiro: leitura do mês em linguagem simples, alertas e tendências.
+"""Insights: leitura objetiva do mês, alertas e tendências.
 
 As regras ficam aqui (e não na tela) para serem testadas e iguais em qualquer cliente.
 O tom acompanha a situação: elogio para quem guardou, atenção para quem gastou quase
@@ -27,9 +27,9 @@ LIMIT_WARNING_PCT = 80.0
 DUE_SOON_DAYS = 7
 
 IN_PROGRESS_HEADLINES = {
-    "great": "Mês indo muito bem",
-    "good": "Mês no caminho certo",
-    "attention": "Atenção ao resto do mês",
+    "great": "Desempenho acima da meta",
+    "good": "Desempenho dentro do esperado",
+    "attention": "Margem reduzida para o restante do mês",
 }
 
 MONTH_NAMES = [
@@ -95,11 +95,11 @@ def consultant(db: Session, user: User, month: date, today: date | None = None) 
         return {
             "month": format_month(month),
             "mood": "empty",
-            "headline": "Vamos começar?",
+            "headline": "Sem lançamentos no período",
             "summary": (
-                f"Ainda não há lançamentos em {month_name(month)}. Cadastre sua renda e suas "
-                "contas (as que se repetem todo mês podem ir em Contas fixas) e eu passo a "
-                "acompanhar seus números por aqui."
+                f"Nenhuma movimentação registrada em {month_name(month)}. Cadastre receitas e "
+                "despesas (as recorrentes podem ser configuradas em Recorrências) para gerar "
+                "a análise do mês."
             ),
             "savings_pct": None,
             "in_progress": False,
@@ -118,39 +118,39 @@ def consultant(db: Session, user: User, month: date, today: date | None = None) 
     # 1. Resultado do mês
     if income <= 0:
         mood = "concern"
-        headline = "Sem renda lançada neste mês"
+        headline = "Nenhuma receita registrada"
         text = (
-            f"Há {brl(expenses)} em contas e nenhuma renda registrada. Se você recebeu algo, "
-            "lance para eu conseguir avaliar o mês."
+            f"Há {brl(expenses)} em despesas e nenhuma receita no período. Registre as "
+            "receitas do mês para que a análise considere o resultado completo."
         )
     elif balance < 0:
         mood = "concern"
-        headline = "Este mês fechou no vermelho"
+        headline = "Resultado negativo no mês"
         text = (
-            f"As contas passaram a renda em {brl(balance)}. Acontece, mas vale entender o "
-            "motivo: veja abaixo onde os gastos subiram e o que dá para segurar no próximo mês."
+            f"As despesas superaram as receitas em {brl(balance)}. Os pontos abaixo mostram "
+            "onde houve aumento e o que pode ser ajustado no próximo período."
         )
     elif savings_pct is not None and savings_pct >= 20:
         mood = "great"
-        headline = "Mês excelente!"
+        headline = "Taxa de poupança acima da meta"
         text = (
-            f"Você guardou {pct(savings_pct)} da renda ({brl(balance)}). Isso está acima dos "
-            "20% recomendados. Se ainda não fez, separe esse valor para a reserva ou para "
-            "suas metas antes que ele se misture aos gastos."
+            f"Poupança de {pct(savings_pct)} da receita ({brl(balance)}), acima da referência "
+            "de 20%. Recomendação: transferir o excedente para a reserva de emergência ou para "
+            "as metas antes que seja absorvido pelas despesas."
         )
     elif savings_pct is not None and savings_pct >= 10:
         mood = "good"
-        headline = "Bom mês"
+        headline = "Resultado positivo"
         text = (
-            f"Sobraram {brl(balance)} ({pct(savings_pct)} da renda). Está no caminho certo; "
-            "chegar a 20% deixaria você mais protegido para imprevistos."
+            f"Saldo de {brl(balance)} ({pct(savings_pct)} da receita). A referência de 20% "
+            "de poupança amplia a proteção contra imprevistos."
         )
     else:
         mood = "attention"
-        headline = "Mês no limite"
+        headline = "Margem reduzida"
         text = (
-            f"Sobraram só {brl(balance)} ({pct(savings_pct or 0)} da renda). Qualquer "
-            "imprevisto vira dívida. Vale revisar os gastos não essenciais."
+            f"Saldo de {brl(balance)} ({pct(savings_pct or 0)} da receita). Com margem "
+            "baixa, um imprevisto tende a gerar dívida; revise as despesas não essenciais."
         )
     result_summary = text
 
@@ -159,8 +159,8 @@ def consultant(db: Session, user: User, month: date, today: date | None = None) 
     if in_progress and mood != "concern":
         headline = IN_PROGRESS_HEADLINES[mood]
         result_summary = (
-            f"Até agora, {text[0].lower()}{text[1:]} O mês ainda não acabou: os números "
-            "mudam conforme novos gastos forem lançados."
+            f"Parcial do mês: {text[0].lower()}{text[1:]} Os valores serão atualizados "
+            "conforme novos lançamentos."
         )
 
     # 2. Comparação com a própria média
@@ -171,18 +171,17 @@ def consultant(db: Session, user: User, month: date, today: date | None = None) 
             messages.append(
                 _message(
                     "warning",
-                    f"Gastos {pct(change)} acima da sua média",
-                    f"Você costuma gastar {brl(average_expenses)} por mês (média dos últimos "
-                    f"{len(recent)} meses) e neste mês foram {brl(expenses)}.",
+                    f"Despesas {pct(change)} acima da média",
+                    f"Média dos últimos {len(recent)} meses: {brl(average_expenses)}. "
+                    f"Neste mês: {brl(expenses)}.",
                 )
             )
         elif change <= -10:
             messages.append(
                 _message(
                     "praise",
-                    f"Gastou {pct(-change)} menos que a média",
-                    f"Foram {brl(expenses)}, contra a média de {brl(average_expenses)}. "
-                    "Economia de verdade: parabéns!",
+                    f"Despesas {pct(-change)} abaixo da média",
+                    f"{brl(expenses)} no mês, ante média de {brl(average_expenses)}.",
                 )
             )
 
@@ -197,8 +196,8 @@ def consultant(db: Session, user: User, month: date, today: date | None = None) 
             messages.append(
                 _message(
                     "praise",
-                    f"{streak} meses seguidos no azul",
-                    "Constância é o que mais faz diferença nas finanças. Continue assim!",
+                    f"{streak} meses consecutivos com saldo positivo",
+                    "Consistência é o principal fator de evolução patrimonial.",
                 )
             )
     elif balance < 0:
@@ -207,10 +206,10 @@ def consultant(db: Session, user: User, month: date, today: date | None = None) 
             messages.append(
                 _message(
                     "danger",
-                    "Mais de um mês negativo recentemente",
-                    "Quando o vermelho se repete, a diferença costuma ir para o cartão ou o "
-                    "cheque especial, que têm os juros mais altos. Se for o caso, priorize "
-                    "quitar essas dívidas antes de qualquer outra meta.",
+                    "Resultados negativos recorrentes",
+                    "Déficits repetidos costumam ser cobertos por cartão de crédito ou cheque "
+                    "especial, as linhas de juros mais altos. Priorize a quitação dessas dívidas "
+                    "antes de novas metas.",
                 )
             )
 
@@ -224,7 +223,7 @@ def consultant(db: Session, user: User, month: date, today: date | None = None) 
             alerts.append(
                 _message(
                     "danger",
-                    f"Limite de {item['name']} estourado",
+                    f"Limite de {item['name']} excedido",
                     f"{brl(item['total'])} de {brl(limit)} ({pct(used)}).",
                     category_id=item["category_id"],
                 )
@@ -233,9 +232,9 @@ def consultant(db: Session, user: User, month: date, today: date | None = None) 
             alerts.append(
                 _message(
                     "warning",
-                    f"{item['name']} perto do limite",
-                    f"Já usou {pct(used)} ({brl(item['total'])} de {brl(limit)}). "
-                    f"Restam {brl(limit - item['total'])} para o mês.",
+                    f"{item['name']}: limite próximo",
+                    f"{pct(used)} utilizado ({brl(item['total'])} de {brl(limit)}). "
+                    f"Disponível: {brl(limit - item['total'])}.",
                     category_id=item["category_id"],
                 )
             )
@@ -256,8 +255,8 @@ def consultant(db: Session, user: User, month: date, today: date | None = None) 
         alerts.append(
             _message(
                 "warning",
-                f"{name} acima do normal",
-                f"{brl(item['total'])} neste mês, {brl(diff)} a mais que a sua média ({brl(avg)}).",
+                f"{name} acima da média",
+                f"{brl(item['total'])} no mês; {brl(diff)} acima da média ({brl(avg)}).",
                 category_id=item["category_id"],
             )
         )
@@ -268,9 +267,9 @@ def consultant(db: Session, user: User, month: date, today: date | None = None) 
         alerts.append(
             _message(
                 "warning",
-                "Orçamento quase estourado",
-                f"{pct(committed)} da renda já está comprometida com contas. Evite novos "
-                "gastos até o fim do mês.",
+                "Orçamento próximo do limite",
+                f"{pct(committed)} da receita já está comprometida. Recomendação: evitar novas "
+                "despesas até o fechamento do mês.",
             )
         )
 
@@ -283,9 +282,9 @@ def consultant(db: Session, user: User, month: date, today: date | None = None) 
         alerts.append(
             _message(
                 "danger",
-                f"{len(overdue)} conta(s) em atraso",
-                f"{names}{'…' if len(overdue) > 3 else ''}, somando {brl(total)}. Atrasos "
-                "geram multa e juros: pague ou marque como paga se já pagou.",
+                f"{len(overdue)} despesa(s) em atraso",
+                f"{names}{'…' if len(overdue) > 3 else ''}: total de {brl(total)}. Atrasos "
+                "geram multa e juros; registre o pagamento caso já tenha sido feito.",
             )
         )
     soon = [e for e in unpaid if today <= e.due_date <= today + timedelta(days=DUE_SOON_DAYS)]
@@ -294,8 +293,8 @@ def consultant(db: Session, user: User, month: date, today: date | None = None) 
         alerts.append(
             _message(
                 "info",
-                f"{len(soon)} conta(s) vencendo nos próximos {DUE_SOON_DAYS} dias",
-                f"Somam {brl(total)}.",
+                f"{len(soon)} vencimento(s) nos próximos {DUE_SOON_DAYS} dias",
+                f"Total: {brl(total)}.",
             )
         )
 
@@ -307,10 +306,10 @@ def consultant(db: Session, user: User, month: date, today: date | None = None) 
         alerts.append(
             _message(
                 "info",
-                f"{len(upcoming)} gasto(s) planejado(s) nos próximos {DUE_SOON_DAYS} dias",
+                f"{len(upcoming)} despesa(s) prevista(s) nos próximos {DUE_SOON_DAYS} dias",
                 f"Dia {first.date.day:02d}: {first.description} ({brl(first.amount)})"
                 + (f" e mais {len(upcoming) - 1}" if len(upcoming) > 1 else "")
-                + f". Total previsto: {brl(total)}. Lance quando acontecer, no Calendário.",
+                + f". Total previsto: {brl(total)}. Confirme no Calendário quando ocorrer.",
             )
         )
 
@@ -332,16 +331,16 @@ def consultant(db: Session, user: User, month: date, today: date | None = None) 
             )
         )
         avg = _average([Decimal(total) for _, total in past])
-        text = f"{pct(share)} da sua renda deste mês é variável ({brl(variable_total)})."
+        text = f"{pct(share)} da receita do mês é variável ({brl(variable_total)})."
         if avg is not None:
-            text += f" Sua média recente é {brl(avg)}"
+            text += f" Média recente: {brl(avg)}"
             text += (
-                ": este mês veio acima, bom momento para guardar a diferença."
+                "; o excedente pode ser destinado à reserva ou às metas."
                 if variable_total > avg
-                else ": planeje as contas fixas pela média, não pelo melhor mês."
+                else "; dimensione as despesas fixas pela média, não pelo melhor mês."
             )
         else:
-            text += " Planeje as contas fixas contando só com a parte fixa."
+            text += " Dimensione as despesas fixas considerando apenas a receita fixa."
         alerts.append(_message("info", "Renda variável", text))
 
     # 7. Próximo mês (fixas + parcelas já lançadas + planejados)
@@ -350,8 +349,8 @@ def consultant(db: Session, user: User, month: date, today: date | None = None) 
         alerts.append(
             _message(
                 "warning",
-                "Próximo mês tende a fechar no vermelho",
-                "Só com as contas fixas, parcelas e gastos planejados, faltariam "
+                "Projeção negativa para o próximo mês",
+                "Considerando recorrências, parcelas e despesas previstas, o déficit estimado é de "
                 f"{brl(nxt['balance'])}.",
             )
         )
@@ -368,10 +367,9 @@ def consultant(db: Session, user: User, month: date, today: date | None = None) 
             messages.append(
                 _message(
                     "info",
-                    "Comece sua reserva de emergência",
-                    f"O ideal é guardar de 3 a 6 meses de gastos ({brl(base * 3)} a "
-                    f"{brl(base * 6)}) num investimento de resgate rápido, como o Tesouro "
-                    "Selic ou um CDB com liquidez diária.",
+                    "Reserva de emergência não iniciada",
+                    f"Referência: 3 a 6 meses de despesas ({brl(base * 3)} a {brl(base * 6)}), "
+                    "em aplicação de liquidez diária e baixo risco.",
                 )
             )
         elif reserve_months >= 6:
@@ -379,16 +377,16 @@ def consultant(db: Session, user: User, month: date, today: date | None = None) 
                 _message(
                     "praise",
                     "Reserva de emergência completa",
-                    f"Ela cobre {num(reserve_months)} meses de gastos. Daqui em diante, o que "
-                    "sobrar pode ir para objetivos de prazo mais longo.",
+                    f"Cobertura de {num(reserve_months)} meses de despesas. Excedentes podem ser "
+                    "direcionados a objetivos de longo prazo.",
                 )
             )
         elif reserve_months < 3:
             messages.append(
                 _message(
                     "info",
-                    "Reserva ainda pequena",
-                    f"Cobre {num(reserve_months)} meses de gastos; a meta é de 3 a 6.",
+                    "Reserva abaixo da referência",
+                    f"Cobertura de {num(reserve_months)} meses de despesas; referência: 3 a 6.",
                 )
             )
 
@@ -397,7 +395,7 @@ def consultant(db: Session, user: User, month: date, today: date | None = None) 
         remaining = goal.target_amount - goal.current_amount
         if remaining <= 0:
             messages.append(
-                _message("praise", f'Meta "{goal.name}" alcançada', "Objetivo cumprido!")
+                _message("praise", f'Meta "{goal.name}" atingida', "Valor-alvo alcançado.")
             )
             continue
         if not goal.target_date:
@@ -409,8 +407,8 @@ def consultant(db: Session, user: User, month: date, today: date | None = None) 
             alerts.append(
                 _message(
                     "warning",
-                    f'Prazo da meta "{goal.name}" chegou',
-                    f"Faltam {brl(remaining)}. Que tal definir uma nova data?",
+                    f'Prazo da meta "{goal.name}" encerrado',
+                    f"Restam {brl(remaining)}. Defina um novo prazo para manter o acompanhamento.",
                 )
             )
             continue
@@ -419,9 +417,9 @@ def consultant(db: Session, user: User, month: date, today: date | None = None) 
             alerts.append(
                 _message(
                     "info",
-                    f'Meta "{goal.name}" fora do ritmo',
-                    f"Para chegar lá até {month_name(goal.target_date)}, seria preciso guardar "
-                    f"{brl(needed)} por mês, mais do que sobrou agora ({brl(max(balance, ZERO))}).",
+                    f'Meta "{goal.name}" abaixo do ritmo necessário',
+                    f"Para atingir o valor até {month_name(goal.target_date)}, são necessários "
+                    f"{brl(needed)} por mês; o saldo atual é de {brl(max(balance, ZERO))}.",
                 )
             )
 
@@ -433,9 +431,9 @@ def consultant(db: Session, user: User, month: date, today: date | None = None) 
         messages.append(
             _message(
                 "info",
-                "Dica de segurança",
-                "Ative a verificação em duas etapas (em Segurança) para proteger seus dados "
-                "financeiros mesmo que alguém descubra sua senha.",
+                "Segurança da conta",
+                "Ative a verificação em duas etapas em Ajustes › Segurança para proteger o "
+                "acesso mesmo em caso de vazamento da senha.",
             )
         )
     return {

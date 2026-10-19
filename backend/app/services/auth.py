@@ -125,11 +125,15 @@ def register(db: Session, email: str, password: str, mail: Mailer) -> None:
         db.commit()
         return
 
+    settings = get_settings()
+    approved = not settings.signup_approval or email in settings.admin_email_list()
     user = User(
         email=email,
         password_hash=security.hash_password(password),
         terms_accepted_at=utcnow(),
-        terms_version=get_settings().terms_version,
+        terms_version=settings.terms_version,
+        access_status="approved" if approved else "pending",
+        approved_at=utcnow() if approved else None,
     )
     db.add(user)
     db.flush()
@@ -220,6 +224,15 @@ def login(db: Session, email: str, password: str, user_agent: str | None) -> Log
             "email_not_verified",
             "Confirme seu e-mail antes de entrar. Verifique sua caixa de entrada.",
         )
+
+    if user.access_status == "pending":
+        raise AppError(
+            403,
+            "access_pending",
+            "Seu cadastro está em análise. Você receberá um e-mail quando o acesso for liberado.",
+        )
+    if user.access_status == "blocked":
+        raise AppError(403, "access_blocked", "Acesso suspenso. Fale com a administração.")
 
     if security.password_needs_rehash(user.password_hash):
         user.password_hash = security.hash_password(password)
@@ -556,3 +569,7 @@ def _verify_second_factor(db: Session, user: User, code: str) -> bool:
         return False
     recovery.used_at = utcnow()
     return True
+
+
+def is_admin(user: User) -> bool:
+    return bool(user.is_admin) or user.email.lower() in get_settings().admin_email_list()

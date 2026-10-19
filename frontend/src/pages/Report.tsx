@@ -53,11 +53,11 @@ export default function Report() {
       <section className="report__section">
         <div className="stats">
           <div className="stat">
-            <span className="stat__label">Renda</span>
+            <span className="stat__label">Receitas</span>
             <strong className="stat__value">{money(s.income_total)}</strong>
           </div>
           <div className="stat">
-            <span className="stat__label">Contas</span>
+            <span className="stat__label">Despesas</span>
             <strong className="stat__value">{money(s.expense_total)}</strong>
           </div>
           <div className="stat">
@@ -80,7 +80,7 @@ export default function Report() {
       </section>
 
       <section className="report__section">
-        <h2>Renda</h2>
+        <h2>Receitas</h2>
         <table className="table">
           <tbody>
             {data.data.incomes.map((i) => (
@@ -91,7 +91,7 @@ export default function Report() {
             ))}
             {data.data.incomes.length === 0 && (
               <tr>
-                <td className="muted">Nenhuma renda lançada.</td>
+                <td className="muted">Nenhuma receita registrada.</td>
               </tr>
             )}
           </tbody>
@@ -99,7 +99,7 @@ export default function Report() {
       </section>
 
       <section className="report__section">
-        <h2>Contas</h2>
+        <h2>Despesas</h2>
         <table className="table">
           <thead>
             <tr>

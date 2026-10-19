@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent, type PointerEvent } from "react";
-import { createPortal } from "react-dom";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowDownLeft,
   CalendarClock,
@@ -8,6 +7,7 @@ import {
   ChevronRight,
   CheckCheck,
   Copy,
+  CopyPlus,
   ListChecks,
   TrendingDown,
   Zap,
@@ -18,7 +18,6 @@ import {
   Receipt,
   Scale,
   Trash2,
-  Repeat,
   Sparkles,
   Wallet,
 } from "lucide-react";
@@ -46,9 +45,10 @@ import { EmptyGuide, Tip } from "../components/help";
 import { ConsultantTeaser } from "../components/consultant";
 import { Chart } from "../components/chart/Chart";
 import { extrasApi, saveQuickEntry, useCards, useDaily } from "../api/extras";
+import { moneyApi, useReviewCount } from "../api/money";
 import { Alert, Button, Kpi, LoadingRegion, PageHeader, Sheet, Skeleton } from "../components/ui";
 import { useUndo } from "../components/undo";
-import { addMonths, money, monthLabel, percent, shortDate, thisMonth, todayISO } from "../lib/format";
+import { addMonths, money, monthLabel, parseMoney, percent, shortDate, thisMonth, todayISO } from "../lib/format";
 import { normalizeText } from "../lib/text";
 
 type Editing =
@@ -57,7 +57,7 @@ type Editing =
   | { type: "expense"; expense: Expense }
   | { type: "income"; income: Income }
   | { type: "delete-expense"; expense: Expense }
-  | { type: "choose" }
+  | { type: "copy" }
   | null;
 
 // ---------------------------------------------------------------- indicadores
@@ -70,17 +70,17 @@ function Kpis({ data }: { data: MonthData }) {
   const paidPct = expenseTotal > 0 ? (Number(s.paid_total) / expenseTotal) * 100 : 0;
   return (
     <div className="kpis">
-      <Kpi icon={<ArrowDownLeft size={17} />} label="Renda" value={money(s.income_total)} foot={`${data.incomes.length} lançamento(s)`} />
+      <Kpi icon={<ArrowDownLeft size={17} />} label="Receitas" value={money(s.income_total)} foot={`${data.incomes.length} lançamento(s)`} />
       <Kpi
         icon={<Receipt size={17} />}
         tone="expense"
-        label="Contas"
+        label="Despesas"
         value={money(s.expense_total)}
         foot={
           <span className="stack stack--tight" style={{ gap: 6 }}>
             <Bar pct={paidPct} />
             <span>
-              Pago {money(s.paid_total)} · falta {money(s.pending_total)}
+              Pago {money(s.paid_total)} · pendente {money(s.pending_total)}
             </span>
           </span>
         }
@@ -91,15 +91,15 @@ function Kpis({ data }: { data: MonthData }) {
         label="Saldo"
         value={money(s.balance)}
         valueClass={balance < 0 ? "tone--error" : "tone--ok"}
-        foot={balance < 0 ? "As contas passam da renda" : "Sobra depois das contas"}
+        foot={balance < 0 ? "Despesas acima das receitas" : "Receitas menos despesas"}
       />
       <Kpi
         icon={<Gauge size={17} />}
         tone="neutral"
-        label="Renda comprometida"
+        label="Comprometimento"
         value={percent(committed)}
         valueClass={committed !== null && committed > 100 ? "tone--error" : undefined}
-        foot={committed === null ? "Sem renda lançada" : committed <= 50 ? "Saudável (até 50%)" : committed <= 80 ? "Atenção" : "Alto"}
+        foot={committed === null ? "Sem receitas no mês" : committed <= 50 ? "Saudável (até 50% da receita)" : committed <= 80 ? "Moderado" : "Elevado"}
       />
     </div>
   );
@@ -234,7 +234,7 @@ function LedgerRow({
               {expense.installment_number}/{expense.installment_total}
             </Badge>
           )}
-          {expense.recurring_id && <Badge>fixa</Badge>}
+          {expense.recurring_id && <Badge>recorrente</Badge>}
         </span>
         <span className="ledger__sub">
           <span className="dot" style={{ background: category?.color ?? undefined }} aria-hidden />
@@ -242,7 +242,7 @@ function LedgerRow({
           {" · "}
           {expense.due_date ? `vence ${shortDate(expense.due_date)}` : "sem vencimento"}
           {expense.payment_method && ` · ${paymentLabel(expense.payment_method)}`}
-          {expense.notes && <span title={expense.notes}> · 📝</span>}
+          {expense.notes && <span title={expense.notes}> · com observação</span>}
         </span>
       </button>
       <span className="ledger__status">
@@ -323,7 +323,7 @@ function ExpensesCard({
     if (action === "delete") {
       undo.remove({
         ids,
-        message: `${ids.length} conta(s) excluída(s)`,
+        message: `${ids.length} despesa(s) excluída(s)`,
         commit: () => extrasApi.bulk(ids, "delete"),
       });
       stopSelecting();
@@ -332,7 +332,7 @@ function ExpensesCard({
     if (action === "category" && !bulkCategory) return;
     await bulk.mutateAsync({ ids, action, category: bulkCategory || undefined });
     haptic("success");
-    announce(`${ids.length} conta(s) atualizada(s)`);
+    announce(`${ids.length} despesa(s) atualizada(s)`);
     stopSelecting();
   }
 
@@ -340,14 +340,14 @@ function ExpensesCard({
     const ids = overdue.map((e) => e.id);
     await bulk.mutateAsync({ ids, action: "pay" });
     haptic("success");
-    undo.done({ message: `${ids.length} conta(s) vencida(s) marcada(s) como paga(s)`, revert: () => extrasApi.bulk(ids, "unpay") });
+    undo.done({ message: `${ids.length} despesa(s) marcada(s) como paga(s)`, revert: () => extrasApi.bulk(ids, "unpay") });
   }
 
   return (
     <section className="card stack">
       <div className="section-header">
         <h2>
-          Contas <span className="muted section-header__total">· {money(data.summary.expense_total)}</span>
+          Despesas <span className="muted section-header__total">· {money(data.summary.expense_total)}</span>
         </h2>
         <span className="row" style={{ gap: 8 }}>
           {data.expenses.length > 1 && !selecting && (
@@ -355,15 +355,17 @@ function ExpensesCard({
               <ListChecks size={16} /> Selecionar
             </Button>
           )}
-          <Button type="button" variant="secondary" className="only-desktop" onClick={() => setEditing({ type: "new-expense" })}>
-            <Plus size={16} /> Conta
-          </Button>
+          {!selecting && (
+            <Button type="button" variant="secondary" onClick={() => setEditing({ type: "copy" })}>
+              <CopyPlus size={16} /> Copiar do mês anterior
+            </Button>
+          )}
         </span>
       </div>
       {overdue.length > 0 && !selecting && (
         <div className="overdue-bar" role="status">
           <span>
-            {overdue.length} conta(s) vencida(s) sem marcar · {money(overdue.reduce((sum, e) => sum + Number(e.amount), 0))}
+            {overdue.length} despesa(s) vencida(s) sem pagamento registrado · {money(overdue.reduce((sum, e) => sum + Number(e.amount), 0))}
           </span>
           <Button type="button" variant="secondary" loading={bulk.isPending} onClick={() => void payOverdue()}>
             <CheckCheck size={16} /> Marcar todas como pagas
@@ -415,8 +417,8 @@ function ExpensesCard({
         <div className="list-tools" role="search">
           <label className="list-tools__search">
             <Search size={16} aria-hidden />
-            <span className="sr-only">Buscar conta</span>
-            <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar (ex.: mercado)" />
+            <span className="sr-only">Buscar despesa</span>
+            <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar no mês" />
           </label>
           <select value={status} onChange={(e) => setStatus(e.target.value as StatusFilter)} aria-label="Filtrar por situação">
             <option value="all">Todas</option>
@@ -437,7 +439,7 @@ function ExpensesCard({
       )}
       {filtering && (
         <p className="muted small" style={{ margin: 0 }} role="status">
-          {visible.length} de {data.expenses.length} conta(s) · {money(visibleTotal)}{" "}
+          {visible.length} de {data.expenses.length} despesa(s) · {money(visibleTotal)}{" "}
           <button
             type="button"
             className="link-btn"
@@ -454,14 +456,8 @@ function ExpensesCard({
       {data.expenses.length === 0 ? (
         <EmptyGuide
           icon={<Receipt size={22} />}
-          title="Nenhuma conta neste mês"
-          text="Lance o que você paga: contas da casa, compras, assinaturas. Dá para marcar como paga, parcelar e repetir."
-          example={<>Ex.: “Aluguel” R$ 1.200 vence dia 10 · “Mercado” R$ 350 já pago · “TV” 10x de R$ 199</>}
-          action={
-            <Button type="button" onClick={() => setEditing({ type: "new-expense" })}>
-              <Plus size={16} /> Lançar conta
-            </Button>
-          }
+          title="Nenhuma despesa no mês"
+          text="Use “Nova despesa” no topo ou o lançamento rápido. Despesas podem ser únicas, parceladas ou recorrentes."
         />
       ) : (
         <ul className="ledger">
@@ -540,15 +536,20 @@ function QuickBar({ categories }: { categories: Category[] }) {
     <form className="quick-bar" onSubmit={submit} role="search" aria-label="Lançamento rápido">
       <label className="list-tools__search quick-bar__input">
         <Zap size={16} aria-hidden />
-        <span className="sr-only">Lançar numa frase</span>
+        <span className="sr-only">Lançamento rápido</span>
         <input
           value={text}
           onChange={(e) => setText(e.target.value)}
-          placeholder="Lançar rápido: mercado 120 pix ontem · + freela 600"
+          placeholder="Ex.: mercado 120 pix ontem"
           autoComplete="off"
           enterKeyHint="send"
         />
       </label>
+      <Tip label="Como escrever o lançamento rápido">
+        Descrição + valor, e opcionalmente forma de pagamento, data e parcelas. Exemplos: “mercado 120 pix ontem”, “uber 23,50
+        débito”, “geladeira 1800 em 10x crédito” (10 parcelas de R$ 180), “+ freelance 600” (receita). O valor informado com
+        parcelas é o total da compra.
+      </Tip>
       <Button type="submit" loading={busy} disabled={!text.trim()}>
         Lançar
       </Button>
@@ -561,42 +562,65 @@ function QuickBar({ categories }: { categories: Category[] }) {
   );
 }
 
-/** "Quanto posso gastar hoje" e o saldo previsto dia a dia. */
+/** Disponível hoje e saldo previsto dia a dia, com simulação de uma despesa extra. */
 function DailyCard({ month }: { month: string }) {
   const daily = useDaily(month);
+  const [simulate, setSimulate] = useState("");
   const data = daily.data;
   if (!data || data.days.length === 0) return null;
   const can = data.can_spend;
   const negative = data.first_negative;
+  const extra = Number(parseMoney(simulate) ?? 0);
+  const rest = can ? Number(can.rest_of_month) - extra : Number(data.end_balance) - extra;
+  const perDay = can ? Math.max(rest, 0) / can.days_left : 0;
   return (
     <section className="card stack daily-card" aria-label="Saldo previsto do mês">
       {can ? (
         <div>
-          <span className="stat__label">Quanto posso gastar hoje</span>
-          <strong className={`daily-card__value ${Number(can.today) <= 0 ? "tone--error" : "tone--ok"}`}>{money(can.today)}</strong>
+          <span className="stat__label">
+            Disponível hoje{" "}
+            <Tip label="Como o disponível é calculado">
+              Receitas do mês menos todas as despesas e despesas previstas, dividido pelos dias restantes (incluindo hoje).
+            </Tip>
+          </span>
+          <strong className={`daily-card__value ${perDay <= 0 ? "tone--error" : "tone--ok"}`}>{money(extra ? perDay : can.today)}</strong>
           <span className="muted small">
-            {Number(can.rest_of_month) > 0
-              ? `${money(can.rest_of_month)} livres até o fim do mês (${can.days_left} dia(s)), já tirando as contas e os planejados.`
-              : "Nada livre até o fim do mês: as contas previstas já usam toda a renda."}
+            {rest > 0
+              ? `${money(rest)} livres até o fim do mês (${can.days_left} dia(s)).`
+              : "Sem saldo livre até o fim do mês: as despesas previstas consomem toda a receita."}
           </span>
         </div>
       ) : (
         <div>
           <span className="stat__label">Saldo previsto no fim do mês</span>
-          <strong className={`daily-card__value ${Number(data.end_balance) < 0 ? "tone--error" : "tone--ok"}`}>{money(data.end_balance)}</strong>
+          <strong className={`daily-card__value ${rest < 0 ? "tone--error" : "tone--ok"}`}>{money(rest)}</strong>
         </div>
       )}
+      <label className="simulate">
+        <span className="field-label">
+          Simular despesa <Tip>Veja o efeito de um gasto antes de fazê-lo. Nada é lançado.</Tip>
+        </span>
+        <input inputMode="decimal" value={simulate} onChange={(e) => setSimulate(e.target.value)} placeholder="0,00" />
+      </label>
       <Chart
         type="line"
+        fit
         labels={data.days.map((d) => ({ key: d.date, label: d.date.slice(8) }))}
-        series={[{ key: "saldo", name: "Saldo previsto", color: "#1f7a62", values: data.days.map((d) => Number(d.balance)) }]}
+        series={[
+          {
+            key: "saldo",
+            name: "Saldo previsto",
+            color: "#1f7a62",
+            values: data.days.map((d) => Number(d.balance) - (extra && d.date >= todayISO() ? extra : 0)),
+          },
+        ]}
         description={`Saldo previsto dia a dia em ${monthLabel(month)}`}
         height={140}
       />
       {negative && (
         <p className="tone--error small row" style={{ margin: 0, gap: 6 }}>
-          <TrendingDown size={15} aria-hidden /> O saldo fica negativo a partir do dia {negative.slice(8)}
-          {data.lowest && ` (chega a ${money(data.lowest.balance)})`}. Veja o que dá para adiar.
+          <TrendingDown size={15} aria-hidden /> Saldo negativo a partir do dia {negative.slice(8)}
+          {data.lowest && ` (mínimo de ${money(data.lowest.balance)})`}.
         </p>
       )}
     </section>
@@ -620,7 +644,7 @@ function IncomeGroup({ title, items, setEditing }: { title: string; items: Incom
             <button type="button" className="item__main" onClick={() => setEditing({ type: "income", income })} title="Editar">
               <span className="item__title">{income.description}</span>
               <span className="item__meta">
-                {[income.recurring_id ? "Todo mês" : null, income.day ? `dia ${income.day}` : null, income.notes ? "📝" : null]
+                {[income.recurring_id ? "Recorrente" : null, income.day ? `dia ${income.day}` : null, income.notes ? "com observação" : null]
                   .filter(Boolean)
                   .join(" · ")}
               </span>
@@ -642,18 +666,16 @@ function IncomesCard({ data, setEditing }: { data: MonthData; setEditing: (e: Ed
     <section className="card stack">
       <div className="section-header">
         <h2>
-          Renda <span className="muted section-header__total">· {money(data.summary.income_total)}</span>
-          <Tip label="O que é renda fixa e variável">
-            Fixa: o mesmo valor todo mês (salário). Variável: muda a cada mês (bicos, comissões). A previsão usa a média da variável.
+          Receitas <span className="muted section-header__total">· {money(data.summary.income_total)}</span>
+          <Tip label="Receita fixa e variável">
+            Fixa: mesmo valor todo mês (salário, aposentadoria). Variável: muda a cada mês (freelance, comissões). A projeção usa a
+            média da receita variável.
           </Tip>
         </h2>
-        <Button type="button" variant="secondary" className="only-desktop" onClick={() => setEditing({ type: "new-income" })}>
-          <Plus size={16} /> Renda
-        </Button>
       </div>
       {incomes.length === 0 ? (
         <p className="muted" style={{ margin: 0 }}>
-          Nenhuma renda lançada neste mês. Ex.: “Salário” R$ 3.200 todo dia 5, ou “Freela” como variável.
+          Nenhuma receita no mês. Use “Nova receita” no topo.
         </p>
       ) : (
         <>
@@ -665,15 +687,24 @@ function IncomesCard({ data, setEditing }: { data: MonthData; setEditing: (e: Ed
   );
 }
 
+const PACE_LABEL = { over: "Acima do limite", risk: "Acima do ritmo", ok: "No ritmo" } as const;
+
 function BreakdownCard({ data, categories }: { data: MonthData; categories: Category[] }) {
   const s = data.summary;
+  const paceQuery = useQuery({ queryKey: ["budget", "pace", data.month], queryFn: () => moneyApi.pace(data.month) });
+  const pace = new Map((paceQuery.data ?? []).map((r) => [r.category_id ?? "none", r]));
   const total = Number(s.expense_total);
   if (total === 0) return null;
   const colors = new Map(categories.map((c) => [c.id, c.color ?? undefined]));
   const essentialPct = (Number(s.essential_total) / total) * 100;
   return (
     <section className="card stack">
-      <h2>Para onde vai o dinheiro</h2>
+      <h2>
+        Despesas por categoria{" "}
+        <Tip label="Ritmo por categoria">
+          Compara o gasto de cada categoria com o esperado até hoje: o limite definido ou, sem limite, a média dos últimos 3 meses.
+        </Tip>
+      </h2>
       <div className="stack stack--tight">
         <div className="stacked-bar" aria-hidden>
           <div className="seg--needs" style={{ width: `${essentialPct}%` }} />
@@ -696,7 +727,12 @@ function BreakdownCard({ data, categories }: { data: MonthData; categories: Cate
             <div className="split">
               <span>
                 <span className="dot" style={{ background: c.category_id ? colors.get(c.category_id) : undefined }} aria-hidden />
-                {c.name}
+                {c.name}{" "}
+                {pace.get(c.category_id ?? "none") && pace.get(c.category_id ?? "none")!.status !== "ok" && (
+                  <span className={`badge ${pace.get(c.category_id ?? "none")!.status === "over" ? "badge--error" : "badge--warn"}`}>
+                    {PACE_LABEL[pace.get(c.category_id ?? "none")!.status]}
+                  </span>
+                )}
               </span>
               <span className="num">
                 {money(c.total)}{" "}
@@ -723,6 +759,68 @@ function BreakdownCard({ data, categories }: { data: MonthData; categories: Cate
   );
 }
 
+function CopyPrevious({ month, onDone }: { month: string; onDone: () => void }) {
+  const candidates = useQuery({ queryKey: ["budget", "copy", month], queryFn: () => moneyApi.copyCandidates(month) });
+  const [selected, setSelected] = useState<ReadonlySet<string> | null>(null);
+  const [error, setError] = useState("");
+  const copy = useBudgetMutation((ids: string[]) => moneyApi.copyPrevious(month, ids));
+  const items = candidates.data ?? [];
+  const chosen = selected ?? new Set(items.map((e) => e.id));
+
+  async function submit() {
+    setError("");
+    try {
+      const created = await copy.mutateAsync([...chosen]);
+      announce(`${created.length} despesa(s) copiada(s)`);
+      onDone();
+    } catch (err) {
+      setError(errorMessage(err));
+    }
+  }
+
+  return (
+    <div className="stack">
+      <p className="muted" style={{ margin: 0 }}>
+        Despesas únicas de {monthLabel(addMonths(month, -1))}. Recorrências e parcelas já são lançadas automaticamente. As cópias
+        entram como pendentes.
+      </p>
+      <Alert tone="error">{error}</Alert>
+      {candidates.isPending && <Skeleton height={120} />}
+      {candidates.data && items.length === 0 && <p className="muted">Não há despesas únicas no mês anterior.</p>}
+      {items.length > 0 && (
+        <ul className="items">
+          {items.map((e) => (
+            <li key={e.id} className="item">
+              <label className="check" style={{ flex: 1 }}>
+                <input
+                  type="checkbox"
+                  checked={chosen.has(e.id)}
+                  onChange={(ev) => {
+                    const next = new Set(chosen);
+                    if (ev.target.checked) next.add(e.id);
+                    else next.delete(e.id);
+                    setSelected(next);
+                  }}
+                />
+                {e.description}
+              </label>
+              <span className="item__amount">{money(e.amount)}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className="form-actions">
+        <Button type="button" variant="secondary" onClick={onDone}>
+          Cancelar
+        </Button>
+        <Button type="button" disabled={chosen.size === 0} loading={copy.isPending} onClick={() => void submit()}>
+          Copiar {chosen.size} despesa(s)
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 function removeExpense(undo: ReturnType<typeof useUndo>, expense: Expense, scope: DeleteScope) {
   const what = scope === "following" ? `"${expense.description}" e as próximas excluídas` : `"${expense.description}" excluída`;
   undo.remove({ ids: [expense.id], message: what, commit: () => budgetApi.deleteExpense(expense.id, scope) });
@@ -745,7 +843,7 @@ function DeleteExpense({ expense, onDone }: { expense: Expense; onDone: () => vo
       </p>
       {repeats && (
         <p className="muted" style={{ margin: 0 }}>
-          {expense.installment_group_id ? "É uma compra parcelada." : "É uma conta fixa."} Excluir só esta ou também as próximas?
+          {expense.installment_group_id ? "Compra parcelada." : "Despesa recorrente."} Excluir apenas esta ou também as próximas?
         </p>
       )}
       <div className="form-actions">
@@ -754,11 +852,11 @@ function DeleteExpense({ expense, onDone }: { expense: Expense; onDone: () => vo
         </Button>
         {repeats && (
           <Button type="button" variant="danger" onClick={() => del("following")}>
-            {expense.installment_group_id ? "Esta e as próximas parcelas" : "Deste mês em diante"}
+            {expense.installment_group_id ? "Esta e as próximas parcelas" : "Este mês e os seguintes"}
           </Button>
         )}
         <Button type="button" variant="danger" onClick={() => del("one")}>
-          <Trash2 size={16} /> {repeats ? "Só esta" : "Excluir"}
+          <Trash2 size={16} /> {repeats ? "Apenas esta" : "Excluir"}
         </Button>
       </div>
     </div>
@@ -819,6 +917,7 @@ export default function MonthPage() {
     setSearch({}, { replace: true });
   }, [search, setSearch]);
   const cats = categories.data ?? [];
+  const reviewCount = useReviewCount();
   const close = () => setEditing(null);
   const isCurrent = month === thisMonth();
 
@@ -848,15 +947,13 @@ export default function MonthPage() {
           )
         }
         actions={
-          <span className="only-desktop">
-            <span className="row">
-              <Button type="button" variant="secondary" onClick={() => setEditing({ type: "new-income" })}>
-                <Wallet size={16} /> Nova renda
-              </Button>
-              <Button type="button" onClick={() => setEditing({ type: "new-expense" })}>
-                <Plus size={16} /> Nova conta
-              </Button>
-            </span>
+          <span className="row month-actions">
+            <Button type="button" variant="secondary" onClick={() => setEditing({ type: "new-income" })}>
+              <Wallet size={16} /> Nova receita
+            </Button>
+            <Button type="button" onClick={() => setEditing({ type: "new-expense" })}>
+              <Plus size={16} /> Nova despesa
+            </Button>
           </span>
         }
       />
@@ -871,26 +968,26 @@ export default function MonthPage() {
           aria-busy={data.isPlaceholderData || undefined}
         >
           <QuickBar categories={cats} />
+          {reviewCount > 0 && (
+            <Link to="/revisar" className="review-banner">
+              <ListChecks size={18} aria-hidden />
+              <span>
+                <strong>{reviewCount} despesa(s) importada(s) para revisar.</strong> Confira as categorias antes que entrem nas análises.
+              </span>
+            </Link>
+          )}
           {data.data.incomes.length === 0 && data.data.expenses.length === 0 ? (
             <div className="empty-hint">
               <span className="kpi__icon" aria-hidden>
                 <Sparkles size={18} />
               </span>
               <div>
-                <h2>Comece pela sua renda</h2>
+                <h2>Primeiros lançamentos do mês</h2>
                 <p>
-                  Lance quanto você recebe e depois as contas do mês. Ex.: “Salário” R$ 3.200 (fixa, todo mês, dia 5) e
-                  “Aluguel” R$ 1.200 (se repete, vence dia 10). O que se repete aparece sozinho nos próximos meses; os
-                  gastos futuros (aniversário, IPVA) vão no <Link to="/calendario">Calendário</Link>.
+                  Comece pelas receitas (“Nova receita”) e depois registre as despesas (“Nova despesa”). Lançamentos recorrentes, como
+                  salário e aluguel, são repetidos automaticamente nos meses seguintes. Despesas futuras, como IPVA, podem ser
+                  agendadas no <Link to="/calendario">Calendário</Link>.
                 </p>
-                <div className="row" style={{ marginTop: 12 }}>
-                  <Button type="button" onClick={() => setEditing({ type: "new-income" })}>
-                    <Wallet size={16} /> Lançar renda
-                  </Button>
-                  <Link className="btn btn--secondary" to="/fixas">
-                    <Repeat size={16} /> Contas fixas
-                  </Link>
-                </div>
               </div>
             </div>
           ) : (
@@ -910,41 +1007,16 @@ export default function MonthPage() {
         </div>
       )}
 
-      {/* Fora do conteúdo (portal) para não andar junto nas animações de troca de página. */}
-      {createPortal(
-        <button type="button" className="fab no-print" aria-label="Adicionar conta ou renda" onClick={() => setEditing({ type: "choose" })}>
-          <Plus size={26} />
-        </button>,
-        document.body,
-      )}
-
-      <Sheet open={editing?.type === "choose"} title="Adicionar" onClose={close}>
-        <ul className="menu-list">
-          <li>
-            <button type="button" onClick={() => setEditing({ type: "new-expense" })}>
-              <span className="kpi__icon kpi__icon--expense">
-                <Receipt size={18} />
-              </span>
-              Nova conta
-            </button>
-          </li>
-          <li>
-            <button type="button" onClick={() => setEditing({ type: "new-income" })}>
-              <span className="kpi__icon">
-                <Wallet size={18} />
-              </span>
-              Nova renda
-            </button>
-          </li>
-        </ul>
+      <Sheet open={editing?.type === "copy"} title="Copiar do mês anterior" onClose={close}>
+        {editing?.type === "copy" && <CopyPrevious month={month} onDone={close} />}
       </Sheet>
 
-      <Sheet open={editing?.type === "new-expense"} title={`Nova conta · ${monthLabel(month)}`} onClose={close}>
+      <Sheet open={editing?.type === "new-expense"} title={`Nova despesa · ${monthLabel(month)}`} onClose={close}>
         {editing?.type === "new-expense" && (
           <ExpenseForm month={month} categories={cats} draft={editing.draft} onDone={close} />
         )}
       </Sheet>
-      <Sheet open={editing?.type === "expense"} title="Editar conta" onClose={close}>
+      <Sheet open={editing?.type === "expense"} title="Editar despesa" onClose={close}>
         {editing?.type === "expense" && (
           <div className="stack">
             <ExpenseForm month={month} categories={cats} expense={editing.expense} onDone={close} />
@@ -968,19 +1040,19 @@ export default function MonthPage() {
                 <Copy size={16} /> Duplicar
               </Button>
               <Button type="button" variant="danger" onClick={() => setEditing({ type: "delete-expense", expense: editing.expense })}>
-                <Trash2 size={16} /> Excluir conta
+                <Trash2 size={16} /> Excluir despesa
               </Button>
             </div>
           </div>
         )}
       </Sheet>
-      <Sheet open={editing?.type === "delete-expense"} title="Excluir conta" onClose={close}>
+      <Sheet open={editing?.type === "delete-expense"} title="Excluir despesa" onClose={close}>
         {editing?.type === "delete-expense" && <DeleteExpense expense={editing.expense} onDone={close} />}
       </Sheet>
-      <Sheet open={editing?.type === "new-income"} title={`Nova renda · ${monthLabel(month)}`} onClose={close}>
+      <Sheet open={editing?.type === "new-income"} title={`Nova receita · ${monthLabel(month)}`} onClose={close}>
         {editing?.type === "new-income" && <IncomeForm month={month} onDone={close} />}
       </Sheet>
-      <Sheet open={editing?.type === "income"} title="Editar renda" onClose={close}>
+      <Sheet open={editing?.type === "income"} title="Editar receita" onClose={close}>
         {editing?.type === "income" && <IncomeForm month={month} income={editing.income} onDone={close} />}
       </Sheet>
     </>

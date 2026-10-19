@@ -3,7 +3,7 @@ import { normalizeText } from "./text";
 
 /**
  * Lançamento numa frase: "mercado 120 pix ontem", "uber 23,50 débito",
- * "tv 1990 10x crédito dia 5", "+ freela 600" (renda).
+ * "tv 1990 em 10x crédito dia 5" (valor total, 10 parcelas), "+ freelance 600" (receita).
  * Tudo o que não é valor, data, forma de pagamento ou parcelas vira a descrição.
  */
 export type QuickEntry = {

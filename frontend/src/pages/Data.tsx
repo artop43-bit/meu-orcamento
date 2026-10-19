@@ -13,6 +13,7 @@ import {
 import { Badge, CategorySelect } from "../components/budget";
 import { Alert, Button, PageHeader } from "../components/ui";
 import { addMonths, money, monthLabel, shortDate, thisMonth } from "../lib/format";
+import { DateField } from "../components/DateField";
 
 // ---------------------------------------------------------------- app antigo
 
@@ -66,7 +67,7 @@ function LegacyImport() {
       reserve: skip.has("reserve") ? null : preview.reserve,
     });
     setDone(
-      `Importado: ${result.incomes} renda(s), ${result.expenses} conta(s), ${result.goals} meta(s), ` +
+      `Importado: ${result.incomes} receita(s), ${result.expenses} despesa(s), ${result.goals} meta(s), ` +
         `${result.history_months} mês(es) de histórico e ${result.investments} reserva.`,
     );
     setPreview(null);
@@ -84,7 +85,7 @@ function LegacyImport() {
     <section className="card stack">
       <h2>Importar do app antigo</h2>
       <p className="muted small">
-        Use o arquivo <code>.json</code> exportado pelo Meu Orçamento antigo. Antes de gravar, você revisa tudo. Seu
+        Use o arquivo <code>.json</code> exportado pelo Meu Orçamento antigo. Os dados são exibidos para conferência antes da gravação. Seu
         perfil (nome, idade) não é importado.
       </p>
       <Alert tone="error">{error}</Alert>
@@ -93,7 +94,7 @@ function LegacyImport() {
         <div className="row row--end">
           <label className="month-picker">
             Os dados do arquivo são de qual mês?
-            <input type="month" value={month} onChange={(e) => e.target.value && setMonth(e.target.value)} />
+            <DateField month value={month} onChange={(v) => v && setMonth(v)} />
           </label>
           <label className={`btn btn--primary ${loading ? "is-loading" : ""}`}>
             {loading ? "Lendo…" : "Escolher arquivo .json"}
@@ -105,7 +106,7 @@ function LegacyImport() {
       {preview && (
         <div className="stack">
           {preview.already_imported && (
-            <Alert tone="info">Você já importou um arquivo antigo antes. Importar de novo pode duplicar lançamentos.</Alert>
+            <Alert tone="info">Um arquivo antigo já foi importado. Uma nova importação pode duplicar lançamentos.</Alert>
           )}
           <p>
             Destino: <strong>{monthLabel(preview.month)}</strong>. Marque <em>todo mês</em> no que se repete
@@ -135,7 +136,7 @@ function LegacyImport() {
 
           {preview.expenses.length > 0 && (
             <div>
-              <h3>Contas</h3>
+              <h3>Despesas</h3>
               <ul className="items">
                 {preview.expenses.map((item, i) => (
                   <li key={`e${i}`} className={`item ${skip.has(`e${i}`) ? "item--skipped" : ""}`}>
@@ -169,7 +170,7 @@ function LegacyImport() {
             {preview.history.length > 0 && (
               <label className="check">
                 <input type="checkbox" checked={!skip.has("history")} onChange={() => toggle("history")} />
-                Histórico de {preview.history.length} mês(es) anterior(es), como totais de renda e contas
+                Histórico de {preview.history.length} mês(es) anterior(es), como totais de receitas e despesas
               </label>
             )}
             {preview.goals.length > 0 && (
@@ -275,7 +276,7 @@ function StatementImport() {
       <h2>Importar extrato bancário</h2>
       <p className="muted small">
         Aceita <strong>OFX</strong> (recomendado, quase todo banco oferece em "exportar extrato") e{" "}
-        <strong>CSV</strong>. As saídas viram contas pagas e as entradas viram renda. Lançamentos já importados são
+        <strong>CSV</strong>. Saídas entram como despesas pagas (em “Para revisar”) e entradas como receitas. Lançamentos já importados são
         reconhecidos e ficam desmarcados.
       </p>
       <Alert tone="error">{error}</Alert>
@@ -342,7 +343,7 @@ function StatementImport() {
                           onChange={(v) => setCategoryOf((c) => ({ ...c, [t.ref]: v }))}
                         />
                       ) : (
-                        <span className="muted">Renda</span>
+                        <span className="muted">Receita</span>
                       )}
                     </td>
                     <td className={`num ${t.kind === "income" ? "tone--ok" : ""}`}>
@@ -403,11 +404,11 @@ function Export() {
         <div className="row row--end">
           <label className="month-picker">
             De
-            <input type="month" value={start} onChange={(e) => e.target.value && setStart(e.target.value)} />
+            <DateField month value={start} onChange={(v) => v && setStart(v)} />
           </label>
           <label className="month-picker">
             Até
-            <input type="month" value={end} onChange={(e) => e.target.value && setEnd(e.target.value)} />
+            <DateField month value={end} onChange={(v) => v && setEnd(v)} />
           </label>
           <Button
             type="button"
@@ -432,7 +433,7 @@ function Export() {
         <div className="row row--end">
           <label className="month-picker">
             Mês
-            <input type="month" value={reportMonth} onChange={(e) => e.target.value && setReportMonth(e.target.value)} />
+            <DateField month value={reportMonth} onChange={(v) => v && setReportMonth(v)} />
           </label>
           <Link className="btn btn--secondary" to={`/relatorio/${reportMonth}`}>
             Abrir relatório

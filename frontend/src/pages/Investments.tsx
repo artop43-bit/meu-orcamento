@@ -84,7 +84,7 @@ function InvestmentForm({ investment, onDone }: { investment?: Investment; onDon
 
   const save = useBudgetMutation(async () => {
     const investedValue = parseMoney(invested);
-    if (investedValue === null) throw new Error("Informe quanto você investiu.");
+    if (investedValue === null) throw new Error("Informe o valor investido.");
     // Valor atual em branco = igual ao investido.
     const currentValue = current.trim() ? requireMoney(current) : investedValue;
     const qty = quantity.trim() ? Number(quantity.replace(/\./g, "").replace(",", ".")) : null;
@@ -142,8 +142,8 @@ function InvestmentForm({ investment, onDone }: { investment?: Investment; onDon
               <span className="field-label">
                 Código (opcional){" "}
                 <Tip>
-                  Código na B3 (PETR4, MXRF11, BOVA11) ou da cripto (BTC, ETH). Com código e quantidade, o valor atual se atualiza sozinho
-                  pela cotação.
+                  Código na B3 (PETR4, MXRF11, BOVA11) ou do criptoativo (BTC, ETH). Com código e quantidade, o valor atual é atualizado pela
+                  cotação.
                 </Tip>
               </span>
               <input value={ticker} onChange={(e) => setTicker(e.target.value)} placeholder="Ex.: PETR4" maxLength={12} autoCapitalize="characters" />
@@ -170,7 +170,7 @@ function InvestmentForm({ investment, onDone }: { investment?: Investment; onDon
       </div>
       <label className="check">
         <input type="checkbox" checked={reserve} onChange={(e) => setReserve(e.target.checked)} />
-        Faz parte da minha reserva de emergência
+        Compõe a reserva de emergência
       </label>
       <FormActions loading={save.isPending} onCancel={onDone} label={investment ? "Salvar" : "Adicionar"} />
     </form>
@@ -252,22 +252,22 @@ function usePortfolioRefresh(enabled: boolean) {
 
 export default function Investments() {
   const [params] = useSearchParams();
-  const tab = params.get("secao") === "mercado" ? "mercado" : "carteira";
+  const tab = ["cotacoes", "mercado"].includes(params.get("secao") ?? "") ? "cotacoes" : "carteira";
   return (
     <>
       <PageHeader
         title="Investimentos"
-        subtitle={tab === "mercado" ? "Cotações, índices e renda fixa, para se informar." : "Onde seu dinheiro está guardado e quanto está rendendo."}
+        subtitle={tab === "cotacoes" ? "Índices, moedas, ações, criptoativos e renda fixa." : "Posição consolidada da carteira e rentabilidade."}
       />
       <nav className="page-tabs no-print" aria-label="Seções de investimentos" style={{ marginBottom: 20 }}>
         <Link to="/investimentos" aria-current={tab === "carteira" ? "page" : undefined}>
           Minha carteira
         </Link>
-        <Link to="/investimentos?secao=mercado" aria-current={tab === "mercado" ? "page" : undefined}>
-          Mercado
+        <Link to="/investimentos?secao=cotacoes" aria-current={tab === "cotacoes" ? "page" : undefined}>
+          Cotações
         </Link>
       </nav>
-      {tab === "mercado" ? <MarketSection /> : <Portfolio />}
+      {tab === "cotacoes" ? <MarketSection /> : <Portfolio />}
     </>
   );
 }
@@ -324,7 +324,7 @@ function Portfolio() {
               <EmptyGuide
                 icon={<Landmark size={22} />}
                 title="Sua carteira está vazia"
-                text="Cadastre onde seu dinheiro está guardado. Marque o que é reserva de emergência para contar no score financeiro."
+                text="Cadastre os investimentos e marque os que compõem a reserva de emergência (considerada no score financeiro)."
                 example={<>Ex.: “Reserva no CDB” R$ 5.000 (reserva) · “Petrobras” PETR4 × 100 (valor pela cotação)</>}
                 action={
                   <Button type="button" onClick={() => setAdding(true)}>
@@ -341,8 +341,8 @@ function Portfolio() {
               ))}
             </ul>
             <p className="muted small" style={{ margin: 0 }}>
-              Com código e quantidade, o valor atual vem da cotação (atualiza sozinho). Os demais são informados por você:
-              atualize de tempos em tempos com o saldo do banco ou da corretora.
+              Ativos com código e quantidade são atualizados pela cotação. Para os demais, atualize o valor periodicamente com o saldo
+              da instituição.
             </p>
           </section>
 

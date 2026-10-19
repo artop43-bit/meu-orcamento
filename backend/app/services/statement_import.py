@@ -22,6 +22,8 @@ from app.core.parsing import normalize_text, parse_amount, parse_date
 from app.db.types import utcnow
 from app.models import Expense, Income, User
 from app.services import budget
+from app.services import suggest as suggestions
+from app.services.category_words import FALLBACK
 
 REF_PREFIX = "stmt:"
 MAX_TRANSACTIONS = 2000
@@ -52,98 +54,6 @@ CREDIT_COLUMNS = {"credito", "entrada", "creditos", "credito (r$)"}
 DEBIT_COLUMNS = {"debito", "saida", "debitos", "debito (r$)"}
 
 # Palavra no texto do extrato -> categoria padrão sugerida.
-KEYWORDS: list[tuple[tuple[str, ...], str]] = [
-    (
-        (
-            "aluguel",
-            "condominio",
-            "energia",
-            "enel",
-            "cemig",
-            "light",
-            "copel",
-            "sabesp",
-            "agua",
-            "gas ",
-            "iptu",
-        ),
-        "Moradia",
-    ),
-    (
-        (
-            "mercado",
-            "supermerc",
-            "padaria",
-            "acougue",
-            "hortifruti",
-            "atacad",
-            "assai",
-            "carrefour",
-            "pao de acucar",
-            "ifood",
-            "rappi",
-            "restaurante",
-            "lanchonete",
-        ),
-        "Alimentação",
-    ),
-    (
-        (
-            "uber",
-            "99 ",
-            "99app",
-            "posto",
-            "combustivel",
-            "shell",
-            "ipiranga",
-            "estacionamento",
-            "pedagio",
-            "metro",
-            "onibus",
-            "bilhete unico",
-        ),
-        "Transporte",
-    ),
-    (
-        (
-            "farmacia",
-            "drogaria",
-            "drogasil",
-            "raia",
-            "pague menos",
-            "hospital",
-            "clinica",
-            "laboratorio",
-            "unimed",
-            "amil",
-            "dentista",
-        ),
-        "Saúde",
-    ),
-    (("escola", "faculdade", "universidade", "curso", "udemy", "alura", "livraria"), "Educação"),
-    (
-        (
-            "netflix",
-            "spotify",
-            "disney",
-            "prime video",
-            "hbo",
-            "youtube",
-            "internet",
-            "vivo",
-            "claro",
-            "tim ",
-            "oi ",
-            "celular",
-            "telefone",
-        ),
-        "Serviços",
-    ),
-    (
-        ("cinema", "ingresso", "bar ", "show", "steam", "playstation", "viagem", "hotel", "airbnb"),
-        "Lazer",
-    ),
-]
 
 
 @dataclass
@@ -313,10 +223,10 @@ def _category_suggester(db: Session, user: User) -> Any:
             return by_rule
         if text in learned:
             return learned[text]
-        padded = f" {text} "
-        for words, name in KEYWORDS:
-            if any(word in padded for word in words):
-                return by_name.get(normalize_text(name))
+        name = suggestions.keyword_category(description)
+        for candidate in (name, FALLBACK.get(name or "")):
+            if candidate and normalize_text(candidate) in by_name:
+                return by_name[normalize_text(candidate)]
         return None
 
     return suggest
@@ -385,6 +295,7 @@ def commit(db: Session, user: User, items: list[dict[str, Any]]) -> dict[str, in
                 raise AppError(404, "not_found", "Categoria não encontrada.")
             db.add(
                 Expense(
+                    needs_review=True,
                     user_id=user.id,
                     month=month,
                     description=item["description"],

@@ -91,6 +91,8 @@ token="$(grep -o 'verificar-email?token=[A-Za-z0-9_-]*' "$WORK/api.log" | tail -
 check "e-mail de confirmação gerado" test -n "$token"
 check "link do e-mail usa https://localhost" grep -q "https://localhost/verificar-email" "$WORK/api.log"
 check "e-mail confirmado" grep -q "confirmado" <(api -X POST "$BASE/api/auth/verify-email" -d "{\"token\":\"$token\"}")
+check "beta fechado: login aguarda aprovação" grep -q "access_pending" <(api -X POST "$BASE/api/auth/login" -d "{\"email\":\"$EMAIL\",\"password\":\"$PASSWORD\"}")
+check "aprovação pelo terminal" "${COMPOSE[@]}" exec -T api python -m app.cli approve "$EMAIL"
 check "login" grep -q '"status":"ok"' <(api -X POST "$BASE/api/auth/login" -d "{\"email\":\"$EMAIL\",\"password\":\"$PASSWORD\"}")
 check "cookie __Host-session (Secure)" grep -q "__Host-session" "$JAR"
 api -X POST "$BASE/api/months/2030-01/expenses" -d '{"description":"Aluguel","amount":"1500.00"}' > /dev/null

@@ -19,6 +19,7 @@ import { Alert, Button, PageHeader } from "../components/ui";
 import { extrasApi, extrasKeys } from "../api/extras";
 import { Tip } from "../components/help";
 import { money, moneyInput, monthLabel } from "../lib/format";
+import { DateField } from "../components/DateField";
 
 function RecurringEdit({ item, categories, onDone }: { item: Recurring; categories: Category[]; onDone: () => void }) {
   const [description, setDescription] = useState(item.description);
@@ -55,7 +56,7 @@ function RecurringEdit({ item, categories, onDone }: { item: Recurring; categori
     >
       <Alert tone="error">{error}</Alert>
       <p className="muted small">
-        As mudanças valem a partir do mês atual, nos lançamentos ainda não pagos.
+        As alterações valem a partir do mês atual, para lançamentos ainda não pagos.
       </p>
       <div className="grid-2">
         <label>
@@ -90,7 +91,7 @@ function RecurringEdit({ item, categories, onDone }: { item: Recurring; categori
         )}
         <label>
           Último mês (opcional)
-          <input type="month" value={endMonth} min={item.start_month} onChange={(e) => setEndMonth(e.target.value)} />
+          <DateField month value={endMonth} min={item.start_month} onChange={setEndMonth} />
         </label>
       </div>
       <FormActions loading={save.isPending} onCancel={onDone} />
@@ -116,7 +117,7 @@ function RecurringRow({ item, categories }: { item: Recurring; categories: Categ
       <button type="button" className="item__main" onClick={() => setEditing(true)} title="Editar">
         <span className="item__title">{item.description}</span>
         <span className="item__meta">
-          {item.kind === "expense" ? (category?.name ?? "Sem categoria") : item.income_type === "variable" ? "Renda variável" : "Renda fixa"}
+          {item.kind === "expense" ? (category?.name ?? "Sem categoria") : item.income_type === "variable" ? "Receita variável" : "Receita fixa"}
           {item.interval_months > 1 && ` · ${INTERVALS.find((i) => i.value === item.interval_months)?.label.toLowerCase()}`}
           {item.due_day && ` · dia ${item.due_day}`}
           {item.payment_method && ` · ${paymentLabel(item.payment_method)}`}
@@ -142,7 +143,7 @@ function RecurringRow({ item, categories }: { item: Recurring; categories: Categ
   );
 }
 
-/** Quanto as contas fixas custam por mês e por ano, e gastos que parecem assinatura. */
+/** Custo mensal e anual das recorrências e gastos com padrão de assinatura. */
 function Subscriptions() {
   const data = useQuery({ queryKey: extrasKeys.subscriptions, queryFn: extrasApi.subscriptions });
   const promote = useBudgetMutation(extrasApi.promote);
@@ -152,8 +153,8 @@ function Subscriptions() {
     <section className="card stack">
       <div className="section-header">
         <h2>
-          Assinaturas e contas fixas{" "}
-          <Tip>Soma do que é cobrado todo mês (ou a cada N meses). Contas a cada 6 meses ou anuais entram pelo valor equivalente por mês.</Tip>
+          Assinaturas e recorrências{" "}
+          <Tip>Soma das despesas recorrentes. Cobranças semestrais ou anuais entram pelo valor mensal equivalente.</Tip>
         </h2>
       </div>
       <div className="stats">
@@ -180,9 +181,9 @@ function Subscriptions() {
       )}
       {info.candidates.length > 0 && (
         <div className="stack stack--tight">
-          <h3 style={{ margin: 0 }}>Parecem se repetir</h3>
+          <h3 style={{ margin: 0 }}>Possíveis assinaturas</h3>
           <p className="muted small" style={{ margin: 0 }}>
-            Lançados quase todo mês com valor parecido. Virar fixa faz eles aparecerem sozinhos a partir do mês que vem.
+            Lançamentos com valor semelhante em vários meses. Convertidos em recorrência, passam a ser lançados automaticamente a partir do próximo mês.
           </p>
           <ul className="items">
             {info.candidates.map((c) => (
@@ -202,7 +203,7 @@ function Subscriptions() {
                     promote.mutate({ description: c.description, amount: c.amount, category_id: c.category_id, due_day: c.due_day })
                   }
                 >
-                  Virar fixa
+                  Tornar recorrente
                 </Button>
               </li>
             ))}
@@ -223,7 +224,7 @@ export default function RecurringPage() {
   return (
     <div className="stack">
       <PageHeader
-        title="Contas e rendas fixas"
+        title="Recorrências"
         subtitle={`Lançadas automaticamente todo mês. Para criar uma, marque "Todo mês" ao lançar no orçamento.`}
       />
       <Subscriptions />
@@ -232,7 +233,7 @@ export default function RecurringPage() {
       {items.data && (
         <div className="layout-2">
           <section className="card stack">
-            <h2>Rendas fixas</h2>
+            <h2>Receitas recorrentes</h2>
             {incomes.length === 0 && <p className="muted">Nenhuma.</p>}
             <ul className="items">
               {incomes.map((item) => (
@@ -241,7 +242,7 @@ export default function RecurringPage() {
             </ul>
           </section>
           <section className="card stack">
-            <h2>Contas fixas</h2>
+            <h2>Despesas recorrentes</h2>
             {expenses.length === 0 && <p className="muted">Nenhuma.</p>}
             <ul className="items">
               {expenses.map((item) => (

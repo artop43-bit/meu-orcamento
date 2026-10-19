@@ -8,12 +8,14 @@ from app.models.budget import (
     Goal,
     Income,
     Investment,
+    MoneyAccount,
     PlannedExpense,
     RecurringItem,
     SavedAnalysis,
+    Transfer,
     WatchItem,
 )
-from app.models.user import AuthToken, RecoveryCode, SecurityEvent, User, UserSession
+from app.models.user import AuthToken, EmailLog, RecoveryCode, SecurityEvent, User, UserSession
 
 __all__ = [
     "AuthToken",
@@ -21,17 +23,20 @@ __all__ = [
     "Category",
     "CategoryRule",
     "CreditCard",
+    "EmailLog",
     "Expense",
     "Feedback",
     "Goal",
     "Income",
     "Investment",
+    "MoneyAccount",
     "RecoveryCode",
     "RecurringItem",
     "PlannedExpense",
     "SavedAnalysis",
     "WatchItem",
     "SecurityEvent",
+    "Transfer",
     "User",
     "UserSession",
 ]

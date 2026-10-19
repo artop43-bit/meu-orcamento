@@ -75,7 +75,7 @@ class RecurringItem(Base):
     end_month: Mapped[date | None] = mapped_column(Date)
     # Repete a cada N meses (1 = todo mês, 12 = anual).
     interval_months: Mapped[int] = mapped_column(SmallInteger, default=1)
-    # Renda: "fixed" (salário, benefícios) ou "variable" (bicos, comissões).
+    # Renda: "fixed" (salário, benefícios) ou "variable" (freelance, comissões).
     income_type: Mapped[str | None] = mapped_column(String(10))
     payment_method: Mapped[str | None] = mapped_column(String(12))
     notes: Mapped[str | None] = mapped_column(String(500))
@@ -97,6 +97,9 @@ class Income(Base):
     amount: Mapped[Decimal] = mapped_column(Money)
     recurring_id: Mapped[uuid.UUID | None] = _recurring_fk()
     income_type: Mapped[str] = mapped_column(String(10), default="fixed")
+    account_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("money_accounts.id", ondelete="SET NULL"), index=True
+    )
     # Dia previsto do recebimento (opcional).
     day: Mapped[int | None] = mapped_column(SmallInteger)
     notes: Mapped[str | None] = mapped_column(String(500))
@@ -130,6 +133,11 @@ class Expense(Base):
         ForeignKey("credit_cards.id", ondelete="SET NULL"), index=True
     )
     purchase_date: Mapped[date | None] = mapped_column(Date)
+    account_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("money_accounts.id", ondelete="SET NULL"), index=True
+    )
+    # Veio do extrato e ainda não foi conferida (categoria, valor).
+    needs_review: Mapped[bool] = mapped_column(default=False, server_default="0")
 
     # Compra parcelada: todas as parcelas compartilham o mesmo grupo.
     installment_group_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, index=True)
@@ -236,6 +244,10 @@ class CreditCard(Base):
     closing_day: Mapped[int] = mapped_column(SmallInteger)
     due_day: Mapped[int] = mapped_column(SmallInteger)
     color: Mapped[str | None] = mapped_column(String(7))
+    # Conta que paga a fatura (o saldo dela cai quando a fatura é paga).
+    account_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("money_accounts.id", ondelete="SET NULL")
+    )
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
 
 
@@ -268,4 +280,39 @@ class Feedback(Base):
     user_agent: Mapped[str | None] = mapped_column(String(300))
     app_version: Mapped[str | None] = mapped_column(String(20))
     status: Mapped[str] = mapped_column(String(10), default="new")  # "new" | "read" | "done"
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+
+
+class MoneyAccount(Base):
+    """Conta onde o dinheiro está: corrente, poupança, carteira..."""
+
+    __tablename__ = "money_accounts"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = _user_fk()
+    name: Mapped[str] = mapped_column(String(60))
+    kind: Mapped[str] = mapped_column(String(10))  # "checking" | "savings" | "wallet" | "other"
+    # Saldo no dia em que a conta foi cadastrada (ponto de partida).
+    initial_balance: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=Decimal("0"))
+    color: Mapped[str | None] = mapped_column(String(7))
+    archived: Mapped[bool] = mapped_column(default=False, server_default="0")
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+
+
+class Transfer(Base):
+    """Dinheiro que muda de conta (não é receita nem despesa)."""
+
+    __tablename__ = "transfers"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = _user_fk()
+    from_account_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("money_accounts.id", ondelete="CASCADE")
+    )
+    to_account_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("money_accounts.id", ondelete="CASCADE")
+    )
+    amount: Mapped[Decimal] = mapped_column(Money)
+    date: Mapped[date] = mapped_column(Date)
+    notes: Mapped[str | None] = mapped_column(String(200))
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)

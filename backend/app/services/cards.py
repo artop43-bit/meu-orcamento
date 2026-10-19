@@ -62,6 +62,7 @@ def get_card(db: Session, user: User, card_id: uuid.UUID) -> CreditCard:
 
 
 def create_card(db: Session, user: User, data: dict[str, Any]) -> CreditCard:
+    budget._check_account(db, user, data.get("account_id"))
     card = CreditCard(user_id=user.id, **data)
     db.add(card)
     db.commit()
@@ -70,6 +71,7 @@ def create_card(db: Session, user: User, data: dict[str, Any]) -> CreditCard:
 
 def update_card(db: Session, user: User, card_id: uuid.UUID, changes: dict[str, Any]) -> CreditCard:
     card = get_card(db, user, card_id)
+    budget._check_account(db, user, changes.get("account_id"))
     budget._apply(card, changes)
     db.commit()
     return card

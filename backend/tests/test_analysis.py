@@ -86,7 +86,7 @@ def test_score_excellent(user: TestClient) -> None:
         "reserve": 25.0,
         "consistency": 15.0,
     }
-    assert score["tips"] == ["Seus indicadores estão equilibrados. Continue assim!"]
+    assert score["tips"] == ["Indicadores equilibrados no período."]
 
 
 def test_score_critical(user: TestClient) -> None:
