@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.db.types import utcnow
-from app.models import AuthToken, SecurityEvent, UserSession
+from app.models import AuthToken, EmailLog, SecurityEvent, UserSession
 
 USED_TOKEN_RETENTION = timedelta(days=7)
 
@@ -35,8 +35,11 @@ def cleanup(db: Session) -> dict[str, int]:
     events = db.execute(
         delete(SecurityEvent).where(SecurityEvent.created_at <= now - retention)
     ).rowcount
+    emails = db.execute(
+        delete(EmailLog).where(EmailLog.created_at <= now - timedelta(days=30))
+    ).rowcount
     db.commit()
-    return {"sessions": sessions, "tokens": tokens, "security_events": events}
+    return {"sessions": sessions, "tokens": tokens, "security_events": events, "emails": emails}
 
 
 def run_cleanup() -> None:
@@ -95,9 +98,22 @@ def run_feedback(limit: int = 30) -> None:
         print(f"  {item.message}\n", flush=True)
 
 
+def run_admin(command: str, email: str) -> None:
+    """Liberar, bloquear ou tornar admin uma conta pelo terminal (ex.: o primeiro admin)."""
+    from app.db.session import SessionLocal
+    from app.services import admin
+
+    with SessionLocal() as db:
+        print(admin.cli_action(db, command, email), flush=True)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(prog="python -m app.cli", description=__doc__)
-    parser.add_argument("command", choices=["cleanup", "schedule", "seed-demo", "feedback"])
+    parser.add_argument(
+        "command",
+        choices=["cleanup", "schedule", "seed-demo", "feedback", "make-admin", "approve", "block"],
+    )
+    parser.add_argument("email", nargs="?", help="make-admin/approve/block: e-mail da conta")
     parser.add_argument(
         "--credentials-file", help="seed-demo: também grava e-mail e senha neste arquivo"
     )
@@ -115,6 +131,10 @@ def main() -> None:
         schedule()
     elif args.command == "feedback":
         run_feedback()
+    elif args.command in ("make-admin", "approve", "block"):
+        if not args.email:
+            parser.error("informe o e-mail da conta")
+        run_admin(args.command, args.email)
     else:
         run_seed_demo(args.credentials_file, with_data=not args.vazia, reset=args.reset)
 

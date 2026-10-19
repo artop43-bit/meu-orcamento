@@ -16,194 +16,7 @@ from sqlalchemy.orm import Session
 
 from app.core.months import add_months
 from app.models import Category, Expense, User
-
-# Categoria padrão → palavras (sem acento, minúsculas). Também casa com categorias
-# criadas pelo usuário que tenham o mesmo nome.
-KEYWORDS: dict[str, list[str]] = {
-    "Moradia": [
-        "aluguel",
-        "condominio",
-        "iptu",
-        "luz",
-        "energia",
-        "enel",
-        "cemig",
-        "copel",
-        "light",
-        "agua",
-        "sabesp",
-        "saneamento",
-        "gas",
-        "comgas",
-        "ultragaz",
-        "reforma",
-        "moveis",
-        "financiamento imovel",
-        "prestacao casa",
-        "diarista",
-        "faxina",
-    ],
-    "Alimentação": [
-        "mercado",
-        "supermercado",
-        "feira",
-        "padaria",
-        "acougue",
-        "hortifruti",
-        "ifood",
-        "restaurante",
-        "lanche",
-        "lanchonete",
-        "pizza",
-        "hamburguer",
-        "almoco",
-        "jantar",
-        "cafe",
-        "atacadao",
-        "assai",
-        "carrefour",
-        "pao de acucar",
-        "extra",
-        "dia ",
-        "rappi",
-        "marmita",
-        "sorvete",
-        "doceria",
-    ],
-    "Transporte": [
-        "uber",
-        "99",
-        "taxi",
-        "onibus",
-        "metro",
-        "trem",
-        "bilhete unico",
-        "combustivel",
-        "gasolina",
-        "etanol",
-        "alcool",
-        "posto",
-        "shell",
-        "ipiranga",
-        "estacionamento",
-        "pedagio",
-        "sem parar",
-        "ipva",
-        "licenciamento",
-        "seguro carro",
-        "mecanico",
-        "oficina",
-        "pneu",
-        "revisao",
-        "multa",
-        "financiamento carro",
-        "moto",
-    ],
-    "Saúde": [
-        "farmacia",
-        "drogaria",
-        "remedio",
-        "medicamento",
-        "droga raia",
-        "drogasil",
-        "pague menos",
-        "consulta",
-        "medico",
-        "dentista",
-        "exame",
-        "laboratorio",
-        "plano de saude",
-        "unimed",
-        "amil",
-        "hapvida",
-        "bradesco saude",
-        "sulamerica",
-        "psicologo",
-        "terapia",
-        "academia",
-        "smart fit",
-        "fisioterapia",
-        "otica",
-        "oculos",
-        "hospital",
-    ],
-    "Educação": [
-        "escola",
-        "faculdade",
-        "mensalidade escolar",
-        "curso",
-        "udemy",
-        "alura",
-        "livro",
-        "livraria",
-        "material escolar",
-        "apostila",
-        "ingles",
-        "idiomas",
-        "matricula",
-        "uniforme",
-        "pos graduacao",
-        "creche",
-    ],
-    "Serviços": [
-        "internet",
-        "telefone",
-        "celular",
-        "vivo",
-        "claro",
-        "tim",
-        "oi ",
-        "netflix",
-        "spotify",
-        "disney",
-        "prime video",
-        "amazon prime",
-        "hbo",
-        "max",
-        "globoplay",
-        "youtube premium",
-        "icloud",
-        "google one",
-        "assinatura",
-        "streaming",
-        "banco",
-        "tarifa",
-        "anuidade",
-        "seguro",
-        "contador",
-        "lavanderia",
-        "cabeleireiro",
-        "barbeiro",
-        "manicure",
-        "correios",
-    ],
-    "Lazer": [
-        "cinema",
-        "show",
-        "teatro",
-        "ingresso",
-        "viagem",
-        "hotel",
-        "airbnb",
-        "passagem",
-        "bar",
-        "balada",
-        "festa",
-        "presente",
-        "aniversario",
-        "jogo",
-        "steam",
-        "playstation",
-        "xbox",
-        "nintendo",
-        "passeio",
-        "parque",
-        "praia",
-        "clube",
-        "cerveja",
-        "churrasco",
-    ],
-}
+from app.services.category_words import EXACT_ONLY, FALLBACK, WORDS
 
 HISTORY_MONTHS = 18
 
@@ -257,23 +70,47 @@ def suggest_category(
         category_id, _ = votes.most_common(1)[0]
         return _out(categories[category_id], "history")
 
-    # 2. Palavras-chave.
-    by_name = {normalize(c.name): c for c in categories.values()}
-    padded = f" {text} "
-    best: tuple[int, Category] | None = None
-    for name, words in KEYWORDS.items():
-        category = by_name.get(normalize(name))
-        if category is None:
-            continue
-        for word in words:
-            key = word.strip()
-            if re.search(rf"(^|\W){re.escape(key)}(\W|$)", padded):
-                # A palavra mais longa vence ("seguro carro" antes de "seguro").
-                if best is None or len(key) > best[0]:
-                    best = (len(key), category)
-    if best is not None:
-        return _out(best[1], "keywords")
+    # 2. Dicionário de termos comuns.
+    name = keyword_category(description)
+    if name is not None:
+        by_name = {normalize(c.name): c for c in categories.values()}
+        for candidate in (name, FALLBACK.get(name)):
+            if candidate and normalize(candidate) in by_name:
+                return _out(by_name[normalize(candidate)], "keywords")
     return None
+
+
+def tokens(text: str) -> list[str]:
+    """Palavras da descrição, já sem acento e sem códigos de extrato ("IFD*IFOOD" → ifd, ifood)."""
+    return [t for t in re.split(r"[^a-z0-9&]+", normalize(text)) if t]
+
+
+def keyword_category(description: str) -> str | None:
+    """Nome da categoria padrão sugerida pelo dicionário, ou None."""
+    words = tokens(description)
+    if not words:
+        return None
+    phrase = f" {' '.join(words)} "
+    best: tuple[int, str] | None = None
+    for term, category in WORDS.items():
+        if " " in term or "&" in term:
+            if f" {term} " not in phrase:
+                continue
+            score = len(term) * 10
+        elif term in words:
+            score = len(term) * 10
+        elif (
+            len(term) >= 4
+            and term not in EXACT_ONLY
+            and any(w.startswith(term) and len(w) - len(term) <= 4 for w in words)
+        ):
+            # Variações: plural e sufixos ("pizza" → "pizzaria", "farmac" → "farmacias").
+            score = len(term)
+        else:
+            continue
+        if best is None or score > best[0]:
+            best = (score, category)
+    return best[1] if best else None
 
 
 def _out(category: Category, source: str) -> dict[str, Any]:

@@ -16,7 +16,7 @@ def test_empty_demo_account_for_qa(client: TestClient, db: Session) -> None:
     assert login(client, DEMO_EMAIL, password).json()["status"] == "ok"
     month = client.get(f"/api/months/{format_month(current_month())}").json()
     assert month["expenses"] == [] and month["incomes"] == []
-    assert len(client.get("/api/categories").json()) == 8
+    assert len(client.get("/api/categories").json()) == 11
     assert client.get("/api/goals").json() == []
 
 
@@ -43,7 +43,7 @@ def test_demo_account_with_sample_data(client: TestClient, db: Session) -> None:
     # Salário fixo + freelas (renda variável) do mês.
     assert Decimal(month["summary"]["income_total"]) == Decimal("4880.00")
     types = {i["description"]: i["income_type"] for i in month["incomes"]}
-    assert types == {"Salário": "fixed", "Freelas": "variable"}
+    assert types == {"Salário": "fixed", "Freelance": "variable"}
 
     history = client.get("/api/history?months=6").json()
     assert all(p["has_data"] for p in history)

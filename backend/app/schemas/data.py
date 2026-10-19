@@ -1,11 +1,10 @@
 import uuid
-from datetime import date
 from decimal import Decimal
 from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, Field, StringConstraints
 
-from app.schemas.budget import Description, Money, MonthStr
+from app.schemas.budget import Description, Money, MonthStr, SafeDate
 
 MAX_FILE_CHARS = 5_000_000
 NonNegative = Annotated[Decimal, Field(ge=0, max_digits=12, decimal_places=2)]
@@ -85,7 +84,7 @@ Ref = Annotated[str, Field(pattern=r"^stmt:[0-9a-f]{40}$")]
 
 class StatementTransaction(BaseModel):
     ref: Ref
-    date: date
+    date: SafeDate
     description: Description
     amount: Money
     kind: Literal["income", "expense"]

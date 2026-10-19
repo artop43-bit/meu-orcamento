@@ -44,6 +44,8 @@ class Settings(BaseSettings):
     brapi_token: str = ""
     # E-mails (separados por vírgula) que veem as sugestões enviadas pelo app.
     admin_emails: str = ""
+    # Beta fechado: cadastro novo só entra depois que um admin libera.
+    signup_approval: bool = True
 
     @property
     def cors_origin_list(self) -> list[str]:

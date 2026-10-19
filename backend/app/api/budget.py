@@ -116,7 +116,7 @@ def create_income(month: str, body: IncomeIn, user: CurrentUser, db: DbSession) 
 def update_income(
     income_id: uuid.UUID, body: IncomePatch, user: CurrentUser, db: DbSession, scope: Scope = "one"
 ) -> IncomeOut:
-    changes = _changes(body, nullable={"day", "notes"})
+    changes = _changes(body, nullable={"day", "notes", "account_id"})
     return IncomeOut.model_validate(service.update_income(db, user, income_id, changes, scope))
 
 
@@ -147,7 +147,9 @@ def update_expense(
     db: DbSession,
     scope: Scope = "one",
 ) -> ExpenseOut:
-    changes = _changes(body, nullable={"category_id", "due_date", "notes", "payment_method"})
+    changes = _changes(
+        body, nullable={"category_id", "due_date", "notes", "payment_method", "account_id"}
+    )
     expense = service.update_expense(db, user, expense_id, changes, scope)
     return ExpenseOut.model_validate(expense)
 

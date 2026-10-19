@@ -35,6 +35,12 @@ def _validation_message(exc: RequestValidationError) -> str:
             return "Informe uma descrição." if field == "description" else "Informe um nome."
         if field == "installments":
             return "O número de parcelas deve ser entre 2 e 120."
+        if "Data inválida" in str(error.get("msg", "")) or (
+            error["type"] == "string_pattern_mismatch" and "month" in field
+        ):
+            return "Data inválida: use um ano entre 2000 e 2100."
+        if error["type"] in ("date_from_datetime_parsing", "date_parsing"):
+            return "Data inválida. Use o formato dd/mm/aaaa."
         if field == "accept_terms":
             return "Para criar a conta, aceite os Termos de uso e a Política de privacidade."
     return "Verifique os dados informados."

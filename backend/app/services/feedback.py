@@ -6,13 +6,14 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.config import get_settings
 from app.core.errors import AppError
 from app.models import Feedback, User
 
 
 def is_admin(user: User) -> bool:
-    return user.email.lower() in get_settings().admin_email_list()
+    from app.services.auth import is_admin as check
+
+    return check(user)
 
 
 def create(db: Session, user: User, data: dict[str, Any], user_agent: str | None) -> Feedback:

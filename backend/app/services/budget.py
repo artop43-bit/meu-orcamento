@@ -29,6 +29,9 @@ DEFAULT_CATEGORIES: list[tuple[str, bool, str]] = [
     ("Educação", True, "#76b7b2"),
     ("Serviços", True, "#9c755f"),
     ("Lazer", False, "#b07aa1"),
+    ("Compras", False, "#ff9da7"),
+    ("Assinaturas", False, "#8cd17d"),
+    ("Pets", False, "#d4a6c8"),
     ("Outros", False, "#bab0ac"),
 ]
 
@@ -315,12 +318,21 @@ def _end_recurrence_before(db: Session, item_id: uuid.UUID | None, month: date) 
 # ---------------------------------------------------------------- rendas
 
 
+def _check_account(db: Session, user: User, account_id: uuid.UUID | None) -> None:
+    if account_id is not None:
+        from app.models import MoneyAccount
+
+        _owned(db, MoneyAccount, account_id, user)
+
+
 def create_income(db: Session, user: User, month: date, data: dict[str, Any]) -> Income:
     """Lança a renda. Com repetição, cria uma fixa a partir deste mês e devolve a deste mês."""
+    _check_account(db, user, data.get("account_id"))
+    account_id = data.pop("account_id", None)
     repeat = data.pop("repeat", "once")
     until = data.pop("until_month", None)
     if repeat == "once":
-        income = Income(user_id=user.id, month=month, **data)
+        income = Income(user_id=user.id, month=month, account_id=account_id, **data)
         db.add(income)
         db.commit()
         return income
@@ -346,8 +358,9 @@ def create_income(db: Session, user: User, month: date, data: dict[str, Any]) ->
     _materialize(db, item, month)
     db.flush()
     income = db.scalar(select(Income).where(Income.recurring_id == item.id, Income.month == month))
-    db.commit()
     assert income is not None
+    income.account_id = account_id
+    db.commit()
     return income
 
 
@@ -373,7 +386,10 @@ def update_income(
 ) -> Income:
     """Altera a renda. Com scope="following", vale também para os próximos meses da fixa."""
     income = _owned(db, Income, income_id, user)
+    _check_account(db, user, changes.get("account_id"))
     if scope == "following" and income.recurring_id is not None:
+        if "account_id" in changes:
+            income.account_id = changes.pop("account_id")
         recurring = {_INCOME_TO_RECURRING[k]: v for k, v in changes.items()}
         update_recurring(db, user, income.recurring_id, recurring, from_month=income.month)
         db.refresh(income)
@@ -404,6 +420,7 @@ def create_expense(db: Session, user: User, month: date, data: dict[str, Any]) -
     until = data.pop("until_month", None)
     card_id = data.pop("card_id", None)
     purchase_date = data.pop("purchase_date", None)
+    _check_account(db, user, data.get("account_id"))
     if data.get("category_id") is None:
         # Regra automática do usuário ("contém uber → Transporte").
         from app.services import rules
@@ -442,6 +459,7 @@ def create_expense(db: Session, user: User, month: date, data: dict[str, Any]) -
             select(Expense).where(Expense.recurring_id == item.id, Expense.month == month)
         )
         assert expense is not None
+        expense.account_id = data.get("account_id")
         if paid:
             expense.paid = True
             expense.paid_at = utcnow()
@@ -576,6 +594,7 @@ def update_expense(
     expense = _owned(db, Expense, expense_id, user)
     if "category_id" in changes:
         _check_category(db, user, changes["category_id"])
+    _check_account(db, user, changes.get("account_id"))
     shared = {k: v for k, v in changes.items() if k in _EXPENSE_TO_RECURRING}
     if scope == "following" and shared:
         if expense.installment_group_id is not None:
