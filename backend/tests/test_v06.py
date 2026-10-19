@@ -5,7 +5,6 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 
-from app.core.config import get_settings
 from app.core.email import OutgoingEmail
 from app.models import CreditCard
 from app.services import budget as budget_service
@@ -269,36 +268,6 @@ def test_subscriptions_fixed_costs_and_candidates(user: TestClient) -> None:
     ).json()
     assert promoted["start_month"] == "2030-02"
     assert user.get("/api/subscriptions").json()["candidates"] == []
-
-
-# ---------------------------------------------------------------- sugestões (feedback)
-
-
-def test_feedback_and_admin(user: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
-    sent = user.post(
-        "/api/feedback",
-        json={
-            "kind": "idea",
-            "message": "Queria ver as faturas no calendário",
-            "page": "/orcamento",
-        },
-        headers={"User-Agent": "Teste/1.0"},
-    )
-    assert sent.status_code == 201
-    assert user.get("/api/auth/me").json()["is_admin"] is False
-    assert user.get("/api/admin/feedback").status_code == 403
-
-    monkeypatch.setattr(get_settings(), "admin_emails", "outra@x.com, Ana@Example.com")
-    assert user.get("/api/auth/me").json()["is_admin"] is True
-    [item] = user.get("/api/admin/feedback").json()
-    assert item["message"].startswith("Queria ver")
-    assert (item["email"], item["user_agent"], item["status"]) == (
-        "ana@example.com",
-        "Teste/1.0",
-        "new",
-    )
-    user.patch(f"/api/admin/feedback/{item['id']}", json={"status": "done"})
-    assert user.get("/api/admin/feedback").json()[0]["status"] == "done"
 
 
 def test_money_split_total() -> None:

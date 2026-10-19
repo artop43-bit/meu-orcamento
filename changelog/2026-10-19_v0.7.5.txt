@@ -1,0 +1,52 @@
+MEU ORÇAMENTO · UPDATE LOG
+Versão 0.7.5 · Solicitações, perfil, cartão de débito e formulários revisados
+Data: 19/10/2026 às 17:45 (horário de Brasília)
+Vale para computador e celular.
+
+Solicitações (melhoria do campo de sugestões)
+- [x] Cada solicitação é uma conversa própria: assunto, tipo (sugestão, problema, outro) e status
+      (aberta, respondida, resolvida)
+- [x] Até 3 imagens por mensagem (PNG, JPG, WebP ou GIF, até 5 MB cada), com prévia antes de enviar;
+      no celular, o anexo abre a câmera ou a galeria; um toque amplia a imagem
+- [x] Usuário: Ajustes › Minhas solicitações, com aviso de resposta nova no menu e no cartão de Ajustes;
+      no celular, a conversa ocupa a tela e a caixa de resposta fica fixa embaixo
+- [x] Administração › Solicitações: visões Recentes, Por usuário e Por status, com busca no assunto,
+      nas mensagens e no e-mail; responder com texto e imagem e mudar o status
+- [x] O feedback já recebido virou conversa; "Enviar feedback" passou a abrir uma solicitação nova
+- [x] Segurança das imagens: tipo conferido abrindo a imagem, localização (GPS) e metadados removidos,
+      e só o dono e a administração conseguem abrir
+
+Perfil (Ajustes › Perfil)
+- [x] Nome de exibição, profissão, cidade e frase curta (tudo opcional)
+- [x] Foto e banner (imagem ou GIF animado), com enquadramento (arrastar e zoom) antes de salvar
+- [x] Resumo com os números de Insights: médias de receitas e despesas, taxa de poupança, metas
+      concluídas, meses no azul, maior sequência e score; cada item pode ser mostrado ou ocultado
+- [x] Retrospectiva do mês ou do ano em telas (estilo story), com imagem para baixar ou compartilhar
+      (story 9:16 e feed 1:1); valores em reais só aparecem se a pessoa ativar
+- [x] Foto no menu, na Administração e nas solicitações
+
+Datas e validação
+- [x] Mensagens específicas: "Fevereiro de 2027 tem 28 dias.", "Mês inválido", "Ano inválido",
+      "Data incompleta"
+- [x] Data com erro impede o salvar em todos os formulários (antes o formulário salvava sem a data)
+- [x] Dia conferido contra o mês, na tela e no servidor: lançamento só daquele mês aceita apenas os dias
+      que existem; recorrente aceita 1 a 31, com o aviso de que nos meses curtos cai no último dia
+- [x] Mensagens de erro do próprio app junto do campo, no lugar dos balões do navegador; a tela rola até
+      o campo com problema
+
+Layout
+- [x] Grade única nos formulários: campos, opções e formas de pagamento alinhados nas mesmas colunas
+- [x] Rótulos com altura fixa (o ícone ⓘ não empurra o campo); caixas de texto com a fonte do app
+
+Cartões
+- [x] Função do cartão: Crédito, Débito ou Crédito e débito
+- [x] Débito: a compra entra paga, sai da conta vinculada ao cartão e não usa limite nem fatura
+- [x] Crédito sem a opção "Sem cartão"; sem cartão cadastrado, atalho "Cadastrar cartão" no próprio
+      formulário
+
+Qualidade
+- [x] Teste automático no CI ampliado: alinhamento das janelas, datas inválidas, dia 31 de fevereiro,
+      campo obrigatório, débito e crédito, solicitações com imagem (envio e resposta), perfil e
+      retrospectiva — em monitor, notebook e celular
+- [x] Migração 0011 (com caminho de volta) e exportação de dados incluindo perfil, cartões, contas e
+      solicitações

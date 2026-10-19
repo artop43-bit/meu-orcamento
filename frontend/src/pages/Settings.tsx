@@ -1,13 +1,16 @@
 import type { ReactNode } from "react";
-import { ArrowLeftRight, ChevronLeft, ChevronRight, CircleHelp, Keyboard, Repeat, ShieldCheck, SlidersHorizontal, Tags } from "lucide-react";
+import { ArrowLeftRight, ChevronLeft, ChevronRight, CircleHelp, Keyboard, MessagesSquare, Repeat, ShieldCheck, SlidersHorizontal, Tags, UserRound } from "lucide-react";
 import { Link, Outlet, useLocation } from "react-router";
 
+import { useSupportUnread } from "../api/support";
 import { SHORTCUTS } from "../components/power";
 import { PageHeader } from "../components/ui";
 
 export type SettingsItem = { to: string; label: string; description: string; icon: ReactNode };
 
 export const SETTINGS_ITEMS: SettingsItem[] = [
+  { to: "/ajustes/perfil", label: "Perfil", description: "Nome, foto, banner, resumo pessoal e retrospectiva do mês ou do ano.", icon: <UserRound size={20} /> },
+  { to: "/ajustes/solicitacoes", label: "Minhas solicitações", description: "Sugestões e problemas enviados à administração, com as respostas.", icon: <MessagesSquare size={20} /> },
   { to: "/ajustes/recorrencias", label: "Recorrências", description: "Despesas e receitas lançadas automaticamente, assinaturas e custo anual.", icon: <Repeat size={20} /> },
   { to: "/ajustes/categorias", label: "Categorias e regras", description: "Categorias, limites mensais e regras de classificação automática.", icon: <Tags size={20} /> },
   { to: "/ajustes/dados", label: "Importar e exportar", description: "Extratos OFX/CSV, planilhas e backup completo dos dados.", icon: <ArrowLeftRight size={20} /> },
@@ -19,6 +22,7 @@ export const SETTINGS_ITEMS: SettingsItem[] = [
 
 /** Tela "Ajustes": lista das sub-telas. */
 export default function SettingsHub() {
+  const unread = useSupportUnread().data ?? 0;
   return (
     <>
       <PageHeader title="Ajustes" subtitle="Configurações da conta, dados e preferências." />
@@ -30,7 +34,12 @@ export default function SettingsHub() {
                 {item.icon}
               </span>
               <span className="settings-list__text">
-                <strong>{item.label}</strong>
+                <strong>
+                  {item.label}
+                  {item.to === "/ajustes/solicitacoes" && unread > 0 && (
+                    <span className="badge badge--accent settings-list__badge">{unread} resposta(s) nova(s)</span>
+                  )}
+                </strong>
                 <span className="muted small">{item.description}</span>
               </span>
               <ChevronRight size={18} aria-hidden className="muted" />

@@ -1,5 +1,5 @@
 import { Suspense, useEffect, useLayoutEffect, useRef, useState, type MouseEvent, type ReactNode } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Banknote,
   CalendarDays,
@@ -23,11 +23,15 @@ import {
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router";
 
 import { authApi, ME_KEY, useMe } from "../api/auth";
+import { moneyApi } from "../api/money";
+import { useProfile } from "../api/profile";
+import { useSupportUnread } from "../api/support";
 import { announce, prefersReducedMotion } from "../lib/announce";
 import { neighbor } from "../lib/gestures";
 import { haptic } from "../lib/haptics";
 import { releaseLabel } from "../release";
 import { Tour } from "./help";
+import { Avatar } from "./media";
 import { openFeedback, openPalette, PowerLayer } from "./power";
 import { togglePrivacy, usePrefs } from "../lib/prefs";
 import { Brand, LoadingRegion, Sheet, Skeleton } from "./ui";
@@ -97,6 +101,16 @@ function writeSession(key: string) {
  * Desktop: menu lateral fixo. Celular: barra superior + abas embaixo + menu "Mais",
  * com gestos (deslizar entre abas, puxar para atualizar).
  */
+/** Contador discreto ao lado de um item do menu (respostas novas, solicitações não lidas). */
+function NavBadge({ count, label }: { count: number; label: string }) {
+  if (count <= 0) return null;
+  return (
+    <span className="nav-badge" aria-label={label} title={label}>
+      {count > 9 ? "9+" : count}
+    </span>
+  );
+}
+
 export function Shell() {
   const queryClient = useQueryClient();
   const { data: user } = useMe();
@@ -199,6 +213,18 @@ export function Shell() {
     await authApi.setTwoFactorPrompt(true).catch(() => undefined);
   }
 
+  const supportUnread = useSupportUnread(Boolean(user)).data ?? 0;
+  const profile = useProfile();
+  const adminOverview = useQuery({
+    queryKey: ["admin", "overview"],
+    queryFn: moneyApi.adminOverview,
+    enabled: Boolean(user?.is_admin),
+    refetchInterval: 60_000,
+  });
+  const adminUnread = adminOverview.data?.feedback_new ?? 0;
+  const displayName = profile.data?.display_name || user?.email || "";
+  const unreadLabel = `${supportUnread} resposta(s) nova(s) em Minhas solicitações`;
+
   async function logout() {
     await authApi.logout().catch(() => undefined);
     queryClient.setQueryData(ME_KEY, null);
@@ -233,12 +259,14 @@ export function Shell() {
             <NavLink key={item.to} to={item.to} className="sidebar__link" onClick={(e) => onNavClick(e, item.to)}>
               {item.icon}
               {item.label}
+              <NavBadge count={supportUnread} label={unreadLabel} />
             </NavLink>
           ))}
           {user?.is_admin && (
             <NavLink to="/admin" className="sidebar__link">
               {ADMIN.icon}
               {ADMIN.label}
+              <NavBadge count={adminUnread} label={`${adminUnread} solicitação(ões) não lida(s)`} />
             </NavLink>
           )}
         </nav>
@@ -256,14 +284,18 @@ export function Shell() {
           >
             {prefs.privacy ? <Eye size={17} /> : <EyeOff size={17} />}
           </button>
-          <button type="button" className="sidebar__tool" onClick={openFeedback} aria-label="Enviar feedback" title="Enviar feedback">
+          <button type="button" className="sidebar__tool" onClick={openFeedback} aria-label="Nova solicitação" title="Nova solicitação (sugestão ou problema)">
             <MessageSquarePlus size={17} />
           </button>
         </div>
         <div className="sidebar__footer">
-          <span className="sidebar__user" title={user?.email}>
-            {user?.email}
-          </span>
+          <Link to="/ajustes/perfil" className="sidebar__profile" title="Meu perfil">
+            <Avatar fileId={profile.data?.avatar_id} name={displayName} size={32} />
+            <span className="sidebar__user">
+              <strong>{displayName}</strong>
+              {profile.data?.display_name && <span className="muted small">{user?.email}</span>}
+            </span>
+          </Link>
           <button type="button" className="sidebar__link sidebar__logout" onClick={logout}>
             <LogOut size={18} /> Sair
           </button>
@@ -344,18 +376,30 @@ export function Shell() {
           aria-expanded={moreOpen}
           aria-current={inMore ? "page" : undefined}
         >
-          <Ellipsis size={20} />
+          <span className="tabbar__icon">
+            <Ellipsis size={20} />
+            {supportUnread + adminUnread > 0 && <span className="tabbar__dot" aria-hidden />}
+          </span>
           Mais
+          {supportUnread + adminUnread > 0 && <span className="sr-only"> (há mensagens novas)</span>}
         </button>
       </nav>
 
       <Sheet open={moreOpen} title="Mais opções" onClose={() => setMoreOpen(false)}>
+        <Link to="/ajustes/perfil" className="menu-profile" onClick={() => setMoreOpen(false)}>
+          <Avatar fileId={profile.data?.avatar_id} name={displayName} size={44} />
+          <span>
+            <strong>{displayName}</strong>
+            <span className="muted small">Ver meu perfil</span>
+          </span>
+        </Link>
         <ul className="menu-list">
           {MORE.map((item) => (
             <li key={item.to}>
               <Link to={item.to} aria-current={item.to === section ? "page" : undefined}>
                 {item.icon}
                 {item.label}
+                {item.to === "/ajustes" && <NavBadge count={supportUnread} label={unreadLabel} />}
               </Link>
             </li>
           ))}
@@ -364,12 +408,13 @@ export function Shell() {
               <Link to="/admin">
                 {ADMIN.icon}
                 {ADMIN.label}
+                <NavBadge count={adminUnread} label={`${adminUnread} solicitação(ões) não lida(s)`} />
               </Link>
             </li>
           )}
           <li>
             <button type="button" onClick={openFeedback}>
-              <MessageSquarePlus size={20} /> Enviar feedback
+              <MessageSquarePlus size={20} /> Nova solicitação
             </button>
           </li>
           <li>

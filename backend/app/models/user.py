@@ -38,6 +38,14 @@ class User(Base):
     # Administração (painel). ADMIN_EMAILS no servidor também dá acesso.
     is_admin: Mapped[bool] = mapped_column(default=False, server_default="0")
 
+    # Perfil (tudo opcional). As preferências do resumo ficam em JSON: quais dados aparecem
+    # no perfil e se a retrospectiva mostra valores em reais.
+    display_name: Mapped[str | None] = mapped_column(String(60))
+    bio: Mapped[str | None] = mapped_column(String(160))
+    city: Mapped[str | None] = mapped_column(String(80))
+    profession: Mapped[str | None] = mapped_column(String(80))
+    profile_prefs: Mapped[str | None] = mapped_column(Text)
+
     # O usuário pediu para não ver mais o convite para ativar a verificação em duas etapas.
     twofa_prompt_dismissed_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
 

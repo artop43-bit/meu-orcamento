@@ -1,11 +1,8 @@
 """v0.6: cartões e faturas, regras, ações em lote, saldo dia a dia, assinaturas e sugestões."""
 
 import uuid
-from datetime import datetime
-from typing import Annotated, Literal
 
-from fastapi import APIRouter, Header, status
-from pydantic import BaseModel, StringConstraints
+from fastapi import APIRouter, status
 
 from app.api.budget import _changes
 from app.api.deps import CurrentUser, DbSession
@@ -26,7 +23,7 @@ from app.schemas.budget import (
     RuleOut,
     SubscriptionsOut,
 )
-from app.services import budget, cards, daily, feedback, rules, subscriptions
+from app.services import budget, cards, daily, rules, subscriptions
 
 router = APIRouter(tags=["conforto (v0.6)"])
 
@@ -122,66 +119,3 @@ def list_subscriptions(user: CurrentUser, db: DbSession) -> SubscriptionsOut:
 @router.post("/subscriptions/promote", status_code=status.HTTP_201_CREATED)
 def promote(body: PromoteIn, user: CurrentUser, db: DbSession) -> RecurringOut:
     return RecurringOut.model_validate(subscriptions.promote(db, user, body.model_dump()))
-
-
-# ---------------------------------------------------------------- sugestões (feedback)
-
-
-class FeedbackIn(BaseModel):
-    kind: Literal["bug", "idea", "other"]
-    message: Annotated[str, StringConstraints(strip_whitespace=True, min_length=3, max_length=4000)]
-    page: Annotated[str, StringConstraints(max_length=200)] | None = None
-    app_version: Annotated[str, StringConstraints(max_length=20)] | None = None
-
-
-class FeedbackOut(BaseModel):
-    id: uuid.UUID
-    kind: str
-    message: str
-    page: str | None
-    user_agent: str | None
-    app_version: str | None
-    status: str
-    created_at: datetime
-    email: str | None
-
-
-class FeedbackStatusIn(BaseModel):
-    status: Literal["new", "read", "done"]
-
-
-@router.post("/feedback", status_code=status.HTTP_201_CREATED)
-def send_feedback(
-    body: FeedbackIn,
-    user: CurrentUser,
-    db: DbSession,
-    user_agent: Annotated[str | None, Header()] = None,
-) -> dict[str, str]:
-    feedback.create(db, user, body.model_dump(), user_agent)
-    return {"status": "ok"}
-
-
-@router.get("/admin/feedback")
-def list_feedback(user: CurrentUser, db: DbSession) -> list[FeedbackOut]:
-    return [
-        FeedbackOut(
-            id=f.id,
-            kind=f.kind,
-            message=f.message,
-            page=f.page,
-            user_agent=f.user_agent,
-            app_version=f.app_version,
-            status=f.status,
-            created_at=f.created_at,
-            email=email,
-        )
-        for f, email in feedback.list_all(db, user)
-    ]
-
-
-@router.patch("/admin/feedback/{item_id}")
-def feedback_status(
-    item_id: uuid.UUID, body: FeedbackStatusIn, user: CurrentUser, db: DbSession
-) -> dict[str, str]:
-    feedback.set_status(db, user, item_id, body.status)
-    return {"status": body.status}

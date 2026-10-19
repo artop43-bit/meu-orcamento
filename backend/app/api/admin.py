@@ -27,6 +27,8 @@ class Overview(BaseModel):
 class AdminUserOut(BaseModel):
     id: uuid.UUID
     email: str
+    display_name: str | None
+    avatar_id: uuid.UUID | None
     created_at: datetime
     email_verified: bool
     access_status: str

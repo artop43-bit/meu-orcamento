@@ -14,7 +14,19 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.months import format_month
-from app.models import Category, Expense, Goal, Income, Investment, RecurringItem, User
+from app.models import (
+    Category,
+    CreditCard,
+    Expense,
+    Goal,
+    Income,
+    Investment,
+    MoneyAccount,
+    RecurringItem,
+    SupportMessage,
+    SupportThread,
+    User,
+)
 from app.services import budget
 
 COLUMNS = ["Mês", "Tipo", "Data", "Descrição", "Categoria", "Valor", "Pago", "Parcela", "Fixa"]
@@ -201,10 +213,47 @@ def backup(db: Session, user: User) -> dict[str, Any]:
             "created_at": user.created_at.isoformat(),
             "two_factor_enabled": user.totp_enabled,
         },
+        "profile": {
+            "display_name": user.display_name,
+            "bio": user.bio,
+            "city": user.city,
+            "profession": user.profession,
+        },
         "categories": _rows(db, Category, user),
         "recurring": _rows(db, RecurringItem, user),
         "incomes": _rows(db, Income, user),
         "expenses": _rows(db, Expense, user),
         "goals": _rows(db, Goal, user),
         "investments": _rows(db, Investment, user),
+        "cards": _rows(db, CreditCard, user),
+        "accounts": _rows(db, MoneyAccount, user),
+        "support_requests": _support(db, user),
     }
+
+
+def _support(db: Session, user: User) -> list[dict[str, Any]]:
+    """Solicitações com as mensagens (as imagens ficam de fora: são baixadas pelo app)."""
+    result = []
+    for thread in db.scalars(select(SupportThread).where(SupportThread.user_id == user.id)):
+        messages = db.scalars(
+            select(SupportMessage)
+            .where(SupportMessage.thread_id == thread.id)
+            .order_by(SupportMessage.created_at)
+        )
+        result.append(
+            {
+                "title": thread.title,
+                "kind": thread.kind,
+                "status": thread.status,
+                "created_at": thread.created_at.isoformat(),
+                "messages": [
+                    {
+                        "from": "administração" if m.from_admin else "você",
+                        "body": m.body,
+                        "created_at": m.created_at.isoformat(),
+                    }
+                    for m in messages
+                ],
+            }
+        )
+    return result

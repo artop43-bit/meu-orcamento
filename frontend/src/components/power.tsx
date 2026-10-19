@@ -18,7 +18,8 @@ import { useLocation, useNavigate } from "react-router";
 
 import { useCategories } from "../api/budget";
 import { errorMessage } from "../api/client";
-import { extrasApi, saveQuickEntry, useCards } from "../api/extras";
+import { saveQuickEntry, useCards } from "../api/extras";
+import { KIND_LABEL, supportApi, type ThreadKind } from "../api/support";
 import { announce } from "../lib/announce";
 import { haptic } from "../lib/haptics";
 import { getPrefs, togglePrivacy } from "../lib/prefs";
@@ -26,6 +27,7 @@ import { looksLikeEntry, parseQuickEntry } from "../lib/quickEntry";
 import { normalizeText } from "../lib/text";
 import { money } from "../lib/format";
 import { RELEASE, RELEASE_NOTES } from "../release";
+import { ImagePicker } from "./media";
 import { Alert, Button, Sheet } from "./ui";
 import { useUndo } from "./undo";
 
@@ -198,7 +200,7 @@ export function CommandPalette() {
         keywords: "privacidade ocultar",
         run: () => void togglePrivacy(),
       },
-      { id: "sugestao", label: "Enviar feedback", icon: <MessageSquarePlus size={16} />, keywords: "sugestao problema bug", run: openFeedback },
+      { id: "sugestao", label: "Nova solicitação (sugestão ou problema)", icon: <MessageSquarePlus size={16} />, keywords: "feedback sugestao problema bug solicitacao", run: openFeedback },
       { id: "atalhos", label: "Atalhos de teclado", hint: "?", icon: <Keyboard size={16} />, run: openShortcuts },
       ...PAGES.map(([to, label, words]) => ({ id: to, label: `Ir para ${label}`, icon: <ArrowRight size={16} />, keywords: words, run: go(to) })),
     ];
@@ -366,14 +368,18 @@ export function WhatsNew() {
 
 export function FeedbackSheet() {
   const [open, setOpen] = useState(false);
-  const [kind, setKind] = useState<"idea" | "bug" | "other">("idea");
+  const [kind, setKind] = useState<ThreadKind>("idea");
+  const [title, setTitle] = useState("");
   const [message, setMessage] = useState("");
+  const [images, setImages] = useState<File[]>([]);
   const [error, setError] = useState("");
-  const [sent, setSent] = useState(false);
+  const [sent, setSent] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
   useWindowEvent(OPEN_FEEDBACK, () => {
-    setSent(false);
+    setSent(null);
     setError("");
     setOpen(true);
   });
@@ -383,10 +389,16 @@ export function FeedbackSheet() {
     setError("");
     setBusy(true);
     try {
-      await extrasApi.sendFeedback({ kind, message, page: location.pathname + location.search, app_version: RELEASE.version });
+      const thread = await supportApi.create(
+        { title: title.trim(), kind, message: message.trim(), page: location.pathname + location.search, app_version: RELEASE.version },
+        images,
+      );
+      setTitle("");
       setMessage("");
-      setSent(true);
+      setImages([]);
+      setSent(thread.id);
       haptic("success");
+      await queryClient.invalidateQueries({ queryKey: ["support"] });
     } catch (err) {
       setError(errorMessage(err));
     } finally {
@@ -395,13 +407,24 @@ export function FeedbackSheet() {
   }
 
   return (
-    <Sheet open={open} title="Enviar feedback" onClose={() => setOpen(false)}>
+    <Sheet open={open} title="Nova solicitação" onClose={() => setOpen(false)}>
       {sent ? (
         <div className="stack">
-          <Alert tone="success">Feedback recebido. Obrigado pela contribuição.</Alert>
+          <Alert tone="success">
+            Solicitação enviada. A resposta da administração aparece em Ajustes › Minhas solicitações, com um aviso no menu.
+          </Alert>
           <div className="form-actions">
-            <Button type="button" onClick={() => setOpen(false)}>
-              Pronto
+            <Button type="button" variant="secondary" onClick={() => setOpen(false)}>
+              Fechar
+            </Button>
+            <Button
+              type="button"
+              onClick={() => {
+                setOpen(false);
+                navigate(`/ajustes/solicitacoes/${sent}`);
+              }}
+            >
+              Acompanhar solicitação
             </Button>
           </div>
         </div>
@@ -411,32 +434,37 @@ export function FeedbackSheet() {
           <fieldset className="radios">
             <legend className="field-label">Tipo</legend>
             <div className="segmented segmented--3">
-              {(
-                [
-                  ["idea", "Sugestão"],
-                  ["bug", "Problema"],
-                  ["other", "Outro"],
-                ] as const
-              ).map(([value, label]) => (
+              {(Object.keys(KIND_LABEL) as ThreadKind[]).map((value) => (
                 <label key={value}>
                   <input type="radio" name="kind" checked={kind === value} onChange={() => setKind(value)} />
-                  {label}
+                  {KIND_LABEL[value]}
                 </label>
               ))}
             </div>
           </fieldset>
+          <label>
+            Assunto
+            <input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              minLength={3}
+              maxLength={120}
+              required
+              placeholder={kind === "bug" ? "Ex.: Gráfico de Insights não carrega" : "Ex.: Exportar relatório anual em PDF"}
+            />
+          </label>
           <label>
             Mensagem
             <textarea
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               rows={5}
-              minLength={3}
               maxLength={4000}
               required
               placeholder={kind === "bug" ? "Passos realizados, resultado esperado e resultado obtido." : "Descreva a sugestão."}
             />
           </label>
+          <ImagePicker files={images} onChange={setImages} />
           <p className="muted small" style={{ margin: 0 }}>
             São enviados também a tela atual ({location.pathname}) e a versão {RELEASE.version}. Nenhum valor financeiro é incluído.
           </p>
@@ -445,7 +473,7 @@ export function FeedbackSheet() {
               Cancelar
             </Button>
             <Button type="submit" loading={busy}>
-              Enviar
+              Enviar solicitação
             </Button>
           </div>
         </form>

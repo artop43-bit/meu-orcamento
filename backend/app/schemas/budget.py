@@ -127,6 +127,8 @@ class ExpenseIn(BaseModel):
     # Compra no cartão: o mês e o vencimento vêm da fatura em que a compra cai.
     card_id: uuid.UUID | None = None
     purchase_date: Day | None = None
+    # Compra no débito com um cartão: entra paga e sai da conta vinculada ao cartão.
+    debit_card_id: uuid.UUID | None = None
     account_id: uuid.UUID | None = None
 
 
@@ -153,6 +155,7 @@ class ExpenseOut(_MonthOut):
     payment_method: str | None
     card_id: uuid.UUID | None
     purchase_date: date | None
+    debit_card_id: uuid.UUID | None
     account_id: uuid.UUID | None
     needs_review: bool
     installment_group_id: uuid.UUID | None
@@ -371,17 +374,24 @@ class BulkIn(BaseModel):
 CardName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=60)]
 
 
+CardKind = Literal["credit", "debit", "both"]
+
+
 class CardIn(BaseModel):
     name: CardName
+    # Crédito (fatura e limite), débito (sai na hora da conta vinculada) ou os dois.
+    kind: CardKind = "credit"
     limit_amount: Money | None = None
-    closing_day: DueDay
-    due_day: DueDay
+    # Obrigatórios quando o cartão tem crédito (conferido no serviço).
+    closing_day: DueDay | None = None
+    due_day: DueDay | None = None
     color: Color | None = None
     account_id: uuid.UUID | None = None
 
 
 class CardPatch(BaseModel):
     name: CardName | None = None
+    kind: CardKind | None = None
     limit_amount: Money | None = None
     closing_day: DueDay | None = None
     due_day: DueDay | None = None
@@ -392,9 +402,10 @@ class CardPatch(BaseModel):
 class CardOut(_Out):
     id: uuid.UUID
     name: str
+    kind: str
     limit_amount: Decimal | None
-    closing_day: int
-    due_day: int
+    closing_day: int | None
+    due_day: int | None
     color: str | None
     account_id: uuid.UUID | None
 
@@ -413,8 +424,9 @@ class CardSummary(BaseModel):
     used: Decimal
     available: Decimal | None
     used_pct: float | None
-    best_day: int
-    open_invoice: InvoiceOut
+    # Só para cartões com crédito (no cartão só de débito ficam vazios).
+    best_day: int | None
+    open_invoice: InvoiceOut | None
     closed_invoice: InvoiceOut | None
 
 

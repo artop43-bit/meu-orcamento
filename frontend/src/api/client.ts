@@ -10,7 +10,9 @@ export class ApiError extends Error {
 
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   const headers: Record<string, string> = { "X-Requested-With": "fetch" };
-  if (body !== undefined) headers["Content-Type"] = "application/json";
+  // Envio de arquivos (FormData): o navegador monta o Content-Type com o "boundary".
+  const isForm = body instanceof FormData;
+  if (body !== undefined && !isForm) headers["Content-Type"] = "application/json";
 
   let response: Response;
   try {
@@ -18,7 +20,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
       method,
       credentials: "include",
       headers,
-      body: body === undefined ? undefined : JSON.stringify(body),
+      body: body === undefined ? undefined : isForm ? body : JSON.stringify(body),
     });
   } catch {
     throw new ApiError(0, "network", "Sem conexão com o servidor. Tente novamente.");
@@ -41,6 +43,10 @@ export const api = {
   post: <T>(path: string, body: unknown = {}) => request<T>("POST", path, body),
   patch: <T>(path: string, body: unknown) => request<T>("PATCH", path, body),
   delete: (path: string) => request<void>("DELETE", path),
+  /** Envio com arquivos (multipart). */
+  form: <T>(method: "POST" | "PUT", path: string, data: FormData) => request<T>(method, path, data),
+  /** DELETE que devolve dados (ex.: perfil depois de remover a foto). */
+  remove: <T>(path: string) => request<T>("DELETE", path),
 };
 
 export function errorMessage(error: unknown): string {

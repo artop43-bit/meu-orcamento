@@ -1,14 +1,35 @@
-import { useEffect, useId, useRef, useState, type InputHTMLAttributes } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, type InputHTMLAttributes } from "react";
 import { CalendarDays } from "lucide-react";
 
 /**
  * Campos de data do app: sempre dd/mm/aaaa (ou mm/aaaa), iguais em qualquer navegador.
  * Digitação com máscara + botão que abre o calendário do sistema. O valor trafega em ISO
  * ("2026-10-19" / "2026-10"). Anos aceitos: 2000 a 2100 (o servidor confere de novo).
+ *
+ * Data com problema fica marcada com a explicação exata (ex.: "Fevereiro de 2027 tem 28
+ * dias.") e IMPEDE o envio do formulário (validação nativa com setCustomValidity).
  */
 export const MIN_YEAR = 2000;
 export const MAX_YEAR = 2100;
-export const DATE_ERROR = `Data inválida: use dd/mm/aaaa com ano entre ${MIN_YEAR} e ${MAX_YEAR}.`;
+
+const MONTHS = [
+  "Janeiro",
+  "Fevereiro",
+  "Março",
+  "Abril",
+  "Maio",
+  "Junho",
+  "Julho",
+  "Agosto",
+  "Setembro",
+  "Outubro",
+  "Novembro",
+  "Dezembro",
+];
+
+export function daysInMonth(year: number, month: number): number {
+  return new Date(year, month, 0).getDate();
+}
 
 function isoToText(iso: string, month: boolean): string {
   if (!iso) return "";
@@ -16,24 +37,36 @@ function isoToText(iso: string, month: boolean): string {
   return month ? `${m}/${y}` : `${d}/${m}/${y}`;
 }
 
+/**
+ * Explica o que há de errado com a data digitada; null se está boa (ou vazia).
+ * Com `partial`, data ainda incompleta não é erro (a pessoa está digitando).
+ */
+export function dateProblem(text: string, month: boolean, opts: { min?: string; max?: string; partial?: boolean } = {}): string | null {
+  const digits = text.replace(/\D/g, "");
+  if (!digits) return null;
+  const size = month ? 6 : 8;
+  if (digits.length < size) return opts.partial ? null : `Data incompleta: use ${month ? "mm/aaaa" : "dd/mm/aaaa"}.`;
+  const d = month ? 1 : Number(digits.slice(0, 2));
+  const m = Number(digits.slice(month ? 0 : 2, month ? 2 : 4));
+  const y = Number(digits.slice(month ? 2 : 4));
+  if (m < 1 || m > 12) return "Mês inválido: use de 01 a 12.";
+  if (y < MIN_YEAR || y > MAX_YEAR) return `Ano inválido: use um ano entre ${MIN_YEAR} e ${MAX_YEAR}.`;
+  if (!month) {
+    const last = daysInMonth(y, m);
+    if (d < 1) return "Dia inválido: use a partir de 01.";
+    if (d > last) return `${MONTHS[m - 1]} de ${y} tem ${last} dias.`;
+  }
+  const iso = month ? `${y}-${String(m).padStart(2, "0")}` : `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+  if (opts.min && iso < opts.min) return `Use uma data a partir de ${isoToText(opts.min, month)}.`;
+  if (opts.max && iso > opts.max) return `Use uma data até ${isoToText(opts.max, month)}.`;
+  return null;
+}
+
 /** "19102026" ou "19/10/2026" → "2026-10-19"; null se inválida. */
 export function textToIso(text: string, month: boolean): string | null {
   const digits = text.replace(/\D/g, "");
-  if (month) {
-    if (digits.length !== 6) return null;
-    const m = Number(digits.slice(0, 2));
-    const y = Number(digits.slice(2));
-    if (m < 1 || m > 12 || y < MIN_YEAR || y > MAX_YEAR) return null;
-    return `${y}-${String(m).padStart(2, "0")}`;
-  }
-  if (digits.length !== 8) return null;
-  const d = Number(digits.slice(0, 2));
-  const m = Number(digits.slice(2, 4));
-  const y = Number(digits.slice(4));
-  if (y < MIN_YEAR || y > MAX_YEAR || m < 1 || m > 12) return null;
-  const last = new Date(y, m, 0).getDate();
-  if (d < 1 || d > last) return null;
-  return `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+  if (digits.length !== (month ? 6 : 8) || dateProblem(text, month)) return null;
+  return month ? `${digits.slice(2)}-${digits.slice(0, 2)}` : `${digits.slice(4)}-${digits.slice(2, 4)}-${digits.slice(0, 2)}`;
 }
 
 function mask(text: string, month: boolean): string {
@@ -56,7 +89,9 @@ type Props = Omit<InputHTMLAttributes<HTMLInputElement>, "value" | "onChange" | 
 
 export function DateField({ value, onChange, month = false, min, max, label, required, id, ...rest }: Props) {
   const [text, setText] = useState(() => isoToText(value, month));
-  const [invalid, setInvalid] = useState(false);
+  // Erro de data incompleta só aparece depois de sair do campo (ou ao tentar salvar).
+  const [touched, setTouched] = useState(false);
+  const input = useRef<HTMLInputElement>(null);
   const picker = useRef<HTMLInputElement>(null);
   const autoId = useId();
   const fieldId = id ?? autoId;
@@ -67,19 +102,26 @@ export function DateField({ value, onChange, month = false, min, max, label, req
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value, month]);
 
+  const problem = dateProblem(text, month, { min, max, partial: !touched });
+  const blocking = dateProblem(text, month, { min, max });
+  const missing = required && !text;
+  const shown = problem ?? (touched && missing ? "Informe a data." : null);
+
+  // A validação nativa do formulário passa a conhecer o erro: o botão salvar não envia.
+  useLayoutEffect(() => {
+    input.current?.setCustomValidity(blocking ?? "");
+  }, [blocking]);
+
   function commit(next: string) {
     const masked = mask(next, month);
     setText(masked);
     if (!masked) {
-      setInvalid(false);
       onChange("");
       return;
     }
     const iso = textToIso(masked, month);
-    const outOfRange = iso !== null && ((min && iso < min) || (max && iso > max));
-    const complete = masked.replace(/\D/g, "").length === (month ? 6 : 8);
-    setInvalid(complete && (iso === null || !!outOfRange));
-    if (iso && !outOfRange) onChange(iso);
+    if (iso && !dateProblem(masked, month, { min, max })) onChange(iso);
+    else if (masked.replace(/\D/g, "").length === (month ? 6 : 8)) onChange("");
   }
 
   function openPicker() {
@@ -93,9 +135,10 @@ export function DateField({ value, onChange, month = false, min, max, label, req
   }
 
   return (
-    <span className={`date-field ${invalid ? "is-invalid" : ""}`}>
+    <span className={`date-field ${shown ? "is-invalid" : ""}`}>
       <input
         {...rest}
+        ref={input}
         id={fieldId}
         aria-label={label}
         type="text"
@@ -105,9 +148,12 @@ export function DateField({ value, onChange, month = false, min, max, label, req
         maxLength={month ? 7 : 10}
         value={text}
         required={required}
-        aria-invalid={invalid || undefined}
-        aria-describedby={invalid ? `${fieldId}-erro` : undefined}
+        aria-invalid={shown ? true : undefined}
+        aria-describedby={shown ? `${fieldId}-erro` : undefined}
+        data-own-errors=""
         onChange={(e) => commit(e.target.value)}
+        onBlur={() => setTouched(true)}
+        onInvalid={() => setTouched(true)}
       />
       <button type="button" className="date-field__btn" onClick={openPicker} aria-label="Abrir calendário" tabIndex={-1}>
         <CalendarDays size={17} aria-hidden />
@@ -124,11 +170,81 @@ export function DateField({ value, onChange, month = false, min, max, label, req
         value={value}
         onChange={(e) => e.target.value && commit(isoToText(e.target.value, month))}
       />
-      {invalid && (
+      {shown && (
         <small id={`${fieldId}-erro`} className="date-field__error" role="alert">
-          {DATE_ERROR}
+          {shown}
         </small>
       )}
     </span>
+  );
+}
+
+/**
+ * Dia do mês (recebimento, vencimento, fechamento). Em lançamento só daquele mês o dia
+ * precisa existir no mês; no que se repete vale 1 a 31 (nos meses curtos cai no último dia).
+ */
+export function DayField({
+  value,
+  onChange,
+  month,
+  recurring,
+  required,
+  id,
+  label,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  /** AAAA-MM do lançamento (para saber quantos dias o mês tem). */
+  month?: string;
+  recurring: boolean;
+  required?: boolean;
+  id?: string;
+  label?: string;
+}) {
+  const input = useRef<HTMLInputElement>(null);
+  const [touched, setTouched] = useState(false);
+  const autoId = useId();
+  const fieldId = id ?? autoId;
+  const day = value ? Number(value) : null;
+  const [y, m] = (month ?? "").split("-").map(Number);
+  const last = month && !recurring ? daysInMonth(y!, m!) : 31;
+
+  let problem: string | null = null;
+  if (day !== null && (!Number.isInteger(day) || day < 1)) problem = "Dia inválido: use de 1 a 31.";
+  else if (day !== null && day > last)
+    problem = month && !recurring ? `${MONTHS[m! - 1]} de ${y} tem ${last} dias. Use um dia entre 1 e ${last}.` : "Dia inválido: use de 1 a 31.";
+  else if (required && day === null && touched) problem = "Informe o dia.";
+  const hint = !problem && recurring && day !== null && day >= 29 ? "Em meses mais curtos, cai no último dia do mês." : null;
+
+  useLayoutEffect(() => {
+    input.current?.setCustomValidity(problem && problem !== "Informe o dia." ? problem : "");
+  }, [problem]);
+
+  return (
+    <>
+      <input
+        ref={input}
+        id={fieldId}
+        type="text"
+        inputMode="numeric"
+        autoComplete="off"
+        maxLength={2}
+        placeholder={recurring ? "1 a 31" : `1 a ${last}`}
+        value={value}
+        required={required}
+        aria-label={label}
+        aria-invalid={problem ? true : undefined}
+        aria-describedby={problem || hint ? `${fieldId}-ajuda` : undefined}
+        data-own-errors=""
+        onChange={(e) => onChange(e.target.value.replace(/\D/g, "").slice(0, 2))}
+        onBlur={() => setTouched(true)}
+        onInvalid={() => setTouched(true)}
+      />
+      {(problem || hint) && (
+        <small id={`${fieldId}-ajuda`} className={problem ? "date-field__error" : "muted small"} role={problem ? "alert" : undefined}>
+          {problem ?? hint}
+        </small>
+      )}
+    </>
   );
 }

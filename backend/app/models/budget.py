@@ -133,6 +133,10 @@ class Expense(Base):
         ForeignKey("credit_cards.id", ondelete="SET NULL"), index=True
     )
     purchase_date: Mapped[date | None] = mapped_column(Date)
+    # Compra no débito com um cartão: só registra qual cartão foi usado (não entra em fatura).
+    debit_card_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("credit_cards.id", ondelete="SET NULL")
+    )
     account_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("money_accounts.id", ondelete="SET NULL"), index=True
     )
@@ -232,17 +236,21 @@ class WatchItem(Base):
 
 
 class CreditCard(Base):
-    """Cartão de crédito: as compras caem na fatura certa pelo dia de fechamento."""
+    """Cartão: no crédito, as compras caem na fatura certa pelo dia de fechamento; no débito,
+    saem na hora da conta vinculada (sem fatura e sem usar limite)."""
 
     __tablename__ = "credit_cards"
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = _user_fk()
     name: Mapped[str] = mapped_column(String(60))
+    # Função do cartão: "credit", "debit" ou "both".
+    kind: Mapped[str] = mapped_column(String(6), default="credit", server_default="credit")
     limit_amount: Mapped[Decimal | None] = mapped_column(Money)
     # Dia em que a fatura fecha (compras a partir dele vão para a próxima) e dia do vencimento.
-    closing_day: Mapped[int] = mapped_column(SmallInteger)
-    due_day: Mapped[int] = mapped_column(SmallInteger)
+    # Só existem quando o cartão tem crédito.
+    closing_day: Mapped[int | None] = mapped_column(SmallInteger)
+    due_day: Mapped[int | None] = mapped_column(SmallInteger)
     color: Mapped[str | None] = mapped_column(String(7))
     # Conta que paga a fatura (o saldo dela cai quando a fatura é paga).
     account_id: Mapped[uuid.UUID | None] = mapped_column(
@@ -262,24 +270,6 @@ class CategoryRule(Base):
     # Texto já normalizado (minúsculas, sem acento).
     pattern: Mapped[str] = mapped_column(String(60))
     category_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("categories.id", ondelete="CASCADE"))
-    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
-
-
-class Feedback(Base):
-    """Sugestão ou problema enviado de dentro do app."""
-
-    __tablename__ = "feedback"
-
-    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
-    user_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey("users.id", ondelete="SET NULL"), index=True
-    )
-    kind: Mapped[str] = mapped_column(String(10))  # "bug" | "idea" | "other"
-    message: Mapped[str] = mapped_column(Text)
-    page: Mapped[str | None] = mapped_column(String(200))
-    user_agent: Mapped[str | None] = mapped_column(String(300))
-    app_version: Mapped[str | None] = mapped_column(String(20))
-    status: Mapped[str] = mapped_column(String(10), default="new")  # "new" | "read" | "done"
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
 
 

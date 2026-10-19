@@ -4,7 +4,19 @@ from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api import admin, analysis, auth, budget, data, extras, health, market, money, planner
+from app.api import (
+    admin,
+    analysis,
+    auth,
+    budget,
+    data,
+    extras,
+    health,
+    market,
+    money,
+    planner,
+    support,
+)
 from app.core.config import DEFAULT_SECRET_KEY, get_settings
 from app.core.errors import register_error_handlers
 from app.core.rate_limit import client_ip
@@ -89,6 +101,7 @@ def create_app() -> FastAPI:
     app.include_router(extras.router, prefix="/api")
     app.include_router(admin.router, prefix="/api")
     app.include_router(money.router, prefix="/api")
+    app.include_router(support.router, prefix="/api")
     return app
 
 

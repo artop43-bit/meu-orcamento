@@ -361,6 +361,24 @@ def _fill(db: Session, user: User) -> None:
         select(Expense).where(Expense.user_id == user.id, Expense.card_id.is_(None))
     ):
         expense.account_id = account.id
+    # Cartão de débito: a compra entra paga e sai da conta corrente (sem fatura e sem limite).
+    debit = CreditCard(
+        user_id=user.id, name="Débito Conta corrente", kind="debit", account_id=account.id
+    )
+    db.add(debit)
+    db.flush()
+    budget.create_expense(
+        db,
+        user,
+        this_month,
+        {
+            "description": "Padaria",
+            "amount": Decimal("18.50"),
+            "category_id": alimentacao.id,
+            "debit_card_id": debit.id,
+            "purchase_date": today,
+        },
+    )
     db.add(
         Transfer(
             user_id=user.id,
