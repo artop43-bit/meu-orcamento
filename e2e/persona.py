@@ -1172,7 +1172,7 @@ def mobile_sections(browser):
         cdp.send("Input.dispatchTouchEvent", {"type": "touchEnd", "touchPoints": []})
         page.wait_for_timeout(600)
 
-    # Deslizar anda pelas telas na ordem do menu (Insights → Histórico; Insights ← Metas).
+    # Deslizar anda pelas telas na ordem do menu (Insights → Histórico; Investimentos ← Insights).
     # (abaixo da faixa de seções de Insights, que rola para o lado e por isso não troca de tela)
     page.goto(f"{BASE}/analises?secao=tendencias")
     idle(page, 700)
@@ -1181,7 +1181,7 @@ def mobile_sections(browser):
     page.goto(f"{BASE}/analises?secao=resumo")
     idle(page, 700)
     swipe(60, 330, y=520)
-    assert page.url.endswith("/metas"), page.url
+    assert page.url.endswith("/investimentos"), page.url
     # O gesto vale também na parte de baixo da tela.
     idle(page, 500)
     swipe(330, 60, y=720)
