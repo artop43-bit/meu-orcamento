@@ -57,6 +57,7 @@ PAGES = [
     "/ajustes/notas",
     "/mensagens",
     "/dividas",
+    "/divisoes",
     "/analises?secao=calculadoras",
     "/admin?aba=recados",
     "/ajustes/seguranca",

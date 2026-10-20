@@ -35,6 +35,7 @@ import {
   SupportPage,
   InboxPage,
   DebtsPage,
+  SplitsPage,
   LoanTablePage,
   Unsubscribe,
   Security,
@@ -97,6 +98,7 @@ export default function App() {
           <Route path="/busca" element={<SearchPage />} />
           <Route path="/mensagens" element={<InboxPage />} />
           <Route path="/dividas" element={<DebtsPage />} />
+          <Route path="/divisoes" element={<SplitsPage />} />
           <Route path="/dividas/:id/tabela" element={<LoanTablePage />} />
           <Route path="/admin" element={<AdminPage />} />
           <Route path="/admin/sugestoes" element={<Navigate to="/admin?aba=solicitacoes" replace />} />

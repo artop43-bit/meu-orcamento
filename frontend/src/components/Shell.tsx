@@ -23,6 +23,7 @@ import {
   ShieldCheck,
   Sun,
   Target,
+  Users,
   Wallet,
 } from "lucide-react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router";
@@ -34,6 +35,7 @@ import { useInboxUnread } from "../api/inbox";
 import { announce, prefersReducedMotion } from "../lib/announce";
 import { neighbor } from "../lib/gestures";
 import { haptic } from "../lib/haptics";
+import { setCycleStart } from "../lib/format";
 import { releaseLabel } from "../release";
 import { Tour } from "./help";
 import { Avatar } from "./media";
@@ -69,6 +71,7 @@ const MAIN: NavItem[] = [
   { to: "/contas", label: "Contas", icon: <Banknote size={20} /> },
   { to: "/cartoes", label: "Cartões", icon: <CreditCard size={20} /> },
   { to: "/dividas", label: "Dívidas", icon: <Scale size={20} /> },
+  { to: "/divisoes", label: "Divisões", icon: <Users size={20} /> },
   { to: "/metas", label: "Metas", icon: <Target size={20} /> },
   { to: "/historico", label: "Histórico", icon: <History size={20} /> },
 ];
@@ -123,6 +126,8 @@ function NavBadge({ count, label }: { count: number; label: string }) {
 export function Shell() {
   const queryClient = useQueryClient();
   const { data: user } = useMe();
+  // Mês financeiro da conta: definido antes de as telas calcularem o "mês atual".
+  setCycleStart(user?.month_start_day ?? 1);
   const location = useLocation();
   const navigate = useNavigate();
   const [moreOpen, setMoreOpen] = useState(false);

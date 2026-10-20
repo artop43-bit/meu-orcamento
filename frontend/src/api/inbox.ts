@@ -4,7 +4,7 @@ import { api } from "./client";
 
 export type InboxItem = {
   id: string;
-  kind: "reply" | "announcement";
+  kind: "reply" | "announcement" | "alert";
   title: string;
   body: string;
   important: boolean;
