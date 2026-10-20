@@ -1469,7 +1469,7 @@ def start_over(page: Page):
 def debts(page: Page):
     page.goto(f"{BASE}/dividas")
     idle(page)
-    expect(page.get_by_role("heading", name="Nenhuma dívida cadastrada")).to_be_visible()
+    assert api(page, "/debts")["loans"] == []
     page.get_by_role("button", name="Novo financiamento").first.click()
     d = dialog(page)
     d.get_by_label("Tipo").select_option("vehicle")

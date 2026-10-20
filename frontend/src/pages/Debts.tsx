@@ -126,20 +126,24 @@ function LoanForm({ loan, onDone }: { loan?: Loan; onDone: () => void }) {
           </span>
           <input value={ratePct} onChange={(e) => setRatePct(e.target.value.replace(/[^\d,.]/g, ""))} inputMode="decimal" required placeholder="Ex.: 1,49" />
         </label>
-        <fieldset className="radios">
-          <legend className="field-label">Período da taxa</legend>
-          <div className="segmented">
-            <label>
-              <input type="radio" name="rate-period" checked={period === "monthly"} onChange={() => setPeriod("monthly")} />
-              Ao mês
-            </label>
-            <label>
-              <input type="radio" name="rate-period" checked={period === "yearly"} onChange={() => setPeriod("yearly")} />
-              Ao ano
-            </label>
-          </div>
-        </fieldset>
+        <label>
+          Número de parcelas
+          <input type="number" min={1} max={420} value={count} onChange={(e) => setCount(e.target.value)} required />
+        </label>
       </div>
+      <fieldset className="radios">
+        <legend className="field-label">Período da taxa</legend>
+        <div className="segmented">
+          <label>
+            <input type="radio" name="rate-period" checked={period === "monthly"} onChange={() => setPeriod("monthly")} />
+            Ao mês
+          </label>
+          <label>
+            <input type="radio" name="rate-period" checked={period === "yearly"} onChange={() => setPeriod("yearly")} />
+            Ao ano
+          </label>
+        </div>
+      </fieldset>
       <fieldset className="radios">
         <legend className="field-label">
           Sistema de amortização{" "}
@@ -158,10 +162,6 @@ function LoanForm({ loan, onDone }: { loan?: Loan; onDone: () => void }) {
       </fieldset>
       <div className="grid-2">
         <label>
-          Número de parcelas
-          <input type="number" min={1} max={420} value={count} onChange={(e) => setCount(e.target.value)} required />
-        </label>
-        <label>
           Vencimento da 1ª parcela
           <DateField value={firstDue} onChange={setFirstDue} required />
         </label>
@@ -171,14 +171,15 @@ function LoanForm({ loan, onDone }: { loan?: Loan; onDone: () => void }) {
           </span>
           <input type="number" min={0} max={419} value={paidBefore} onChange={(e) => setPaidBefore(e.target.value)} />
         </label>
-        {suggested > 0 && Number(paidBefore || 0) !== suggested && (
-          <div className="field-hint-action">
-            <Button type="button" variant="secondary" onClick={() => setPaidBefore(String(suggested))}>
-              Usar {suggested} (pelas datas)
-            </Button>
-          </div>
-        )}
       </div>
+      {suggested > 0 && Number(paidBefore || 0) !== suggested && (
+        <p className="muted small" style={{ margin: 0 }}>
+          Pelas datas, {suggested} parcela(s) já venceram.{" "}
+          <button type="button" className="link-btn" onClick={() => setPaidBefore(String(suggested))}>
+            Usar {suggested}
+          </button>
+        </p>
+      )}
       <details className="details">
         <summary>Custos extras (opcional)</summary>
         <div className="grid-2">
@@ -191,9 +192,7 @@ function LoanForm({ loan, onDone }: { loan?: Loan; onDone: () => void }) {
             <MoneyInput value={fee} onChange={setFee} required={false} />
           </label>
           <label>
-            <span className="field-label">
-              IOF financiado <Tip>Quando o IOF é somado ao valor financiado (veja no contrato).</Tip>
-            </span>
+            IOF somado ao valor financiado
             <MoneyInput value={iof} onChange={setIof} required={false} />
           </label>
         </div>

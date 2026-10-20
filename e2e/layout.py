@@ -225,6 +225,8 @@ def check(page: Page, device: str, name: str, full: bool = True, scope: str | No
 def check_tips(page: Page, device: str, name: str):
     tips = page.locator("dialog[open] .tip__btn")
     for i in range(tips.count()):
+        if not tips.nth(i).is_visible():  # dica dentro de uma seção recolhida
+            continue
         tips.nth(i).click()
         page.wait_for_timeout(120)
         box = page.evaluate(TIP_OUT)
