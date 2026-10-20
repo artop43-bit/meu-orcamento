@@ -111,3 +111,12 @@ def test_numbers_survive_alongside_existing_threads(people: TestClient, db: Sess
     db.expire_all()
     thread = db.scalar(select(SupportThread))
     assert thread is not None and thread.number == 1
+
+
+def test_ten_accent_colors(people: TestClient) -> None:
+    switch(people, "ana@example.com")
+    for accent in ("indigo", "rosa", "vermelho", "ambar", "ciano", "grafite"):
+        out = people.patch("/api/me/appearance", json={"accent": accent})
+        assert out.status_code == 200 and out.json()["accent"] == accent
+    assert people.get("/api/auth/me").json()["accent"] == "grafite"
+    assert people.patch("/api/me/appearance", json={"accent": "dourado"}).status_code == 422

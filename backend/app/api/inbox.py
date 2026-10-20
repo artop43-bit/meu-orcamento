@@ -150,9 +150,15 @@ def create_announcement(
 # ---------------------------------------------------------------- aparência na conta
 
 
+# Cores de destaque (as mesmas de frontend/src/theme/tokens.ts).
+Accent = Literal[
+    "verde", "azul", "indigo", "roxo", "rosa", "vermelho", "laranja", "ambar", "ciano", "grafite"
+]
+
+
 class AppearanceIn(BaseModel):
     theme: Literal["system", "light", "dark"] | None = None
-    accent: Literal["verde", "azul", "roxo", "laranja"] | None = None
+    accent: Accent | None = None
 
 
 class AppearanceOut(BaseModel):

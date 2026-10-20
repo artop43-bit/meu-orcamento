@@ -1,0 +1,41 @@
+MEU ORÇAMENTO · UPDATE LOG
+Versão 1.1.0 · Menu em grupos, gestos no celular, solicitações como tarefas e 10 cores
+Data: 20/10/2026 às 21:30 (horário de Brasília)
+
+Menu em grupos
+- [x] Menu principal enxuto: Orçamento; Carteira (Contas, Cartões, Dívidas, Divisões); Planejamento
+      (Calendário, Metas); Investimentos; Análises (Insights, Histórico). Ajustes e Administração abaixo
+- [x] Grupos abrem e fecham no próprio menu; abrir um grupo leva à primeira tela dele
+- [x] Celular: abas de baixo com os grupos e faixa com as telas do grupo no topo; Investimentos no "Mais"
+- [x] Mensagens virou um balão nas ferramentas do menu (com o número de não lidas), fora da lista principal
+- [x] Botão de tema ao lado de "Sair", no rodapé do menu
+
+Mais mobilidade no celular
+- [x] Janelas que sobem de baixo fecham ao arrastar para baixo (em qualquer ponto, não só na alça);
+      se algo foi preenchido, pergunta antes de descartar
+- [x] Deslizar para a direita volta das sub-telas (Ajustes, conversas, tabela de dívidas)
+- [x] Deslizar para os lados anda entre as telas, na ordem do menu
+- [x] Puxar para baixo no topo atualiza a tela
+
+Mensagens e solicitações
+- [x] Responder recados do ADM dentro de Mensagens: a resposta vira uma conversa
+- [x] Solicitações agora ficam em Mensagens › Conversas (saíram de Ajustes)
+- [x] Solicitações numeradas (#N), com andamento: aberta, em andamento, planejada (com versão),
+      respondida, resolvida ou recusada; a pessoa é avisada quando o andamento muda
+- [x] Administração: quadro por andamento, filtros por tipo e versão, busca por #número e nota para a pessoa
+
+Aparência
+- [x] 10 cores de destaque (verde, azul, índigo, roxo, rosa, vermelho, laranja, âmbar, ciano e grafite),
+      todas com contraste AA no claro e no escuro
+- [x] Preparação para temas personalizados: cores em tokens num só lugar (src/theme/tokens.ts),
+      folha de tema gerada (npm run theme) e teste de contraste e de cores fixas
+- [x] "Atalhos de teclado" saiu de Ajustes (continua em Preferências)
+
+Correções
+- [x] "Instalar no computador" não aparecia: o convite do navegador agora é guardado logo ao abrir o app
+- [x] Horário de publicação das versões 0.8.0, 0.9.0 e 1.0.0 estava 3 horas adiantado (corrigido)
+- [x] Teste automático do tema estabilizado
+
+Técnico
+- [x] Migração 0017: número, andamento, nota, versão planejada e recado de origem nas solicitações
+- [x] Testes: servidor (pytest), telas (vitest), ponta a ponta, layout em 5 tamanhos e acessibilidade

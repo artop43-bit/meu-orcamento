@@ -1,6 +1,6 @@
 MEU ORÇAMENTO · UPDATE LOG
 Versão 1.0.0 · Dívidas, mês financeiro, alertas, divisões e app Android
-Data: 20/10/2026 às 20:15 (horário de Brasília)
+Data: 20/10/2026 às 17:15 (horário de Brasília)
 
 Financiamentos e empréstimos
 - [x] Cadastro com tipo (imóvel, veículo, pessoal, consignado, cheque especial, outro), instituição,

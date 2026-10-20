@@ -1,6 +1,6 @@
 MEU ORÇAMENTO · UPDATE LOG
 Versão 0.8.0 · Avisos por e-mail, metas com objetivo e importação única
-Data: 20/10/2026 às 07:00 (horário de Brasília)
+Data: 20/10/2026 às 04:00 (horário de Brasília)
 
 Lembrete de vencimentos por e-mail
 - [x] No máximo um e-mail por dia, às 8h (Brasília), só quando há contas em aberto

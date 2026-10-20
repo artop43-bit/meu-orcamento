@@ -1,6 +1,6 @@
 MEU ORÇAMENTO · UPDATE LOG
 Versão 0.9.0 · Mensagens, tema na conta e começar do zero
-Data: 20/10/2026 às 14:15 (horário de Brasília)
+Data: 20/10/2026 às 11:15 (horário de Brasília)
 
 Caixa de mensagens (recados do ADM)
 - [x] Item "Mensagens" no menu (computador) e no "Mais" (celular), com contador de não lidas;

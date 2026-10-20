@@ -6,10 +6,9 @@ import { errorMessage } from "../api/client";
 import { currentSubscription, disablePush, enablePush, PUSH_KEY, pushApi, pushSupported, type PushConfig } from "../api/push";
 import { Alert, Button, PageHeader } from "../components/ui";
 import { announce } from "../lib/announce";
+import { promptInstall, useInstallPrompt } from "../lib/install";
 
 export const APK_URL = "/downloads/meu-orcamento.apk";
-
-type InstallPrompt = Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: string }> };
 
 function isAndroid() {
   return /Android/i.test(navigator.userAgent);
@@ -135,24 +134,11 @@ function Notifications() {
 
 /** Ajustes › App e notificações: instalar no Android (APK), no iPhone e no computador. */
 export default function AppInstallPage() {
-  const [prompt, setPrompt] = useState<InstallPrompt | null>(null);
+  const prompt = useInstallPrompt();
   const [done, setDone] = useState(installed());
 
-  useEffect(() => {
-    const capture = (event: Event) => {
-      event.preventDefault();
-      setPrompt(event as InstallPrompt);
-    };
-    window.addEventListener("beforeinstallprompt", capture);
-    return () => window.removeEventListener("beforeinstallprompt", capture);
-  }, []);
-
   async function install() {
-    if (!prompt) return;
-    await prompt.prompt();
-    const { outcome } = await prompt.userChoice;
-    if (outcome === "accepted") setDone(true);
-    setPrompt(null);
+    if (await promptInstall()) setDone(true);
   }
 
   return (

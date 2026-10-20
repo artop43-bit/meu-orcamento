@@ -1483,6 +1483,24 @@ def theme_on_account(page: Page):
     expect(page.locator("html")).not_to_have_attribute("data-theme", "dark")
 
 
+@step("v1.1: 10 cores de destaque em Preferências, salvas na conta")
+def accent_colors(page: Page):
+    page.goto(f"{BASE}/ajustes/preferencias")
+    idle(page)
+    picker = page.get_by_role("group", name="Cor de destaque")
+    expect(picker.locator(".swatch")).to_have_count(10)
+    picker.get_by_label("Grafite").check()
+    expect(page.locator("html")).to_have_attribute("data-accent", "grafite")
+    page.wait_for_timeout(400)
+    assert api(page, "/auth/me")["accent"] == "grafite"
+    picker.scroll_into_view_if_needed()
+    page.screenshot(path=OUT / "v11-cores.png")
+    picker.get_by_label("Verde").check()
+    expect(page.locator("html")).to_have_attribute("data-accent", "verde")
+    page.wait_for_timeout(400)
+    assert api(page, "/auth/me")["accent"] == "verde"
+
+
 @step("v0.9: começar do zero — escolher áreas, backup, senha e frase; zera só as análises salvas")
 def start_over(page: Page):
     page.goto(f"{BASE}/ajustes/perfil")
@@ -1868,6 +1886,7 @@ def main():
         release_notes(page)
         inbox_and_announcement(page)
         theme_on_account(page)
+        accent_colors(page)
         start_over(page)
         debts(page)
         calculators(page)
