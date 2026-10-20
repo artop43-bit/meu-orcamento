@@ -1,6 +1,7 @@
 import { useEffect, useId, useMemo, useRef, useState, type FormEvent } from "react";
+import { createPortal } from "react-dom";
 import { useQueryClient } from "@tanstack/react-query";
-import { CreditCard, Sparkles, Trash2 } from "lucide-react";
+import { CreditCard, Sparkles, Trash2, Users } from "lucide-react";
 
 import {
   budgetApi,
@@ -24,6 +25,7 @@ import {
 import { extrasApi, hasCredit, hasDebit, useCards, type Card } from "../api/extras";
 import { CardForm } from "./CardForm";
 import { ReceiptsField } from "./Receipts";
+import { SplitForm } from "./SplitForm";
 import { useAccounts } from "../api/money";
 import { DateField, DayField } from "./DateField";
 import { normalizeText } from "../lib/text";
@@ -251,6 +253,7 @@ export function ExpenseForm({
   onDone: () => void;
 }) {
   const start = expense ?? draft;
+  const [splitting, setSplitting] = useState(false);
   const [description, setDescription] = useState(start?.description ?? "");
   const [amount, setAmount] = useState(start?.amount ? moneyInput(start.amount) : "");
   const [categoryId, setCategoryId] = useState(start?.category_id ?? "");
@@ -741,6 +744,14 @@ export function ExpenseForm({
         setPending={setPendingReceipts}
       />
 
+      {expense && (
+        <div className="split-entry">
+          <Button type="button" variant="secondary" onClick={() => setSplitting(true)}>
+            <Users size={16} /> Dividir com outras pessoas
+          </Button>
+        </div>
+      )}
+
       <details className="more" open={moreOpen} onToggle={(e) => setMoreOpen((e.target as HTMLDetailsElement).open)}>
         <summary>Observação</summary>
         <div className="stack stack--tight" style={{ marginTop: 12 }}>
@@ -767,18 +778,29 @@ export function ExpenseForm({
         label={duplicateOf ? "Salvar mesmo assim" : expense ? "Salvar" : "Adicionar despesa"}
         onAnother={expense ? undefined : () => void run(true)}
       />
-      <Sheet open={addingCard} title="Novo cartão" onClose={() => setAddingCard(false)}>
-        {addingCard && (
-          <CardForm
-            defaultKind={payment === "debit" ? "debit" : "credit"}
-            onDone={(created) => {
-              setAddingCard(false);
-              if (created && payment === "debit") setDebitCardId(created.id);
-              if (created && payment === "credit") setCardId(created.id);
-            }}
-          />
+      {/* Fora do <form> da despesa (portal): um formulário dentro de outro enviaria os dois. */}
+      {expense &&
+        createPortal(
+          <Sheet open={splitting} title="Dividir despesa" onClose={() => setSplitting(false)}>
+            {splitting && <SplitForm expense={expense} onDone={() => setSplitting(false)} />}
+          </Sheet>,
+          document.body,
         )}
-      </Sheet>
+      {createPortal(
+        <Sheet open={addingCard} title="Novo cartão" onClose={() => setAddingCard(false)}>
+          {addingCard && (
+            <CardForm
+              defaultKind={payment === "debit" ? "debit" : "credit"}
+              onDone={(created) => {
+                setAddingCard(false);
+                if (created && payment === "debit") setDebitCardId(created.id);
+                if (created && payment === "credit") setCardId(created.id);
+              }}
+            />
+          )}
+        </Sheet>,
+        document.body,
+      )}
     </form>
   );
 }

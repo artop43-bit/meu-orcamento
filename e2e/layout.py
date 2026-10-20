@@ -48,6 +48,7 @@ PAGES = [
     ("notas", "/ajustes/notas"),
     ("mensagens", "/mensagens"),
     ("dividas", "/dividas"),
+    ("divisoes", "/divisoes"),
     ("calculadoras", "/analises?secao=calculadoras"),
     ("admin-recados", "/admin?aba=recados"),
     ("seguranca", "/ajustes/seguranca"),
@@ -272,6 +273,7 @@ def dialogs(page: Page, device: str):
         ("/investimentos", "Novo investimento", "form-investimento"),
         ("/metas", "Nova meta", "form-meta"),
         ("/dividas", "Novo financiamento", "form-financiamento"),
+        ("/divisoes", "Nova anotação", "form-divisao-anotacao"),
         ("/ajustes/solicitacoes", "Nova solicitação", "form-solicitacao"),
         ("/ajustes/perfil", "Editar perfil", "form-perfil"),
     ):

@@ -15,7 +15,7 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from app.core.errors import AppError
-from app.core.months import add_months, current_month, parse_month, with_day
+from app.core.months import add_months, current_month, cycle_date, parse_month, with_day
 from app.db.base import Base
 from app.db.types import utcnow
 from app.models import BudgetMonth, Category, Expense, Goal, Income, RecurringItem, User
@@ -115,6 +115,11 @@ def _check_category(db: Session, user: User, category_id: uuid.UUID | None) -> N
 # ---------------------------------------------------------------- meses e fixas
 
 
+def _start_day(db: Session, user_id: uuid.UUID) -> int:
+    user = db.get(User, user_id)
+    return user.month_start_day if user else 1
+
+
 def _materialize(db: Session, item: RecurringItem, month: date) -> None:
     """Lança a conta/renda fixa no mês, se ainda não estiver lá."""
     model = Income if item.kind == "income" else Expense
@@ -142,7 +147,9 @@ def _materialize(db: Session, item: RecurringItem, month: date) -> None:
                 description=item.description,
                 amount=item.amount,
                 category_id=item.category_id,
-                due_date=with_day(month, item.due_day) if item.due_day else None,
+                due_date=cycle_date(month, item.due_day, _start_day(db, item.user_id))
+                if item.due_day
+                else None,
                 payment_method=item.payment_method,
                 notes=item.notes,
                 recurring_id=item.id,
@@ -244,7 +251,7 @@ def update_recurring(
     _apply(item, changes)
 
     # Propaga para os lançamentos a partir do mês escolhido que ainda não foram pagos.
-    this_month = from_month or current_month()
+    this_month = from_month or current_month(user.month_start_day)
     if item.kind == "income":
         instances: list[Income | Expense] = list(
             db.scalars(
@@ -274,7 +281,11 @@ def update_recurring(
         if isinstance(instance, Expense):
             instance.category_id = item.category_id
             instance.payment_method = item.payment_method
-            instance.due_date = with_day(instance.month, item.due_day) if item.due_day else None
+            instance.due_date = (
+                cycle_date(instance.month, item.due_day, user.month_start_day)
+                if item.due_day
+                else None
+            )
         else:
             instance.income_type = item.income_type or "fixed"
             instance.day = item.due_day
@@ -288,7 +299,7 @@ def update_recurring(
 def delete_recurring(db: Session, user: User, item_id: uuid.UUID) -> None:
     """Remove a fixa e os lançamentos futuros; mantém o mês atual e os anteriores."""
     item = _owned(db, RecurringItem, item_id, user)
-    after = current_month()
+    after = current_month(user.month_start_day)
     for model in (Income, Expense):
         db.execute(delete(model).where(model.recurring_id == item.id, model.month > after))
         for instance in db.scalars(select(model).where(model.recurring_id == item.id)):

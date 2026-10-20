@@ -25,7 +25,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.core.email import send_email
-from app.core.months import add_months
+from app.core.months import add_months, month_of
 from app.db.types import utcnow
 from app.models import (
     EmailLog,
@@ -57,6 +57,7 @@ KINDS = {
     "due": "lembretes de vencimento",
     "monthly": "resumo do mês",
     "messages": "cópias das mensagens por e-mail",
+    "alerts": "alertas de gastos e assinaturas",
 }
 SEND_HOUR = 8
 
@@ -107,6 +108,8 @@ def unsubscribe(db: Session, token: str) -> tuple[User, str] | None:
         user.notify_due = False
     elif kind == "monthly":
         user.notify_monthly = False
+    elif kind == "alerts":
+        user.notify_alerts = False
     else:
         user.notify_messages = False
     db.commit()
@@ -417,7 +420,6 @@ def run_daily(db: Session, now: datetime | None = None) -> dict[str, int]:
     if now.hour < SEND_HOUR:
         return {"due": 0, "monthly": 0}
     today = now.date()
-    previous = add_months(today.replace(day=1), -1)
     sent = {"due": 0, "monthly": 0}
     users = list(db.scalars(select(User)))
     for user in users:
@@ -429,7 +431,9 @@ def run_daily(db: Session, now: datetime | None = None) -> dict[str, int]:
                 if message and _claim(db, user, "due", today.isoformat()):
                     deliver(db, user, message)
                     sent["due"] += 1
-            if user.notify_monthly and today.day == 1:
+            # Resumo no 1º dia do mês financeiro (dia 1 ou o dia escolhido pela pessoa).
+            if user.notify_monthly and today.day == user.month_start_day:
+                previous = add_months(month_of(today, user.month_start_day), -1)
                 message = monthly_message(db, user, previous)
                 if message and _claim(db, user, "monthly", f"{previous:%Y-%m}"):
                     deliver(db, user, message)

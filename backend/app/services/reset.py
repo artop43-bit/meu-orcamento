@@ -30,6 +30,7 @@ from app.models import (
     PlannedExpense,
     RecurringItem,
     SavedAnalysis,
+    SplitShare,
     StoredFile,
     Transfer,
     User,
@@ -139,6 +140,7 @@ def reset(
     try:
         if "entries" in chosen:
             db.execute(delete(PlannedExpense).where(PlannedExpense.user_id == uid))
+            db.execute(delete(SplitShare).where(SplitShare.user_id == uid))
             db.execute(delete(Transfer).where(Transfer.user_id == uid))
             expense_ids = select(Expense.id).where(Expense.user_id == uid)
             db.execute(delete(StoredFile).where(StoredFile.expense_id.in_(expense_ids)))

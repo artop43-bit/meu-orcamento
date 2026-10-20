@@ -84,3 +84,27 @@ class NetWorthSnapshot(Base):
     assets: Mapped[Decimal] = mapped_column(Money)
     debts: Mapped[Decimal] = mapped_column(Money)
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, onupdate=utcnow)
+
+
+class SplitShare(Base):
+    """Divisão de despesas: parte de uma despesa que outra pessoa deve (ou que a pessoa deve).
+
+    direction "owes_me": a pessoa deve ao usuário (ex.: a parte dela num jantar que ele pagou);
+    "i_owe": o usuário deve à pessoa. Acertar as contas marca as partes como quitadas.
+    """
+
+    __tablename__ = "split_shares"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    expense_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("expenses.id", ondelete="CASCADE"), index=True
+    )
+    person: Mapped[str] = mapped_column(String(60))
+    description: Mapped[str] = mapped_column(String(120))
+    amount: Mapped[Decimal] = mapped_column(Money)
+    direction: Mapped[str] = mapped_column(String(7))  # "owes_me" | "i_owe"
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+    settled_at: Mapped[datetime | None] = mapped_column(UTCDateTime)

@@ -18,7 +18,7 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from app.core.errors import AppError
-from app.core.months import add_months, with_day
+from app.core.months import add_months, month_of, with_day
 from app.db.types import utcnow
 from app.models import (
     Category,
@@ -180,7 +180,7 @@ def _materialize(db: Session, user: User, loan: Loan) -> None:
         db.add(
             Expense(
                 user_id=user.id,
-                month=due.replace(day=1),
+                month=month_of(due, user.month_start_day),
                 description=f"{loan.name} ({row.number}/{loan.installments})"[:120],
                 amount=row.payment,
                 category_id=category,
@@ -403,7 +403,7 @@ def overview(db: Session, user: User, today: date | None = None) -> dict[str, An
     from app.services import money as money_service
     from app.services.budget import current_month
 
-    month = today.replace(day=1) if today else current_month()
+    month = today.replace(day=1) if today else current_month(user.month_start_day)
     today = today or date.today()
     loans = [summary(db, loan) for loan in list_loans(db, user)]
     others = list_other(db, user)

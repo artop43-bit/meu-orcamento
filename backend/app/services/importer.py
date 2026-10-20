@@ -25,6 +25,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.types import TypeDecorator, TypeEngine
 
 from app.core.errors import AppError
+from app.core.months import month_of
 from app.core.parsing import normalize_text, parse_amount, parse_date
 from app.db.types import utcnow
 from app.models import (
@@ -40,6 +41,7 @@ from app.models import (
     MoneyAccount,
     OtherDebt,
     RecurringItem,
+    SplitShare,
     User,
 )
 from app.services import budget, statement_import
@@ -464,7 +466,7 @@ def commit(
             db.add(
                 Income(
                     user_id=user.id,
-                    month=item["date"].replace(day=1),
+                    month=month_of(item["date"], user.month_start_day),
                     description=item["description"],
                     amount=item["amount"],
                     import_ref=item["ref"],
@@ -499,7 +501,7 @@ def commit(
                 Expense(
                     needs_review=True,
                     user_id=user.id,
-                    month=item["date"].replace(day=1),
+                    month=month_of(item["date"], user.month_start_day),
                     description=item["description"],
                     amount=item["amount"],
                     category_id=category_id,
@@ -571,6 +573,7 @@ BACKUP_TABLES: list[tuple[str, Any]] = [
     ("goals", Goal),
     ("investments", Investment),
     ("other_debts", OtherDebt),
+    ("splits", SplitShare),
 ]
 SKIP_COLUMNS = {"user_id", "import_batch_id"}
 
