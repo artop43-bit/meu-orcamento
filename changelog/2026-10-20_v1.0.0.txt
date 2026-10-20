@@ -1,0 +1,62 @@
+MEU ORÇAMENTO · UPDATE LOG
+Versão 1.0.0 · Dívidas, mês financeiro, alertas, divisões e app Android
+Data: 20/10/2026 às 20:00 (horário de Brasília)
+
+Financiamentos e empréstimos
+- [x] Cadastro com tipo (imóvel, veículo, pessoal, consignado, cheque especial, outro), instituição,
+      valor, taxa ao mês ou ao ano (convertida por juros compostos), número de parcelas e 1º vencimento
+- [x] Price (parcelas iguais) e SAC (parcelas que caem), com explicação na tela
+- [x] Custos extras opcionais: seguro e taxa mensal na parcela, IOF somado ao financiado; CET calculado
+- [x] Contrato em andamento: parcelas já pagas (com sugestão pelas datas) e saldo devedor de hoje
+- [x] Tabela mês a mês (parcela, juros, amortização, seguro e taxas, saldo) para imprimir/PDF e baixar
+      em planilha
+- [x] Simulação de amortização extra: economia de juros, reduzindo o prazo ou a parcela
+- [x] As parcelas a pagar entram sozinhas no Orçamento; pagar uma baixa o saldo devedor; editar o
+      contrato refaz só as parcelas não pagas; excluir mantém o histórico pago
+
+Dívidas e patrimônio
+- [x] Tela Dívidas no menu: dívida total, parcelas por mês, bens e investimentos, patrimônio líquido
+- [x] Outras dívidas com saldo informado à mão; parcelas futuras do cartão contam como dívida
+- [x] Patrimônio líquido mês a mês em gráfico (uma foto por mês, atualizada todo dia)
+- [x] Consultor considera o peso das parcelas na renda (alerta acima de 30%)
+
+Calculadoras (Insights › Ferramentas)
+- [x] Juros compostos, quanto guardar por mês, à vista ou parcelado, antecipar parcelas e reserva de
+      emergência; sem recomendar produtos
+
+Mês financeiro pelo dia do salário
+- [x] Preferências › Mês financeiro: o mês pode começar em qualquer dia de 1 a 28 (ex.: de 5/10 a 4/11)
+- [x] Mês atual, vencimento das contas fixas, saldo dia a dia, ritmo das categorias, saldos das contas,
+      importação de extratos, parcelas de financiamento e resumo do mês seguem o período
+- [x] O período aparece no Orçamento
+
+Alertas inteligentes
+- [x] Gasto bem acima do normal da categoria e valor alto em um lugar novo
+- [x] Assinatura ou conta fixa mais cara que no mês anterior; renovação anual nos próximos 7 dias
+- [x] Quadro "Atenção" no Orçamento; os novos vão para Mensagens e por e-mail (desligável), sem repetir
+
+Divisões
+- [x] "Dividir com outras pessoas" na edição da despesa: partes iguais, por valor ou porcentagem
+- [x] Tela Divisões no menu: quem deve a quem por pessoa, anotações avulsas ("me deve"/"eu devo")
+- [x] "Acertar contas" quita tudo com a pessoa e pode lançar o reembolso como receita do mês
+
+App Android e notificações
+- [x] App Android (APK) para baixar em Ajustes › App e notificações, sem loja: abre em tela cheia,
+      com ícone e tela de abertura, e se atualiza sozinho (as telas vêm do site)
+- [x] Passo a passo da instalação ("permitir instalar de fontes desconhecidas" na primeira vez)
+- [x] iPhone e computador: instalar pela tela de início ou pelo navegador
+- [x] Notificações no aparelho para contas a vencer, mensagens e alertas, cada uma desligável;
+      recados importantes sempre chegam; botão de teste
+- [x] Abre sem internet com os últimos dados salvos (apagados ao sair da conta) e avisa "Sem conexão"
+
+Correções
+- [x] "Novo cartão" aberto de dentro do formulário de despesa enviava a despesa junto; agora não
+
+Qualidade
+- [x] Migrações 0014, 0015 e 0016 com volta completa
+- [x] Testes novos no servidor: matemática do financiamento conferida à mão (Price, SAC, taxa, CET),
+      parcelas no orçamento, patrimônio, ciclo do mês, alertas, divisões e notificações
+- [x] Testes das calculadoras e do mês financeiro nas telas
+- [x] Roteiro de ponta a ponta, layout (claro e escuro, computador e celular) e acessibilidade com
+      todas as telas novas; teste de produção confere o app instalável e a verificação do Android
+- [x] Backup, restauração e Começar do zero incluem financiamentos, dívidas e divisões

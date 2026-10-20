@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 from app.core.errors import AppError
 from app.db.types import utcnow
 from app.models import Announcement, InboxItem, SupportThread, User
-from app.services import notify
+from app.services import notify, push
 from app.services.auth import Mailer
 
 PREVIEW = 600  # caracteres do texto no e-mail
@@ -49,6 +49,14 @@ def notify_reply(db: Session, thread: SupportThread, body: str, mail: Mailer) ->
         thread_id=thread.id,
     )
     db.add(item)
+    push.send(
+        db,
+        user,
+        "messages",
+        "Sua solicitação foi respondida",
+        thread.title,
+        f"/ajustes/solicitacoes/{thread.id}",
+    )
     if _can_email(user):
         _email(
             mail,
@@ -167,6 +175,7 @@ def announce(
                 announcement_id=announcement.id,
             )
         )
+        push.send(db, user, "messages", title, body, "/mensagens", force=important)
         if _can_email(user, force=important):
             _email(
                 mail,

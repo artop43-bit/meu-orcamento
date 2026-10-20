@@ -36,6 +36,7 @@ import {
   InboxPage,
   DebtsPage,
   SplitsPage,
+  AppInstallPage,
   LoanTablePage,
   Unsubscribe,
   Security,
@@ -119,6 +120,7 @@ export default function App() {
             <Route path="solicitacoes/:id" element={<SupportPage />} />
             <Route path="ajuda" element={<HelpPage />} />
             <Route path="notas" element={<ReleaseNotesPage />} />
+            <Route path="app" element={<AppInstallPage />} />
           </Route>
           {/* Endereços antigos continuam funcionando. */}
           <Route path="/fixas" element={<Navigate to="/ajustes/recorrencias" replace />} />

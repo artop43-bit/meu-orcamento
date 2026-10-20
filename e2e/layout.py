@@ -49,6 +49,7 @@ PAGES = [
     ("mensagens", "/mensagens"),
     ("dividas", "/dividas"),
     ("divisoes", "/divisoes"),
+    ("app", "/ajustes/app"),
     ("calculadoras", "/analises?secao=calculadoras"),
     ("admin-recados", "/admin?aba=recados"),
     ("seguranca", "/ajustes/seguranca"),

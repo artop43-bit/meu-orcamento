@@ -18,6 +18,7 @@ from app.api import (
     money,
     notifications,
     planner,
+    push,
     sharing,
     support,
 )
@@ -112,6 +113,7 @@ def create_app() -> FastAPI:
     app.include_router(notifications.router, prefix="/api")
     app.include_router(inbox.router, prefix="/api")
     app.include_router(sharing.router, prefix="/api")
+    app.include_router(push.router, prefix="/api")
     app.include_router(debts.router, prefix="/api")
     return app
 

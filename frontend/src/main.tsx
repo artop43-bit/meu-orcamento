@@ -17,6 +17,14 @@ installFormErrors();
 // Depois de salvar algo, as telas afetadas são recarregadas na hora (invalidateQueries).
 const queryClient = new QueryClient({ defaultOptions: { queries: { staleTime: 30_000 } } });
 
+// App instalável e sem internet: o service worker só roda no site publicado (no desenvolvimento
+// ele atrapalharia a atualização automática das telas).
+if (import.meta.env.PROD && "serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    void navigator.serviceWorker.register("/sw.js").catch(() => undefined);
+  });
+}
+
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>

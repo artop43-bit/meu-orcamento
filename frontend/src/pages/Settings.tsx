@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { ArrowLeftRight, ChevronLeft, ChevronRight, CircleHelp, Keyboard, MessagesSquare, Repeat, ShieldCheck, SlidersHorizontal, Sparkles, Tags, UserRound } from "lucide-react";
+import { ArrowLeftRight, ChevronLeft, ChevronRight, CircleHelp, Keyboard, MessagesSquare, Repeat, ShieldCheck, SlidersHorizontal, Smartphone, Sparkles, Tags, UserRound } from "lucide-react";
 import { Link, Outlet, useLocation } from "react-router";
 
 import { useSupportUnread } from "../api/support";
@@ -17,6 +17,7 @@ export const SETTINGS_ITEMS: SettingsItem[] = [
   { to: "/ajustes/seguranca", label: "Segurança", description: "Senha, verificação em duas etapas, sessões ativas e exclusão da conta.", icon: <ShieldCheck size={20} /> },
   { to: "/ajustes/preferencias", label: "Preferências", description: "Tema, cor de destaque, tamanho do texto, densidade e privacidade.", icon: <SlidersHorizontal size={20} /> },
   { to: "/ajustes/atalhos", label: "Atalhos de teclado", description: "Comandos rápidos para lançar e navegar sem o mouse.", icon: <Keyboard size={20} /> },
+  { to: "/ajustes/app", label: "App e notificações", description: "Instalar no Android, iPhone ou computador e receber avisos no aparelho.", icon: <Smartphone size={20} /> },
   { to: "/ajustes/notas", label: "Notas da versão", description: "Novidades de cada atualização e atalho para enviar sugestões.", icon: <Sparkles size={20} /> },
   { to: "/ajustes/ajuda", label: "Central de ajuda", description: "Guia de cada tela, exemplos e o tour de apresentação.", icon: <CircleHelp size={20} /> },
 ];
