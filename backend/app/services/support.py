@@ -14,6 +14,7 @@ from app.core.errors import AppError
 from app.db.types import utcnow
 from app.models import StoredFile, SupportMessage, SupportThread, User
 from app.services import files
+from app.services.auth import Mailer
 
 MAX_FILES = 3
 STATUSES = ("open", "answered", "resolved")
@@ -140,10 +141,12 @@ def messages(db: Session, thread: SupportThread) -> list[dict[str, Any]]:
 
 def open_mine(db: Session, user: User, thread_id: uuid.UUID) -> SupportThread:
     """Abre a conversa do próprio usuário e marca as respostas como lidas."""
+    from app.services import inbox
+
     thread = _owned_thread(db, user, thread_id)
-    if thread.user_unread:
-        thread.user_unread = False
-        db.commit()
+    thread.user_unread = False
+    inbox.mark_thread_read(db, user, thread.id)
+    db.commit()
     return thread
 
 
@@ -180,14 +183,23 @@ def admin_open(db: Session, admin: User, thread_id: uuid.UUID) -> SupportThread:
 
 
 def admin_reply(
-    db: Session, admin: User, thread_id: uuid.UUID, body: str, uploads: list[bytes]
+    db: Session,
+    admin: User,
+    thread_id: uuid.UUID,
+    body: str,
+    uploads: list[bytes],
+    mail: Mailer | None = None,
 ) -> SupportThread:
+    from app.services import inbox
+
     _check_admin(admin)
     thread = _any_thread(db, thread_id)
     _add_message(db, thread, admin, body, uploads, from_admin=True)
     thread.status = "answered"
     thread.user_unread = True
     thread.admin_unread = False
+    if mail is not None:
+        inbox.notify_reply(db, thread, body, mail)
     db.commit()
     return thread
 

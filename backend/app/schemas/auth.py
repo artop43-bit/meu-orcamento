@@ -24,6 +24,9 @@ class UserOut(BaseModel):
     is_admin: bool = False
     # Configuração inicial guiada já concluída (ou pulada).
     onboarded_at: datetime | None = None
+    # v0.9: aparência salva na conta (None = ainda não escolheu; vale a do aparelho).
+    theme: str | None = None
+    accent: str | None = None
 
     @model_validator(mode="after")
     def _admin(self) -> "UserOut":

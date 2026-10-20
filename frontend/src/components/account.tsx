@@ -21,6 +21,8 @@ const EVENT_LABELS: Record<string, string> = {
   recovery_codes_regenerated: "Novos códigos de recuperação gerados",
   session_revoked: "Uma sessão foi encerrada",
   sessions_revoked: "Outras sessões foram encerradas",
+  not_me: "“Não fui eu”: sessões encerradas para proteger a conta",
+  data_reset: "Dados apagados em “Começar do zero”",
 };
 
 /** "Chrome no Windows" a partir do user-agent (aproximado, só para exibição). */

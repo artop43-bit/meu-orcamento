@@ -12,6 +12,8 @@ export type User = {
   created_at: string;
   /** Configuração inicial guiada concluída (ou pulada). */
   onboarded_at?: string | null;
+  theme?: "system" | "light" | "dark" | null;
+  accent?: "verde" | "azul" | "roxo" | "laranja" | null;
 };
 
 export type LoginResult =

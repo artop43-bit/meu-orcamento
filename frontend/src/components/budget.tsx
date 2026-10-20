@@ -5,7 +5,7 @@ import { errorMessage } from "../api/client";
 import { money, parseMoney } from "../lib/format";
 import { Button } from "./ui";
 
-export function Badge({ children, tone = "neutral" }: { children: ReactNode; tone?: "neutral" | "accent" }) {
+export function Badge({ children, tone = "neutral" }: { children: ReactNode; tone?: "neutral" | "accent" | "warn" }) {
   return <span className={`badge badge--${tone}`}>{children}</span>;
 }
 

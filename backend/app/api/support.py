@@ -7,7 +7,7 @@ from typing import Annotated, Any, Literal
 from fastapi import APIRouter, File, Form, Header, Query, Response, UploadFile, status
 from pydantic import BaseModel, StringConstraints, ValidationError
 
-from app.api.deps import CurrentUser, DbSession
+from app.api.deps import CurrentUser, DbSession, MailerDep
 from app.core.errors import AppError
 from app.core.months import parse_month
 from app.models import SupportThread, User
@@ -282,11 +282,13 @@ def admin_reply(
     thread_id: uuid.UUID,
     user: CurrentUser,
     db: DbSession,
+    mail: MailerDep,
     message: Annotated[str, Form()],
     images: Uploads = None,
 ) -> AdminThreadDetail:
     data = _parse(ReplyIn, message=message)
-    return _admin_detail(db, support.admin_reply(db, user, thread_id, data.message, _read(images)))
+    thread = support.admin_reply(db, user, thread_id, data.message, _read(images), mail)
+    return _admin_detail(db, thread)
 
 
 @router.patch("/admin/support/threads/{thread_id}")

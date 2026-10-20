@@ -17,7 +17,13 @@ from app.models.budget import (
     Transfer,
     WatchItem,
 )
-from app.models.support import StoredFile, SupportMessage, SupportThread
+from app.models.support import (
+    Announcement,
+    InboxItem,
+    StoredFile,
+    SupportMessage,
+    SupportThread,
+)
 from app.models.user import (
     AuthToken,
     EmailLog,
@@ -30,6 +36,7 @@ from app.models.user import (
 )
 
 __all__ = [
+    "Announcement",
     "AuthToken",
     "BudgetMonth",
     "Category",
@@ -43,6 +50,7 @@ __all__ = [
     "ImportMapping",
     "KnownDevice",
     "NotificationLog",
+    "InboxItem",
     "Income",
     "Investment",
     "MoneyAccount",

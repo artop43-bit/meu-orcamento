@@ -8,6 +8,21 @@ export class ApiError extends Error {
   }
 }
 
+let keepalive = false;
+
+/**
+ * Requisições iniciadas dentro de `fn` continuam mesmo se a página for recarregada ou fechada
+ * (fetch com keepalive). Usado para confirmar uma exclusão pendente ao sair da página.
+ */
+export function withKeepalive<T>(fn: () => T): T {
+  keepalive = true;
+  try {
+    return fn();
+  } finally {
+    keepalive = false;
+  }
+}
+
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   const headers: Record<string, string> = { "X-Requested-With": "fetch" };
   // Envio de arquivos (FormData): o navegador monta o Content-Type com o "boundary".
@@ -20,6 +35,8 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
       method,
       credentials: "include",
       headers,
+      // Arquivos não cabem no limite do keepalive (64 KB); só requisições pequenas.
+      keepalive: keepalive && !isForm,
       body: body === undefined ? undefined : isForm ? body : JSON.stringify(body),
     });
   } catch {

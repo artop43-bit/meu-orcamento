@@ -28,6 +28,7 @@ import { renderShareImage, shareOrDownload, ShareButtons, StoryViewer, periodTit
 import { Alert, Button, LoadingRegion, PageHeader, Sheet, Skeleton } from "../components/ui";
 import { announce } from "../lib/announce";
 import { addMonths, money, percent, thisMonth } from "../lib/format";
+import { StartOver } from "../components/StartOver";
 
 type Stat = { key: StatKey; label: string; icon: ReactNode; value: (s: ProfileSummary) => string; foot?: (s: ProfileSummary) => string };
 
@@ -312,6 +313,10 @@ export default function ProfilePage() {
 
       <div style={{ marginTop: 20 }}>
         <RetrospectiveCard profile={data} />
+      </div>
+
+      <div style={{ marginTop: 20 }}>
+        <StartOver />
       </div>
 
       {editing && <EditProfile profile={data} open={editing} onClose={() => setEditing(false)} />}

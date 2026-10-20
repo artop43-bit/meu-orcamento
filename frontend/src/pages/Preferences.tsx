@@ -5,6 +5,7 @@ import { Keyboard, Mail, MessageSquarePlus } from "lucide-react";
 import { api, errorMessage } from "../api/client";
 import { openFeedback, openShortcuts, SHORTCUTS } from "../components/power";
 import { Alert, Button, PageHeader } from "../components/ui";
+import { setAppearance } from "../lib/appearance";
 import { setPrefs, usePrefs, type Prefs } from "../lib/prefs";
 
 function Choice<K extends keyof Prefs>({
@@ -18,6 +19,7 @@ function Choice<K extends keyof Prefs>({
   value: Prefs[K];
   options: [Prefs[K], string][];
 }) {
+  const queryClient = useQueryClient();
   return (
     <fieldset className="radios">
       <legend className="field-label">{label}</legend>
@@ -28,7 +30,12 @@ function Choice<K extends keyof Prefs>({
               type="radio"
               name={String(name)}
               checked={value === option}
-              onChange={() => setPrefs({ [name]: option } as Partial<Prefs>)}
+              onChange={() =>
+                // Tema e cor de destaque ficam salvos na conta (valem em todos os aparelhos).
+                name === "theme" || name === "accent"
+                  ? setAppearance({ [name]: option } as Partial<Pick<Prefs, "theme" | "accent">>, queryClient)
+                  : setPrefs({ [name]: option } as Partial<Prefs>)
+              }
             />
             {text}
           </label>
@@ -38,7 +45,13 @@ function Choice<K extends keyof Prefs>({
   );
 }
 
-type NotifyPrefs = { notify_due: boolean; notify_due_days: 1 | 3 | 7; notify_hide_values: boolean; notify_monthly: boolean };
+type NotifyPrefs = {
+  notify_due: boolean;
+  notify_due_days: 1 | 3 | 7;
+  notify_hide_values: boolean;
+  notify_monthly: boolean;
+  notify_messages: boolean;
+};
 
 /** Avisos por e-mail: vencimentos, resumo do mês e privacidade dos valores. */
 function EmailNotices() {
@@ -94,6 +107,10 @@ function EmailNotices() {
             <input type="checkbox" checked={p.notify_hide_values} onChange={(e) => void update({ notify_hide_values: e.target.checked })} />
             Ocultar valores nos e-mails
           </label>
+          <label className="check">
+            <input type="checkbox" checked={p.notify_messages} onChange={(e) => void update({ notify_messages: e.target.checked })} />
+            Cópia por e-mail das mensagens (respostas às solicitações e recados da administração)
+          </label>
           <p className="muted small" style={{ margin: 0 }}>
             O aviso de acesso por um aparelho novo é sempre enviado, por segurança.
           </p>
@@ -112,6 +129,10 @@ export default function Preferences() {
         <div className="stack" style={{ gap: 20 }}>
           <section className="card stack">
             <h2>Aparência</h2>
+            <p className="muted small" style={{ margin: 0 }}>
+              Tema e cor de destaque ficam salvos na sua conta e valem em todos os aparelhos. Tamanho do texto e espaçamento valem só neste
+              aparelho.
+            </p>
             <Choice
               name="theme"
               label="Tema"

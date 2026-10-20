@@ -11,6 +11,42 @@ export type Release = {
 
 export const RELEASES: Release[] = [
   {
+    version: "0.9.0",
+    date: "20/10/2026 às 14:15",
+    title: "Mensagens, tema na conta e começar do zero",
+    sections: [
+      {
+        title: "Mensagens",
+        items: [
+          "Caixa de Mensagens no menu, com contador de não lidas: respostas às suas solicitações e recados da administração.",
+          "Cópia por e-mail de cada mensagem, que pode ser desligada em Ajustes › Preferências.",
+          "Recados importantes ficam fixados no topo até serem lidos.",
+        ],
+      },
+      {
+        title: "Aparência",
+        items: [
+          "Botão rápido de tema (automático, claro ou escuro) no menu e no “Mais” do celular.",
+          "Tema e cor de destaque salvos na conta: valem em todos os aparelhos.",
+          "O app abre direto no tema escolhido, sem piscar o claro, e o modo escuro foi revisado em todas as telas.",
+        ],
+      },
+      {
+        title: "Começar do zero (sugestão da comunidade)",
+        items: [
+          "Em Ajustes › Perfil, escolha quais áreas voltam ao padrão: lançamentos, recorrências, contas, cartões, metas, investimentos, categorias ou análises.",
+          "Backup em um toque antes de apagar, confirmação com senha e aviso por e-mail.",
+        ],
+      },
+      {
+        title: "Correção",
+        items: [
+          "Um lançamento excluído não volta mais ao recarregar a página ou sair do app logo depois de excluir.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.8.0",
     date: "20/10/2026 às 07:00",
     title: "Avisos por e-mail, metas com objetivo e importação única",

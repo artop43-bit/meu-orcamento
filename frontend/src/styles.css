@@ -4697,7 +4697,9 @@ kbd {
 
 /* ---------------------------------------------------------------- menu lateral */
 .sidebar__tools {
-  display: flex;
+  /* Busca em linha inteira; privacidade, tema e nova solicitação divididos embaixo. */
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 6px;
   margin-top: 10px;
   padding-top: 10px;
@@ -4729,7 +4731,7 @@ kbd {
 }
 
 .sidebar__tool--wide {
-  flex: 1;
+  grid-column: 1 / -1;
   justify-content: flex-start;
   min-width: 0;
 }
@@ -6609,4 +6611,215 @@ textarea {
 
 .export-card > label > select {
   max-width: 240px;
+}
+
+/* ================================================================ v0.9 */
+
+/* ---------------------------------------------------------------- caixa de mensagens */
+.inbox-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.inbox-item {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.inbox-item.is-unread {
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+}
+
+.inbox-item.is-important {
+  border-color: var(--warn);
+  background: color-mix(in srgb, var(--warn) 6%, var(--surface));
+}
+
+.inbox-item__head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 14px 16px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.inbox-item__icon {
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--surface-2);
+  color: var(--muted);
+}
+
+.inbox-item.is-unread .inbox-item__icon {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.inbox-item__main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.inbox-item__title {
+  overflow-wrap: anywhere;
+}
+
+.inbox-item.is-unread .inbox-item__title {
+  font-weight: 700;
+}
+
+.inbox-item__meta {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.inbox-item__body {
+  display: grid;
+  gap: 12px;
+  padding: 0 16px 16px 64px;
+}
+
+.inbox-item__text {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.55;
+}
+
+.inbox-item__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+@media (max-width: 599px) {
+  .inbox-item__head {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .inbox-item__head .badge {
+    grid-column: 2;
+    justify-self: start;
+  }
+
+  .inbox-item__body {
+    padding: 0 16px 16px;
+  }
+}
+
+.icon-btn--badge {
+  position: relative;
+}
+
+.icon-btn__dot {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 2px var(--surface);
+}
+
+.menu-theme {
+  padding: 12px 4px;
+  border-bottom: 1px solid var(--border);
+}
+
+.menu-theme .segmented label {
+  flex: 1 1 0;
+  justify-content: center;
+}
+
+/* ---------------------------------------------------------------- recados (administração) */
+.announcement-preview {
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+
+.announcement-preview__title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 8px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.announcement-preview__body {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.55;
+}
+
+/* ---------------------------------------------------------------- começar do zero */
+.danger-zone {
+  border-color: color-mix(in srgb, var(--error) 35%, var(--border));
+}
+
+.danger-zone h2 {
+  color: var(--error);
+}
+
+.backup-callout {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+
+.backup-callout > span {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+
+.reset-all {
+  margin-bottom: 4px;
+  font-weight: 700;
+}
+
+.reset-areas {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.reset-areas .check {
+  align-items: flex-start;
+  padding: 8px 0;
+  border-top: 1px solid var(--border);
+}
+
+.reset-areas__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
 }

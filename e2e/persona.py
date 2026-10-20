@@ -340,7 +340,7 @@ def installments(page: Page, months: list[str]):
     assert later
 
 
-@step("Excluir com Desfazer: some na hora, volta ao desfazer, sai de vez depois")
+@step("Excluir com Desfazer: some na hora, volta ao desfazer, sai de vez depois e vale mesmo recarregando")
 def undo_delete(page: Page, month: str):
     open_month(page, month)
     add_expense(page, month, "Lançamento errado", 12.34, "Outros", 3)
@@ -356,6 +356,14 @@ def undo_delete(page: Page, month: str):
     idle(page)
     data = api(page, f"/months/{month}")
     assert not any(e["description"] == "Lançamento errado" for e in data["expenses"]), "não foi excluída"
+    # Excluir e recarregar (ou fechar) antes do fim do prazo do Desfazer: a exclusão tem de valer.
+    add_expense(page, month, "Excluir e recarregar", 7.77, "Outros", 4)
+    page.locator(".ledger__row", has_text="Excluir e recarregar").get_by_role("button", name="Excluir Excluir e recarregar").click()
+    page.wait_for_timeout(800)
+    page.reload()
+    idle(page, 1500)
+    data = api(page, f"/months/{month}")
+    assert not any(e["description"] == "Excluir e recarregar" for e in data["expenses"]), "voltou depois de recarregar"
 
 
 @step("Editar conta: valor do mercado corrigido")
@@ -1346,6 +1354,117 @@ def release_notes(page: Page):
     expect(d).to_have_count(0)
 
 
+@step("v0.9: caixa de Mensagens com a resposta da solicitação e recado da administração")
+def inbox_and_announcement(page: Page):
+    # A resposta dada em Administração › Solicitações também chegou na caixa (já lida, pois a
+    # conversa foi aberta).
+    page.goto(f"{BASE}/mensagens")
+    idle(page)
+    reply = page.locator(".inbox-item", has_text="Gráfico de Insights não carrega")
+    expect(reply).to_have_count(1)
+    # Recado global: escreve, revisa e envia.
+    page.goto(f"{BASE}/admin?aba=recados")
+    idle(page)
+    expect(page.get_by_text(re.compile(r"\d+ destinatário"))).to_be_visible()
+    page.get_by_label("Título").fill("Manutenção programada")
+    page.get_by_label("Mensagem", exact=True).fill("No sábado, às 22h, o app fica fora do ar por cerca de 10 minutos.")
+    page.get_by_label(re.compile("^Importante")).check()
+    page.get_by_role("button", name="Revisar e enviar").click()
+    d = dialog(page)
+    expect(d).to_contain_text("Manutenção programada")
+    d.get_by_role("button", name=re.compile(r"^Enviar para \d+ usuário")).click()
+    expect(d).to_have_count(0)
+    expect(page.locator(".alert--success")).to_contain_text(re.compile(r"Recado enviado para \d+ usuário"))
+    expect(page.locator(".item", has_text="Manutenção programada")).to_contain_text("lido por 0")
+    page.screenshot(path=OUT / "v09-admin-recados.png", full_page=True)
+    # Menu: contador de não lidas em Mensagens; o importante fica no topo.
+    page.goto(f"{BASE}/orcamento")
+    idle(page)
+    expect(page.locator(".sidebar").get_by_role("link", name=re.compile("Mensagens")).locator(".nav-badge")).to_have_text("1")
+    page.locator(".sidebar").get_by_role("link", name=re.compile("Mensagens")).click()
+    page.wait_for_url("**/mensagens")
+    idle(page)
+    first = page.locator(".inbox-item").first
+    expect(first).to_contain_text("Manutenção programada")
+    expect(first).to_contain_text("Importante")
+    assert api(page, "/inbox/unread")["unread"] == 1
+    first.locator(".inbox-item__head").click()
+    expect(first.locator(".inbox-item__text")).to_contain_text("sábado")
+    idle(page)
+    page.screenshot(path=OUT / "v09-mensagens.png", full_page=True)
+    assert api(page, "/inbox/unread")["unread"] == 0, "abrir a mensagem deveria marcar como lida"
+    first.get_by_role("button", name="Marcar como não lida").click()
+    idle(page)
+    assert api(page, "/inbox/unread")["unread"] == 1
+    page.get_by_role("button", name="Marcar todas como lidas").click()
+    idle(page)
+    assert api(page, "/inbox/unread")["unread"] == 0
+    # A cópia por e-mail vai para o painel de e-mails enviados.
+    emails = api(page, "/admin/emails")
+    assert any("Manutenção programada" in e["subject"] for e in emails), "recado sem cópia por e-mail"
+
+
+@step("v0.9: tema escuro pelo botão rápido, salvo na conta e aplicado em outro aparelho")
+def theme_on_account(page: Page):
+    page.goto(f"{BASE}/orcamento")
+    idle(page)
+    tool = page.locator(".sidebar").get_by_role("button", name=re.compile("^Tema:"))
+    expect(tool).to_have_attribute("aria-label", re.compile("Tema: Automático"))
+    tool.click()  # Claro
+    tool.click()  # Escuro
+    expect(page.locator("html")).to_have_attribute("data-theme", "dark")
+    page.wait_for_timeout(400)
+    assert api(page, "/auth/me")["theme"] == "dark"
+    page.screenshot(path=OUT / "v09-escuro-orcamento.png", full_page=True)
+    # Outro "aparelho" (sem nada salvo no navegador): o tema vem da conta.
+    other = page.context.browser.new_context(viewport={"width": 390, "height": 844}, is_mobile=True, has_touch=True)
+    mobile = other.new_page()
+    mobile.goto(f"{BASE}/entrar")
+    mobile.get_by_label("E-mail").fill(EMAIL)
+    mobile.get_by_label("Senha").fill(PASSWORD)
+    mobile.get_by_role("button", name="Entrar").click()
+    mobile.wait_for_url("**/orcamento**")
+    expect(mobile.locator("html")).to_have_attribute("data-theme", "dark")
+    # No celular, o tema também se troca pelo menu "Mais".
+    mobile.locator(".tabbar").get_by_role("button", name="Mais").click()
+    menu = mobile.locator("dialog[open]")
+    menu.get_by_label("Automático").check()
+    expect(mobile.locator("html")).not_to_have_attribute("data-theme", "dark")
+    mobile.screenshot(path=OUT / "v09-celular-menu-tema.png")
+    mobile.wait_for_timeout(400)
+    other.close()
+    assert api(page, "/auth/me")["theme"] == "system"
+    page.reload()
+    idle(page)
+    expect(page.locator("html")).not_to_have_attribute("data-theme", "dark")
+
+
+@step("v0.9: começar do zero — escolher áreas, backup, senha e frase; zera só as análises salvas")
+def start_over(page: Page):
+    page.goto(f"{BASE}/ajustes/perfil")
+    idle(page)
+    page.get_by_role("button", name="Começar do zero").click()
+    d = dialog(page)
+    with page.expect_download() as info:
+        d.get_by_role("button", name="Baixar backup").click()
+    assert info.value.suggested_filename.endswith(".json")
+    d.get_by_label("Selecionar tudo").check()
+    expect(d.get_by_role("button", name="Apagar tudo")).to_be_disabled()
+    expect(d).to_contain_text("a configuração inicial guiada aparece de novo")
+    page.screenshot(path=OUT / "v09-comecar-do-zero.png")
+    d.get_by_label("Selecionar tudo").uncheck()
+    d.get_by_label(re.compile("^Análises salvas")).check()
+    d.get_by_label("Sua senha").fill(PASSWORD)
+    d.get_by_label(re.compile("Para confirmar")).fill("começar do zero")
+    d.get_by_role("button", name=re.compile("Apagar 1 área")).click()
+    expect(d).to_have_count(0, timeout=8000)
+    idle(page)
+    assert api(page, "/analysis/saved") == []
+    assert len(api(page, f"/months/{CURRENT}")["expenses"]) > 0, "lançamentos não podiam ser apagados"
+    emails = api(page, "/admin/emails")
+    assert any(e["subject"] == "Dados apagados da sua conta" for e in emails)
+
+
 @step("Segurança: ativar 2FA, sair, entrar com código, desativar")
 def two_factor(page: Page):
     page.goto(f"{BASE}/seguranca")
@@ -1381,6 +1500,7 @@ def two_factor(page: Page):
     page.get_by_label("Código do aplicativo ou de recuperação").fill(totp.now())
     page.get_by_role("button", name="Desativar", exact=True).click()
     idle(page)
+    expect(page.get_by_role("button", name="Ativar verificação em duas etapas")).to_be_visible()
     assert api(page, "/auth/me")["totp_enabled"] is False
 
 
@@ -1416,7 +1536,7 @@ def mobile(browser):
     page.screenshot(path=OUT / "celular-categorias.png", full_page=True)
     overflow = page.evaluate("document.documentElement.scrollWidth > window.innerWidth")
     assert not overflow, "rolagem lateral no celular"
-    for path in ("/orcamento", "/calendario", "/metas", "/analises", "/investimentos", "/investimentos?secao=cotacoes", "/historico", "/ajustes", "/ajustes/recorrencias", "/ajustes/dados", "/ajustes/dados?aba=exportar", "/ajustes/notas", "/ajustes/seguranca", "/ajustes/ajuda", "/ajustes/atalhos", "/cartoes", "/contas", "/revisar", "/busca", "/ajustes/preferencias"):
+    for path in ("/orcamento", "/calendario", "/metas", "/analises", "/investimentos", "/investimentos?secao=cotacoes", "/historico", "/ajustes", "/ajustes/recorrencias", "/ajustes/dados", "/ajustes/dados?aba=exportar", "/ajustes/notas", "/mensagens", "/ajustes/seguranca", "/ajustes/ajuda", "/ajustes/atalhos", "/cartoes", "/contas", "/revisar", "/busca", "/ajustes/preferencias"):
         page.goto(BASE + path)
         idle(page, 300)
         wide = page.evaluate("document.documentElement.scrollWidth - window.innerWidth")
@@ -1480,6 +1600,9 @@ def main():
         import_ofx(page)
         email_notices(page)
         release_notes(page)
+        inbox_and_announcement(page)
+        theme_on_account(page)
+        start_over(page)
         two_factor(page)
         banner_never(page)
         STATE["state"] = ctx.storage_state()
