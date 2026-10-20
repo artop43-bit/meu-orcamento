@@ -35,6 +35,12 @@ const AREAS: { key: ResetArea; label: string; detail: string; effect?: string }[
     effect: "Voltam as categorias padrão; o que usava uma categoria apagada passa para “Outros”.",
   },
   { key: "analyses", label: "Análises salvas", detail: "Análises montadas em Insights." },
+  {
+    key: "debts",
+    label: "Financiamentos e dívidas",
+    detail: "Financiamentos, empréstimos, outras dívidas e o histórico do patrimônio.",
+    effect: "Parcelas já pagas ficam no histórico como despesas comuns; as a pagar somem.",
+  },
 ];
 
 /** Perfil › Zona de risco: escolher o que volta ao padrão, baixar backup e confirmar. */

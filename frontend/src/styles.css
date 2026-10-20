@@ -6823,3 +6823,87 @@ textarea {
   gap: 2px;
   min-width: 0;
 }
+
+/* ================================================================ v1.0 */
+
+/* ---------------------------------------------------------------- dívidas */
+.loan-card__title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.loan-card__title > span:last-child {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.loan-card__title h2 {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.loan-card__facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 16px;
+  margin: 0;
+}
+
+.loan-card__facts div {
+  min-width: 0;
+}
+
+.loan-card__facts dt {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.loan-card__facts dd {
+  margin: 2px 0 0;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.loan-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.loan-card .section-header {
+  flex-wrap: nowrap;
+  align-items: flex-start;
+}
+
+.field-hint-action {
+  display: flex;
+  align-items: flex-end;
+}
+
+.loan-table tr.is-paid td {
+  color: var(--muted);
+  background: var(--surface-2);
+}
+
+@media print {
+  .loan-table {
+    font-size: 9pt;
+  }
+
+  .loan-table tr.is-paid td {
+    background: #f2f2f2;
+  }
+}
+
+/* ---------------------------------------------------------------- calculadoras */
+.calc-result {
+  padding: 14px 16px;
+  border-radius: var(--radius);
+  background: var(--accent-soft);
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}

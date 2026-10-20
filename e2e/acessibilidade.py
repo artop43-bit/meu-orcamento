@@ -56,6 +56,8 @@ PAGES = [
     "/ajustes/dados?aba=exportar",
     "/ajustes/notas",
     "/mensagens",
+    "/dividas",
+    "/analises?secao=calculadoras",
     "/admin?aba=recados",
     "/ajustes/seguranca",
     "/ajustes/preferencias",

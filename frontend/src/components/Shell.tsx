@@ -16,6 +16,7 @@ import {
   Moon,
   MessageSquarePlus,
   RefreshCw,
+  Scale,
   Search,
   Settings,
   ShieldAlert,
@@ -67,6 +68,7 @@ const MAIN: NavItem[] = [
   { to: "/investimentos", label: "Investimentos", icon: <Landmark size={20} /> },
   { to: "/contas", label: "Contas", icon: <Banknote size={20} /> },
   { to: "/cartoes", label: "Cartões", icon: <CreditCard size={20} /> },
+  { to: "/dividas", label: "Dívidas", icon: <Scale size={20} /> },
   { to: "/metas", label: "Metas", icon: <Target size={20} /> },
   { to: "/historico", label: "Histórico", icon: <History size={20} /> },
 ];

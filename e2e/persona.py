@@ -1465,6 +1465,81 @@ def start_over(page: Page):
     assert any(e["subject"] == "Dados apagados da sua conta" for e in emails)
 
 
+@step("v1.0: financiamento com taxa anual e SAC, parcelas no orçamento, amortização extra e tabela")
+def debts(page: Page):
+    page.goto(f"{BASE}/dividas")
+    idle(page)
+    expect(page.get_by_role("heading", name="Nenhuma dívida cadastrada")).to_be_visible()
+    page.get_by_role("button", name="Novo financiamento").first.click()
+    d = dialog(page)
+    d.get_by_label("Tipo").select_option("vehicle")
+    d.get_by_label("Nome").fill("Financiamento do carro")
+    d.get_by_label("Instituição (opcional)").fill("Banco do Brasil")
+    d.get_by_label("Valor financiado").fill(money(30000))
+    d.get_by_label(re.compile("^Taxa de juros")).fill("18,5")
+    d.get_by_label("Ao ano").check()
+    d.get_by_label("SAC (parcelas que caem)").check()
+    d.get_by_label("Número de parcelas").fill("36")
+    first_due = f"{TODAY.year}-{TODAY.month:02d}-15"
+    d.get_by_label("Vencimento da 1ª parcela").fill(br_date(first_due))
+    expect(d.locator(".summary-box")).to_contain_text("caindo até")
+    page.screenshot(path=OUT / "v10-financiamento-form.png")
+    d.get_by_role("button", name="Cadastrar").click()
+    expect(d).to_have_count(0, timeout=8000)
+    idle(page)
+    [loan] = api(page, "/debts")["loans"]
+    assert loan["installments"] == 36 and loan["system"] == "sac", loan
+    assert 1.3 < loan["monthly_rate"] < 1.5, loan["monthly_rate"]
+    card = page.locator(".loan-card", has_text="Financiamento do carro")
+    expect(card).to_contain_text("0 de 36 parcelas")
+    # A 1ª parcela entrou no orçamento do mês.
+    month = api(page, f"/months/{CURRENT}")
+    assert any(e["description"] == "Financiamento do carro (1/36)" for e in month["expenses"])
+    # Amortização extra: reduz o prazo e mostra a economia.
+    card.get_by_role("button", name="Simular amortização extra").click()
+    d = dialog(page)
+    d.get_by_label("Valor a amortizar").fill(money(5000))
+    d.get_by_role("button", name="Simular").click()
+    expect(d.locator(".summary-box")).to_contain_text("Economia de")
+    expect(d.locator(".summary-box")).to_contain_text("Prazo cai de 36")
+    page.keyboard.press("Escape")
+    # Outra dívida com saldo manual.
+    page.get_by_role("button", name="Adicionar").click()
+    d = dialog(page)
+    d.get_by_label("Nome").fill("Acordo com a loja")
+    d.get_by_label("Saldo devedor").fill(money(900))
+    d.get_by_label(re.compile("^Pagamento por mês")).fill(money(150))
+    d.get_by_role("button", name="Salvar").click()
+    expect(d).to_have_count(0)
+    idle(page)
+    data = api(page, "/debts")
+    assert data["others"][0]["balance"] == "900.00" and len(data["history"]) == 1
+    page.screenshot(path=OUT / "v10-dividas.png", full_page=True)
+    # Tabela de parcelas para imprimir.
+    card.get_by_role("link", name="Tabela de parcelas").click()
+    page.wait_for_url("**/dividas/**/tabela")
+    idle(page)
+    expect(page.locator(".loan-table tbody tr")).to_have_count(36)
+    with page.expect_download() as info:
+        page.get_by_role("button", name="Baixar planilha").click()
+    assert info.value.suggested_filename.endswith(".csv")
+    page.screenshot(path=OUT / "v10-tabela.png", full_page=True)
+
+
+@step("v1.0: calculadoras em Insights (juros compostos, à vista ou parcelado, reserva)")
+def calculators(page: Page):
+    page.goto(f"{BASE}/analises?secao=calculadoras")
+    idle(page)
+    result = page.locator(".calc-result")
+    expect(result).to_contain_text("Em 5 ano(s)")
+    page.get_by_role("button", name="À vista ou parcelado").click()
+    expect(result).to_contain_text(re.compile("sai mais barato"))
+    page.get_by_role("button", name="Reserva de emergência").click()
+    page.get_by_label(re.compile("^Gastos essenciais")).fill(money(2500))
+    expect(result).to_contain_text("R$ 15.000,00")
+    page.screenshot(path=OUT / "v10-calculadoras.png", full_page=True)
+
+
 @step("Segurança: ativar 2FA, sair, entrar com código, desativar")
 def two_factor(page: Page):
     page.goto(f"{BASE}/seguranca")
@@ -1536,7 +1611,7 @@ def mobile(browser):
     page.screenshot(path=OUT / "celular-categorias.png", full_page=True)
     overflow = page.evaluate("document.documentElement.scrollWidth > window.innerWidth")
     assert not overflow, "rolagem lateral no celular"
-    for path in ("/orcamento", "/calendario", "/metas", "/analises", "/investimentos", "/investimentos?secao=cotacoes", "/historico", "/ajustes", "/ajustes/recorrencias", "/ajustes/dados", "/ajustes/dados?aba=exportar", "/ajustes/notas", "/mensagens", "/ajustes/seguranca", "/ajustes/ajuda", "/ajustes/atalhos", "/cartoes", "/contas", "/revisar", "/busca", "/ajustes/preferencias"):
+    for path in ("/orcamento", "/calendario", "/metas", "/analises", "/investimentos", "/investimentos?secao=cotacoes", "/historico", "/ajustes", "/ajustes/recorrencias", "/ajustes/dados", "/ajustes/dados?aba=exportar", "/ajustes/notas", "/mensagens", "/dividas", "/analises?secao=calculadoras", "/ajustes/seguranca", "/ajustes/ajuda", "/ajustes/atalhos", "/cartoes", "/contas", "/revisar", "/busca", "/ajustes/preferencias"):
         page.goto(BASE + path)
         idle(page, 300)
         wide = page.evaluate("document.documentElement.scrollWidth - window.innerWidth")
@@ -1603,6 +1678,8 @@ def main():
         inbox_and_announcement(page)
         theme_on_account(page)
         start_over(page)
+        debts(page)
+        calculators(page)
         two_factor(page)
         banner_never(page)
         STATE["state"] = ctx.storage_state()

@@ -776,6 +776,8 @@ const BACKUP_LABELS: Record<string, string> = {
   expenses: "despesa(s)",
   goals: "meta(s)",
   investments: "investimento(s)",
+  loans: "financiamento(s)",
+  other_debts: "outra(s) dívida(s)",
 };
 
 // ================================================================ exportar
