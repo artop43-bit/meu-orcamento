@@ -44,6 +44,8 @@ PAGES = [
     ("recorrencias", "/ajustes/recorrencias"),
     ("categorias", "/ajustes/categorias"),
     ("dados", "/ajustes/dados"),
+    ("dados-exportar", "/ajustes/dados?aba=exportar"),
+    ("notas", "/ajustes/notas"),
     ("seguranca", "/ajustes/seguranca"),
     ("preferencias", "/ajustes/preferencias"),
     ("atalhos", "/ajustes/atalhos"),
@@ -269,6 +271,23 @@ def dialogs(page: Page, device: str):
             if name == "form-cartao":
                 page.locator("dialog[open]").get_by_label("Crédito e débito").check()
             form(page, device, name)
+    # Segunda etapa da meta (valor e prazo).
+    page.goto(BASE + "/metas")
+    settle(page, 500)
+    page.get_by_role("button", name="Nova meta").first.click()
+    d = page.locator("dialog[open]")
+    d.get_by_label("Nome da meta").fill("Cirurgia no joelho")
+    d.get_by_role("button", name="Continuar").click()
+    d.get_by_label("Valor total").fill("12.000,00")
+    form(page, device, "form-meta-valor")
+    # Importação: etapa de conferir as colunas de uma planilha.
+    sample = OUT / "planilha.csv"
+    sample.write_text("Data;Histórico;Valor\n05/01/2026;SUPERMERCADO BH LTDA;-152,30\n06/01/2026;SALARIO;3200,00\n", encoding="utf-8")
+    page.goto(BASE + "/ajustes/dados")
+    settle(page, 500)
+    page.get_by_test_id("import-input").set_input_files(str(sample))
+    settle(page, 700)
+    check(page, device, "importar-colunas")
 
 
 def main() -> int:

@@ -54,6 +54,7 @@ export type Expense = {
   card_id: string | null;
   purchase_date: string | null;
   debit_card_id?: string | null;
+  receipt_ids?: string[];
   account_id: string | null;
   needs_review: boolean;
   installment_group_id: string | null;
@@ -105,6 +106,29 @@ export type Recurring = {
   notes: string | null;
 };
 
+export type GoalKind =
+  | "emergency"
+  | "purchase"
+  | "travel"
+  | "health"
+  | "education"
+  | "home"
+  | "vehicle"
+  | "debt"
+  | "retirement"
+  | "other";
+
+export type GoalProjection = {
+  status: "completed" | "on_track" | "ahead" | "behind" | "estimate" | "no_pace";
+  remaining: string;
+  pace: string | null;
+  pace_source: "contributions" | "plan" | "surplus" | null;
+  eta: string | null;
+  months_needed: number | null;
+  required_monthly: string | null;
+  months_left: number | null;
+};
+
 export type Goal = {
   id: string;
   name: string;
@@ -112,7 +136,27 @@ export type Goal = {
   current_amount: string;
   target_date: string | null;
   progress_pct: number;
+  kind: GoalKind;
+  motivation: string | null;
+  monthly_plan: string | null;
+  is_main: boolean;
+  completed_at: string | null;
+  image_id: string | null;
+  projection: GoalProjection | null;
 };
+
+export type GoalInput = {
+  name: string;
+  target_amount: string;
+  current_amount?: string;
+  target_date?: string | null;
+  kind?: GoalKind;
+  motivation?: string | null;
+  monthly_plan?: string | null;
+  is_main?: boolean;
+};
+
+export type GoalSuggestion = { goal_id: string; goal_name: string; surplus: string; amount: string };
 
 export type HistoryPoint = {
   month: string;
@@ -246,10 +290,21 @@ export const budgetApi = {
   deleteRecurring: (id: string) => api.delete(`/recurring/${id}`),
 
   goals: () => api.get<Goal[]>("/goals"),
-  createGoal: (data: { name: string; target_amount: string; target_date?: string | null }) =>
-    api.post<Goal>("/goals", data),
-  updateGoal: (id: string, data: Partial<{ name: string; target_amount: string; target_date: string | null }>) =>
-    api.patch<Goal>(`/goals/${id}`, data),
+  createGoal: (data: GoalInput) => api.post<Goal>("/goals", data),
+  updateGoal: (id: string, data: Partial<GoalInput>) => api.patch<Goal>(`/goals/${id}`, data),
+  goalSuggestion: () => api.get<GoalSuggestion | null>("/goals/suggestion"),
+  setGoalImage: (id: string, file: Blob, name: string) => {
+    const form = new FormData();
+    form.append("image", file, name);
+    return api.form<Goal>("PUT", `/goals/${id}/image`, form);
+  },
+  removeGoalImage: (id: string) => api.remove<Goal>(`/goals/${id}/image`),
+  addReceipts: (expenseId: string, files: File[]) => {
+    const form = new FormData();
+    for (const f of files) form.append("images", f, f.name);
+    return api.form<{ receipt_ids: string[] }>("POST", `/expenses/${expenseId}/receipts`, form);
+  },
+  removeReceipt: (expenseId: string, fileId: string) => api.delete(`/expenses/${expenseId}/receipts/${fileId}`),
   contribute: (id: string, amount: string) =>
     api.post<Goal>(`/goals/${id}/contributions`, { amount }),
   deleteGoal: (id: string) => api.delete(`/goals/${id}`),

@@ -24,6 +24,10 @@ const loaders = {
   Investments: () => import("./Investments"),
   Recurring: () => import("./Recurring"),
   Report: () => import("./Report"),
+  AnnualReport: () => import("./AnnualReport"),
+  ReleaseNotes: () => import("./ReleaseNotes"),
+  Onboarding: () => import("./Onboarding"),
+  PublicActions: () => import("./PublicActions"),
   Security: () => import("./Security"),
   Legal: () => import("./Legal"),
 };
@@ -49,6 +53,11 @@ export const History = lazy(loaders.History);
 export const Investments = lazy(loaders.Investments);
 export const RecurringPage = lazy(loaders.Recurring);
 export const Report = lazy(loaders.Report);
+export const AnnualReport = lazy(loaders.AnnualReport);
+export const ReleaseNotesPage = lazy(loaders.ReleaseNotes);
+export const OnboardingPage = lazy(loaders.Onboarding);  // configuração inicial guiada (janela)
+export const Unsubscribe = lazy(() => loaders.PublicActions().then((m) => ({ default: m.Unsubscribe })));
+export const NotMe = lazy(() => loaders.PublicActions().then((m) => ({ default: m.NotMe })));
 export const Security = lazy(loaders.Security);
 export const Privacy = lazy(() => loaders.Legal().then((m) => ({ default: m.Privacy })));
 export const Terms = lazy(() => loaders.Legal().then((m) => ({ default: m.Terms })));

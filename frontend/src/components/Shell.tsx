@@ -37,7 +37,7 @@ import { togglePrivacy, usePrefs } from "../lib/prefs";
 import { Brand, LoadingRegion, Sheet, Skeleton } from "./ui";
 import { UndoProvider } from "./undo";
 import { ErrorBoundary } from "./ErrorBoundary";
-import { preloadPages } from "../pages/lazy";
+import { OnboardingPage, preloadPages } from "../pages/lazy";
 import { resetSwipe, useMobileGestures } from "./useMobileGestures";
 
 /** Enquanto a tela é baixada (primeira visita, conexão lenta). */
@@ -431,7 +431,13 @@ export function Shell() {
         </p>
       </Sheet>
 
-      <Tour />
+      {user && !user.onboarded_at ? (
+        <Suspense fallback={null}>
+          <OnboardingPage onClose={() => undefined} />
+        </Suspense>
+      ) : (
+        <Tour />
+      )}
       <PowerLayer />
       <div id="sr-announcer" className="sr-only" role="status" aria-live="polite" />
     </div>

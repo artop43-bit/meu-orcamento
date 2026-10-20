@@ -3,15 +3,17 @@
  * do changelog (pasta changelog/), que tem a mesma versão, data e hora.
  */
 export const RELEASE = {
-  version: "0.7.7",
+  version: "0.8.0",
   // Data e hora (Brasília) em que o update foi publicado.
-  releasedAt: "2026-10-19T21:45:00-03:00",
+  releasedAt: "2026-10-20T02:30:00-03:00",
 };
 
 /** Mostrado uma vez em "Novidades" depois do update (curto: o detalhe fica no changelog). */
 export const RELEASE_NOTES: { title: string; text: string }[] = [
-  { title: "E-mails de verdade.", text: "Confirmação de cadastro e redefinição de senha chegam direto na sua caixa de entrada." },
-  { title: "Termos e Privacidade completos.", text: "Responsável, contato e foro preenchidos; as páginas deixaram de ser rascunho." },
+  { title: "Avisos por e-mail.", text: "Lembrete das contas a vencer, resumo do mês e aviso de acesso por aparelho novo. Ajuste em Preferências." },
+  { title: "Metas com objetivo.", text: "Tipo, imagem, motivação e projeção de conclusão, com a meta principal em destaque no Orçamento." },
+  { title: "Importar e exportar.", text: "Uma só importação para OFX, CSV, Excel e backup, com prévia e desfazer; exportação com filtros e resumo anual." },
+  { title: "Comprovantes.", text: "Anexe a foto do recibo ou da nota fiscal na despesa." },
 ];
 
 export function releaseLabel(): string {

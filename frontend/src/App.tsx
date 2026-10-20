@@ -12,6 +12,7 @@ import ResetPassword from "./pages/ResetPassword";
 import VerifyEmail from "./pages/VerifyEmail";
 import {
   AccountsPage,
+  AnnualReport,
   AdminPage,
   Analysis,
   CalendarPage,
@@ -22,14 +23,17 @@ import {
   HelpPage,
   History,
   Investments,
+  NotMe,
   PreferencesPage,
   ProfilePage,
   Privacy,
   RecurringPage,
+  ReleaseNotesPage,
   Report,
   ReviewPage,
   SearchPage,
   SupportPage,
+  Unsubscribe,
   Security,
   SettingsHub,
   SettingsLayout,
@@ -78,6 +82,8 @@ export default function App() {
         <Route path="/redefinir-senha" element={<ResetPassword />} />
         <Route path="/privacidade" element={<Privacy />} />
         <Route path="/termos" element={<Terms />} />
+        <Route path="/descadastrar" element={<Unsubscribe />} />
+        <Route path="/nao-fui-eu" element={<NotMe />} />
         <Route element={<RequireAuth />}>
           <Route path="/" element={<Navigate to="/orcamento" replace />} />
           <Route path="/orcamento/:month?" element={<MonthPage />} />
@@ -104,6 +110,7 @@ export default function App() {
             <Route path="solicitacoes" element={<SupportPage />} />
             <Route path="solicitacoes/:id" element={<SupportPage />} />
             <Route path="ajuda" element={<HelpPage />} />
+            <Route path="notas" element={<ReleaseNotesPage />} />
           </Route>
           {/* Endereços antigos continuam funcionando. */}
           <Route path="/fixas" element={<Navigate to="/ajustes/recorrencias" replace />} />
@@ -112,6 +119,7 @@ export default function App() {
           <Route path="/seguranca" element={<Navigate to="/ajustes/seguranca" replace />} />
           <Route path="/preferencias" element={<Navigate to="/ajustes/preferencias" replace />} />
           <Route path="/ajuda" element={<Navigate to="/ajustes/ajuda" replace />} />
+          <Route path="/relatorio/ano/:ano" element={<AnnualReport />} />
           <Route path="/relatorio/:month?" element={<Report />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
