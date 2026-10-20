@@ -246,8 +246,8 @@ export default function Preferences() {
           </section>
         </div>
         <div className="stack" style={{ gap: 20 }}>
-          <section className="card stack">
-            <h2>Atalhos</h2>
+          <section className="card stack" id="atalhos">
+            <h2>Atalhos de teclado</h2>
             <dl className="shortcuts">
               {SHORTCUTS.map(([key, what]) => (
                 <div key={key}>

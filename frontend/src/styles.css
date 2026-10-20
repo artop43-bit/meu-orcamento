@@ -7000,3 +7000,161 @@ textarea {
   border-color: var(--border-strong);
   color: var(--fg);
 }
+
+/* ================================================================ v1.1 */
+
+/* ---------------------------------------------------------------- menu em grupos */
+.nav-group__toggle {
+  width: 100%;
+  border: none;
+  background: none;
+  font: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.nav-group.is-current > .nav-group__toggle {
+  color: var(--fg);
+  font-weight: 650;
+}
+
+.nav-group__chevron {
+  margin-left: auto;
+  transition: transform 0.15s ease;
+}
+
+.nav-group__toggle[aria-expanded="true"] .nav-group__chevron {
+  transform: rotate(180deg);
+}
+
+.nav-group__items {
+  display: grid;
+  gap: 2px;
+  margin: 2px 0 4px;
+  padding-left: 14px;
+  border-left: 1px solid var(--border);
+  margin-left: 22px;
+  animation: nav-open 0.16s ease-out;
+}
+
+@keyframes nav-open {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+.sidebar__sublink {
+  padding: 7px 10px;
+  font-size: 0.9rem;
+}
+
+/* Balão de Mensagens na barra de ferramentas, com contador. */
+.sidebar__tool--messages {
+  position: relative;
+  text-decoration: none;
+}
+
+.sidebar__tool--messages.active {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.sidebar__tool-badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-fg);
+  font-size: 0.68rem;
+  font-weight: 700;
+  display: inline-grid;
+  place-items: center;
+  box-shadow: 0 0 0 2px var(--surface);
+}
+
+/* Rodapé: "Sair" e o botão de tema lado a lado. */
+.sidebar__footer-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.sidebar__theme {
+  flex: 0 0 auto;
+  width: 36px;
+}
+
+/* ---------------------------------------------------------------- celular: telas do grupo */
+.group-tabs {
+  display: none;
+}
+
+@media (max-width: 1023px) {
+  .group-tabs {
+    display: flex;
+    gap: 6px;
+    margin: 0 0 14px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .group-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .group-tabs a {
+    flex: 0 0 auto;
+    min-height: 40px;
+    display: inline-flex;
+    align-items: center;
+    padding: 0 16px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--muted);
+    font-weight: 600;
+    font-size: 0.9rem;
+    text-decoration: none;
+  }
+
+  .group-tabs a.active {
+    background: var(--accent-soft);
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+}
+
+/* ---------------------------------------------------------------- janelas no celular */
+.sheet__body {
+  overscroll-behavior: contain;
+}
+
+.sheet__confirm {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 0 0 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--warn);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: 0 6px 18px rgb(0 0 0 / 0.12);
+  font-weight: 600;
+}
+
+.sheet__confirm-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}

@@ -1,4 +1,5 @@
 import {
+  type TouchEvent,
   useEffect,
   useId,
   useRef,
@@ -150,12 +151,18 @@ export function Sheet({
   const [rendered, setRendered] = useState(open);
   const titleId = useId();
   const drag = useRef<{ y: number; t: number; dy: number } | null>(null);
+  // Algo foi digitado na janela? Arrastar para fechar pede confirmação antes de descartar.
+  const dirty = useRef(false);
+  const [confirming, setConfirming] = useState(false);
+  const bodyDrag = useRef<{ x: number; y: number; t: number; active: boolean } | null>(null);
 
   useEffect(() => {
     const dialog = ref.current;
     if (!dialog) return;
     if (open) {
       setRendered(true);
+      dirty.current = false;
+      setConfirming(false);
       dialog.classList.remove("is-closing");
       if (!dialog.open) {
         // O campo com autoFocus já recebeu o foco ao montar; showModal() o levaria para o
@@ -206,16 +213,66 @@ export function Sheet({
     drag.current = null;
     if (!state || !dialog) return;
     const velocity = state.dy / Math.max(e.timeStamp - state.t, 1);
-    if (state.dy > dialog.offsetHeight / 3 || (velocity > 0.5 && state.dy > 40)) {
+    finishDrag(state.dy, velocity);
+  }
+
+  /** Solta o arrasto: fecha se foi longe ou rápido o bastante; senão volta ao lugar. */
+  function finishDrag(dy: number, velocity: number) {
+    const dialog = ref.current;
+    if (!dialog) return;
+    const far = dy > dialog.offsetHeight / 3 || (velocity > 0.5 && dy > 40);
+    if (far && !dirty.current) {
       haptic("tap");
       dialog.style.transition = "transform 0.18s ease-in";
       dialog.style.transform = "translateY(100%)";
       dialog.dataset.dragged = "1";
       window.setTimeout(onClose, 170);
-    } else {
-      dialog.style.transition = "transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1)";
-      dialog.style.transform = "";
+      return;
     }
+    dialog.style.transition = "transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1)";
+    dialog.style.transform = "";
+    if (far) {
+      haptic("tap");
+      setConfirming(true);
+    }
+  }
+
+  // Arrastar a partir do conteúdo: só quando ele já está no topo e o gesto é para baixo
+  // (como nos apps nativos). Campos de texto e áreas com rolagem lateral ficam de fora.
+  function onBodyTouchStart(e: TouchEvent<HTMLDivElement>) {
+    const target = e.target as Element;
+    if (e.touches.length !== 1 || target.closest("input, textarea, select, [contenteditable], .table-wrap, .chart")) {
+      bodyDrag.current = null;
+      return;
+    }
+    const t = e.touches[0]!;
+    bodyDrag.current = { x: t.clientX, y: t.clientY, t: e.timeStamp, active: false };
+  }
+
+  function onBodyTouchMove(e: TouchEvent<HTMLDivElement>) {
+    const state = bodyDrag.current;
+    const dialog = ref.current;
+    if (!state || !dialog || !matchMedia("(max-width: 1023px)").matches) return;
+    const t = e.touches[0]!;
+    const dy = t.clientY - state.y;
+    const dx = t.clientX - state.x;
+    if (!state.active) {
+      if (e.currentTarget.scrollTop > 0 || dy < 10 || Math.abs(dx) > dy) {
+        if (Math.abs(dy) > 10 || Math.abs(dx) > 10) bodyDrag.current = null;
+        return;
+      }
+      state.active = true;
+      dialog.style.transition = "none";
+    }
+    dialog.style.transform = `translateY(${Math.max(0, dy)}px)`;
+  }
+
+  function onBodyTouchEnd(e: TouchEvent<HTMLDivElement>) {
+    const state = bodyDrag.current;
+    bodyDrag.current = null;
+    if (!state?.active) return;
+    const dy = (e.changedTouches[0]?.clientY ?? state.y) - state.y;
+    finishDrag(Math.max(0, dy), Math.max(0, dy) / Math.max(e.timeStamp - state.t, 1));
   }
 
   const dragProps = {
@@ -230,6 +287,9 @@ export function Sheet({
       ref={ref}
       className={`sheet ${wide ? "sheet--wide" : ""}`}
       aria-labelledby={titleId}
+      onInput={() => {
+        dirty.current = true;
+      }}
       // Só ações do usuário (Esc, X, clique fora) chamam onClose. O fechamento feito pelo
       // código ao trocar de janela não pode, senão anularia a próxima janela que está abrindo.
       onCancel={(e) => {
@@ -252,7 +312,38 @@ export function Sheet({
               <X size={20} />
             </button>
           </div>
-          <div className="sheet__body">{children}</div>
+          <div
+            className="sheet__body"
+            onTouchStart={onBodyTouchStart}
+            onTouchMove={onBodyTouchMove}
+            onTouchEnd={onBodyTouchEnd}
+            onTouchCancel={() => {
+              bodyDrag.current = null;
+              if (ref.current) ref.current.style.transform = "";
+            }}
+          >
+            {confirming && (
+              <div className="sheet__confirm" role="alertdialog" aria-label="Descartar alterações?">
+                <span>Descartar o que foi preenchido?</span>
+                <span className="sheet__confirm-actions">
+                  <Button type="button" variant="secondary" onClick={() => setConfirming(false)}>
+                    Continuar editando
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="danger"
+                    onClick={() => {
+                      setConfirming(false);
+                      onClose();
+                    }}
+                  >
+                    Descartar
+                  </Button>
+                </span>
+              </div>
+            )}
+            {children}
+          </div>
         </div>
       )}
     </dialog>

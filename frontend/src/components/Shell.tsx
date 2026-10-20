@@ -3,7 +3,9 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Banknote,
   CalendarDays,
+  CalendarRange,
   ChartPie,
+  ChevronDown,
   CreditCard,
   Ellipsis,
   Eye,
@@ -12,9 +14,9 @@ import {
   Landmark,
   LogOut,
   Mail,
+  MessageSquarePlus,
   Monitor,
   Moon,
-  MessageSquarePlus,
   RefreshCw,
   Scale,
   Search,
@@ -25,6 +27,7 @@ import {
   Target,
   Users,
   Wallet,
+  WalletCards,
   WifiOff,
 } from "lucide-react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router";
@@ -34,7 +37,7 @@ import { moneyApi } from "../api/money";
 import { useProfile } from "../api/profile";
 import { useInboxUnread } from "../api/inbox";
 import { announce, prefersReducedMotion } from "../lib/announce";
-import { neighbor } from "../lib/gestures";
+import { GROUPS, groupEntry, groupOf, leafLabel, LEAVES, MOBILE_TABS, neighborLeaf, parentOf, sectionOf, type NavGroup } from "../lib/navigation";
 import { haptic } from "../lib/haptics";
 import { setCycleStart } from "../lib/format";
 import { releaseLabel } from "../release";
@@ -62,35 +65,42 @@ function PageLoading() {
   );
 }
 
-type NavItem = { to: string; label: string; icon: ReactNode; short?: string };
+type NavItem = { to: string; label: string; icon: ReactNode };
 
-const MAIN: NavItem[] = [
-  { to: "/orcamento", label: "Orçamento", icon: <Wallet size={20} /> },
-  { to: "/calendario", label: "Calendário", icon: <CalendarDays size={20} /> },
-  { to: "/analises", label: "Insights", icon: <ChartPie size={20} /> },
-  { to: "/investimentos", label: "Investimentos", icon: <Landmark size={20} /> },
-  { to: "/contas", label: "Contas", icon: <Banknote size={20} /> },
-  { to: "/cartoes", label: "Cartões", icon: <CreditCard size={20} /> },
-  { to: "/dividas", label: "Dívidas", icon: <Scale size={20} /> },
-  { to: "/divisoes", label: "Divisões", icon: <Users size={20} /> },
-  { to: "/metas", label: "Metas", icon: <Target size={20} /> },
-  { to: "/historico", label: "Histórico", icon: <History size={20} /> },
-];
+const GROUP_ICONS: Record<string, ReactNode> = {
+  orcamento: <Wallet size={20} />,
+  carteira: <WalletCards size={20} />,
+  planejamento: <CalendarRange size={20} />,
+  investimentos: <Landmark size={20} />,
+  analises: <ChartPie size={20} />,
+};
+const LEAF_ICONS: Record<string, ReactNode> = {
+  "/contas": <Banknote size={18} />,
+  "/cartoes": <CreditCard size={18} />,
+  "/dividas": <Scale size={18} />,
+  "/divisoes": <Users size={18} />,
+  "/calendario": <CalendarDays size={18} />,
+  "/metas": <Target size={18} />,
+  "/analises": <ChartPie size={18} />,
+  "/historico": <History size={18} />,
+};
 
-const MESSAGES: NavItem = { to: "/mensagens", label: "Mensagens", icon: <Mail size={20} /> };
-const SETTINGS: NavItem[] = [{ to: "/ajustes", label: "Ajustes", icon: <Settings size={20} /> }];
+const SETTINGS: NavItem = { to: "/ajustes", label: "Ajustes", icon: <Settings size={20} /> };
 const THEME_ICON = { system: <Monitor size={17} />, light: <Sun size={17} />, dark: <Moon size={17} /> } as const;
 const ADMIN: NavItem = { to: "/admin", label: "Administração", icon: <ShieldCheck size={20} /> };
-// Telas fora do menu (títulos da barra do topo e do navegador).
-const EXTRA_TITLES: Record<string, string> = { "/revisar": "Para revisar", "/busca": "Busca", "/admin": "Administração", "/mensagens": "Mensagens" };
+// Telas fora dos grupos (títulos da barra do topo e do navegador).
+const EXTRA_TITLES: Record<string, string> = {
+  "/revisar": "Para revisar",
+  "/busca": "Busca",
+  "/admin": "Administração",
+  "/mensagens": "Mensagens",
+  "/ajustes": "Ajustes",
+};
 
-// No celular, as 4 primeiras viram abas; o resto vai para "Mais".
-const TABS = MAIN.slice(0, 4);
-const MORE = [...MAIN.slice(4), MESSAGES, ...SETTINGS];
-
-const ALL = [...MAIN, ...SETTINGS];
-const TITLES: Record<string, string> = { ...Object.fromEntries(ALL.map((item) => [item.to, item.label])), ...EXTRA_TITLES };
-const TAB_PATHS = TABS.map((item) => item.to);
+// No celular, os grupos principais viram abas; Investimentos fica no "Mais".
+const TAB_GROUPS = GROUPS.filter((g) => MOBILE_TABS.includes(g.key));
+const MORE_GROUPS = GROUPS.filter((g) => !MOBILE_TABS.includes(g.key));
+const ORDER = [...LEAVES, "/ajustes"];
 const LATER_KEY = "2fa-lembrar-depois";
 
 function readSession(key: string): boolean {
@@ -154,13 +164,14 @@ export function Shell() {
   const pullRef = useRef<HTMLDivElement>(null);
   const previousSection = useRef<string | null>(null);
 
-  const section = "/" + (location.pathname.split("/")[1] ?? "");
-  const title = TITLES[section] ?? "Meu Orçamento";
+  const section = sectionOf(location.pathname);
+  const title = leafLabel(location.pathname) ?? EXTRA_TITLES[section] ?? "Meu Orçamento";
+  const group = groupOf(location.pathname);
+  const [openGroup, setOpenGroup] = useState<string | null>(group?.key ?? null);
   const [twoFactorLater, setTwoFactorLater] = useState(() => readSession(LATER_KEY));
   const showTwoFactorBanner =
     user && !user.totp_enabled && !user.twofa_prompt_dismissed && !twoFactorLater && location.pathname !== "/seguranca";
-  const tabIndex = TAB_PATHS.indexOf(section);
-  const inMore = MORE.some((item) => item.to === section);
+  const inMore = !group || !MOBILE_TABS.includes(group.key);
 
   // Depois de entrar, baixa as outras telas em segundo plano (navegação instantânea).
   useEffect(() => preloadPages(), []);
@@ -170,8 +181,11 @@ export function Shell() {
     if (user) syncAppearance(user);
   }, [user]);
 
-  // Fecha o menu "Mais" ao trocar de página.
+  // Fecha o menu "Mais" ao trocar de página; o grupo da tela atual fica aberto no menu.
   useEffect(() => setMoreOpen(false), [location.pathname]);
+  useEffect(() => {
+    if (group?.children) setOpenGroup(group.key);
+  }, [group]);
 
   useEffect(() => {
     document.title = `${title} · Meu Orçamento`;
@@ -211,8 +225,7 @@ export function Shell() {
     previousSection.current = section;
     resetSwipe(contentRef.current);
     if (from === null || from === section) return;
-    const order = ALL.map((item) => item.to);
-    const dir = Math.sign(order.indexOf(section) - order.indexOf(from));
+    const dir = Math.sign(ORDER.indexOf(section) - ORDER.indexOf(from));
     if (pageRef.current) pageRef.current.dataset.enter = String(dir);
     window.scrollTo(0, 0);
     const heading = pageRef.current?.querySelector("h1");
@@ -222,11 +235,13 @@ export function Shell() {
     }
   }, [section]);
 
-  // Deslizar sempre troca as abas principais (as seções dentro de cada tela são por toque).
+  // Deslizar anda pelas telas na ordem do menu; numa sub-tela (ex.: Ajustes › Perfil),
+  // deslizar para a direita volta para a tela de cima.
+  const parent = parentOf(location.pathname);
   useMobileGestures(contentRef, pullRef, {
-    canGo: (dir) => neighbor(TAB_PATHS, tabIndex, dir) !== null,
+    canGo: (dir) => (dir === -1 && parent !== null) || (parent === null && neighborLeaf(location.pathname, dir) !== null),
     go: (dir) => {
-      const to = neighbor(TAB_PATHS, tabIndex, dir);
+      const to = dir === -1 && parent !== null ? parent : neighborLeaf(location.pathname, dir);
       if (to) navigate(to);
     },
     refresh: async () => {
@@ -276,6 +291,16 @@ export function Shell() {
     queryClient.clear();
   }
 
+  // Grupo do menu: abre (e leva à primeira tela, se a atual for de outro grupo) ou fecha.
+  function toggleGroup(g: NavGroup) {
+    if (openGroup === g.key) {
+      setOpenGroup(null);
+      return;
+    }
+    setOpenGroup(g.key);
+    if (group?.key !== g.key) navigate(groupEntry(g));
+  }
+
   // Tocar de novo na aba em que já está volta ao topo (como nos apps nativos).
   function onNavClick(event: MouseEvent, to: string) {
     if (to === section && window.scrollY > 0) {
@@ -293,24 +318,43 @@ export function Shell() {
       <aside className="sidebar no-print" aria-label="Menu principal">
         <Brand to="/" />
         <nav className="stack stack--tight" style={{ gap: 2 }} aria-label="Seções">
-          {MAIN.map((item) => (
-            <NavLink key={item.to} to={item.to} className="sidebar__link" onClick={(e) => onNavClick(e, item.to)}>
-              {item.icon}
-              {item.label}
-            </NavLink>
-          ))}
+          {GROUPS.map((g) =>
+            g.children ? (
+              <div key={g.key} className={`nav-group ${group?.key === g.key ? "is-current" : ""}`}>
+                <button
+                  type="button"
+                  className="sidebar__link nav-group__toggle"
+                  aria-expanded={openGroup === g.key}
+                  aria-controls={`grupo-${g.key}`}
+                  onClick={() => toggleGroup(g)}
+                >
+                  {GROUP_ICONS[g.key]}
+                  {g.label}
+                  <ChevronDown size={16} className="nav-group__chevron" aria-hidden />
+                </button>
+                {openGroup === g.key && (
+                  <div id={`grupo-${g.key}`} className="nav-group__items">
+                    {g.children.map((c) => (
+                      <NavLink key={c.to} to={c.to} className="sidebar__link sidebar__sublink" onClick={(e) => onNavClick(e, c.to)}>
+                        {LEAF_ICONS[c.to]}
+                        {c.label}
+                      </NavLink>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <NavLink key={g.key} to={g.to!} className="sidebar__link" onClick={(e) => onNavClick(e, g.to!)}>
+                {GROUP_ICONS[g.key]}
+                {g.label}
+              </NavLink>
+            ),
+          )}
           <p className="sidebar__group" aria-hidden></p>
-          <NavLink to={MESSAGES.to} className="sidebar__link" onClick={(e) => onNavClick(e, MESSAGES.to)}>
-            {MESSAGES.icon}
-            {MESSAGES.label}
-            <NavBadge count={inboxUnread} label={unreadLabel} />
+          <NavLink to={SETTINGS.to} className="sidebar__link" onClick={(e) => onNavClick(e, SETTINGS.to)}>
+            {SETTINGS.icon}
+            {SETTINGS.label}
           </NavLink>
-          {SETTINGS.map((item) => (
-            <NavLink key={item.to} to={item.to} className="sidebar__link" onClick={(e) => onNavClick(e, item.to)}>
-              {item.icon}
-              {item.label}
-            </NavLink>
-          ))}
           {user?.is_admin && (
             <NavLink to="/admin" className="sidebar__link">
               {ADMIN.icon}
@@ -333,9 +377,19 @@ export function Shell() {
           >
             {prefs.privacy ? <Eye size={17} /> : <EyeOff size={17} />}
           </button>
-          <button type="button" className="sidebar__tool" onClick={cycleTheme} aria-label={`Tema: ${themeLabel}. Trocar o tema`} title={`Tema: ${themeLabel} (clique para trocar)`}>
-            {THEME_ICON[prefs.theme]}
-          </button>
+          <NavLink
+            to="/mensagens"
+            className="sidebar__tool sidebar__tool--messages"
+            aria-label={inboxUnread > 0 ? `Mensagens, ${unreadLabel}` : "Mensagens"}
+            title="Mensagens"
+          >
+            <Mail size={17} />
+            {inboxUnread > 0 && (
+              <span className="sidebar__tool-badge" aria-hidden>
+                {inboxUnread > 9 ? "9+" : inboxUnread}
+              </span>
+            )}
+          </NavLink>
           <button type="button" className="sidebar__tool" onClick={openFeedback} aria-label="Nova solicitação" title="Nova solicitação (sugestão ou problema)">
             <MessageSquarePlus size={17} />
           </button>
@@ -348,9 +402,20 @@ export function Shell() {
               {profile.data?.display_name && <span className="muted small">{user?.email}</span>}
             </span>
           </Link>
-          <button type="button" className="sidebar__link sidebar__logout" onClick={logout}>
-            <LogOut size={18} /> Sair
-          </button>
+          <div className="sidebar__footer-row">
+            <button type="button" className="sidebar__link sidebar__logout" onClick={logout}>
+              <LogOut size={18} /> Sair
+            </button>
+            <button
+              type="button"
+              className="sidebar__tool sidebar__theme"
+              onClick={cycleTheme}
+              aria-label={`Tema: ${themeLabel}. Trocar o tema`}
+              title={`Tema: ${themeLabel} (clique para trocar)`}
+            >
+              {THEME_ICON[prefs.theme]}
+            </button>
+          </div>
           <span className="row small" style={{ gap: 12 }}>
             <Link to="/privacidade" className="muted">
               Privacidade
@@ -413,6 +478,15 @@ export function Shell() {
                 </span>
               </div>
             )}
+            {group?.children && (
+              <nav className="group-tabs no-print" aria-label={group.label}>
+                {group.children.map((c) => (
+                  <NavLink key={c.to} to={c.to}>
+                    {c.label}
+                  </NavLink>
+                ))}
+              </nav>
+            )}
             {/* A chave inclui a privacidade: ao esconder/mostrar valores, a tela redesenha. */}
             <ErrorBoundary key={`${location.pathname}-${prefs.privacy}`}>
               <Suspense fallback={<PageLoading />}>
@@ -424,12 +498,16 @@ export function Shell() {
       </div>
 
       <nav className="tabbar no-print" aria-label="Navegação">
-        {TABS.map((item) => (
-          <NavLink key={item.to} to={item.to} onClick={(e) => onNavClick(e, item.to)}>
-            {item.icon}
-            {item.short ?? item.label}
-          </NavLink>
-        ))}
+        {TAB_GROUPS.map((g) => {
+          const active = group?.key === g.key;
+          const to = active ? section : groupEntry(g);
+          return (
+            <Link key={g.key} to={to} className={active ? "active" : undefined} aria-current={active ? "page" : undefined} onClick={(e) => onNavClick(e, to)}>
+              {GROUP_ICONS[g.key]}
+              {g.label}
+            </Link>
+          );
+        })}
         <button
           type="button"
           className={inMore ? "active" : undefined}
@@ -456,15 +534,27 @@ export function Shell() {
           </span>
         </Link>
         <ul className="menu-list">
-          {MORE.map((item) => (
-            <li key={item.to}>
-              <Link to={item.to} aria-current={item.to === section ? "page" : undefined}>
-                {item.icon}
-                {item.label}
-                {item.to === "/mensagens" && <NavBadge count={inboxUnread} label={unreadLabel} />}
+          {MORE_GROUPS.map((g) => (
+            <li key={g.key}>
+              <Link to={groupEntry(g)} aria-current={group?.key === g.key ? "page" : undefined}>
+                {GROUP_ICONS[g.key]}
+                {g.label}
               </Link>
             </li>
           ))}
+          <li>
+            <Link to="/mensagens" aria-current={section === "/mensagens" ? "page" : undefined}>
+              <Mail size={20} />
+              Mensagens
+              <NavBadge count={inboxUnread} label={unreadLabel} />
+            </Link>
+          </li>
+          <li>
+            <Link to={SETTINGS.to} aria-current={section === SETTINGS.to ? "page" : undefined}>
+              {SETTINGS.icon}
+              {SETTINGS.label}
+            </Link>
+          </li>
           {user?.is_admin && (
             <li>
               <Link to="/admin">

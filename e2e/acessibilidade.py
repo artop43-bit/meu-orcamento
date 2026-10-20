@@ -63,7 +63,6 @@ PAGES = [
     "/admin?aba=recados",
     "/ajustes/seguranca",
     "/ajustes/preferencias",
-    "/ajustes/atalhos",
     "/ajustes/ajuda",
 ]
 DEVICES = {

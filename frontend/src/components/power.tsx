@@ -151,9 +151,8 @@ const PAGES: [string, string, string][] = [
   ["/ajustes/recorrencias", "Recorrências e assinaturas", "fixas"],
   ["/ajustes/categorias", "Categorias e regras", "limites"],
   ["/ajustes/dados", "Importar e exportar", "extrato ofx csv excel"],
-  ["/ajustes/preferencias", "Preferências", "tema cor texto privacidade aparencia"],
+  ["/ajustes/preferencias", "Preferências", "tema cor texto privacidade aparencia atalhos teclado teclas"],
   ["/ajustes/seguranca", "Segurança", "senha 2fa"],
-  ["/ajustes/atalhos", "Atalhos de teclado", "teclas"],
   ["/ajustes/ajuda", "Central de ajuda", "como usar tour"],
 ];
 

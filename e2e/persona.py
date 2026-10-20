@@ -1148,7 +1148,7 @@ def version(page: Page):
     expect(page.locator(".sidebar .app-version")).to_contain_text(re.compile(r"Versão \d+\.\d+\.\d+ · \d{2}/\d{2}/\d{4} às \d{2}:\d{2}"))
 
 
-@step("Celular: deslizar troca só as abas principais, em qualquer ponto da tela")
+@step("Celular: deslizar entre telas, abas dos grupos, voltar da sub-tela e arrastar a janela para fechar")
 def mobile_sections(browser):
     ctx = browser.new_context(
         storage_state=STATE["state"], viewport={"width": 390, "height": 844}, device_scale_factor=2, is_mobile=True, has_touch=True
@@ -1164,19 +1164,54 @@ def mobile_sections(browser):
         cdp.send("Input.dispatchTouchEvent", {"type": "touchEnd", "touchPoints": []})
         page.wait_for_timeout(700)
 
-    # Na Análise financeira, deslizar vai para a próxima aba principal (não troca de seção).
+    def drag_down(x, y0, y1):
+        cdp.send("Input.dispatchTouchEvent", {"type": "touchStart", "touchPoints": [{"x": x, "y": y0}]})
+        for i in range(1, 13):
+            cdp.send("Input.dispatchTouchEvent", {"type": "touchMove", "touchPoints": [{"x": x + 1, "y": y0 + (y1 - y0) * i / 12}]})
+            page.wait_for_timeout(16)
+        cdp.send("Input.dispatchTouchEvent", {"type": "touchEnd", "touchPoints": []})
+        page.wait_for_timeout(600)
+
+    # Deslizar anda pelas telas na ordem do menu (Insights → Histórico; Investimentos ← Insights).
+    # (abaixo da faixa de seções de Insights, que rola para o lado e por isso não troca de tela)
     page.goto(f"{BASE}/analises?secao=tendencias")
     idle(page, 700)
-    swipe(330, 60)
-    assert page.url.endswith("/investimentos"), page.url
+    swipe(330, 60, y=520)
+    assert page.url.endswith("/historico"), page.url
     page.goto(f"{BASE}/analises?secao=resumo")
     idle(page, 700)
-    swipe(60, 330)
-    assert page.url.endswith("/calendario"), page.url
+    swipe(60, 330, y=520)
+    assert page.url.endswith("/investimentos"), page.url
     # O gesto vale também na parte de baixo da tela.
     idle(page, 500)
     swipe(330, 60, y=720)
     assert "/analises" in page.url, page.url
+    # Abas de baixo são os grupos; no topo, as telas do grupo.
+    page.goto(f"{BASE}/cartoes")
+    idle(page, 600)
+    tabs = page.locator(".tabbar")
+    for name in ("Orçamento", "Carteira", "Planejamento", "Análises"):
+        expect(tabs.get_by_role("link", name=name)).to_be_visible()
+    expect(tabs.get_by_role("button", name=re.compile("^Mais"))).to_be_visible()
+    expect(tabs.get_by_role("link", name="Carteira")).to_have_attribute("aria-current", "page")
+    group = page.locator(".group-tabs")
+    expect(group.get_by_role("link")).to_have_text(["Contas", "Cartões", "Dívidas", "Divisões"])
+    group.get_by_role("link", name="Dívidas").click()
+    page.wait_for_url("**/dividas")
+    # Sub-tela: deslizar para a direita volta para a tela de cima.
+    page.goto(f"{BASE}/ajustes/perfil")
+    idle(page, 700)
+    swipe(60, 330)
+    page.wait_for_url("**/ajustes")
+    # Janela: arrastar o conteúdo para baixo fecha.
+    tabs.get_by_role("button", name="Mais").click()
+    menu = page.locator("dialog[open]", has_text="Mais opções")
+    expect(menu).to_be_visible()
+    page.wait_for_timeout(400)
+    # Começa no cartão do perfil (conteúdo da janela, fora de campos), qualquer que seja a fonte.
+    start = menu.locator(".menu-profile").bounding_box()
+    drag_down(start["x"] + start["width"] / 2, start["y"] + start["height"] / 2, 840)
+    expect(menu).to_have_count(0)
     # Construtor no celular: chips abrem a janela de filtros
     page.goto(f"{BASE}/analises?secao=monte")
     idle(page, 700)
@@ -1380,8 +1415,9 @@ def inbox_and_announcement(page: Page):
     # Menu: contador de não lidas em Mensagens; o importante fica no topo.
     page.goto(f"{BASE}/orcamento")
     idle(page)
-    expect(page.locator(".sidebar").get_by_role("link", name=re.compile("Mensagens")).locator(".nav-badge")).to_have_text("1")
-    page.locator(".sidebar").get_by_role("link", name=re.compile("Mensagens")).click()
+    balloon = page.locator(".sidebar .sidebar__tool--messages")
+    expect(balloon.locator(".sidebar__tool-badge")).to_have_text("1")
+    balloon.click()
     page.wait_for_url("**/mensagens")
     idle(page)
     first = page.locator(".inbox-item").first
@@ -1720,7 +1756,7 @@ def mobile(browser):
     page.screenshot(path=OUT / "celular-categorias.png", full_page=True)
     overflow = page.evaluate("document.documentElement.scrollWidth > window.innerWidth")
     assert not overflow, "rolagem lateral no celular"
-    for path in ("/orcamento", "/calendario", "/metas", "/analises", "/investimentos", "/investimentos?secao=cotacoes", "/historico", "/ajustes", "/ajustes/recorrencias", "/ajustes/dados", "/ajustes/dados?aba=exportar", "/ajustes/notas", "/mensagens", "/dividas", "/divisoes", "/ajustes/app", "/analises?secao=calculadoras", "/ajustes/seguranca", "/ajustes/ajuda", "/ajustes/atalhos", "/cartoes", "/contas", "/revisar", "/busca", "/ajustes/preferencias"):
+    for path in ("/orcamento", "/calendario", "/metas", "/analises", "/investimentos", "/investimentos?secao=cotacoes", "/historico", "/ajustes", "/ajustes/recorrencias", "/ajustes/dados", "/ajustes/dados?aba=exportar", "/ajustes/notas", "/mensagens", "/dividas", "/divisoes", "/ajustes/app", "/analises?secao=calculadoras", "/ajustes/seguranca", "/ajustes/ajuda", "/cartoes", "/contas", "/revisar", "/busca", "/ajustes/preferencias"):
         page.goto(BASE + path)
         idle(page, 300)
         wide = page.evaluate("document.documentElement.scrollWidth - window.innerWidth")
