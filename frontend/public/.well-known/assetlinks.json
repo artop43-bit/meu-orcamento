@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "app.meuorcamento",
+      "sha256_cert_fingerprints": [
+        "7C:06:E7:DB:93:FB:23:27:3B:9D:09:D5:A2:56:E0:83:E8:B8:DC:01:1C:E3:6B:3E:1E:3A:9D:63:42:CF:38:04"
+      ]
+    }
+  }
+]

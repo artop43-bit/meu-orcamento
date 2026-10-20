@@ -81,6 +81,14 @@ check "CSP permite imagens blob: (prévia de fotos)" grep -qi "^content-security
 check "cabeçalho Server oculto" bash -c "! grep -qi '^server:' '$WORK/h-site'"
 check "API com Cache-Control: no-store" grep -qi "^cache-control: no-store" "$WORK/h-api"
 
+echo "==> App instalável (v1.0)"
+get -D "$WORK/h-sw" -o /dev/null "$BASE/sw.js"
+check "service worker publicado e sem cache" grep -qi "^cache-control: no-cache" "$WORK/h-sw"
+check "manifesto do app" bash -c "curl -sk '$BASE/manifest.webmanifest' | grep -q 'Meu Orçamento'"
+get -D "$WORK/h-links" -o "$WORK/assetlinks.json" "$BASE/.well-known/assetlinks.json"
+check "assetlinks.json do app Android" grep -q "app.meuorcamento" "$WORK/assetlinks.json"
+check "assetlinks.json como JSON" grep -qi "^content-type: application/json" "$WORK/h-links"
+
 echo "==> Banco inacessível de fora"
 check "porta 5432 fechada no host" bash -c "! (exec 3<>/dev/tcp/127.0.0.1/5432) 2>/dev/null"
 

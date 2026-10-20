@@ -39,6 +39,11 @@ class Settings(BaseSettings):
     smtp_port: int = 587
     smtp_user: str = ""
     smtp_password: str = ""
+    # v1.0: notificações no aparelho (Web Push). Chaves VAPID geradas no servidor;
+    # vazias = desligado.
+    vapid_public_key: str = ""
+    vapid_private_key: str = ""
+    vapid_subject: str = "mailto:meuorcamento.app99@gmail.com"
     # Token grátis de https://brapi.dev (Ibovespa, IFIX e mais limites). Sem ele, o Mercado
     # mostra ações, cripto, moedas e renda fixa, mas não os índices.
     brapi_token: str = ""

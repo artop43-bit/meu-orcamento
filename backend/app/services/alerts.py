@@ -199,6 +199,17 @@ def run_daily(db: Session, mail: Mailer, today: date | None = None) -> int:
                 )
             db.commit()
             sent += 1
+            from app.services import push
+
+            first = fresh[0]
+            push.send(
+                db,
+                user,
+                "alerts",
+                first["title"] if len(fresh) == 1 else f"{len(fresh)} alertas no seu orçamento",
+                first["text"] if len(fresh) == 1 else first["title"],
+                "/mensagens",
+            )
             if user.notify_alerts:
                 message = notify.Message(
                     subject="Alertas do seu orçamento"

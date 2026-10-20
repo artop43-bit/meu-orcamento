@@ -1618,6 +1618,29 @@ def split_expenses(page: Page):
     expect(page.locator(".split-person", has_text="Bia")).to_have_count(0)
 
 
+@step("v1.0: App e notificações (APK, instalar, notificações) e aviso de sem conexão")
+def app_install(page: Page):
+    page.goto(f"{BASE}/ajustes")
+    idle(page)
+    page.locator(".settings-list").get_by_role("link", name=re.compile("App e notificações")).click()
+    page.wait_for_url("**/ajustes/app")
+    idle(page)
+    link = page.get_by_role("link", name=re.compile("Baixar o app"))
+    expect(link).to_have_attribute("href", "/downloads/meu-orcamento.apk")
+    expect(page.get_by_role("heading", name=re.compile("Notificações no aparelho"))).to_be_visible()
+    page.screenshot(path=OUT / "v10-app.png", full_page=True)
+    # Sem internet: o app avisa e mostra o que já está na tela.
+    page.goto(f"{BASE}/orcamento")
+    idle(page)
+    page.context.set_offline(True)
+    try:
+        expect(page.get_by_role("status").filter(has_text="Sem conexão")).to_be_visible()
+        page.screenshot(path=OUT / "v10-sem-conexao.png")
+    finally:
+        page.context.set_offline(False)
+    expect(page.get_by_role("status").filter(has_text="Sem conexão")).to_have_count(0)
+
+
 @step("Segurança: ativar 2FA, sair, entrar com código, desativar")
 def two_factor(page: Page):
     page.goto(f"{BASE}/seguranca")
@@ -1689,7 +1712,7 @@ def mobile(browser):
     page.screenshot(path=OUT / "celular-categorias.png", full_page=True)
     overflow = page.evaluate("document.documentElement.scrollWidth > window.innerWidth")
     assert not overflow, "rolagem lateral no celular"
-    for path in ("/orcamento", "/calendario", "/metas", "/analises", "/investimentos", "/investimentos?secao=cotacoes", "/historico", "/ajustes", "/ajustes/recorrencias", "/ajustes/dados", "/ajustes/dados?aba=exportar", "/ajustes/notas", "/mensagens", "/dividas", "/divisoes", "/analises?secao=calculadoras", "/ajustes/seguranca", "/ajustes/ajuda", "/ajustes/atalhos", "/cartoes", "/contas", "/revisar", "/busca", "/ajustes/preferencias"):
+    for path in ("/orcamento", "/calendario", "/metas", "/analises", "/investimentos", "/investimentos?secao=cotacoes", "/historico", "/ajustes", "/ajustes/recorrencias", "/ajustes/dados", "/ajustes/dados?aba=exportar", "/ajustes/notas", "/mensagens", "/dividas", "/divisoes", "/ajustes/app", "/analises?secao=calculadoras", "/ajustes/seguranca", "/ajustes/ajuda", "/ajustes/atalhos", "/cartoes", "/contas", "/revisar", "/busca", "/ajustes/preferencias"):
         page.goto(BASE + path)
         idle(page, 300)
         wide = page.evaluate("document.documentElement.scrollWidth - window.innerWidth")
@@ -1761,6 +1784,7 @@ def main():
         financial_month(page)
         month_alerts(page)
         split_expenses(page)
+        app_install(page)
         two_factor(page)
         banner_never(page)
         STATE["state"] = ctx.storage_state()

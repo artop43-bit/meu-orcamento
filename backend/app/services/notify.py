@@ -426,10 +426,14 @@ def run_daily(db: Session, now: datetime | None = None) -> dict[str, int]:
         if not _eligible(user):
             continue
         try:
-            if user.notify_due:
+            if user.notify_due or user.push_due:
                 message = due_message(db, user, today)
                 if message and _claim(db, user, "due", today.isoformat()):
-                    deliver(db, user, message)
+                    if user.notify_due:
+                        deliver(db, user, message)
+                    from app.services import push
+
+                    push.send(db, user, "due", message.heading, message.intro, "/calendario")
                     sent["due"] += 1
             # Resumo no 1º dia do mês financeiro (dia 1 ou o dia escolhido pela pessoa).
             if user.notify_monthly and today.day == user.month_start_day:

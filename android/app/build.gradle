@@ -1,0 +1,51 @@
+// App Android do Meu Orçamento: Trusted Web Activity (abre o site em tela cheia, sem a barra do
+// navegador). As telas vêm do site, então as atualizações do app não exigem reinstalar o APK.
+// Compilado no GitHub Actions (.github/workflows/android.yml); a chave de assinatura fica nos
+// segredos do repositório (ANDROID_KEYSTORE_B64 e ANDROID_KEYSTORE_PASSWORD).
+plugins {
+    id "com.android.application"
+}
+
+def host = System.getenv("TWA_HOST") ?: "144-22-130-13.sslip.io"
+def assetStatements = """[{\\"relation\\":[\\"delegate_permission/common.handle_all_urls\\"],\\"target\\":{\\"namespace\\":\\"web\\",\\"site\\":\\"https://${host}\\"}}]"""
+
+android {
+    namespace "app.meuorcamento"
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "app.meuorcamento"
+        minSdk 21
+        targetSdk 34
+        versionCode Integer.parseInt(System.getenv("VERSION_CODE") ?: "1")
+        versionName System.getenv("VERSION_NAME") ?: "1.0.0"
+        resValue "string", "asset_statements", assetStatements
+        manifestPlaceholders = [hostName: host, defaultUrl: "https://${host}/orcamento"]
+    }
+
+    signingConfigs {
+        release {
+            storeFile file(System.getenv("KEYSTORE_PATH") ?: "release.p12")
+            storePassword System.getenv("KEYSTORE_PASSWORD")
+            keyAlias "meu-orcamento"
+            keyPassword System.getenv("KEYSTORE_PASSWORD")
+            storeType "pkcs12"
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.release
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    implementation "com.google.androidbrowserhelper:androidbrowserhelper:2.5.0"
+}

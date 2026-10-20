@@ -60,6 +60,10 @@ class User(Base):
     month_start_day: Mapped[int] = mapped_column(SmallInteger, default=1, server_default="1")
     # v1.0: alertas de gasto fora do padrão e de assinaturas (na caixa e por e-mail).
     notify_alerts: Mapped[bool] = mapped_column(default=True, server_default="1")
+    # v1.0: notificações no aparelho, por tipo (valem para os aparelhos inscritos).
+    push_due: Mapped[bool] = mapped_column(default=True, server_default="1")
+    push_messages: Mapped[bool] = mapped_column(default=True, server_default="1")
+    push_alerts: Mapped[bool] = mapped_column(default=True, server_default="1")
     # Configuração inicial guiada concluída (ou pulada).
     onboarded_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
 
@@ -177,3 +181,19 @@ class NotificationLog(Base):
     kind: Mapped[str] = mapped_column(String(20))  # "due" | "monthly"
     ref: Mapped[str] = mapped_column(String(40))  # ex.: "2026-10-20", "2026-09"
     sent_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+
+
+class PushSubscription(Base):
+    """Aparelho inscrito para receber notificações (Web Push). Some ao sair ou ao expirar."""
+
+    __tablename__ = "push_subscriptions"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    endpoint: Mapped[str] = mapped_column(String(600), unique=True)
+    p256dh: Mapped[str] = mapped_column(String(200))
+    auth: Mapped[str] = mapped_column(String(100))
+    user_agent: Mapped[str | None] = mapped_column(String(255))
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
