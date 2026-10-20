@@ -1465,6 +1465,182 @@ def start_over(page: Page):
     assert any(e["subject"] == "Dados apagados da sua conta" for e in emails)
 
 
+@step("v1.0: financiamento com taxa anual e SAC, parcelas no orçamento, amortização extra e tabela")
+def debts(page: Page):
+    page.goto(f"{BASE}/dividas")
+    idle(page)
+    assert api(page, "/debts")["loans"] == []
+    page.get_by_role("button", name="Novo financiamento").first.click()
+    d = dialog(page)
+    d.get_by_label("Tipo").select_option("vehicle")
+    d.get_by_label("Nome").fill("Financiamento do carro")
+    d.get_by_label("Instituição (opcional)").fill("Banco do Brasil")
+    d.get_by_label("Valor financiado", exact=True).fill(money(30000))
+    d.get_by_label(re.compile("^Taxa de juros")).fill("18,5")
+    d.get_by_label("Ao ano").check()
+    d.get_by_label("SAC (parcelas que caem)").check()
+    d.get_by_label("Número de parcelas").fill("36")
+    first_due = f"{TODAY.year}-{TODAY.month:02d}-15"
+    d.get_by_label("Vencimento da 1ª parcela").fill(br_date(first_due))
+    expect(d.locator(".summary-box")).to_contain_text("caindo até")
+    page.screenshot(path=OUT / "v10-financiamento-form.png")
+    d.get_by_role("button", name="Cadastrar").click()
+    expect(d).to_have_count(0, timeout=8000)
+    idle(page)
+    [loan] = api(page, "/debts")["loans"]
+    assert loan["installments"] == 36 and loan["system"] == "sac", loan
+    assert 1.3 < loan["monthly_rate"] < 1.5, loan["monthly_rate"]
+    card = page.locator(".loan-card", has_text="Financiamento do carro")
+    expect(card).to_contain_text("0 de 36 parcelas")
+    # A 1ª parcela entrou no orçamento do mês.
+    month = api(page, f"/months/{CURRENT}")
+    assert any(e["description"] == "Financiamento do carro (1/36)" for e in month["expenses"])
+    # Amortização extra: reduz o prazo e mostra a economia.
+    card.get_by_role("button", name="Simular amortização extra").click()
+    d = dialog(page)
+    d.get_by_label("Valor a amortizar").fill(money(5000))
+    d.get_by_role("button", name="Simular").click()
+    expect(d.locator(".summary-box")).to_contain_text("Economia de")
+    expect(d.locator(".summary-box")).to_contain_text("Prazo cai de 36")
+    page.keyboard.press("Escape")
+    # Outra dívida com saldo manual.
+    page.get_by_role("button", name="Adicionar").click()
+    d = dialog(page)
+    d.get_by_label("Nome").fill("Acordo com a loja")
+    d.get_by_label("Saldo devedor").fill(money(900))
+    d.get_by_label(re.compile("^Pagamento por mês")).fill(money(150))
+    d.get_by_role("button", name="Salvar").click()
+    expect(d).to_have_count(0)
+    idle(page)
+    data = api(page, "/debts")
+    assert data["others"][0]["balance"] == "900.00" and len(data["history"]) == 1
+    page.screenshot(path=OUT / "v10-dividas.png", full_page=True)
+    # Tabela de parcelas para imprimir.
+    card.get_by_role("link", name="Tabela de parcelas").click()
+    page.wait_for_url("**/dividas/**/tabela")
+    idle(page)
+    expect(page.locator(".loan-table tbody tr")).to_have_count(36)
+    with page.expect_download() as info:
+        page.get_by_role("button", name="Baixar planilha").click()
+    assert info.value.suggested_filename.endswith(".csv")
+    page.screenshot(path=OUT / "v10-tabela.png", full_page=True)
+
+
+@step("v1.0: calculadoras em Insights (juros compostos, à vista ou parcelado, reserva)")
+def calculators(page: Page):
+    page.goto(f"{BASE}/analises?secao=calculadoras")
+    idle(page)
+    result = page.locator(".calc-result")
+    expect(result).to_contain_text("Em 5 ano(s)")
+    page.get_by_role("button", name="À vista ou parcelado").click()
+    expect(result).to_contain_text(re.compile("sai mais barato"))
+    page.get_by_role("button", name="Reserva de emergência").click()
+    page.get_by_label(re.compile("^Gastos essenciais")).fill(money(2500))
+    expect(result).to_contain_text("R$ 15.000,00")
+    page.screenshot(path=OUT / "v10-calculadoras.png", full_page=True)
+
+
+@step("v1.0: mês financeiro pelo dia do salário (período no Orçamento e volta ao dia 1)")
+def financial_month(page: Page):
+    page.goto(f"{BASE}/ajustes/preferencias")
+    idle(page)
+    page.get_by_label("Começa no dia").select_option("5")
+    idle(page, 500)
+    assert api(page, "/auth/me")["month_start_day"] == 5
+    expect(page.get_by_text(re.compile(r"Este mês: \d+/\d+ a \d+/\d+"))).to_be_visible()
+    page.goto(f"{BASE}/orcamento")
+    idle(page)
+    expect(page.locator(".page-header")).to_contain_text(re.compile(r"\d+/\d+ a \d+/\d+"))
+    page.screenshot(path=OUT / "v10-mes-financeiro.png")
+    # Volta ao mês do calendário para os passos seguintes.
+    page.goto(f"{BASE}/ajustes/preferencias")
+    idle(page)
+    page.get_by_label("Começa no dia").select_option("1")
+    idle(page, 500)
+    assert api(page, "/auth/me")["month_start_day"] == 1
+
+
+@step("v1.0: alerta de gasto fora do padrão no Orçamento")
+def month_alerts(page: Page):
+    open_month(page, CURRENT)
+    add_expense(page, CURRENT, "Notebook novo", 4200, "Compras", 3)
+    idle(page, 500)
+    alerts = api(page, f"/alerts?month={CURRENT}")
+    assert any("Notebook novo" in a["title"] for a in alerts), alerts
+    page.reload()
+    idle(page)
+    expect(page.locator(".month-alerts")).to_contain_text("Notebook novo")
+    page.screenshot(path=OUT / "v10-alertas.png", full_page=True)
+
+
+@step("v1.0: dividir despesa, placar de quem deve a quem e acerto de contas")
+def split_expenses(page: Page):
+    open_month(page, CURRENT)
+    page.locator(".ledger__row", has_text="Notebook novo").locator(".ledger__open").click()
+    d = dialog(page)
+    d.get_by_role("button", name="Dividir com outras pessoas").click()
+    s = page.locator("dialog[open]", has_text="Como dividir")
+    s.get_by_label("Nome da pessoa 1").fill("Bia")
+    s.get_by_role("button", name="Adicionar pessoa").click()
+    s.get_by_label("Nome da pessoa 2").fill("Caio")
+    expect(s.locator(".summary-box")).to_contain_text("R$ 2.800,00")
+    s.get_by_role("button", name="Dividir", exact=True).click()
+    expect(s).to_have_count(0, timeout=8000)
+    page.keyboard.press("Escape")
+    idle(page)
+    board = api(page, "/splits")
+    assert board["owed_to_me"] == "2800.00", board
+    page.goto(f"{BASE}/divisoes")
+    idle(page)
+    bia = page.locator(".split-person", has_text="Bia")
+    expect(bia).to_contain_text("te deve R$ 1.400,00")
+    page.get_by_role("button", name="Nova anotação").click()
+    d = dialog(page)
+    d.get_by_label("Eu devo à pessoa").check()
+    d.get_by_label("Pessoa", exact=True).fill("Bia")
+    d.get_by_label("Valor").fill(money(200))
+    d.get_by_label("Descrição").fill("Ingresso do show")
+    d.get_by_role("button", name="Salvar").click()
+    expect(d).to_have_count(0)
+    idle(page)
+    expect(bia).to_contain_text("te deve R$ 1.200,00")
+    page.screenshot(path=OUT / "v10-divisoes.png", full_page=True)
+    incomes_before = len(api(page, f"/months/{CURRENT}")["incomes"])
+    bia.get_by_role("button", name="Acertar contas").click()
+    d = dialog(page)
+    expect(d.get_by_label("Lançar o reembolso como receita deste mês")).to_be_checked()
+    d.get_by_role("button", name="Acertar contas").click()
+    expect(d).to_have_count(0)
+    idle(page)
+    incomes = api(page, f"/months/{CURRENT}")["incomes"]
+    assert len(incomes) == incomes_before + 1
+    assert any(i["description"] == "Reembolso de Bia" and i["amount"] == "1200.00" for i in incomes)
+    expect(page.locator(".split-person", has_text="Bia")).to_have_count(0)
+
+
+@step("v1.0: App e notificações (APK, instalar, notificações) e aviso de sem conexão")
+def app_install(page: Page):
+    page.goto(f"{BASE}/ajustes")
+    idle(page)
+    page.locator(".settings-list").get_by_role("link", name=re.compile("App e notificações")).click()
+    page.wait_for_url("**/ajustes/app")
+    idle(page)
+    link = page.get_by_role("link", name=re.compile("Baixar o app"))
+    expect(link).to_have_attribute("href", "/downloads/meu-orcamento.apk")
+    expect(page.get_by_role("heading", name=re.compile("Notificações no aparelho"))).to_be_visible()
+    page.screenshot(path=OUT / "v10-app.png", full_page=True)
+    # Sem internet: o app avisa e mostra o que já está na tela.
+    page.goto(f"{BASE}/orcamento")
+    idle(page)
+    page.context.set_offline(True)
+    try:
+        expect(page.get_by_role("status").filter(has_text="Sem conexão")).to_be_visible()
+        page.screenshot(path=OUT / "v10-sem-conexao.png")
+    finally:
+        page.context.set_offline(False)
+    expect(page.get_by_role("status").filter(has_text="Sem conexão")).to_have_count(0)
+
+
 @step("Segurança: ativar 2FA, sair, entrar com código, desativar")
 def two_factor(page: Page):
     page.goto(f"{BASE}/seguranca")
@@ -1536,7 +1712,7 @@ def mobile(browser):
     page.screenshot(path=OUT / "celular-categorias.png", full_page=True)
     overflow = page.evaluate("document.documentElement.scrollWidth > window.innerWidth")
     assert not overflow, "rolagem lateral no celular"
-    for path in ("/orcamento", "/calendario", "/metas", "/analises", "/investimentos", "/investimentos?secao=cotacoes", "/historico", "/ajustes", "/ajustes/recorrencias", "/ajustes/dados", "/ajustes/dados?aba=exportar", "/ajustes/notas", "/mensagens", "/ajustes/seguranca", "/ajustes/ajuda", "/ajustes/atalhos", "/cartoes", "/contas", "/revisar", "/busca", "/ajustes/preferencias"):
+    for path in ("/orcamento", "/calendario", "/metas", "/analises", "/investimentos", "/investimentos?secao=cotacoes", "/historico", "/ajustes", "/ajustes/recorrencias", "/ajustes/dados", "/ajustes/dados?aba=exportar", "/ajustes/notas", "/mensagens", "/dividas", "/divisoes", "/ajustes/app", "/analises?secao=calculadoras", "/ajustes/seguranca", "/ajustes/ajuda", "/ajustes/atalhos", "/cartoes", "/contas", "/revisar", "/busca", "/ajustes/preferencias"):
         page.goto(BASE + path)
         idle(page, 300)
         wide = page.evaluate("document.documentElement.scrollWidth - window.innerWidth")
@@ -1603,6 +1779,12 @@ def main():
         inbox_and_announcement(page)
         theme_on_account(page)
         start_over(page)
+        debts(page)
+        calculators(page)
+        financial_month(page)
+        month_alerts(page)
+        split_expenses(page)
+        app_install(page)
         two_factor(page)
         banner_never(page)
         STATE["state"] = ctx.storage_state()

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { CheckCheck, Mail, MailOpen, Megaphone, MessageCircle, Pin } from "lucide-react";
+import { BellRing, CheckCheck, Mail, MailOpen, Megaphone, MessageCircle, Pin } from "lucide-react";
 import { Link } from "react-router";
 
 import { errorMessage } from "../api/client";
@@ -32,7 +32,7 @@ function Item({ item, onToggle }: { item: InboxItem; onToggle: (item: InboxItem,
     <li className={`inbox-item ${item.read ? "" : "is-unread"} ${item.important && !item.read ? "is-important" : ""}`}>
       <button type="button" className="inbox-item__head" aria-expanded={open} aria-controls={bodyId} onClick={expand}>
         <span className="inbox-item__icon" aria-hidden>
-          {reply ? <MessageCircle size={18} /> : <Megaphone size={18} />}
+          {reply ? <MessageCircle size={18} /> : item.kind === "alert" ? <BellRing size={18} /> : <Megaphone size={18} />}
         </span>
         <span className="inbox-item__main">
           <span className="inbox-item__title">
@@ -40,7 +40,7 @@ function Item({ item, onToggle }: { item: InboxItem; onToggle: (item: InboxItem,
             {item.title}
           </span>
           <span className="inbox-item__meta">
-            {reply ? "Resposta da administração" : "Recado da administração"} · {when(item.created_at)}
+            {reply ? "Resposta da administração" : item.kind === "alert" ? "Alerta do orçamento" : "Recado da administração"} · {when(item.created_at)}
           </span>
         </span>
         {item.important && (

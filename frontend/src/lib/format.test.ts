@@ -66,3 +66,15 @@ describe("shortDate e percent", () => {
     expect(percent(null)).toBe("—");
   });
 });
+
+describe("mês financeiro", () => {
+  it("rótulo do período e mês atual com início no dia 5", async () => {
+    const { cycleLabel, setCycleStart, thisMonth } = await import("./format");
+    setCycleStart(5);
+    expect(cycleLabel("2030-10")).toBe("5/10 a 4/11");
+    expect(cycleLabel("2031-01")).toBe("5/1 a 4/2");
+    setCycleStart(1);
+    expect(cycleLabel("2030-10")).toBe("");
+    expect(thisMonth()).toMatch(/^\d{4}-\d{2}$/);
+  });
+});

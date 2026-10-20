@@ -16,13 +16,16 @@ import {
   Moon,
   MessageSquarePlus,
   RefreshCw,
+  Scale,
   Search,
   Settings,
   ShieldAlert,
   ShieldCheck,
   Sun,
   Target,
+  Users,
   Wallet,
+  WifiOff,
 } from "lucide-react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router";
 
@@ -33,6 +36,7 @@ import { useInboxUnread } from "../api/inbox";
 import { announce, prefersReducedMotion } from "../lib/announce";
 import { neighbor } from "../lib/gestures";
 import { haptic } from "../lib/haptics";
+import { setCycleStart } from "../lib/format";
 import { releaseLabel } from "../release";
 import { Tour } from "./help";
 import { Avatar } from "./media";
@@ -67,6 +71,8 @@ const MAIN: NavItem[] = [
   { to: "/investimentos", label: "Investimentos", icon: <Landmark size={20} /> },
   { to: "/contas", label: "Contas", icon: <Banknote size={20} /> },
   { to: "/cartoes", label: "Cartões", icon: <CreditCard size={20} /> },
+  { to: "/dividas", label: "Dívidas", icon: <Scale size={20} /> },
+  { to: "/divisoes", label: "Divisões", icon: <Users size={20} /> },
   { to: "/metas", label: "Metas", icon: <Target size={20} /> },
   { to: "/historico", label: "Histórico", icon: <History size={20} /> },
 ];
@@ -108,6 +114,22 @@ function writeSession(key: string) {
  * Desktop: menu lateral fixo. Celular: barra superior + abas embaixo + menu "Mais",
  * com gestos (deslizar entre abas, puxar para atualizar).
  */
+/** Sem internet: o app mostra os últimos dados salvos (service worker) e avisa. */
+function useOffline(): boolean {
+  const [offline, setOffline] = useState(() => typeof navigator !== "undefined" && navigator.onLine === false);
+  useEffect(() => {
+    const on = () => setOffline(false);
+    const off = () => setOffline(true);
+    window.addEventListener("online", on);
+    window.addEventListener("offline", off);
+    return () => {
+      window.removeEventListener("online", on);
+      window.removeEventListener("offline", off);
+    };
+  }, []);
+  return offline;
+}
+
 /** Contador discreto ao lado de um item do menu (respostas novas, solicitações não lidas). */
 function NavBadge({ count, label }: { count: number; label: string }) {
   if (count <= 0) return null;
@@ -121,6 +143,8 @@ function NavBadge({ count, label }: { count: number; label: string }) {
 export function Shell() {
   const queryClient = useQueryClient();
   const { data: user } = useMe();
+  // Mês financeiro da conta: definido antes de as telas calcularem o "mês atual".
+  setCycleStart(user?.month_start_day ?? 1);
   const location = useLocation();
   const navigate = useNavigate();
   const [moreOpen, setMoreOpen] = useState(false);
@@ -226,6 +250,7 @@ export function Shell() {
   }
 
   const inboxUnread = useInboxUnread(Boolean(user)).data ?? 0;
+  const offline = useOffline();
   const profile = useProfile();
   const adminOverview = useQuery({
     queryKey: ["admin", "overview"],
@@ -245,6 +270,8 @@ export function Shell() {
 
   async function logout() {
     await authApi.logout().catch(() => undefined);
+    // Dados guardados para uso sem internet ficam só enquanto a pessoa está logada.
+    navigator.serviceWorker?.controller?.postMessage("limpar-dados");
     queryClient.setQueryData(ME_KEY, null);
     queryClient.clear();
   }
@@ -364,6 +391,12 @@ export function Shell() {
 
         <main ref={contentRef} id="conteudo" className="content" tabIndex={-1}>
           <div ref={pageRef} key={section} className="page">
+            {offline && (
+              <div className="banner banner--offline no-print" role="status">
+                <WifiOff size={18} />
+                <span>Sem conexão. Mostrando os últimos dados salvos neste aparelho; para salvar alterações, conecte-se à internet.</span>
+              </div>
+            )}
             {showTwoFactorBanner && (
               <div className="banner no-print" role="region" aria-label="Sugestão de segurança">
                 <ShieldAlert size={18} />

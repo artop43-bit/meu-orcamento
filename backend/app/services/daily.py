@@ -1,10 +1,10 @@
 """Saldo dia a dia do mês e "quanto posso gastar hoje".
 
-O saldo começa em zero no dia 1 e soma cada renda no dia do recebimento (sem dia = dia 1),
-tira cada conta no vencimento (sem data = dia 1) e os gastos planejados na data.
+O saldo começa em zero no 1º dia do mês financeiro (dia 1 ou o dia escolhido, ex.: o do salário)
+e soma cada renda no dia do recebimento (sem dia = 1º dia), tira cada conta no vencimento (sem data
+ou fora do período = 1º dia) e os gastos planejados na data.
 """
 
-import calendar as cal
 from collections import defaultdict
 from datetime import date, timedelta
 from decimal import Decimal
@@ -12,7 +12,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from app.core.months import with_day
+from app.core.months import cycle_date, cycle_range
 from app.models import User
 from app.services import budget, planned
 
@@ -22,19 +22,16 @@ ZERO = Decimal("0.00")
 def forecast(db: Session, user: User, month: date, today: date | None = None) -> dict[str, Any]:
     today = today or date.today()
     data = budget.get_month(db, user, month)
-    last_day = cal.monthrange(month.year, month.month)[1]
-    end = with_day(month, last_day)
+    start_day = user.month_start_day
+    start, end = cycle_range(month, start_day)
+    last_day = (end - start).days + 1
 
     moves: dict[date, Decimal] = defaultdict(lambda: ZERO)
     for income in data.incomes:
-        moves[with_day(month, income.day) if income.day else month] += income.amount
+        moves[cycle_date(month, income.day, start_day) if income.day else start] += income.amount
     for expense in data.expenses:
-        day = (
-            expense.due_date
-            if expense.due_date and expense.due_date.replace(day=1) == month
-            else month
-        )
-        moves[day] -= expense.amount
+        due = expense.due_date
+        moves[due if due and start <= due <= end else start] -= expense.amount
     pending_planned = planned.pending_planned(db, user, month, end)
     for item in pending_planned:
         moves[item.date] -= item.amount
@@ -44,7 +41,7 @@ def forecast(db: Session, user: User, month: date, today: date | None = None) ->
     first_negative: date | None = None
     lowest = None
     for offset in range(last_day):
-        day = month + timedelta(days=offset)
+        day = start + timedelta(days=offset)
         balance += moves.get(day, ZERO)
         days.append({"date": day, "balance": balance, "change": moves.get(day, ZERO)})
         if balance < 0 and first_negative is None:

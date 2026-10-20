@@ -1,11 +1,15 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Keyboard, Mail, MessageSquarePlus } from "lucide-react";
+import { CalendarRange, Keyboard, Mail, MessageSquarePlus } from "lucide-react";
 
+import { ME_KEY, useMe, type User } from "../api/auth";
 import { api, errorMessage } from "../api/client";
+import { sharingApi } from "../api/sharing";
 import { openFeedback, openShortcuts, SHORTCUTS } from "../components/power";
 import { Alert, Button, PageHeader } from "../components/ui";
+import { announce } from "../lib/announce";
 import { setAppearance } from "../lib/appearance";
+import { cycleLabel, setCycleStart, thisMonth } from "../lib/format";
 import { setPrefs, usePrefs, type Prefs } from "../lib/prefs";
 
 function Choice<K extends keyof Prefs>({
@@ -51,7 +55,53 @@ type NotifyPrefs = {
   notify_hide_values: boolean;
   notify_monthly: boolean;
   notify_messages: boolean;
+  notify_alerts: boolean;
 };
+
+/** Mês financeiro: começa no dia 1 ou no dia do salário. Vale para toda a conta. */
+function FinancialMonth() {
+  const queryClient = useQueryClient();
+  const { data: user } = useMe();
+  const [error, setError] = useState("");
+  const current = user?.month_start_day ?? 1;
+
+  async function change(day: number) {
+    setError("");
+    try {
+      await sharingApi.cycle(day);
+      setCycleStart(day);
+      queryClient.setQueryData<User | null>(ME_KEY, (u) => (u ? { ...u, month_start_day: day } : u));
+      await queryClient.invalidateQueries({ queryKey: ["budget"] });
+      announce(day === 1 ? "Mês financeiro: do dia 1 ao fim do mês" : `Mês financeiro: começa no dia ${day}`);
+    } catch (err) {
+      setError(errorMessage(err));
+    }
+  }
+
+  return (
+    <section className="card stack">
+      <h2>
+        <CalendarRange size={18} aria-hidden /> Mês financeiro
+      </h2>
+      <p className="muted small" style={{ margin: 0 }}>
+        Para quem recebe o salário em outro dia: o mês do orçamento passa a ir do dia escolhido até a véspera dele no mês seguinte (ex.: de 5/10
+        a 4/11). Orçamento, Insights, relatórios e avisos seguem esse período.
+      </p>
+      <Alert tone="error">{error}</Alert>
+      <label className="narrow">
+        Começa no dia
+        <select value={current} onChange={(e) => void change(Number(e.target.value))}>
+          {Array.from({ length: 28 }, (_, i) => i + 1).map((d) => (
+            <option key={d} value={d}>
+              {d === 1 ? "1 (mês do calendário)" : d}
+            </option>
+          ))}
+        </select>
+      </label>
+      {current > 1 && <p className="muted small" style={{ margin: 0 }}>Este mês: {cycleLabel(thisMonth())}.</p>}
+    </section>
+  );
+}
 
 /** Avisos por e-mail: vencimentos, resumo do mês e privacidade dos valores. */
 function EmailNotices() {
@@ -110,6 +160,10 @@ function EmailNotices() {
           <label className="check">
             <input type="checkbox" checked={p.notify_messages} onChange={(e) => void update({ notify_messages: e.target.checked })} />
             Cópia por e-mail das mensagens (respostas às solicitações e recados da administração)
+          </label>
+          <label className="check">
+            <input type="checkbox" checked={p.notify_alerts} onChange={(e) => void update({ notify_alerts: e.target.checked })} />
+            Alertas de gastos fora do padrão e de assinaturas
           </label>
           <p className="muted small" style={{ margin: 0 }}>
             O aviso de acesso por um aparelho novo é sempre enviado, por segurança.
@@ -174,6 +228,7 @@ export default function Preferences() {
               ]}
             />
           </section>
+          <FinancialMonth />
           <EmailNotices />
           <section className="card stack">
             <h2>Privacidade</h2>

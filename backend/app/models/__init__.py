@@ -17,6 +17,7 @@ from app.models.budget import (
     Transfer,
     WatchItem,
 )
+from app.models.debts import Loan, NetWorthSnapshot, OtherDebt, SplitShare
 from app.models.support import (
     Announcement,
     InboxItem,
@@ -29,6 +30,7 @@ from app.models.user import (
     EmailLog,
     KnownDevice,
     NotificationLog,
+    PushSubscription,
     RecoveryCode,
     SecurityEvent,
     User,
@@ -49,6 +51,9 @@ __all__ = [
     "ImportBatch",
     "ImportMapping",
     "KnownDevice",
+    "Loan",
+    "NetWorthSnapshot",
+    "OtherDebt",
     "NotificationLog",
     "InboxItem",
     "Income",
@@ -57,9 +62,11 @@ __all__ = [
     "RecoveryCode",
     "RecurringItem",
     "PlannedExpense",
+    "PushSubscription",
     "SavedAnalysis",
     "WatchItem",
     "SecurityEvent",
+    "SplitShare",
     "StoredFile",
     "SupportMessage",
     "SupportThread",

@@ -2,7 +2,7 @@
 
 import calendar
 import re
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from app.core.config import get_settings
@@ -46,6 +46,29 @@ def with_day(month: date, day: int) -> date:
     return date(month.year, month.month, min(day, last))
 
 
-def current_month() -> date:
-    today = datetime.now(ZoneInfo(get_settings().timezone)).date()
-    return today.replace(day=1)
+def month_of(day: date, start_day: int = 1) -> date:
+    """Mês do orçamento de uma data. Com o mês financeiro começando no dia `start_day` (ex.: dia
+    do salário), o "mês de outubro" vai de 5/10 a 4/11 e a data 2/11 ainda é de outubro."""
+    month = day.replace(day=1)
+    return month if day.day >= start_day else add_months(month, -1)
+
+
+def cycle_date(month: date, day: int, start_day: int = 1) -> date:
+    """A data do dia `day` dentro do mês financeiro `month` (dias antes do início caem no mês
+    seguinte do calendário)."""
+    return with_day(month if day >= start_day else add_months(month, 1), day)
+
+
+def cycle_range(month: date, start_day: int = 1) -> tuple[date, date]:
+    """Primeiro e último dia do mês financeiro."""
+    start = with_day(month, start_day)
+    end = with_day(add_months(month, 1), start_day) - timedelta(days=1)
+    return start, end
+
+
+def today_local() -> date:
+    return datetime.now(ZoneInfo(get_settings().timezone)).date()
+
+
+def current_month(start_day: int = 1) -> date:
+    return month_of(today_local(), start_day)

@@ -6823,3 +6823,180 @@ textarea {
   gap: 2px;
   min-width: 0;
 }
+
+/* ================================================================ v1.0 */
+
+/* ---------------------------------------------------------------- dívidas */
+.loan-card__title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.loan-card__title > span:last-child {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.loan-card__title h2 {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.loan-card__facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 16px;
+  margin: 0;
+}
+
+.loan-card__facts div {
+  min-width: 0;
+}
+
+.loan-card__facts dt {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.loan-card__facts dd {
+  margin: 2px 0 0;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.loan-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.loan-card .section-header {
+  flex-wrap: nowrap;
+  align-items: flex-start;
+}
+
+.loan-table tr.is-paid td {
+  color: var(--muted);
+  background: var(--surface-2);
+}
+
+@media print {
+  .loan-table {
+    font-size: 9pt;
+  }
+
+  .loan-table tr.is-paid td {
+    background: #f2f2f2;
+  }
+}
+
+/* ---------------------------------------------------------------- calculadoras */
+.calc-result {
+  padding: 14px 16px;
+  border-radius: var(--radius);
+  background: var(--accent-soft);
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+/* ---------------------------------------------------------------- divisões */
+.split-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.split-row {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(80px, auto) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.split-row:not(:has(> label:nth-of-type(2))) {
+  grid-template-columns: minmax(0, 1fr) minmax(80px, auto) auto;
+}
+
+.split-row__part {
+  text-align: right;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+@media (max-width: 599px) {
+  .split-row {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  }
+
+  .split-row > label:first-child {
+    grid-column: 1 / -1;
+  }
+
+  .split-row:not(:has(> label:nth-of-type(2))) > label:first-child {
+    grid-column: auto;
+  }
+}
+
+.split-person .section-header {
+  flex-wrap: wrap;
+}
+
+.split-person h2 {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.split-person__balance {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------------------------------------------------------------- alertas do mês */
+.month-alerts__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.month-alert {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  color: var(--warn);
+}
+
+.month-alert > span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  color: var(--fg);
+  overflow-wrap: anywhere;
+}
+
+.month-alert--renewal {
+  color: var(--accent);
+}
+
+/* ---------------------------------------------------------------- app e notificações */
+.install-steps {
+  margin: 0;
+  padding-left: 20px;
+  display: grid;
+  gap: 6px;
+  line-height: 1.5;
+}
+
+.banner--offline {
+  background: var(--surface-2);
+  border-color: var(--border-strong);
+  color: var(--fg);
+}

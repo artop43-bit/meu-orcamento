@@ -14,6 +14,7 @@ export type User = {
   onboarded_at?: string | null;
   theme?: "system" | "light" | "dark" | null;
   accent?: "verde" | "azul" | "roxo" | "laranja" | null;
+  month_start_day?: number;
 };
 
 export type LoginResult =

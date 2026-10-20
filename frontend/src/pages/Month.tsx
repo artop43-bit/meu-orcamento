@@ -45,12 +45,13 @@ import { ExpenseForm, IncomeForm, type ExpenseDraft } from "../components/entryF
 import { EmptyGuide, Tip } from "../components/help";
 import { ConsultantTeaser } from "../components/consultant";
 import { GoalTeaser } from "../components/GoalTeaser";
+import { MonthAlerts } from "../components/MonthAlerts";
 import { Chart } from "../components/chart/Chart";
 import { extrasApi, saveQuickEntry, useCards, useDaily } from "../api/extras";
 import { moneyApi, useReviewCount } from "../api/money";
 import { Alert, Button, Kpi, LoadingRegion, PageHeader, Sheet, Skeleton } from "../components/ui";
 import { useUndo } from "../components/undo";
-import { addMonths, money, monthLabel, parseMoney, percent, shortDate, thisMonth, todayISO } from "../lib/format";
+import { addMonths, cycleLabel, money, monthLabel, parseMoney, percent, shortDate, thisMonth, todayISO } from "../lib/format";
 import { normalizeText } from "../lib/text";
 
 type Editing =
@@ -948,10 +949,13 @@ export default function MonthPage() {
         subtitle={
           isCurrent ? (
             <span className="row" style={{ gap: 6 }}>
-              <CalendarClock size={15} /> Mês atual
+              <CalendarClock size={15} /> Mês atual{cycleLabel(month) && ` · ${cycleLabel(month)}`}
             </span>
           ) : (
-            <Link to={`/orcamento/${thisMonth()}`}>Voltar para o mês atual</Link>
+            <span className="row" style={{ gap: 6 }}>
+              {cycleLabel(month) && <span className="muted">{cycleLabel(month)} ·</span>}
+              <Link to={`/orcamento/${thisMonth()}`}>Voltar para o mês atual</Link>
+            </span>
           )
         }
         actions={
@@ -1007,6 +1011,7 @@ export default function MonthPage() {
           <div className="layout-main-side">
             <ExpensesCard data={data.data} categories={cats} setEditing={setEditing} />
             <div className="stack" style={{ gap: 20 }}>
+              <MonthAlerts month={month} />
               <DailyCard month={month} />
               <GoalTeaser showSuggestion={isCurrent} />
               <IncomesCard data={data.data} setEditing={setEditing} />

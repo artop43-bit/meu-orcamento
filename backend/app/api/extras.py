@@ -107,7 +107,7 @@ def delete_rule(rule_id: uuid.UUID, user: CurrentUser, db: DbSession) -> None:
 @router.get("/daily")
 def daily_forecast(user: CurrentUser, db: DbSession, month: str | None = None) -> DailyOut:
     """Saldo dia a dia do mês e o valor disponível por dia até o fim do mês."""
-    target = parse_month(month) if month else current_month()
+    target = parse_month(month) if month else current_month(user.month_start_day)
     return DailyOut.model_validate(daily.forecast(db, user, target))
 
 

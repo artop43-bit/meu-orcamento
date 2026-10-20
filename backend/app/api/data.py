@@ -66,9 +66,9 @@ def statement_commit(body: StatementImportIn, user: CurrentUser, db: DbSession) 
 # ---------------------------------------------------------------- exportar
 
 
-def _period(start: str, end: str | None) -> tuple[Any, Any]:
+def _period(start: str, end: str | None, start_day: int = 1) -> tuple[Any, Any]:
     first = parse_month(start)
-    last = parse_month(end) if end else current_month()
+    last = parse_month(end) if end else current_month(start_day)
     if last < first:
         raise AppError(400, "invalid_period", "O mês final não pode ser antes do inicial.")
     if export.months_between(first, last) > MAX_EXPORT_MONTHS:
@@ -99,7 +99,7 @@ def export_count(
     account: IdList = [],  # noqa: B006
     card: IdList = [],  # noqa: B006
 ) -> dict[str, int]:
-    first, last = _period(start, end)
+    first, last = _period(start, end, user.month_start_day)
     rows = export.transactions(db, user, first, last, _filters(kind, category, account, card))
     return {"count": len(rows)}
 
@@ -123,7 +123,7 @@ def export_transactions(
     account: IdList = [],  # noqa: B006
     card: IdList = [],  # noqa: B006
 ) -> Response:
-    first, last = _period(start, end)
+    first, last = _period(start, end, user.month_start_day)
     rows = export.transactions(db, user, first, last, _filters(kind, category, account, card))
     name = f"meu-orcamento_{format_month(first)}_a_{format_month(last)}"
     if format == "csv":

@@ -47,6 +47,10 @@ PAGES = [
     ("dados-exportar", "/ajustes/dados?aba=exportar"),
     ("notas", "/ajustes/notas"),
     ("mensagens", "/mensagens"),
+    ("dividas", "/dividas"),
+    ("divisoes", "/divisoes"),
+    ("app", "/ajustes/app"),
+    ("calculadoras", "/analises?secao=calculadoras"),
     ("admin-recados", "/admin?aba=recados"),
     ("seguranca", "/ajustes/seguranca"),
     ("preferencias", "/ajustes/preferencias"),
@@ -223,6 +227,8 @@ def check(page: Page, device: str, name: str, full: bool = True, scope: str | No
 def check_tips(page: Page, device: str, name: str):
     tips = page.locator("dialog[open] .tip__btn")
     for i in range(tips.count()):
+        if not tips.nth(i).is_visible():  # dica dentro de uma seção recolhida
+            continue
         tips.nth(i).click()
         page.wait_for_timeout(120)
         box = page.evaluate(TIP_OUT)
@@ -267,6 +273,8 @@ def dialogs(page: Page, device: str):
         ("/cartoes", "Novo cartão", "form-cartao"),
         ("/investimentos", "Novo investimento", "form-investimento"),
         ("/metas", "Nova meta", "form-meta"),
+        ("/dividas", "Novo financiamento", "form-financiamento"),
+        ("/divisoes", "Nova anotação", "form-divisao-anotacao"),
         ("/ajustes/solicitacoes", "Nova solicitação", "form-solicitacao"),
         ("/ajustes/perfil", "Editar perfil", "form-perfil"),
     ):

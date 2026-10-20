@@ -34,6 +34,10 @@ import {
   SearchPage,
   SupportPage,
   InboxPage,
+  DebtsPage,
+  SplitsPage,
+  AppInstallPage,
+  LoanTablePage,
   Unsubscribe,
   Security,
   SettingsHub,
@@ -94,6 +98,9 @@ export default function App() {
           <Route path="/revisar" element={<ReviewPage />} />
           <Route path="/busca" element={<SearchPage />} />
           <Route path="/mensagens" element={<InboxPage />} />
+          <Route path="/dividas" element={<DebtsPage />} />
+          <Route path="/divisoes" element={<SplitsPage />} />
+          <Route path="/dividas/:id/tabela" element={<LoanTablePage />} />
           <Route path="/admin" element={<AdminPage />} />
           <Route path="/admin/sugestoes" element={<Navigate to="/admin?aba=solicitacoes" replace />} />
           <Route path="/metas" element={<Goals />} />
@@ -113,6 +120,7 @@ export default function App() {
             <Route path="solicitacoes/:id" element={<SupportPage />} />
             <Route path="ajuda" element={<HelpPage />} />
             <Route path="notas" element={<ReleaseNotesPage />} />
+            <Route path="app" element={<AppInstallPage />} />
           </Route>
           {/* Endereços antigos continuam funcionando. */}
           <Route path="/fixas" element={<Navigate to="/ajustes/recorrencias" replace />} />

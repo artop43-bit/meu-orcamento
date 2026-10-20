@@ -11,6 +11,42 @@ export type Release = {
 
 export const RELEASES: Release[] = [
   {
+    version: "1.0.0",
+    date: "20/10/2026 às 20:15",
+    title: "Dívidas, mês financeiro, alertas, divisões e app Android",
+    sections: [
+      {
+        title: "Dívidas e patrimônio",
+        items: [
+          "Financiamentos e empréstimos com taxa ao mês ou ao ano, Price ou SAC, custos extras e CET.",
+          "As parcelas entram sozinhas no Orçamento e o saldo devedor cai a cada pagamento.",
+          "Tabela de parcelas para imprimir ou baixar e simulação de amortização extra.",
+          "Tela Dívidas com o patrimônio líquido mês a mês.",
+        ],
+      },
+      {
+        title: "Planejamento",
+        items: [
+          "Calculadoras em Insights: juros compostos, quanto guardar, à vista ou parcelado, antecipar parcelas e reserva de emergência.",
+          "Mês financeiro pelo dia do salário, em Preferências.",
+          "Alertas de gasto fora do padrão, lugar novo com valor alto, assinatura mais cara e renovação anual.",
+        ],
+      },
+      {
+        title: "Divisões",
+        items: ["Divida despesas entre pessoas e acompanhe quem deve a quem, com acerto de contas."],
+      },
+      {
+        title: "App",
+        items: [
+          "App Android para baixar em Ajustes › App e notificações, que se atualiza sozinho.",
+          "Notificações no aparelho para contas a vencer, mensagens e alertas.",
+          "Abre sem internet com os últimos dados salvos.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.9.0",
     date: "20/10/2026 às 14:15",
     title: "Mensagens, tema na conta e começar do zero",

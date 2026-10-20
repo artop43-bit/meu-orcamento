@@ -4,7 +4,7 @@ import { api } from "./client";
 
 export type InboxItem = {
   id: string;
-  kind: "reply" | "announcement";
+  kind: "reply" | "announcement" | "alert";
   title: string;
   body: string;
   important: boolean;
@@ -26,7 +26,7 @@ export type Announcement = {
 
 export type AnnouncementInput = { title: string; body: string; important: boolean; include_pending: boolean };
 
-export type ResetArea = "entries" | "recurring" | "accounts" | "cards" | "goals" | "investments" | "categories" | "analyses";
+export type ResetArea = "entries" | "recurring" | "accounts" | "cards" | "goals" | "investments" | "categories" | "analyses" | "debts";
 
 export const inboxApi = {
   list: () => api.get<InboxItem[]>("/inbox"),

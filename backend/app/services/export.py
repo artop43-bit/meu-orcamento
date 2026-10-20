@@ -22,8 +22,11 @@ from app.models import (
     Goal,
     Income,
     Investment,
+    Loan,
     MoneyAccount,
+    OtherDebt,
     RecurringItem,
+    SplitShare,
     SupportMessage,
     SupportThread,
     User,
@@ -345,6 +348,9 @@ def backup(db: Session, user: User) -> dict[str, Any]:
         "investments": _rows(db, Investment, user),
         "cards": _rows(db, CreditCard, user),
         "accounts": _rows(db, MoneyAccount, user),
+        "loans": _rows(db, Loan, user),
+        "other_debts": _rows(db, OtherDebt, user),
+        "splits": _rows(db, SplitShare, user),
         "support_requests": _support(db, user),
     }
 
