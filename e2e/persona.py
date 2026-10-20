@@ -1206,7 +1206,10 @@ def mobile_sections(browser):
     tabs.get_by_role("button", name="Mais").click()
     menu = page.locator("dialog[open]", has_text="Mais opções")
     expect(menu).to_be_visible()
-    drag_down(200, 560, 840)
+    page.wait_for_timeout(400)
+    # Começa no cartão do perfil (conteúdo da janela, fora de campos), qualquer que seja a fonte.
+    start = menu.locator(".menu-profile").bounding_box()
+    drag_down(start["x"] + start["width"] / 2, start["y"] + start["height"] / 2, 840)
     expect(menu).to_have_count(0)
     # Construtor no celular: chips abrem a janela de filtros
     page.goto(f"{BASE}/analises?secao=monte")
