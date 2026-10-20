@@ -30,6 +30,8 @@ export type MarketOverview = {
   fixed_income: Indicators;
   disclaimer: string;
   fetched_at: string;
+  /** Seções com o último dado bom (a fonte recusou ou caiu): desde quando. */
+  stale_since?: Partial<Record<"indexes" | "rankings" | "currencies", string>>;
 };
 
 export type AssetRange = "5d" | "1mo" | "3mo" | "1y";

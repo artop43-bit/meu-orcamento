@@ -173,3 +173,52 @@ def test_indicators_keep_last_good_value(monkeypatch: pytest.MonkeyPatch) -> Non
     # Usa o último valor bom em vez de deixar a tela vazia.
     assert again["selic"] == first["selic"]
     assert again["available"] is True
+
+
+# ---------------------------------------------------------------- limite de consultas (v0.8)
+
+
+def test_rankings_come_from_a_single_list_request(user: TestClient) -> None:
+    data = user.get("/api/market/overview").json()
+    assert sum("quote/list" in url for url in CALLS) == 1
+    assert [g["symbol"] for g in data["gainers"]] == ["PETR4"]
+    assert [m["symbol"] for m in data["most_traded"]] == ["PETR4"]
+
+
+def test_rate_limit_retries_and_keeps_last_good_data(
+    user: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from urllib.error import HTTPError
+
+    monkeypatch.setattr(get_settings(), "brapi_token", "teste")
+    monkeypatch.setattr(market, "_sleep", lambda _s: None)
+    first = user.get("/api/market/overview").json()
+    assert first["gainers"] and first["indexes"] and first["currencies"]
+    assert first["stale_since"] == {}
+
+    # A fonte passa a recusar tudo (429). O cache vence e a tela deve continuar com o último dado.
+    refused: list[str] = []
+
+    def refuse(url: str) -> Any:
+        refused.append(url)
+        raise HTTPError(url, 429, "Too Many Requests", None, None)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(market, "get_json", refuse)
+    with market._lock:
+        for key, entry in list(market._cache.items()):
+            market._cache[key] = (0.0, entry[1], entry[2] - 10_000, entry[3])
+    second = user.get("/api/market/overview").json()
+    assert second["gainers"] == first["gainers"]
+    assert second["indexes"] == first["indexes"]
+    assert second["currencies"] == first["currencies"]
+    assert set(second["stale_since"]) == {"indexes", "rankings", "currencies"}
+    # Cada consulta recusada teve exatamente uma nova tentativa.
+    assert len(refused) == 2 * len(set(refused))
+
+
+def test_brapi_requests_are_spaced(monkeypatch: pytest.MonkeyPatch) -> None:
+    waits: list[float] = []
+    monkeypatch.setattr(market, "_sleep", waits.append)
+    market.fetch_json("https://brapi.dev/api/quote/PETR4", brapi=True)
+    market.fetch_json("https://brapi.dev/api/quote/VALE3", brapi=True)
+    assert waits and 0 < waits[0] <= market.BRAPI_GAP_SECONDS + 0.01

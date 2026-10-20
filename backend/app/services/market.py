@@ -20,6 +20,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
+from urllib.error import HTTPError
 from urllib.parse import quote, urlencode
 from urllib.request import Request, urlopen
 
@@ -42,6 +43,12 @@ QUOTE_TTL = 120
 LIST_TTL = 300
 CHART_TTL = 900
 FAIL_TTL = 60
+# Se a fonte recusar (limite de consultas) ou cair, a tela continua com o último dado bom
+# por até 12 horas, mostrando o horário dele, em vez de ficar vazia.
+STALE_MAX_SECONDS = 12 * 3600
+# O plano grátis da brapi recusa consultas simultâneas: uma de cada vez, com um respiro.
+BRAPI_GAP_SECONDS = 0.35
+RETRY_WAIT_SECONDS = 1.5
 
 BRAPI = "https://brapi.dev/api"
 AWESOME = "https://economia.awesomeapi.com.br/json/last/USD-BRL,EUR-BRL"
@@ -63,13 +70,19 @@ SYMBOL_RE = re.compile(r"^\^?[A-Z0-9]{2,10}(\.SA)?$")
 RANGES = {"5d": ("5d", "1d"), "1mo": ("1mo", "1d"), "3mo": ("3mo", "1d"), "1y": ("1y", "1wk")}
 CRYPTO_DAYS = {"5d": 5, "1mo": 30, "3mo": 90, "1y": 365}
 
-_cache: dict[str, tuple[float, Any]] = {}
+# chave → (expira_em, valor, obtido_em [monotônico], obtido_em [data/hora])
+_cache: dict[str, tuple[float, Any, float, datetime]] = {}
 _lock = threading.Lock()
+_brapi_lock = threading.Lock()
+_brapi_last = 0.0
+_sleep = time.sleep  # substituído nos testes
 
 
 def clear_cache() -> None:
+    global _brapi_last
     with _lock:
         _cache.clear()
+    _brapi_last = 0.0
 
 
 def get_json(url: str) -> Any:
@@ -78,8 +91,36 @@ def get_json(url: str) -> Any:
         return json.load(response)
 
 
+def _is_rate_limit(exc: Exception) -> bool:
+    return isinstance(exc, HTTPError) and exc.code == 429
+
+
+def fetch_json(url: str, *, brapi: bool = False) -> Any:
+    """Busca com fila (brapi: uma consulta por vez) e uma nova tentativa se a fonte recusar."""
+    global _brapi_last
+    for attempt in range(2):
+        try:
+            if not brapi:
+                return get_json(url)
+            with _brapi_lock:
+                wait = _brapi_last + BRAPI_GAP_SECONDS - time.monotonic()
+                if wait > 0:
+                    _sleep(wait)
+                try:
+                    return get_json(url)
+                finally:
+                    _brapi_last = time.monotonic()
+        except Exception as exc:
+            if attempt == 0 and _is_rate_limit(exc):
+                _sleep(RETRY_WAIT_SECONDS)
+                continue
+            raise
+    raise RuntimeError("inalcançável")  # pragma: no cover
+
+
 def _cached(key: str, ttl: int, fetch: Any) -> Any:
-    """Resultado em cache; falha fica em cache curto (não martela a fonte fora do ar)."""
+    """Resultado em cache. Se a atualização falhar, mantém o último dado bom (até 12 h) e
+    tenta de novo em 1 minuto; sem dado anterior, devolve None."""
     now = time.monotonic()
     with _lock:
         hit = _cache.get(key)
@@ -87,14 +128,25 @@ def _cached(key: str, ttl: int, fetch: Any) -> Any:
             return hit[1]
     try:
         value = fetch()
-        expires = now + ttl
+        entry = (now + ttl, value, now, datetime.now(UTC))
     except Exception as exc:  # rede, limite, formato inesperado
         logger.warning("Mercado: falha em %s: %s", key, exc)
-        value = None
-        expires = now + FAIL_TTL
+        if hit and hit[1] is not None and now - hit[2] <= STALE_MAX_SECONDS:
+            entry = (now + FAIL_TTL, hit[1], hit[2], hit[3])
+        else:
+            entry = (now + FAIL_TTL, None, now, datetime.now(UTC))
     with _lock:
-        _cache[key] = (expires, value)
-    return value
+        _cache[key] = entry
+    return entry[1]
+
+
+def as_of(key: str, ttl: int) -> datetime | None:
+    """Quando o dado em cache foi obtido, se já passou da validade (dado antigo em uso)."""
+    with _lock:
+        hit = _cache.get(key)
+    if not hit or hit[1] is None:
+        return None
+    return hit[3] if time.monotonic() - hit[2] > ttl else None
 
 
 def normalize_symbol(symbol: str) -> str:
@@ -153,7 +205,7 @@ def stock_quotes(symbols: list[str]) -> dict[str, dict[str, Any]]:
         data = _cached(
             f"quote:{symbol}",
             QUOTE_TTL,
-            lambda s=symbol: get_json(_brapi_url(f"quote/{quote(s)}")),
+            lambda s=symbol: fetch_json(_brapi_url(f"quote/{quote(s)}"), brapi=True),
         )
         if data and data.get("results"):
             result[symbol] = _stock_quote(data["results"][0])
@@ -167,7 +219,7 @@ def crypto_quotes(symbols: list[str]) -> dict[str, dict[str, Any]]:
     ids = ",".join(sorted(CRYPTO[s][0] for s in wanted))
     params = urlencode({"ids": ids, "vs_currencies": "brl", "include_24hr_change": "true"})
     data = _cached(
-        f"crypto:{ids}", QUOTE_TTL, lambda: get_json(f"{COINGECKO}/simple/price?{params}")
+        f"crypto:{ids}", QUOTE_TTL, lambda: fetch_json(f"{COINGECKO}/simple/price?{params}")
     )
     result: dict[str, dict[str, Any]] = {}
     for symbol in wanted:
@@ -193,7 +245,7 @@ def quotes(symbols: list[str]) -> dict[str, dict[str, Any]]:
 
 
 def currencies() -> list[dict[str, Any]]:
-    data = _cached("currencies", QUOTE_TTL, lambda: get_json(AWESOME)) or {}
+    data = _cached("currencies", QUOTE_TTL, lambda: fetch_json(AWESOME)) or {}
     out = []
     for key, name in (("USDBRL", "Dólar"), ("EURBRL", "Euro")):
         row = data.get(key)
@@ -214,15 +266,21 @@ def currencies() -> list[dict[str, Any]]:
 # ---------------------------------------------------------------- painel
 
 
-def _ranking(sort_by: str) -> list[dict[str, Any]]:
-    params = {"sortBy": sort_by, "sortOrder": "desc", "limit": 60, "type": "stock"}
-    if sort_by == "change_asc":
-        params.update(sortBy="change", sortOrder="asc")
-    data = _cached(f"list:{sort_by}", LIST_TTL, lambda: get_json(_brapi_url("quote/list", params)))
+LIST_KEY = "list:volume"
+
+
+def _liquid_stocks() -> list[dict[str, Any]]:
+    """Ações mais negociadas do dia (uma consulta à brapi). Altas e baixas saem desta lista:
+    assim o ranking só tem papéis com volume relevante e a fonte recebe 1 consulta, não 3."""
+    params = {"sortBy": "volume", "sortOrder": "desc", "limit": 100, "type": "stock"}
+    data = _cached(
+        LIST_KEY, LIST_TTL, lambda: fetch_json(_brapi_url("quote/list", params), brapi=True)
+    )
     rows = []
     for row in (data or {}).get("stocks", []):
         symbol = str(row.get("stock", ""))
         volume = _float(row.get("volume")) or 0
+        change = _float(row.get("change"))
         # Fora: mercado fracionário (final F) e papéis quase sem negócio (distorcem a lista).
         if symbol.endswith("F") or volume < 500_000:
             continue
@@ -232,33 +290,58 @@ def _ranking(sort_by: str) -> list[dict[str, Any]]:
                 "name": row.get("name") or symbol,
                 "kind": "fii" if symbol.endswith("11") else "stock",
                 "price": _float(row.get("close")),
-                "change_pct": _float(row.get("change")),
+                "change_pct": change,
                 "volume": volume,
                 "logo": row.get("logo"),
                 "currency": "BRL",
             }
         )
-    return rows[:5]
+    return rows
+
+
+def rankings() -> dict[str, list[dict[str, Any]]]:
+    rows = _liquid_stocks()
+    with_change = [r for r in rows if r["change_pct"] is not None]
+    gainers = sorted(
+        (r for r in with_change if r["change_pct"] > 0), key=lambda r: -r["change_pct"]
+    )
+    losers = sorted((r for r in with_change if r["change_pct"] < 0), key=lambda r: r["change_pct"])
+    most = sorted(rows, key=lambda r: -r["volume"])
+    return {"gainers": gainers[:5], "losers": losers[:5], "most_traded": most[:5]}
 
 
 def overview() -> dict[str, Any]:
     """Painel do Mercado: índices, moedas, cripto, rankings do dia e renda fixa."""
     has_token = bool(get_settings().brapi_token)
+
+    def brapi_part() -> dict[str, Any]:
+        # Tudo o que é da brapi em sequência (a fila espaça as consultas).
+        indexes = list(stock_quotes(list(INDEXES)).values()) if has_token else []
+        return {"indexes": indexes, **rankings()}
+
     # Fontes diferentes em paralelo: a tela espera só pela mais lenta.
     jobs = {
-        "indexes": (lambda: list(stock_quotes(list(INDEXES)).values())) if has_token else list,
+        "brapi": brapi_part,
         "currencies": currencies,
         "crypto": lambda: list(crypto_quotes(["BTC", "ETH", "SOL"]).values()),
-        "gainers": lambda: _ranking("change"),
-        "losers": lambda: _ranking("change_asc"),
-        "most_traded": lambda: _ranking("volume"),
         "fixed_income": indicators.get_indicators,
     }
     with ThreadPoolExecutor(max_workers=len(jobs)) as pool:
         futures = {key: pool.submit(job) for key, job in jobs.items()}
         result = {key: future.result() for key, future in futures.items()}
+    brapi = result.pop("brapi")
+    # Seções mostrando o último dado bom (a atualização falhou): a tela informa o horário.
+    stale = {
+        "indexes": max(
+            (t for t in (as_of(f"quote:{s}", QUOTE_TTL) for s in INDEXES) if t), default=None
+        ),
+        "rankings": as_of(LIST_KEY, LIST_TTL),
+        "currencies": as_of("currencies", QUOTE_TTL),
+    }
     return {
         **result,
+        **brapi,
+        "stale_since": {k: v for k, v in stale.items() if v is not None},
         "indexes_need_token": not has_token,
         "disclaimer": DISCLAIMER,
         "fetched_at": datetime.now(UTC),
@@ -277,7 +360,7 @@ def asset(symbol: str, range_key: str = "1mo") -> dict[str, Any]:
         data = _cached(
             f"chart:{coin_id}:{range_key}",
             CHART_TTL,
-            lambda: get_json(f"{COINGECKO}/coins/{coin_id}/market_chart?{params}"),
+            lambda: fetch_json(f"{COINGECKO}/coins/{coin_id}/market_chart?{params}"),
         )
         history = [
             {"date": datetime.fromtimestamp(ts / 1000, UTC).date().isoformat(), "close": price}
@@ -288,8 +371,9 @@ def asset(symbol: str, range_key: str = "1mo") -> dict[str, Any]:
         data = _cached(
             f"chart:{symbol}:{range_key}",
             CHART_TTL,
-            lambda: get_json(
-                _brapi_url(f"quote/{quote(symbol)}", {"range": api_range, "interval": interval})
+            lambda: fetch_json(
+                _brapi_url(f"quote/{quote(symbol)}", {"range": api_range, "interval": interval}),
+                brapi=True,
             ),
         )
         raw = (data or {}).get("results") or []
