@@ -3,16 +3,17 @@
  * do changelog (pasta changelog/), que tem a mesma versão, data e hora.
  */
 export const RELEASE = {
-  version: "0.9.0",
+  version: "1.0.0",
   // Data e hora (Brasília) em que o update foi publicado.
-  releasedAt: "2026-10-20T14:15:00-03:00",
+  releasedAt: "2026-10-20T20:00:00-03:00",
 };
 
 /** Mostrado uma vez em "Novidades" depois do update (curto: o detalhe fica no changelog). */
 export const RELEASE_NOTES: { title: string; text: string }[] = [
-  { title: "Mensagens.", text: "Respostas às suas solicitações e recados da administração chegam na nova caixa de Mensagens do menu." },
-  { title: "Tema na conta.", text: "Claro, escuro ou automático pelo botão rápido do menu, valendo em todos os seus aparelhos." },
-  { title: "Começar do zero.", text: "Em Perfil, escolha quais áreas voltam ao padrão, com backup antes e confirmação." },
+  { title: "Dívidas e patrimônio.", text: "Financiamentos com parcelas no Orçamento, saldo devedor, tabela e patrimônio líquido mês a mês." },
+  { title: "Mês financeiro e alertas.", text: "O mês pode começar no dia do salário; alertas avisam gastos fora do padrão e assinaturas mais caras." },
+  { title: "Divisões.", text: "Divida despesas e acompanhe quem deve a quem." },
+  { title: "App Android.", text: "Baixe em Ajustes › App e notificações e receba avisos no celular." },
 ];
 
 export function releaseLabel(): string {
