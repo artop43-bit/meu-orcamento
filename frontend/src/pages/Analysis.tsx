@@ -21,6 +21,7 @@ import {
   Telescope,
   TrendingUp,
   WandSparkles,
+  Calculator,
   type LucideIcon,
 } from "lucide-react";
 import { Link, useNavigate, useSearchParams } from "react-router";
@@ -31,6 +32,7 @@ import { errorMessage } from "../api/client";
 import { insightsApi, type AnalysisConfig, type SavedAnalysis } from "../api/insights";
 import { AnalysisResult, Builder, PRESETS, SavedCard, useSaved } from "../components/AnalysisBuilder";
 import { Bar } from "../components/budget";
+import { Calculators } from "../components/Calculators";
 import { Chart } from "../components/chart/Chart";
 import { AlertsCard, ConsultantCard, useInsights } from "../components/consultant";
 import { Alert, Button, Kpi, LoadingRegion, PageHeader, Skeleton } from "../components/ui";
@@ -905,7 +907,7 @@ function SimulatorTab() {
 
 // ---------------------------------------------------------------- página
 
-type SectionKey = "resumo" | "tendencias" | "categorias" | "saude" | "patrimonio" | "comparar" | "projecao" | "simulador" | "monte";
+type SectionKey = "resumo" | "tendencias" | "categorias" | "saude" | "patrimonio" | "comparar" | "projecao" | "simulador" | "calculadoras" | "monte";
 
 const SECTIONS: { key: SectionKey; label: string; group: string; icon: LucideIcon }[] = [
   { key: "resumo", label: "Resumo", group: "Visão geral", icon: LayoutDashboard },
@@ -916,6 +918,7 @@ const SECTIONS: { key: SectionKey; label: string; group: string; icon: LucideIco
   { key: "comparar", label: "Comparar meses", group: "Ferramentas", icon: GitCompareArrows },
   { key: "projecao", label: "Projeção", group: "Ferramentas", icon: Telescope },
   { key: "simulador", label: "Simulador", group: "Ferramentas", icon: FlaskConical },
+  { key: "calculadoras", label: "Calculadoras", group: "Ferramentas", icon: Calculator },
   { key: "monte", label: "Monte sua análise", group: "Personalizar", icon: WandSparkles },
 ];
 
@@ -995,6 +998,12 @@ export default function Analysis() {
             <>
               <SectionTitle title="Simulador" text="Efeito de reduções de despesa ou aumento de receita em 12 meses." />
               <SimulatorTab />
+            </>
+          )}
+          {section === "calculadoras" && (
+            <>
+              <SectionTitle title="Calculadoras" text="Juros compostos, planejamento, à vista ou parcelado, antecipação de parcelas e reserva de emergência." />
+              <Calculators />
             </>
           )}
           {section === "monte" && <BuilderSection initial={builderStart} />}

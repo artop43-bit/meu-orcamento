@@ -36,7 +36,9 @@ from app.models import (
     ImportMapping,
     Income,
     Investment,
+    Loan,
     MoneyAccount,
+    OtherDebt,
     RecurringItem,
     User,
 )
@@ -563,10 +565,12 @@ BACKUP_TABLES: list[tuple[str, Any]] = [
     ("categories", Category),
     ("cards", CreditCard),
     ("recurring", RecurringItem),
+    ("loans", Loan),
     ("incomes", Income),
     ("expenses", Expense),
     ("goals", Goal),
     ("investments", Investment),
+    ("other_debts", OtherDebt),
 ]
 SKIP_COLUMNS = {"user_id", "import_batch_id"}
 

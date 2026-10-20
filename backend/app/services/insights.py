@@ -390,6 +390,31 @@ def consultant(db: Session, user: User, month: date, today: date | None = None) 
                 )
             )
 
+    # 8b. Peso das dívidas (financiamentos, empréstimos e outras dívidas) na renda do mês.
+    from app.services import loans
+
+    weight = loans.debt_weight(db, user, income)
+    if weight:
+        share = weight["pct"]
+        if share > 30:
+            alerts.append(
+                _message(
+                    "warning",
+                    "Parcelas de dívidas acima da referência",
+                    f"As parcelas somam {brl(weight['monthly'])} por mês, {pct(share)} da renda. "
+                    "Referência usual: até 30%. Veja em Dívidas a simulação de amortização extra.",
+                )
+            )
+        else:
+            messages.append(
+                _message(
+                    "info",
+                    "Peso das dívidas na renda",
+                    f"As parcelas somam {brl(weight['monthly'])} por mês, {pct(share)} da renda "
+                    "(referência usual: até 30%).",
+                )
+            )
+
     # 9. Metas com prazo
     for goal in budget.list_goals(db, user):
         remaining = goal.target_amount - goal.current_amount
