@@ -1190,8 +1190,9 @@ def mobile_sections(browser):
     page.goto(f"{BASE}/cartoes")
     idle(page, 600)
     tabs = page.locator(".tabbar")
-    for name in ("Orçamento", "Carteira", "Planejamento", "Análises", "Mais"):
-        expect(tabs.get_by_text(name, exact=True)).to_be_visible()
+    for name in ("Orçamento", "Carteira", "Planejamento", "Análises"):
+        expect(tabs.get_by_role("link", name=name)).to_be_visible()
+    expect(tabs.get_by_role("button", name=re.compile("^Mais"))).to_be_visible()
     expect(tabs.get_by_role("link", name="Carteira")).to_have_attribute("aria-current", "page")
     group = page.locator(".group-tabs")
     expect(group.get_by_role("link")).to_have_text(["Contas", "Cartões", "Dívidas", "Divisões"])
