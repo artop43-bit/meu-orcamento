@@ -54,7 +54,6 @@ PAGES = [
     ("admin-recados", "/admin?aba=recados"),
     ("seguranca", "/ajustes/seguranca"),
     ("preferencias", "/ajustes/preferencias"),
-    ("atalhos", "/ajustes/atalhos"),
     ("ajuda", "/ajustes/ajuda"),
     ("admin", "/admin"),
     ("admin-emails", "/admin?aba=emails"),

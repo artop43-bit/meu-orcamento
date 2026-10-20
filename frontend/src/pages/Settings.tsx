@@ -1,9 +1,8 @@
 import type { ReactNode } from "react";
-import { ArrowLeftRight, ChevronLeft, ChevronRight, CircleHelp, Keyboard, MessagesSquare, Repeat, ShieldCheck, SlidersHorizontal, Smartphone, Sparkles, Tags, UserRound } from "lucide-react";
+import { ArrowLeftRight, ChevronLeft, ChevronRight, CircleHelp, MessagesSquare, Repeat, ShieldCheck, SlidersHorizontal, Smartphone, Sparkles, Tags, UserRound } from "lucide-react";
 import { Link, Outlet, useLocation } from "react-router";
 
 import { useSupportUnread } from "../api/support";
-import { SHORTCUTS } from "../components/power";
 import { PageHeader } from "../components/ui";
 
 export type SettingsItem = { to: string; label: string; description: string; icon: ReactNode };
@@ -16,7 +15,6 @@ export const SETTINGS_ITEMS: SettingsItem[] = [
   { to: "/ajustes/dados", label: "Importar e exportar", description: "Extratos OFX/CSV, planilhas e backup completo dos dados.", icon: <ArrowLeftRight size={20} /> },
   { to: "/ajustes/seguranca", label: "Segurança", description: "Senha, verificação em duas etapas, sessões ativas e exclusão da conta.", icon: <ShieldCheck size={20} /> },
   { to: "/ajustes/preferencias", label: "Preferências", description: "Tema, cor de destaque, tamanho do texto, densidade e privacidade.", icon: <SlidersHorizontal size={20} /> },
-  { to: "/ajustes/atalhos", label: "Atalhos de teclado", description: "Comandos rápidos para lançar e navegar sem o mouse.", icon: <Keyboard size={20} /> },
   { to: "/ajustes/app", label: "App e notificações", description: "Instalar no Android, iPhone ou computador e receber avisos no aparelho.", icon: <Smartphone size={20} /> },
   { to: "/ajustes/notas", label: "Notas da versão", description: "Novidades de cada atualização e atalho para enviar sugestões.", icon: <Sparkles size={20} /> },
   { to: "/ajustes/ajuda", label: "Central de ajuda", description: "Guia de cada tela, exemplos e o tour de apresentação.", icon: <CircleHelp size={20} /> },
@@ -72,33 +70,3 @@ export function SettingsLayout() {
   );
 }
 
-export function ShortcutsPage() {
-  return (
-    <>
-      <PageHeader title="Atalhos de teclado" subtitle="Disponíveis no computador, em qualquer tela." />
-      <section className="card">
-        <table className="table shortcuts-table">
-          <thead>
-            <tr>
-              <th scope="col">Tecla</th>
-              <th scope="col">Ação</th>
-            </tr>
-          </thead>
-          <tbody>
-            {SHORTCUTS.map(([key, what]) => (
-              <tr key={key}>
-                <td>
-                  <kbd>{key}</kbd>
-                </td>
-                <td>{what}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        <p className="muted small" style={{ margin: "12px 0 0" }}>
-          Atalhos de uma tecla não funcionam enquanto um campo de texto está em uso.
-        </p>
-      </section>
-    </>
-  );
-}

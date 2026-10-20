@@ -42,7 +42,6 @@ import {
   Security,
   SettingsHub,
   SettingsLayout,
-  ShortcutsPage,
   Terms,
 } from "./pages/lazy";
 
@@ -114,7 +113,8 @@ export default function App() {
             <Route path="dados" element={<DataPage />} />
             <Route path="seguranca" element={<Security />} />
             <Route path="preferencias" element={<PreferencesPage />} />
-            <Route path="atalhos" element={<ShortcutsPage />} />
+            {/* Atalhos de teclado ficam em Preferências desde a v1.1. */}
+            <Route path="atalhos" element={<Navigate to="/ajustes/preferencias#atalhos" replace />} />
             <Route path="perfil" element={<ProfilePage />} />
             <Route path="solicitacoes" element={<SupportPage />} />
             <Route path="solicitacoes/:id" element={<SupportPage />} />

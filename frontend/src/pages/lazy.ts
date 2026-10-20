@@ -54,7 +54,6 @@ export const ReviewPage = lazy(loaders.Review);
 export const SearchPage = lazy(loaders.Search);
 export const SettingsHub = lazy(loaders.Settings);
 export const SettingsLayout = lazy(() => loaders.Settings().then((m) => ({ default: m.SettingsLayout })));
-export const ShortcutsPage = lazy(() => loaders.Settings().then((m) => ({ default: m.ShortcutsPage })));
 export const HelpPage = lazy(loaders.Help);
 export const Categories = lazy(loaders.Categories);
 export const DataPage = lazy(loaders.Data);
