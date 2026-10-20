@@ -17,6 +17,7 @@ from app.models.budget import (
     Transfer,
     WatchItem,
 )
+from app.models.debts import Loan, NetWorthSnapshot, OtherDebt
 from app.models.support import (
     Announcement,
     InboxItem,
@@ -49,6 +50,9 @@ __all__ = [
     "ImportBatch",
     "ImportMapping",
     "KnownDevice",
+    "Loan",
+    "NetWorthSnapshot",
+    "OtherDebt",
     "NotificationLog",
     "InboxItem",
     "Income",

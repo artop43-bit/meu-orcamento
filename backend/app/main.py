@@ -10,6 +10,7 @@ from app.api import (
     auth,
     budget,
     data,
+    debts,
     extras,
     health,
     inbox,
@@ -109,6 +110,7 @@ def create_app() -> FastAPI:
     app.include_router(support.router, prefix="/api")
     app.include_router(notifications.router, prefix="/api")
     app.include_router(inbox.router, prefix="/api")
+    app.include_router(debts.router, prefix="/api")
     return app
 
 

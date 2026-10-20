@@ -157,6 +157,10 @@ class Expense(Base):
 
     recurring_id: Mapped[uuid.UUID | None] = _recurring_fk()
     import_ref: Mapped[str | None] = mapped_column(String(80))
+    # v1.0: parcela de um financiamento ou empréstimo.
+    loan_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("loans.id", ondelete="SET NULL"), index=True
+    )
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
 
 

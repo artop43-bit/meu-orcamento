@@ -23,7 +23,10 @@ from app.models import (
     ImportMapping,
     Income,
     Investment,
+    Loan,
     MoneyAccount,
+    NetWorthSnapshot,
+    OtherDebt,
     PlannedExpense,
     RecurringItem,
     SavedAnalysis,
@@ -45,6 +48,7 @@ AREAS: dict[str, str] = {
     "investments": "Investimentos",
     "categories": "Categorias e regras",
     "analyses": "Análises salvas",
+    "debts": "Financiamentos e dívidas",
 }
 
 
@@ -75,6 +79,7 @@ def preview(db: Session, user: User) -> dict[str, int]:
         "investments": _count(db, Investment, user) + _count(db, WatchItem, user),
         "categories": custom + _count(db, CategoryRule, user),
         "analyses": _count(db, SavedAnalysis, user),
+        "debts": _count(db, Loan, user) + _count(db, OtherDebt, user),
     }
 
 
@@ -178,6 +183,23 @@ def reset(
             _reset_categories(db, user)
         if "analyses" in chosen:
             db.execute(delete(SavedAnalysis).where(SavedAnalysis.user_id == uid))
+        if "debts" in chosen:
+            # Parcelas já pagas ficam no histórico (sem o vínculo); as a pagar somem com o contrato.
+            db.execute(
+                delete(Expense).where(
+                    Expense.user_id == uid, Expense.loan_id.is_not(None), Expense.paid.is_(False)
+                )
+            )
+            db.execute(update(Expense).where(Expense.user_id == uid).values(loan_id=None))
+            db.execute(delete(Loan).where(Loan.user_id == uid))
+            db.execute(delete(OtherDebt).where(OtherDebt.user_id == uid))
+            db.execute(delete(NetWorthSnapshot).where(NetWorthSnapshot.user_id == uid))
+        elif "entries" in chosen:
+            # Contratos que ficam: as parcelas a pagar voltam a ser lançadas.
+            from app.services import loans
+
+            for loan in loans.list_loans(db, user):
+                loans._materialize(db, user, loan)
         if len(chosen) == len(AREAS):
             user.onboarded_at = None  # recomeço completo: a configuração inicial aparece de novo
         auth._record(db, user, "data_reset")

@@ -58,6 +58,15 @@ def run_notifications() -> dict[str, int]:
         return notify.run_daily(db)
 
 
+def run_snapshots() -> int:
+    """Foto do patrimônio do mês de cada conta (alimenta o gráfico mês a mês)."""
+    from app.db.session import SessionLocal
+    from app.services import loans
+
+    with SessionLocal() as db:
+        return loans.snapshot_all(db)
+
+
 def schedule(tick: timedelta = timedelta(minutes=10)) -> None:
     """Contêiner "scheduler": limpeza uma vez por dia e os avisos por e-mail a partir das 8h
     (horário de Brasília). Rodar várias vezes no dia é seguro: nenhum aviso sai duplicado."""
@@ -66,6 +75,7 @@ def schedule(tick: timedelta = timedelta(minutes=10)) -> None:
         if time.monotonic() - last_cleanup >= 24 * 3600 or last_cleanup == 0.0:
             try:
                 run_cleanup()
+                run_snapshots()
                 last_cleanup = time.monotonic()
             except Exception as exc:  # um erro pontual (ex.: banco reiniciando) não derruba o loop
                 print(f"Falha na limpeza: {exc}", flush=True)
