@@ -1425,9 +1425,17 @@ def theme_on_account(page: Page):
     mobile.get_by_role("button", name="Entrar").click()
     mobile.wait_for_url("**/orcamento**")
     expect(mobile.locator("html")).to_have_attribute("data-theme", "dark")
-    # No celular, o tema também se troca pelo menu "Mais".
-    mobile.locator(".tabbar").get_by_role("button", name="Mais").click()
-    menu = mobile.locator("dialog[open]")
+    # No celular, o tema também se troca pelo menu "Mais". Espera a tela assentar: logo depois do
+    # login o endereço ainda se ajusta, e trocar de endereço fecha o menu (de propósito).
+    idle(mobile, 800)
+    menu = mobile.locator("dialog[open]", has_text="Mais opções")
+    for _ in range(3):
+        mobile.locator(".tabbar").get_by_role("button", name="Mais").click()
+        try:
+            expect(menu).to_be_visible(timeout=3000)
+            break
+        except AssertionError:
+            continue
     menu.get_by_label("Automático").check()
     expect(mobile.locator("html")).not_to_have_attribute("data-theme", "dark")
     mobile.screenshot(path=OUT / "v09-celular-menu-tema.png")
