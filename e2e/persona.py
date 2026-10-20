@@ -996,7 +996,7 @@ def support_requests(page: Page):
     idle(page)
     expect(page.locator(".thread-list__item").first).to_contain_text("1 solicitação(ões)")
     page.get_by_role("tab", name="Recentes").click()
-    page.get_by_placeholder("Buscar por assunto, mensagem ou e-mail").fill("print")
+    page.get_by_placeholder(re.compile("Buscar por #número")).fill("print")
     page.wait_for_timeout(700)
     expect(page.locator(".thread-list__item")).to_have_count(1)
     page.screenshot(path=OUT / "v075-admin-solicitacoes.png", full_page=True)
