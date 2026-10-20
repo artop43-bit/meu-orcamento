@@ -7,7 +7,8 @@ python -m app.cli seed-demo  cria a conta de demonstração com dados (nunca em 
 
 import argparse
 import time
-from datetime import timedelta
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import delete, or_
 from sqlalchemy.orm import Session
@@ -58,6 +59,24 @@ def run_notifications() -> dict[str, int]:
         return notify.run_daily(db)
 
 
+def run_alerts() -> int:
+    """Alertas novos do dia para a caixa de Mensagens (e um e-mail com tudo junto)."""
+    from app.core.email import send_email
+    from app.db.session import SessionLocal
+    from app.services import alerts
+
+    with SessionLocal() as db:
+
+        def mail(to: str, subject: str, body: str, html=None, headers=None) -> None:  # type: ignore[no-untyped-def]
+            db.add(EmailLog(to=to, subject=subject[:200], body=body))
+            try:
+                send_email(to, subject, body, html=html, headers=headers)
+            except Exception as exc:  # SMTP fora do ar: fica registrado no painel
+                print(f"Alerta não enviado para {to}: {exc}", flush=True)
+
+        return alerts.run_daily(db, mail)
+
+
 def run_snapshots() -> int:
     """Foto do patrimônio do mês de cada conta (alimenta o gráfico mês a mês)."""
     from app.db.session import SessionLocal
@@ -80,6 +99,9 @@ def schedule(tick: timedelta = timedelta(minutes=10)) -> None:
             except Exception as exc:  # um erro pontual (ex.: banco reiniciando) não derruba o loop
                 print(f"Falha na limpeza: {exc}", flush=True)
         try:
+            # Alertas a partir das 8h, junto com os outros avisos do dia.
+            if datetime.now(ZoneInfo(get_settings().timezone)).hour >= 8:
+                run_alerts()
             sent = run_notifications()
             if any(sent.values()):
                 print(f"Avisos enviados: {sent}", flush=True)

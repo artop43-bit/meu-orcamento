@@ -76,8 +76,8 @@ def delete_category(category_id: uuid.UUID, user: CurrentUser, db: DbSession) ->
 
 
 @router.get("/months/current")
-def get_current_month() -> dict[str, str]:
-    return {"month": format_month(current_month())}
+def get_current_month(user: CurrentUser) -> dict[str, str]:
+    return {"month": format_month(current_month(user.month_start_day))}
 
 
 @router.get("/months/{month}")
@@ -143,7 +143,7 @@ def get_history(
     until: str | None = None,
     months: Annotated[int, Query(ge=1, le=60)] = 12,
 ) -> list[HistoryPoint]:
-    end = parse_month(until) if until else current_month()
+    end = parse_month(until) if until else current_month(user.month_start_day)
     return [
         HistoryPoint.model_validate({**point, "month": format_month(point["month"])})
         for point in service.history(db, user, end, months)

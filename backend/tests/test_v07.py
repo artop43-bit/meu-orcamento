@@ -22,7 +22,7 @@ def user(client: TestClient, outbox: list[OutgoingEmail]) -> TestClient:
 
 @pytest.fixture(autouse=True)
 def fixed_current_month(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(budget_service, "current_month", lambda: date(2030, 1, 1))
+    monkeypatch.setattr(budget_service, "current_month", lambda *_: date(2030, 1, 1))
 
 
 def add_expense(client: TestClient, month: str = MONTH, **data: Any) -> list[dict[str, Any]]:

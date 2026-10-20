@@ -105,7 +105,7 @@ def search(
 
 @router.get("/analysis/pace")
 def pace(user: CurrentUser, db: DbSession, month: str | None = None) -> list[PaceRow]:
-    target = parse_month(month) if month else current_month()
+    target = parse_month(month) if month else current_month(user.month_start_day)
     return [PaceRow.model_validate(r) for r in money.pace(db, user, target, date.today())]
 
 

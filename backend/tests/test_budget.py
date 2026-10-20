@@ -22,7 +22,7 @@ def user(client: TestClient, outbox: Outbox) -> TestClient:
 
 @pytest.fixture(autouse=True)
 def fixed_current_month(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(budget_service, "current_month", lambda: date(2030, 1, 1))
+    monkeypatch.setattr(budget_service, "current_month", lambda *_: date(2030, 1, 1))
 
 
 def category_id(client: TestClient, name: str) -> str:

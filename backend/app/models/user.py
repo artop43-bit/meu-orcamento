@@ -56,6 +56,10 @@ class User(Base):
     # v0.9: aparência salva na conta (vale em todos os aparelhos). None = ainda não escolheu.
     theme: Mapped[str | None] = mapped_column(String(6))
     accent: Mapped[str | None] = mapped_column(String(8))
+    # v1.0: mês financeiro começa neste dia (1 = mês do calendário; ex.: 5 = dia do salário).
+    month_start_day: Mapped[int] = mapped_column(SmallInteger, default=1, server_default="1")
+    # v1.0: alertas de gasto fora do padrão e de assinaturas (na caixa e por e-mail).
+    notify_alerts: Mapped[bool] = mapped_column(default=True, server_default="1")
     # Configuração inicial guiada concluída (ou pulada).
     onboarded_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
 

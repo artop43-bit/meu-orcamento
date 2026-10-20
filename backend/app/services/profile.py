@@ -125,7 +125,7 @@ def _streak(points: list[dict[str, Any]]) -> int:
 
 def summary(db: Session, user: User, today: date | None = None) -> dict[str, Any]:
     """Médias dos últimos 12 meses fechados (ou do mês atual, se ainda não houver histórico)."""
-    this_month = current_month() if today is None else today.replace(day=1)
+    this_month = current_month(user.month_start_day) if today is None else today.replace(day=1)
     history = budget.history(db, user, add_months(this_month, -1), 12)
     closed = [p for p in history if p["has_data"]]
     if not closed:

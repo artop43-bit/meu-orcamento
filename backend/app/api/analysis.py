@@ -35,7 +35,7 @@ router = APIRouter(tags=["análises"])
 @router.get("/analysis/overview")
 def overview(user: CurrentUser, db: DbSession, month: str | None = None) -> OverviewOut:
     """Score financeiro e regra 50/30/20 do mês (padrão: mês atual)."""
-    target = parse_month(month) if month else current_month()
+    target = parse_month(month) if month else current_month(user.month_start_day)
     return OverviewOut(
         month=format_month(target),
         score=ScoreOut.model_validate(analysis.score(db, user, target)),
@@ -59,14 +59,14 @@ def projection(
     start: str | None = None,
     months: Annotated[int, Query(ge=1, le=36)] = 12,
 ) -> list[ProjectionPoint]:
-    first = parse_month(start) if start else current_month()
+    first = parse_month(start) if start else current_month(user.month_start_day)
     return [ProjectionPoint.model_validate(p) for p in analysis.projection(db, user, first, months)]
 
 
 @router.get("/analysis/insights")
 def get_insights(user: CurrentUser, db: DbSession, month: str | None = None) -> InsightsOut:
     """Leitura do mês pelo "consultor": resumo, elogios, alertas e próximos passos."""
-    target = parse_month(month) if month else current_month()
+    target = parse_month(month) if month else current_month(user.month_start_day)
     return InsightsOut.model_validate(insights.consultant(db, user, target))
 
 
@@ -78,7 +78,7 @@ def get_trends(
     months: Annotated[int, Query(ge=3, le=24)] = 12,
 ) -> TrendsOut:
     """Evolução de renda, gastos e categorias, médias e comparação com o ano anterior."""
-    last = parse_month(until) if until else current_month()
+    last = parse_month(until) if until else current_month(user.month_start_day)
     return TrendsOut.model_validate(insights.trends(db, user, last, months))
 
 

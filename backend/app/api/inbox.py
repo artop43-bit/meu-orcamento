@@ -18,7 +18,7 @@ router = APIRouter(tags=["mensagens e conta"])
 
 class InboxItemOut(BaseModel):
     id: uuid.UUID
-    kind: Literal["reply", "announcement"]
+    kind: Literal["reply", "announcement", "alert"]
     title: str
     body: str
     important: bool
@@ -166,6 +166,25 @@ def appearance(body: AppearanceIn, user: CurrentUser, db: DbSession) -> Appearan
         user.accent = body.accent
     db.commit()
     return AppearanceOut(theme=user.theme, accent=user.accent)
+
+
+# ---------------------------------------------------------------- mês financeiro
+
+
+class CycleIn(BaseModel):
+    month_start_day: int = Field(ge=1, le=28)
+
+
+class CycleOut(BaseModel):
+    month_start_day: int
+
+
+@router.patch("/me/cycle")
+def cycle(body: CycleIn, user: CurrentUser, db: DbSession) -> CycleOut:
+    """Dia em que o mês financeiro começa (1 = mês do calendário; até 28 para valer todo mês)."""
+    user.month_start_day = body.month_start_day
+    db.commit()
+    return CycleOut(month_start_day=user.month_start_day)
 
 
 # ---------------------------------------------------------------- começar do zero

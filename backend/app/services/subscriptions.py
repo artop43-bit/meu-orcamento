@@ -21,7 +21,9 @@ TOLERANCE = Decimal("0.20")  # valores parecidos: até 20% da mediana
 
 
 def overview(db: Session, user: User, today: date | None = None) -> dict[str, Any]:
-    this_month = budget.current_month() if today is None else today.replace(day=1)
+    this_month = (
+        budget.current_month(user.month_start_day) if today is None else today.replace(day=1)
+    )
     fixed = []
     for item in budget.list_recurring(db, user):
         if item.kind != "expense":
@@ -91,7 +93,7 @@ def overview(db: Session, user: User, today: date | None = None) -> dict[str, An
 
 def promote(db: Session, user: User, data: dict[str, Any]) -> RecurringItem:
     """Transforma um gasto que se repete em conta fixa, a partir do próximo mês."""
-    start = add_months(budget.current_month(), 1)
+    start = add_months(budget.current_month(user.month_start_day), 1)
     return budget.create_recurring(
         db,
         user,

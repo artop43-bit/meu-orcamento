@@ -12,7 +12,7 @@ from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.core.errors import AppError
-from app.core.months import add_months, with_day
+from app.core.months import add_months, cycle_date, cycle_range, month_of, with_day
 from app.models import Category, CreditCard, Expense, Income, MoneyAccount, Transfer, User
 from app.services import budget
 from app.services.suggest import normalize
@@ -68,8 +68,9 @@ def balances(db: Session, user: User, today: date | None = None) -> list[dict[st
     Fim do mês = hoje + receitas que ainda chegam no mês − despesas do mês ainda não pagas.
     """
     today = today or date.today()
-    month = today.replace(day=1)
-    end = with_day(month, cal.monthrange(month.year, month.month)[1])
+    start_day = user.month_start_day
+    month = month_of(today, start_day)
+    end = cycle_range(month, start_day)[1]
     accounts = list_accounts(db, user)
     ids = {a.id for a in accounts}
     card_account = {
@@ -85,7 +86,11 @@ def balances(db: Session, user: User, today: date | None = None) -> list[dict[st
             Income.user_id == user.id, Income.account_id.in_(ids), Income.month <= month
         )
     ):
-        received = income.month < month or income.day is None or income.day <= today.day
+        received = (
+            income.month < month
+            or income.day is None
+            or cycle_date(month, income.day, start_day) <= today
+        )
         (now if received else coming)[income.account_id] += income.amount  # type: ignore[index]
 
     for expense in db.scalars(
@@ -281,13 +286,13 @@ def pace(db: Session, user: User, month: date, today: date | None = None) -> lis
     Referência: o limite da categoria ou, sem limite, a média dos 3 meses anteriores.
     """
     today = today or date.today()
-    days = cal.monthrange(month.year, month.month)[1]
-    if today.replace(day=1) > month:
+    start, end = cycle_range(month, user.month_start_day)
+    if today > end:
         elapsed = 1.0
-    elif today.replace(day=1) < month:
+    elif today < start:
         elapsed = 0.0
     else:
-        elapsed = today.day / days
+        elapsed = ((today - start).days + 1) / ((end - start).days + 1)
     categories = {c.id: c for c in db.scalars(select(Category).where(Category.user_id == user.id))}
     spent: dict[uuid.UUID | None, Decimal] = defaultdict(lambda: ZERO)
     for e in db.scalars(select(Expense).where(Expense.user_id == user.id, Expense.month == month)):

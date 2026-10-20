@@ -17,7 +17,7 @@ from app.models.budget import (
     Transfer,
     WatchItem,
 )
-from app.models.debts import Loan, NetWorthSnapshot, OtherDebt
+from app.models.debts import Loan, NetWorthSnapshot, OtherDebt, SplitShare
 from app.models.support import (
     Announcement,
     InboxItem,
@@ -64,6 +64,7 @@ __all__ = [
     "SavedAnalysis",
     "WatchItem",
     "SecurityEvent",
+    "SplitShare",
     "StoredFile",
     "SupportMessage",
     "SupportThread",

@@ -19,6 +19,7 @@ class NotifyPrefs(BaseModel):
     notify_hide_values: bool
     notify_monthly: bool
     notify_messages: bool
+    notify_alerts: bool
 
 
 class NotifyPrefsPatch(BaseModel):
@@ -27,6 +28,7 @@ class NotifyPrefsPatch(BaseModel):
     notify_hide_values: bool | None = None
     notify_monthly: bool | None = None
     notify_messages: bool | None = None
+    notify_alerts: bool | None = None
 
 
 def _prefs(user) -> NotifyPrefs:  # type: ignore[no-untyped-def]
@@ -36,6 +38,7 @@ def _prefs(user) -> NotifyPrefs:  # type: ignore[no-untyped-def]
         notify_hide_values=user.notify_hide_values,
         notify_monthly=user.notify_monthly,
         notify_messages=user.notify_messages,
+        notify_alerts=user.notify_alerts,
     )
 
 

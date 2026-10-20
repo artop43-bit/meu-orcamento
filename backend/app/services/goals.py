@@ -202,7 +202,7 @@ def projection(db: Session, user: User, goal: Goal, today: date | None = None) -
 
 def suggestion(db: Session, user: User, today: date | None = None) -> dict[str, Any] | None:
     """Sobra prevista no mês + meta principal em aberto: sugere destinar parte (nunca sozinho)."""
-    month = budget.current_month() if today is None else today.replace(day=1)
+    month = budget.current_month(user.month_start_day) if today is None else today.replace(day=1)
     goal = db.scalar(
         select(Goal)
         .where(Goal.user_id == user.id, Goal.completed_at.is_(None))
