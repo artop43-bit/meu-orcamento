@@ -11,6 +11,19 @@ export type Release = {
 
 export const RELEASES: Release[] = [
   {
+    version: "0.8.1",
+    date: "20/10/2026 às 12:00",
+    title: "Correção na exclusão de lançamentos",
+    sections: [
+      {
+        title: "Correção",
+        items: [
+          "Excluir um lançamento e logo em seguida recarregar a página, fechar a aba ou sair do app fazia ele voltar. Agora a exclusão vale na hora em que a página é deixada; o “Desfazer” continua funcionando enquanto a tela está aberta.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.8.0",
     date: "20/10/2026 às 07:00",
     title: "Avisos por e-mail, metas com objetivo e importação única",

@@ -1,14 +1,14 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 
-import { errorMessage } from "../api/client";
+import { errorMessage, withKeepalive } from "../api/client";
 import { announce } from "../lib/announce";
 import { haptic } from "../lib/haptics";
 
 /**
  * Exclusão com "Desfazer": o item some da tela na hora, aparece um aviso com o botão
  * "Desfazer" e a exclusão só vai para o servidor depois de alguns segundos.
- * Se a pessoa fechar a aba antes disso, nada é excluído (o lado seguro).
+ * Se a pessoa recarregar, fechar a aba ou sair do app antes disso, a exclusão é enviada na hora.
  */
 
 const DELAY = 6000;
@@ -149,14 +149,24 @@ export function UndoProvider({ children }: { children: ReactNode }) {
     announce("Exclusão desfeita");
   }
 
-  // Ao sair da página com uma exclusão pendente, tenta enviar na hora.
+  // Ao recarregar, fechar a aba ou trocar de app com uma exclusão pendente, envia na hora.
+  // keepalive: sem ele o navegador cancela a requisição quando a página é recarregada.
+  // visibilitychange: no celular, sair do app nem sempre dispara o pagehide.
   useEffect(() => {
     const flush = () => {
-      if (current.current) void current.current.commit();
+      const item = current.current;
+      if (item) withKeepalive(() => void commit(item));
+    };
+    const hidden = () => {
+      if (document.visibilityState === "hidden") flush();
     };
     window.addEventListener("pagehide", flush);
-    return () => window.removeEventListener("pagehide", flush);
-  }, []);
+    document.addEventListener("visibilitychange", hidden);
+    return () => {
+      window.removeEventListener("pagehide", flush);
+      document.removeEventListener("visibilitychange", hidden);
+    };
+  }, [commit]);
 
   const isHidden = useCallback((id: string) => hidden.has(id), [hidden]);
 

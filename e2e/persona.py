@@ -340,7 +340,7 @@ def installments(page: Page, months: list[str]):
     assert later
 
 
-@step("Excluir com Desfazer: some na hora, volta ao desfazer, sai de vez depois")
+@step("Excluir com Desfazer: some na hora, volta ao desfazer, sai de vez depois e vale mesmo recarregando")
 def undo_delete(page: Page, month: str):
     open_month(page, month)
     add_expense(page, month, "Lançamento errado", 12.34, "Outros", 3)
@@ -356,6 +356,14 @@ def undo_delete(page: Page, month: str):
     idle(page)
     data = api(page, f"/months/{month}")
     assert not any(e["description"] == "Lançamento errado" for e in data["expenses"]), "não foi excluída"
+    # Excluir e recarregar (ou fechar) antes do fim do prazo do Desfazer: a exclusão tem de valer.
+    add_expense(page, month, "Excluir e recarregar", 7.77, "Outros", 4)
+    page.locator(".ledger__row", has_text="Excluir e recarregar").get_by_role("button", name="Excluir Excluir e recarregar").click()
+    page.wait_for_timeout(800)
+    page.reload()
+    idle(page, 1500)
+    data = api(page, f"/months/{month}")
+    assert not any(e["description"] == "Excluir e recarregar" for e in data["expenses"]), "voltou depois de recarregar"
 
 
 @step("Editar conta: valor do mercado corrigido")
