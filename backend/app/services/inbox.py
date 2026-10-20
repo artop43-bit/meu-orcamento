@@ -58,7 +58,7 @@ def notify_reply(db: Session, thread: SupportThread, body: str, mail: Mailer) ->
                 heading="Sua solicitação foi respondida",
                 intro=f"A administração respondeu à solicitação “{thread.title}”.",
                 sections=[notify.Section(title="Resposta", note=_excerpt(body))],
-                button=("Abrir a conversa", notify._link(f"/ajustes/solicitacoes?id={thread.id}")),
+                button=("Abrir a conversa", notify._link(f"/ajustes/solicitacoes/{thread.id}")),
                 unsubscribe_kind="messages",
             ),
         )

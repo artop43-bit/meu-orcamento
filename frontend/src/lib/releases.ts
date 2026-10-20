@@ -11,14 +11,37 @@ export type Release = {
 
 export const RELEASES: Release[] = [
   {
-    version: "0.8.1",
-    date: "20/10/2026 às 12:00",
-    title: "Correção na exclusão de lançamentos",
+    version: "0.9.0",
+    date: "20/10/2026 às 13:30",
+    title: "Mensagens, tema na conta e começar do zero",
     sections: [
+      {
+        title: "Mensagens",
+        items: [
+          "Caixa de Mensagens no menu, com contador de não lidas: respostas às suas solicitações e recados da administração.",
+          "Cópia por e-mail de cada mensagem, que pode ser desligada em Ajustes › Preferências.",
+          "Recados importantes ficam fixados no topo até serem lidos.",
+        ],
+      },
+      {
+        title: "Aparência",
+        items: [
+          "Botão rápido de tema (automático, claro ou escuro) no menu e no “Mais” do celular.",
+          "Tema e cor de destaque salvos na conta: valem em todos os aparelhos.",
+          "O app abre direto no tema escolhido, sem piscar o claro, e o modo escuro foi revisado em todas as telas.",
+        ],
+      },
+      {
+        title: "Começar do zero (sugestão da comunidade)",
+        items: [
+          "Em Ajustes › Perfil, escolha quais áreas voltam ao padrão: lançamentos, recorrências, contas, cartões, metas, investimentos, categorias ou análises.",
+          "Backup em um toque antes de apagar, confirmação com senha e aviso por e-mail.",
+        ],
+      },
       {
         title: "Correção",
         items: [
-          "Excluir um lançamento e logo em seguida recarregar a página, fechar a aba ou sair do app fazia ele voltar. Agora a exclusão vale na hora em que a página é deixada; o “Desfazer” continua funcionando enquanto a tela está aberta.",
+          "Um lançamento excluído não volta mais ao recarregar a página ou sair do app logo depois de excluir.",
         ],
       },
     ],

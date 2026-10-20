@@ -1,8 +1,10 @@
+import { useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { CheckCircle2, ChevronLeft, Inbox, MessageSquarePlus } from "lucide-react";
 import { Link, useParams } from "react-router";
 
 import { errorMessage } from "../api/client";
+import { INBOX_KEY } from "../api/inbox";
 import { KIND_LABEL, STATUS_LABEL, supportApi, type Thread, type ThreadStatus } from "../api/support";
 import { EmptyGuide } from "../components/help";
 import { Composer, Conversation } from "../components/media";
@@ -55,8 +57,13 @@ function ThreadView({ id }: { id: string }) {
   const queryClient = useQueryClient();
   const thread = useQuery({ queryKey: ["support", "thread", id], queryFn: () => supportApi.thread(id) });
 
-  // Abrir a conversa marca as respostas como lidas: atualiza a lista e o aviso do menu.
+  // Abrir a conversa marca as respostas como lidas: atualiza a lista e o aviso do menu
+  // (inclusive a caixa de Mensagens, que recebe a mesma resposta).
   const refresh = () => queryClient.invalidateQueries({ queryKey: ["support"] });
+  const loaded = thread.isSuccess;
+  useEffect(() => {
+    if (loaded) void queryClient.invalidateQueries({ queryKey: INBOX_KEY });
+  }, [loaded, id, queryClient]);
 
   if (thread.isPending)
     return (

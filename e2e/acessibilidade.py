@@ -55,6 +55,8 @@ PAGES = [
     "/ajustes/dados",
     "/ajustes/dados?aba=exportar",
     "/ajustes/notas",
+    "/mensagens",
+    "/admin?aba=recados",
     "/ajustes/seguranca",
     "/ajustes/preferencias",
     "/ajustes/atalhos",
@@ -128,9 +130,16 @@ def main() -> int:
                 page.wait_for_timeout(400)
                 audit(page, f"{label} janela Nova receita", found)
                 page.keyboard.press("Escape")
+                page.goto(f"{BASE}/ajustes/perfil")
+                settle(page)
+                page.get_by_role("button", name="Começar do zero").click()
+                page.locator("dialog[open]").get_by_label("Selecionar tudo").check()
+                page.wait_for_timeout(400)
+                audit(page, f"{label} janela Começar do zero", found)
+                page.keyboard.press("Escape")
                 if device == "celular":
                     page.wait_for_timeout(300)
-                    page.get_by_role("button", name="Mais").click()
+                    page.locator(".tabbar").get_by_role("button", name="Mais").click()
                     page.wait_for_timeout(400)
                     audit(page, f"{label} menu Mais", found)
                 ctx.close()

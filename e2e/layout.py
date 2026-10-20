@@ -46,6 +46,8 @@ PAGES = [
     ("dados", "/ajustes/dados"),
     ("dados-exportar", "/ajustes/dados?aba=exportar"),
     ("notas", "/ajustes/notas"),
+    ("mensagens", "/mensagens"),
+    ("admin-recados", "/admin?aba=recados"),
     ("seguranca", "/ajustes/seguranca"),
     ("preferencias", "/ajustes/preferencias"),
     ("atalhos", "/ajustes/atalhos"),
@@ -63,6 +65,11 @@ VIEWPORTS = {
     "monitor": dict(viewport={"width": 1366, "height": 900}),
     "notebook": dict(viewport={"width": 1100, "height": 760}),
     "celular": dict(viewport={"width": 390, "height": 844}, is_mobile=True, has_touch=True, device_scale_factor=2),
+    # v0.9: modo escuro no computador e no celular (o tema segue o sistema por padrão).
+    "monitor-escuro": dict(viewport={"width": 1366, "height": 900}, color_scheme="dark"),
+    "celular-escuro": dict(
+        viewport={"width": 390, "height": 844}, is_mobile=True, has_touch=True, device_scale_factor=2, color_scheme="dark"
+    ),
 }
 
 # Roda na página: devolve os problemas encontrados no que está visível.
@@ -280,6 +287,24 @@ def dialogs(page: Page, device: str):
     d.get_by_role("button", name="Continuar").click()
     d.get_by_label("Valor total").fill("12.000,00")
     form(page, device, "form-meta-valor")
+    # Começar do zero (Perfil › Zona de risco), com tudo marcado.
+    page.goto(BASE + "/ajustes/perfil")
+    settle(page, 500)
+    page.get_by_role("button", name="Começar do zero").click()
+    page.locator("dialog[open]").get_by_label("Selecionar tudo").check()
+    form(page, device, "form-comecar-do-zero")
+    # Recado da administração: prévia antes de enviar.
+    page.goto(BASE + "/admin?aba=recados")
+    settle(page, 500)
+    page.get_by_label("Título").fill("Nova versão disponível")
+    page.get_by_label("Mensagem", exact=True).fill("A versão 0.9 traz a caixa de mensagens, o tema escuro salvo na conta e o começar do zero.")
+    page.get_by_role("button", name="Revisar e enviar").click()
+    form(page, device, "form-recado-previa")
+    if device.startswith("celular"):
+        page.locator(".tabbar").get_by_role("button", name="Mais").click()
+        page.wait_for_timeout(350)
+        check(page, device, "menu-mais", full=False, scope="dialog[open]")
+        page.keyboard.press("Escape")
     # Importação: etapa de conferir as colunas de uma planilha.
     sample = OUT / "planilha.csv"
     sample.write_text("Data;Histórico;Valor\n05/01/2026;SUPERMERCADO BH LTDA;-152,30\n06/01/2026;SALARIO;3200,00\n", encoding="utf-8")

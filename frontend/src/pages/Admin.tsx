@@ -1,18 +1,20 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Copy, Inbox, Mail, MessageSquare, ShieldAlert, Users } from "lucide-react";
+import { Copy, Inbox, Mail, Megaphone, MessageSquare, ShieldAlert, Users } from "lucide-react";
 import { useSearchParams } from "react-router";
 
 import { errorMessage } from "../api/client";
 import { moneyApi, type AdminAction, type AdminUser } from "../api/money";
 import { Alert, Button, Kpi, LoadingRegion, PageHeader, Skeleton } from "../components/ui";
 import { announce } from "../lib/announce";
+import AdminAnnouncements from "./AdminAnnouncements";
 import AdminSupport from "./AdminSupport";
 
 const TABS = [
   { key: "usuarios", label: "Usuários", icon: <Users size={16} /> },
   { key: "emails", label: "E-mails enviados", icon: <Mail size={16} /> },
   { key: "solicitacoes", label: "Solicitações", icon: <MessageSquare size={16} /> },
+  { key: "recados", label: "Recados", icon: <Megaphone size={16} /> },
 ] as const;
 type Tab = (typeof TABS)[number]["key"];
 
@@ -166,7 +168,7 @@ export default function AdminPage() {
   const data = overview.data;
   return (
     <>
-      <PageHeader title="Administração" subtitle="Usuários, liberação de acesso, e-mails e solicitações." />
+      <PageHeader title="Administração" subtitle="Usuários, liberação de acesso, e-mails, solicitações e recados." />
       {overview.isError && <Alert tone="error">{errorMessage(overview.error)}</Alert>}
       {overview.isPending && (
         <LoadingRegion label="Carregando">
@@ -199,6 +201,7 @@ export default function AdminPage() {
       {tab === "usuarios" && <UsersTab />}
       {tab === "emails" && <EmailsTab />}
       {tab === "solicitacoes" && <AdminSupport />}
+      {tab === "recados" && <AdminAnnouncements />}
     </>
   );
 }

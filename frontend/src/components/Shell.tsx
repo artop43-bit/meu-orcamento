@@ -11,12 +11,16 @@ import {
   History,
   Landmark,
   LogOut,
+  Mail,
+  Monitor,
+  Moon,
   MessageSquarePlus,
   RefreshCw,
   Search,
   Settings,
   ShieldAlert,
   ShieldCheck,
+  Sun,
   Target,
   Wallet,
 } from "lucide-react";
@@ -25,7 +29,7 @@ import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router";
 import { authApi, ME_KEY, useMe } from "../api/auth";
 import { moneyApi } from "../api/money";
 import { useProfile } from "../api/profile";
-import { useSupportUnread } from "../api/support";
+import { useInboxUnread } from "../api/inbox";
 import { announce, prefersReducedMotion } from "../lib/announce";
 import { neighbor } from "../lib/gestures";
 import { haptic } from "../lib/haptics";
@@ -33,6 +37,7 @@ import { releaseLabel } from "../release";
 import { Tour } from "./help";
 import { Avatar } from "./media";
 import { openFeedback, openPalette, PowerLayer } from "./power";
+import { nextTheme, setAppearance, syncAppearance, THEMES } from "../lib/appearance";
 import { togglePrivacy, usePrefs } from "../lib/prefs";
 import { Brand, LoadingRegion, Sheet, Skeleton } from "./ui";
 import { UndoProvider } from "./undo";
@@ -66,14 +71,16 @@ const MAIN: NavItem[] = [
   { to: "/historico", label: "Histórico", icon: <History size={20} /> },
 ];
 
+const MESSAGES: NavItem = { to: "/mensagens", label: "Mensagens", icon: <Mail size={20} /> };
 const SETTINGS: NavItem[] = [{ to: "/ajustes", label: "Ajustes", icon: <Settings size={20} /> }];
+const THEME_ICON = { system: <Monitor size={17} />, light: <Sun size={17} />, dark: <Moon size={17} /> } as const;
 const ADMIN: NavItem = { to: "/admin", label: "Administração", icon: <ShieldCheck size={20} /> };
 // Telas fora do menu (títulos da barra do topo e do navegador).
-const EXTRA_TITLES: Record<string, string> = { "/revisar": "Para revisar", "/busca": "Busca", "/admin": "Administração" };
+const EXTRA_TITLES: Record<string, string> = { "/revisar": "Para revisar", "/busca": "Busca", "/admin": "Administração", "/mensagens": "Mensagens" };
 
 // No celular, as 4 primeiras viram abas; o resto vai para "Mais".
 const TABS = MAIN.slice(0, 4);
-const MORE = [...MAIN.slice(4), ...SETTINGS];
+const MORE = [...MAIN.slice(4), MESSAGES, ...SETTINGS];
 
 const ALL = [...MAIN, ...SETTINGS];
 const TITLES: Record<string, string> = { ...Object.fromEntries(ALL.map((item) => [item.to, item.label])), ...EXTRA_TITLES };
@@ -133,6 +140,11 @@ export function Shell() {
 
   // Depois de entrar, baixa as outras telas em segundo plano (navegação instantânea).
   useEffect(() => preloadPages(), []);
+
+  // Aparência salva na conta vale também neste aparelho.
+  useEffect(() => {
+    if (user) syncAppearance(user);
+  }, [user]);
 
   // Fecha o menu "Mais" ao trocar de página.
   useEffect(() => setMoreOpen(false), [location.pathname]);
@@ -213,7 +225,7 @@ export function Shell() {
     await authApi.setTwoFactorPrompt(true).catch(() => undefined);
   }
 
-  const supportUnread = useSupportUnread(Boolean(user)).data ?? 0;
+  const inboxUnread = useInboxUnread(Boolean(user)).data ?? 0;
   const profile = useProfile();
   const adminOverview = useQuery({
     queryKey: ["admin", "overview"],
@@ -223,7 +235,13 @@ export function Shell() {
   });
   const adminUnread = adminOverview.data?.feedback_new ?? 0;
   const displayName = profile.data?.display_name || user?.email || "";
-  const unreadLabel = `${supportUnread} resposta(s) nova(s) em Minhas solicitações`;
+  const unreadLabel = `${inboxUnread} mensagem(ns) não lida(s)`;
+  const themeLabel = THEMES.find(([value]) => value === prefs.theme)?.[1] ?? "Automático";
+  const cycleTheme = () => {
+    const theme = nextTheme(prefs.theme);
+    setAppearance({ theme }, queryClient);
+    announce(`Tema: ${THEMES.find(([value]) => value === theme)?.[1]}`);
+  };
 
   async function logout() {
     await authApi.logout().catch(() => undefined);
@@ -255,11 +273,15 @@ export function Shell() {
             </NavLink>
           ))}
           <p className="sidebar__group" aria-hidden></p>
+          <NavLink to={MESSAGES.to} className="sidebar__link" onClick={(e) => onNavClick(e, MESSAGES.to)}>
+            {MESSAGES.icon}
+            {MESSAGES.label}
+            <NavBadge count={inboxUnread} label={unreadLabel} />
+          </NavLink>
           {SETTINGS.map((item) => (
             <NavLink key={item.to} to={item.to} className="sidebar__link" onClick={(e) => onNavClick(e, item.to)}>
               {item.icon}
               {item.label}
-              <NavBadge count={supportUnread} label={unreadLabel} />
             </NavLink>
           ))}
           {user?.is_admin && (
@@ -283,6 +305,9 @@ export function Shell() {
             title={prefs.privacy ? "Mostrar valores (P)" : "Esconder valores (P)"}
           >
             {prefs.privacy ? <Eye size={17} /> : <EyeOff size={17} />}
+          </button>
+          <button type="button" className="sidebar__tool" onClick={cycleTheme} aria-label={`Tema: ${themeLabel}. Trocar o tema`} title={`Tema: ${themeLabel} (clique para trocar)`}>
+            {THEME_ICON[prefs.theme]}
           </button>
           <button type="button" className="sidebar__tool" onClick={openFeedback} aria-label="Nova solicitação" title="Nova solicitação (sugestão ou problema)">
             <MessageSquarePlus size={17} />
@@ -323,6 +348,10 @@ export function Shell() {
             <button type="button" className="icon-btn" onClick={openPalette} aria-label="Buscar ou lançar">
               <Search size={18} />
             </button>
+            <Link to="/mensagens" className="icon-btn icon-btn--badge" aria-label={inboxUnread > 0 ? `Mensagens, ${unreadLabel}` : "Mensagens"}>
+              <Mail size={18} />
+              {inboxUnread > 0 && <span className="icon-btn__dot" aria-hidden />}
+            </Link>
             <Link to="/" className="brand__logo" aria-label="Meu Orçamento, início">
               <Wallet size={18} />
             </Link>
@@ -378,10 +407,10 @@ export function Shell() {
         >
           <span className="tabbar__icon">
             <Ellipsis size={20} />
-            {supportUnread + adminUnread > 0 && <span className="tabbar__dot" aria-hidden />}
+            {inboxUnread + adminUnread > 0 && <span className="tabbar__dot" aria-hidden />}
           </span>
           Mais
-          {supportUnread + adminUnread > 0 && <span className="sr-only"> (há mensagens novas)</span>}
+          {inboxUnread + adminUnread > 0 && <span className="sr-only"> (há mensagens novas)</span>}
         </button>
       </nav>
 
@@ -399,7 +428,7 @@ export function Shell() {
               <Link to={item.to} aria-current={item.to === section ? "page" : undefined}>
                 {item.icon}
                 {item.label}
-                {item.to === "/ajustes" && <NavBadge count={supportUnread} label={unreadLabel} />}
+                {item.to === "/mensagens" && <NavBadge count={inboxUnread} label={unreadLabel} />}
               </Link>
             </li>
           ))}
@@ -412,6 +441,19 @@ export function Shell() {
               </Link>
             </li>
           )}
+          <li>
+            <fieldset className="radios menu-theme">
+              <legend className="field-label">Tema</legend>
+              <div className="segmented">
+                {THEMES.map(([value, label]) => (
+                  <label key={value}>
+                    <input type="radio" name="menu-theme" checked={prefs.theme === value} onChange={() => setAppearance({ theme: value }, queryClient)} />
+                    {label}
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+          </li>
           <li>
             <button type="button" onClick={openFeedback}>
               <MessageSquarePlus size={20} /> Nova solicitação

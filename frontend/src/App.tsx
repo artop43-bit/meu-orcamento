@@ -33,6 +33,7 @@ import {
   ReviewPage,
   SearchPage,
   SupportPage,
+  InboxPage,
   Unsubscribe,
   Security,
   SettingsHub,
@@ -92,6 +93,7 @@ export default function App() {
           <Route path="/contas" element={<AccountsPage />} />
           <Route path="/revisar" element={<ReviewPage />} />
           <Route path="/busca" element={<SearchPage />} />
+          <Route path="/mensagens" element={<InboxPage />} />
           <Route path="/admin" element={<AdminPage />} />
           <Route path="/admin/sugestoes" element={<Navigate to="/admin?aba=solicitacoes" replace />} />
           <Route path="/metas" element={<Goals />} />

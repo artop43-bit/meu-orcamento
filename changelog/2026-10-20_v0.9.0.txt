@@ -1,0 +1,51 @@
+MEU ORÇAMENTO · UPDATE LOG
+Versão 0.9.0 · Mensagens, tema na conta e começar do zero
+Data: 20/10/2026 às 13:30 (horário de Brasília)
+
+Caixa de mensagens (recados do ADM)
+- [x] Item "Mensagens" no menu (computador) e no "Mais" (celular), com contador de não lidas;
+      envelope na barra do topo do celular
+- [x] Tela Mensagens: lista com filtro Todas / Não lidas, leitura, marcar como lida ou não lida e
+      "Marcar todas como lidas"
+- [x] Chega na caixa: a resposta da administração a uma solicitação (com "Abrir a conversa") e os
+      recados da administração; abrir a conversa marca a resposta como lida também na caixa
+- [x] Cópia por e-mail com botão para o app; pode ser desligada em Ajustes › Preferências e pelo
+      link de descadastro do próprio e-mail
+- [x] Administração › Recados: título e mensagem, contagem de destinatários ao vivo, prévia com
+      confirmação "Enviar para N usuários" e histórico com quantos leram
+- [x] Vai para contas aprovadas; opção de incluir quem aguarda a liberação do acesso
+- [x] Recado "Importante": fixado no topo até ser lido e e-mail enviado mesmo para quem desligou as cópias
+- [x] Só a administração publica; todo envio fica em Administração › E-mails enviados
+
+Tema claro, escuro ou automático
+- [x] Botão rápido de tema no menu do computador e seletor no "Mais" do celular
+- [x] Tema e cor de destaque salvos na conta: valem em todos os aparelhos em que a pessoa entrar
+- [x] O app abre direto no tema certo, sem piscar o claro
+- [x] Telas de entrada e cadastro seguem o sistema ou o último tema usado no aparelho
+- [x] Revisão do modo escuro em todas as telas; impressão e e-mails continuam claros
+- [x] Testes de layout passam a rodar também no modo escuro (computador e celular); acessibilidade
+      (contraste incluído) já roda nos dois temas
+
+Começar do zero (sugestão da comunidade)
+- [x] Só em Ajustes › Perfil, na "Zona de risco"
+- [x] Escolha das áreas, com quantidade de itens e "Selecionar tudo": lançamentos, recorrências,
+      contas, cartões e faturas, metas, investimentos, categorias e regras, análises salvas
+- [x] Dependências resolvidas e explicadas antes de confirmar: lançamentos ficam sem conta ou cartão,
+      categorias apagadas viram "Outros", recorrências param só nos próximos meses
+- [x] "Baixar backup" em destaque na mesma janela (opcional)
+- [x] Confirmação com a senha (e o código do 2FA, se ativo) e a frase COMEÇAR DO ZERO
+- [x] Tudo ou nada (nunca fica pela metade); aviso por e-mail com data e aparelho; registro no
+      histórico de segurança; com tudo zerado, a configuração inicial guiada aparece de novo
+- [x] Nunca apaga a conta, o login, o perfil, as preferências nem as solicitações
+
+Correção (antes prevista como 0.8.1)
+- [x] Excluir um lançamento e recarregar a página, fechar a aba ou sair do app logo depois fazia ele
+      voltar. A exclusão pendente agora é enviada na saída da página de um jeito que o navegador não
+      cancela, e também quando o app vai para segundo plano no celular
+
+Qualidade
+- [x] Migração 0013 com volta completa
+- [x] Testes novos no servidor: caixa e privacidade, cópia por e-mail e descadastro, recados
+      (destinatários, importante, leitura), aparência na conta e começar do zero (senha, frase,
+      cada área e dependências, tudo zerado)
+- [x] Roteiro de ponta a ponta com mensagens, recado, tema em dois aparelhos e começar do zero
