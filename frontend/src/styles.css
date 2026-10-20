@@ -6590,3 +6590,23 @@ textarea {
     grid-column: 1 / -1;
   }
 }
+
+/* Seletor de mês: o limite de largura vale para a caixa inteira, para o ícone do calendário
+   ficar dentro do campo. */
+.month-picker .date-field {
+  max-width: 240px;
+}
+
+.month-picker .date-field input {
+  max-width: none;
+}
+
+/* Cartão da meta: ações ficam na linha do título, também no celular. */
+.goal-card .section-header {
+  flex-wrap: nowrap;
+  align-items: flex-start;
+}
+
+.export-card > label > select {
+  max-width: 240px;
+}
