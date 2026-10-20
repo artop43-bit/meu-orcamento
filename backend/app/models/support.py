@@ -49,13 +49,23 @@ class SupportThread(Base):
     __table_args__ = (Index("ix_support_threads_last_message_at", "last_message_at"),)
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    # v1.1: número fixo e crescente (#1, #2...), para tratar as solicitações como tarefas.
+    number: Mapped[int] = mapped_column(Integer, unique=True)
     user_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), index=True
     )
     title: Mapped[str] = mapped_column(String(120))
     kind: Mapped[str] = mapped_column(String(10))  # "idea" | "bug" | "other"
-    # "open" (aguardando a administração), "answered" (respondida) ou "resolved".
-    status: Mapped[str] = mapped_column(String(10), default="open")
+    # "open" (aberta), "in_progress" (em andamento), "planned" (planejada), "answered"
+    # (respondida), "resolved" (resolvida) ou "declined" (recusada).
+    status: Mapped[str] = mapped_column(String(12), default="open")
+    # Nota do status (ex.: "entra na versão 1.2") e versão planejada.
+    status_note: Mapped[str | None] = mapped_column(String(200))
+    planned_version: Mapped[str | None] = mapped_column(String(20))
+    # v1.1: conversa que começou como resposta a um recado da administração.
+    announcement_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("announcements.id", ondelete="SET NULL"), index=True
+    )
     # Quem ainda não leu a última mensagem do outro lado.
     user_unread: Mapped[bool] = mapped_column(default=False)
     admin_unread: Mapped[bool] = mapped_column(default=True)

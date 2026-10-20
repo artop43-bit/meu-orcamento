@@ -95,6 +95,7 @@ class AnnouncementOut(BaseModel):
     include_pending: bool
     recipients: int
     read: int
+    replies: int = 0
     created_at: datetime
 
 
@@ -113,6 +114,7 @@ def announcements(_: AdminUser, db: DbSession) -> list[AnnouncementOut]:
             include_pending=row["announcement"].include_pending,
             recipients=row["announcement"].recipients,
             read=row["read"],
+            replies=row["replies"],
             created_at=row["announcement"].created_at,
         )
         for row in inbox.list_announcements(db)

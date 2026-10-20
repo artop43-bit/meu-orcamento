@@ -99,7 +99,7 @@ def test_reply_lands_in_inbox_and_by_email(
     copy = outbox[sent:]
     assert len(copy) == 1 and copy[0].to == "ana@example.com"
     assert "Exportar em PDF" in copy[0].subject and "Feito na 0.9!" in copy[0].body
-    assert f"/ajustes/solicitacoes/{thread['id']}" in copy[0].body
+    assert f"/mensagens/conversas/{thread['id']}" in copy[0].body
     assert copy[0].headers.get("List-Unsubscribe")
 
     switch(client, "ana@example.com")
