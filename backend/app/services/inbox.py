@@ -37,14 +37,55 @@ def _can_email(user: User, force: bool = False) -> bool:
 # ---------------------------------------------------------------- resposta a uma solicitação
 
 
+def thread_link(thread: SupportThread) -> str:
+    return f"/mensagens/conversas/{thread.id}"
+
+
 def notify_reply(db: Session, thread: SupportThread, body: str, mail: Mailer) -> InboxItem:
     """A administração respondeu: mensagem na caixa e, se o usuário quiser, e-mail."""
     user = db.get(User, thread.user_id)
     assert user is not None
+    label = f"#{thread.number} {thread.title}"
     item = InboxItem(
         user_id=user.id,
         kind="reply",
-        title=f"Resposta à sua solicitação: {thread.title}"[:160],
+        title=f"Resposta à sua solicitação {label}"[:160],
+        body=body,
+        thread_id=thread.id,
+    )
+    db.add(item)
+    push.send(db, user, "messages", "Sua solicitação foi respondida", label, thread_link(thread))
+    if _can_email(user):
+        _email(
+            mail,
+            user,
+            notify.Message(
+                subject=f"Sua solicitação foi respondida: {label}"[:200],
+                heading="Sua solicitação foi respondida",
+                intro=f"A administração respondeu à solicitação {label}.",
+                sections=[notify.Section(title="Resposta", note=_excerpt(body))],
+                button=("Abrir a conversa", notify._link(thread_link(thread))),
+                unsubscribe_kind="messages",
+            ),
+        )
+    return item
+
+
+def notify_status(db: Session, thread: SupportThread, mail: Mailer) -> InboxItem:
+    """Status da tarefa mudou (ex.: planejada para a versão 1.2): avisa a pessoa."""
+    from app.services.support import STATUS_LABELS
+
+    user = db.get(User, thread.user_id)
+    assert user is not None
+    status = STATUS_LABELS.get(thread.status, thread.status)
+    if thread.planned_version and thread.status == "planned":
+        status += f" (versão {thread.planned_version})"
+    label = f"#{thread.number} {thread.title}"
+    body = thread.status_note or f"A solicitação {label} agora está como: {status}."
+    item = InboxItem(
+        user_id=user.id,
+        kind="reply",
+        title=f"Solicitação #{thread.number}: {status}"[:160],
         body=body,
         thread_id=thread.id,
     )
@@ -53,20 +94,20 @@ def notify_reply(db: Session, thread: SupportThread, body: str, mail: Mailer) ->
         db,
         user,
         "messages",
-        "Sua solicitação foi respondida",
+        f"Solicitação #{thread.number}: {status}",
         thread.title,
-        f"/ajustes/solicitacoes/{thread.id}",
+        thread_link(thread),
     )
     if _can_email(user):
         _email(
             mail,
             user,
             notify.Message(
-                subject=f"Sua solicitação foi respondida: {thread.title}"[:200],
-                heading="Sua solicitação foi respondida",
-                intro=f"A administração respondeu à solicitação “{thread.title}”.",
-                sections=[notify.Section(title="Resposta", note=_excerpt(body))],
-                button=("Abrir a conversa", notify._link(f"/ajustes/solicitacoes/{thread.id}")),
+                subject=f"Solicitação {label}: {status}"[:200],
+                heading=f"Solicitação #{thread.number}: {status}",
+                intro=f"O andamento da solicitação “{thread.title}” foi atualizado.",
+                sections=[notify.Section(title="Atualização", note=_excerpt(body))],
+                button=("Abrir a conversa", notify._link(thread_link(thread))),
                 unsubscribe_kind="messages",
             ),
         )
@@ -201,5 +242,11 @@ def list_announcements(db: Session) -> list[dict[str, Any]]:
         .correlate(Announcement)
         .scalar_subquery()
     )
-    rows = db.execute(select(Announcement, read).order_by(Announcement.created_at.desc()))
-    return [{"announcement": a, "read": n} for a, n in rows]
+    replies = (
+        select(func.count())
+        .where(SupportThread.announcement_id == Announcement.id)
+        .correlate(Announcement)
+        .scalar_subquery()
+    )
+    rows = db.execute(select(Announcement, read, replies).order_by(Announcement.created_at.desc()))
+    return [{"announcement": a, "read": n, "replies": r} for a, n, r in rows]

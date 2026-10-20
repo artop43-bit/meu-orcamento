@@ -11,8 +11,46 @@ export type Release = {
 
 export const RELEASES: Release[] = [
   {
+    version: "1.1.0",
+    date: "20/10/2026 às 21:30",
+    title: "Menu em grupos, gestos no celular, solicitações como tarefas e 10 cores",
+    sections: [
+      {
+        title: "Menu",
+        items: [
+          "Menu enxuto em grupos: Orçamento, Carteira, Planejamento, Investimentos e Análises.",
+          "Mensagens virou um balão no menu, com o número de não lidas; o tema fica ao lado de Sair.",
+          "No celular, as abas de baixo mostram os grupos e o topo mostra as telas de cada grupo.",
+        ],
+      },
+      {
+        title: "Celular",
+        items: [
+          "Arraste as janelas para baixo para fechar; se algo foi preenchido, o app pergunta antes.",
+          "Deslize para a direita para voltar das sub-telas e para os lados para trocar de tela.",
+          "Puxe para baixo no topo para atualizar.",
+        ],
+      },
+      {
+        title: "Mensagens",
+        items: [
+          "Responda aos recados do ADM: a resposta vira uma conversa.",
+          "Solicitações numeradas (#N) em Mensagens › Conversas, com o andamento e a versão planejada.",
+        ],
+      },
+      {
+        title: "Aparência",
+        items: ["10 cores de destaque em Preferências, todas legíveis no claro e no escuro."],
+      },
+      {
+        title: "Correções",
+        items: ["O botão \"Instalar no computador\" volta a aparecer no Chrome e no Edge.", "Horário de publicação das versões anteriores corrigido."],
+      },
+    ],
+  },
+  {
     version: "1.0.0",
-    date: "20/10/2026 às 20:15",
+    date: "20/10/2026 às 17:15",
     title: "Dívidas, mês financeiro, alertas, divisões e app Android",
     sections: [
       {
@@ -48,7 +86,7 @@ export const RELEASES: Release[] = [
   },
   {
     version: "0.9.0",
-    date: "20/10/2026 às 14:15",
+    date: "20/10/2026 às 11:15",
     title: "Mensagens, tema na conta e começar do zero",
     sections: [
       {
@@ -84,7 +122,7 @@ export const RELEASES: Release[] = [
   },
   {
     version: "0.8.0",
-    date: "20/10/2026 às 07:00",
+    date: "20/10/2026 às 04:00",
     title: "Avisos por e-mail, metas com objetivo e importação única",
     sections: [
       {

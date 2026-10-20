@@ -95,6 +95,7 @@ class AnnouncementOut(BaseModel):
     include_pending: bool
     recipients: int
     read: int
+    replies: int = 0
     created_at: datetime
 
 
@@ -113,6 +114,7 @@ def announcements(_: AdminUser, db: DbSession) -> list[AnnouncementOut]:
             include_pending=row["announcement"].include_pending,
             recipients=row["announcement"].recipients,
             read=row["read"],
+            replies=row["replies"],
             created_at=row["announcement"].created_at,
         )
         for row in inbox.list_announcements(db)
@@ -148,9 +150,15 @@ def create_announcement(
 # ---------------------------------------------------------------- aparência na conta
 
 
+# Cores de destaque (as mesmas de frontend/src/theme/tokens.ts).
+Accent = Literal[
+    "verde", "azul", "indigo", "roxo", "rosa", "vermelho", "laranja", "ambar", "ciano", "grafite"
+]
+
+
 class AppearanceIn(BaseModel):
     theme: Literal["system", "light", "dark"] | None = None
-    accent: Literal["verde", "azul", "roxo", "laranja"] | None = None
+    accent: Accent | None = None
 
 
 class AppearanceOut(BaseModel):

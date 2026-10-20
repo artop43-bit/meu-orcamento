@@ -115,6 +115,7 @@ export default function AdminAnnouncements() {
                   </span>
                   <span className="item__meta">
                     {when(a.created_at)} · {a.recipients} destinatário(s) · lido por {a.read}
+                    {a.replies > 0 && ` · ${a.replies} resposta(s) em Solicitações`}
                     {a.include_pending && " · incluiu quem aguarda liberação"}
                   </span>
                 </span>

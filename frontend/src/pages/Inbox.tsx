@@ -1,14 +1,18 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { BellRing, CheckCheck, Mail, MailOpen, Megaphone, MessageCircle, Pin } from "lucide-react";
-import { Link } from "react-router";
+import { BellRing, CheckCheck, Mail, MailOpen, Megaphone, MessageCircle, MessageSquarePlus, Pin, Reply } from "lucide-react";
+import { Link, useLocation, useNavigate } from "react-router";
 
 import { errorMessage } from "../api/client";
 import { INBOX_KEY, inboxApi, type InboxItem } from "../api/inbox";
+import { supportApi } from "../api/support";
 import { Badge } from "../components/budget";
 import { EmptyGuide } from "../components/help";
+import { Composer } from "../components/media";
+import { openFeedback } from "../components/power";
 import { Alert, Button, LoadingRegion, PageHeader, Skeleton } from "../components/ui";
 import { announce } from "../lib/announce";
+import { CONVERSATIONS, Conversations } from "./Support";
 
 type Filter = "all" | "unread";
 
@@ -19,6 +23,9 @@ function when(iso: string): string {
 function Item({ item, onToggle }: { item: InboxItem; onToggle: (item: InboxItem, read: boolean) => void }) {
   // Fechada até a pessoa abrir; abrir marca como lida.
   const [open, setOpen] = useState(false);
+  const [replying, setReplying] = useState(false);
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const reply = item.kind === "reply";
   const bodyId = `msg-${item.id}`;
 
@@ -54,9 +61,14 @@ function Item({ item, onToggle }: { item: InboxItem; onToggle: (item: InboxItem,
           <p className="inbox-item__text">{item.body}</p>
           <div className="inbox-item__actions">
             {reply && item.thread_id && (
-              <Link className="btn btn--secondary" to={`/ajustes/solicitacoes/${item.thread_id}`}>
+              <Link className="btn btn--secondary" to={`${CONVERSATIONS}/${item.thread_id}`}>
                 <MessageCircle size={16} aria-hidden /> Abrir a conversa
               </Link>
+            )}
+            {item.kind === "announcement" && !replying && (
+              <Button type="button" variant="secondary" onClick={() => setReplying(true)}>
+                <Reply size={16} aria-hidden /> Responder
+              </Button>
             )}
             <Button type="button" variant="secondary" onClick={() => onToggle(item, !item.read)}>
               {item.read ? (
@@ -70,14 +82,27 @@ function Item({ item, onToggle }: { item: InboxItem; onToggle: (item: InboxItem,
               )}
             </Button>
           </div>
+          {replying && (
+            <div className="inbox-item__reply">
+              <Composer
+                placeholder="Sua resposta para a administração"
+                onSend={async (message, images) => {
+                  const thread = await supportApi.replyAnnouncement(item.id, message, images);
+                  announce("Resposta enviada");
+                  await queryClient.invalidateQueries({ queryKey: ["support"] });
+                  navigate(`${CONVERSATIONS}/${thread.id}`);
+                }}
+              />
+            </div>
+          )}
         </div>
       )}
     </li>
   );
 }
 
-/** Caixa de mensagens: respostas às solicitações e recados da administração. */
-export default function InboxPage() {
+/** Mensagens › Avisos: respostas, recados da administração e alertas. */
+function Notices() {
   const queryClient = useQueryClient();
   const items = useQuery({ queryKey: [...INBOX_KEY, "list"], queryFn: inboxApi.list });
   const [filter, setFilter] = useState<Filter>("all");
@@ -114,17 +139,14 @@ export default function InboxPage() {
 
   return (
     <>
-      <PageHeader
-        title="Mensagens"
-        subtitle={unread > 0 ? `${unread} mensagem(ns) não lida(s)` : "Respostas às suas solicitações e recados da administração."}
-        actions={
-          unread > 0 ? (
-            <Button type="button" variant="secondary" onClick={() => void readAll()}>
-              <CheckCheck size={16} /> Marcar todas como lidas
-            </Button>
-          ) : undefined
-        }
-      />
+      {unread > 0 && (
+        <div className="row" style={{ marginBottom: 12 }}>
+          <span className="muted">{unread} não lida(s)</span>
+          <Button type="button" variant="secondary" onClick={() => void readAll()}>
+            <CheckCheck size={16} /> Marcar todas como lidas
+          </Button>
+        </div>
+      )}
       <Alert tone="error">{error}</Alert>
       {items.isPending && (
         <LoadingRegion label="Carregando as mensagens">
@@ -169,6 +191,34 @@ export default function InboxPage() {
           )}
         </section>
       )}
+    </>
+  );
+}
+
+/** Mensagens: avisos (respostas, recados e alertas) e conversas com a administração. */
+export default function InboxPage() {
+  const location = useLocation();
+  const conversations = location.pathname.startsWith(CONVERSATIONS);
+  return (
+    <>
+      <PageHeader
+        title="Mensagens"
+        subtitle="Avisos, recados da administração e as suas conversas (solicitações numeradas)."
+        actions={
+          <Button type="button" variant={conversations ? "primary" : "secondary"} onClick={openFeedback}>
+            <MessageSquarePlus size={16} /> Nova solicitação
+          </Button>
+        }
+      />
+      <nav className="page-tabs no-print" aria-label="Mensagens" style={{ marginBottom: 20 }}>
+        <Link to="/mensagens" aria-current={!conversations ? "page" : undefined}>
+          Avisos
+        </Link>
+        <Link to={CONVERSATIONS} aria-current={conversations ? "page" : undefined}>
+          Conversas
+        </Link>
+      </nav>
+      {conversations ? <Conversations /> : <Notices />}
     </>
   );
 }

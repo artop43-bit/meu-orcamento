@@ -150,8 +150,11 @@ def test_thread_conversation_flow(
     assert reply.json()["status"] == "answered"
     assert client.get("/api/admin/support/counts").json() == {
         "open": 0,
+        "in_progress": 0,
+        "planned": 0,
         "answered": 1,
         "resolved": 0,
+        "declined": 0,
         "unread": 0,
     }
 

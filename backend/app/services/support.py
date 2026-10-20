@@ -1,7 +1,9 @@
 """Solicitações: cada uma é uma conversa entre o usuário e a administração.
 
-Status: "open" (aguardando a administração), "answered" (a administração respondeu) e
-"resolved" (encerrada; uma nova mensagem do usuário reabre). Cada lado tem o seu "não lido".
+Status: "open" (aguardando a administração), "in_progress" (em andamento), "planned"
+(planejada para uma versão), "answered" (a administração respondeu), "resolved" (resolvida) e
+"declined" (recusada). Uma nova mensagem do usuário reabre. Cada lado tem o seu "não lido".
+Desde a v1.1 cada solicitação tem um número fixo (#1, #2...) para ser tratada como tarefa.
 """
 
 import uuid
@@ -17,7 +19,15 @@ from app.services import files
 from app.services.auth import Mailer
 
 MAX_FILES = 3
-STATUSES = ("open", "answered", "resolved")
+STATUSES = ("open", "in_progress", "planned", "answered", "resolved", "declined")
+STATUS_LABELS = {
+    "open": "Aberta",
+    "in_progress": "Em andamento",
+    "planned": "Planejada",
+    "answered": "Respondida",
+    "resolved": "Resolvida",
+    "declined": "Recusada",
+}
 
 
 def _check_admin(user: User) -> None:
@@ -48,14 +58,21 @@ def _add_message(
     return message
 
 
+def _next_number(db: Session) -> int:
+    return (db.scalar(select(func.max(SupportThread.number))) or 0) + 1
+
+
 def create_thread(
     db: Session,
     user: User,
     data: dict[str, Any],
     uploads: list[bytes],
     user_agent: str | None,
+    announcement_id: uuid.UUID | None = None,
 ) -> SupportThread:
     thread = SupportThread(
+        number=_next_number(db),
+        announcement_id=announcement_id,
         user_id=user.id,
         title=data["title"],
         kind=data["kind"],
@@ -204,20 +221,73 @@ def admin_reply(
     return thread
 
 
-def admin_set_status(db: Session, admin: User, thread_id: uuid.UUID, status: str) -> SupportThread:
+def admin_set_status(
+    db: Session,
+    admin: User,
+    thread_id: uuid.UUID,
+    status: str,
+    note: str | None = None,
+    version: str | None = None,
+    mail: Mailer | None = None,
+) -> SupportThread:
+    """Muda o status da tarefa (com nota e versão opcionais) e avisa a pessoa na caixa."""
+    from app.services import inbox
+
     _check_admin(admin)
     if status not in STATUSES:
         raise AppError(400, "invalid_status", "Status inválido.")
     thread = _any_thread(db, thread_id)
+    changed = thread.status != status or (note or None) != thread.status_note
     thread.status = status
+    thread.status_note = (note or "").strip()[:200] or None
+    thread.planned_version = (version or "").strip()[:20] or None
+    if changed and mail is not None:
+        inbox.notify_status(db, thread, mail)
     db.commit()
     return thread
+
+
+def reply_announcement(
+    db: Session, user: User, item_id: uuid.UUID, body: str, uploads: list[bytes]
+) -> SupportThread:
+    """Responder um recado: abre (ou continua) uma conversa ligada a ele."""
+    from app.models import Announcement, InboxItem
+
+    item = db.get(InboxItem, item_id)
+    if item is None or item.user_id != user.id or item.announcement_id is None:
+        raise AppError(404, "not_found", "Recado não encontrado.")
+    announcement = db.get(Announcement, item.announcement_id)
+    if announcement is None:
+        raise AppError(404, "not_found", "Recado não encontrado.")
+    thread = db.scalar(
+        select(SupportThread).where(
+            SupportThread.user_id == user.id, SupportThread.announcement_id == announcement.id
+        )
+    )
+    if thread is None:
+        return create_thread(
+            db,
+            user,
+            {
+                "title": f"Resposta ao recado: {announcement.title}"[:120],
+                "kind": "other",
+                "message": body,
+            },
+            uploads,
+            None,
+            announcement_id=announcement.id,
+        )
+    return reply_mine(db, user, thread.id, body, uploads)
 
 
 def _search(stmt: Select[Any], query: str | None) -> Select[Any]:
     if not query:
         return stmt
-    like = f"%{query.strip().lower()}%"
+    text = query.strip()
+    # "#12" ou "12": busca pelo número da solicitação.
+    if text.lstrip("#").isdigit():
+        return stmt.where(SupportThread.number == int(text.lstrip("#")))
+    like = f"%{text.lower()}%"
     in_messages = (
         select(SupportMessage.thread_id)
         .where(func.lower(SupportMessage.body).like(like))
@@ -240,6 +310,8 @@ def admin_list(
     status: str | None = None,
     user_id: uuid.UUID | None = None,
     limit: int = 300,
+    kind: str | None = None,
+    version: str | None = None,
 ) -> list[tuple[SupportThread, User, int]]:
     """Solicitações com o autor e o número de mensagens, da última mensagem para a primeira."""
     _check_admin(admin)
@@ -254,6 +326,10 @@ def admin_list(
         stmt = stmt.where(SupportThread.status == status)
     if user_id:
         stmt = stmt.where(SupportThread.user_id == user_id)
+    if kind:
+        stmt = stmt.where(SupportThread.kind == kind)
+    if version:
+        stmt = stmt.where(SupportThread.planned_version == version)
     stmt = _search(stmt, query)
     stmt = stmt.order_by(SupportThread.last_message_at.desc()).limit(limit)
     return [(t, u, n) for t, u, n in db.execute(stmt)]
@@ -274,6 +350,16 @@ def admin_by_user(db: Session, admin: User, query: str | None = None) -> list[di
         if item["last_message_at"] is None or thread.last_message_at > item["last_message_at"]:
             item["last_message_at"] = thread.last_message_at
     return sorted(people.values(), key=lambda p: p["last_message_at"], reverse=True)
+
+
+def admin_versions(db: Session, admin: User) -> list[str]:
+    _check_admin(admin)
+    rows = db.scalars(
+        select(SupportThread.planned_version)
+        .where(SupportThread.planned_version.is_not(None))
+        .distinct()
+    )
+    return sorted({v for v in rows if v}, reverse=True)
 
 
 def admin_counts(db: Session, admin: User) -> dict[str, int]:

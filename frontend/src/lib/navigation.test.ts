@@ -28,7 +28,9 @@ describe("navegação em grupos", () => {
 
   it("voltar das sub-telas", () => {
     expect(parentOf("/ajustes/perfil")).toBe("/ajustes");
-    expect(parentOf("/ajustes/solicitacoes/123")).toBe("/ajustes/solicitacoes");
+    expect(parentOf("/mensagens/conversas/123")).toBe("/mensagens/conversas");
+    expect(parentOf("/mensagens/conversas")).toBe("/mensagens");
+    expect(parentOf("/mensagens")).toBeNull();
     expect(parentOf("/dividas/abc/tabela")).toBe("/dividas");
     expect(parentOf("/ajustes")).toBeNull();
     expect(parentOf("/orcamento/2030-01")).toBeNull();

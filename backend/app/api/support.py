@@ -18,7 +18,7 @@ router = APIRouter(tags=["solicitações e perfil"])
 Title = Annotated[str, StringConstraints(strip_whitespace=True, min_length=3, max_length=120)]
 Body = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=4000)]
 Kind = Literal["idea", "bug", "other"]
-Status = Literal["open", "answered", "resolved"]
+Status = Literal["open", "in_progress", "planned", "answered", "resolved", "declined"]
 Uploads = Annotated[list[UploadFile] | None, File(description="Até 3 imagens")]
 
 
@@ -51,12 +51,16 @@ class MessageOut(BaseModel):
 
 class ThreadOut(BaseModel):
     id: uuid.UUID
+    number: int
     title: str
     kind: str
     status: str
     unread: bool
     created_at: datetime
     last_message_at: datetime
+    status_note: str | None = None
+    planned_version: str | None = None
+    announcement_id: uuid.UUID | None = None
 
 
 class ThreadDetail(ThreadOut):
@@ -92,6 +96,8 @@ class PersonRow(BaseModel):
 
 class StatusIn(BaseModel):
     status: Status
+    note: Annotated[str, StringConstraints(strip_whitespace=True, max_length=200)] | None = None
+    version: Annotated[str, StringConstraints(strip_whitespace=True, max_length=20)] | None = None
 
 
 def _parse(model: type[BaseModel], **values: Any) -> Any:
@@ -123,12 +129,16 @@ def _read(uploads: list[UploadFile] | None) -> list[bytes]:
 def _thread(thread: SupportThread, unread: bool) -> dict[str, Any]:
     return {
         "id": thread.id,
+        "number": thread.number,
         "title": thread.title,
         "kind": thread.kind,
         "status": thread.status,
         "unread": unread,
         "created_at": thread.created_at,
         "last_message_at": thread.last_message_at,
+        "status_note": thread.status_note,
+        "planned_version": thread.planned_version,
+        "announcement_id": thread.announcement_id,
     }
 
 
@@ -227,8 +237,12 @@ def admin_threads(
     q: Annotated[str | None, Query(max_length=100)] = None,
     status_filter: Annotated[Status | None, Query(alias="status")] = None,
     user_id: uuid.UUID | None = None,
+    kind: Kind | None = None,
+    version: Annotated[str | None, Query(max_length=20)] = None,
 ) -> list[AdminThreadOut]:
-    rows = support.admin_list(db, user, query=q, status=status_filter, user_id=user_id)
+    rows = support.admin_list(
+        db, user, query=q, status=status_filter, user_id=user_id, kind=kind, version=version
+    )
     avatars = profile.avatar_map(db, list({u.id for _, u, _ in rows}))
     return [
         AdminThreadOut(
@@ -293,9 +307,34 @@ def admin_reply(
 
 @router.patch("/admin/support/threads/{thread_id}")
 def admin_status(
-    thread_id: uuid.UUID, body: StatusIn, user: CurrentUser, db: DbSession
+    thread_id: uuid.UUID, body: StatusIn, user: CurrentUser, db: DbSession, mail: MailerDep
 ) -> AdminThreadDetail:
-    return _admin_detail(db, support.admin_set_status(db, user, thread_id, body.status))
+    thread = support.admin_set_status(
+        db, user, thread_id, body.status, body.note, body.version, mail
+    )
+    return _admin_detail(db, thread)
+
+
+@router.get("/admin/support/versions")
+def admin_versions(user: CurrentUser, db: DbSession) -> list[str]:
+    """Versões já usadas nas tarefas (para o filtro e para sugerir ao planejar)."""
+    return support.admin_versions(db, user)
+
+
+# ---------------------------------------------------------------- resposta a um recado
+
+
+@router.post("/inbox/{item_id}/reply")
+def reply_announcement(
+    item_id: uuid.UUID,
+    user: CurrentUser,
+    db: DbSession,
+    message: Annotated[str, Form()],
+    images: Uploads = None,
+) -> ThreadDetail:
+    data = _parse(ReplyIn, message=message)
+    thread = support.reply_announcement(db, user, item_id, data.message, _read(images))
+    return ThreadDetail(**_thread(thread, False), messages=support.messages(db, thread))
 
 
 # ---------------------------------------------------------------- perfil

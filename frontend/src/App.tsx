@@ -97,6 +97,8 @@ export default function App() {
           <Route path="/revisar" element={<ReviewPage />} />
           <Route path="/busca" element={<SearchPage />} />
           <Route path="/mensagens" element={<InboxPage />} />
+          <Route path="/mensagens/conversas" element={<InboxPage />} />
+          <Route path="/mensagens/conversas/:id" element={<InboxPage />} />
           <Route path="/dividas" element={<DebtsPage />} />
           <Route path="/divisoes" element={<SplitsPage />} />
           <Route path="/dividas/:id/tabela" element={<LoanTablePage />} />

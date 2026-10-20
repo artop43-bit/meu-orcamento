@@ -970,7 +970,7 @@ def support_requests(page: Page):
     d.get_by_role("button", name="Enviar solicitação").click()
     expect(d).to_contain_text("Solicitação enviada", timeout=8000)
     d.get_by_role("button", name="Acompanhar solicitação").click()
-    page.wait_for_url("**/ajustes/solicitacoes/**")
+    page.wait_for_url("**/mensagens/conversas/**")
     idle(page)
     expect(page.get_by_role("heading", name="Gráfico de Insights não carrega")).to_be_visible()
     expect(page.get_by_role("img", name="Imagem anexada 1")).to_be_visible()
@@ -996,19 +996,19 @@ def support_requests(page: Page):
     idle(page)
     expect(page.locator(".thread-list__item").first).to_contain_text("1 solicitação(ões)")
     page.get_by_role("tab", name="Recentes").click()
-    page.get_by_placeholder("Buscar por assunto, mensagem ou e-mail").fill("print")
+    page.get_by_placeholder(re.compile("Buscar por #número")).fill("print")
     page.wait_for_timeout(700)
     expect(page.locator(".thread-list__item")).to_have_count(1)
     page.screenshot(path=OUT / "v075-admin-solicitacoes.png", full_page=True)
 
-    # Usuário: aviso de resposta nova em Ajustes; ao abrir, fica lida.
+    # Usuário: a conversa (com número) fica em Mensagens › Conversas; ao abrir, fica lida.
     assert api(page, "/support/unread")["unread"] == 1
-    page.goto(f"{BASE}/ajustes")
+    page.goto(f"{BASE}/mensagens")
     idle(page)
-    expect(page.get_by_text("1 resposta(s) nova(s)")).to_be_visible()
-    page.locator(".settings-list").get_by_role("link", name=re.compile("Minhas solicitações")).click()
+    page.get_by_role("navigation", name="Mensagens").get_by_role("link", name="Conversas").click()
+    page.wait_for_url("**/mensagens/conversas")
     idle(page)
-    page.get_by_role("link", name=re.compile("Gráfico de Insights não carrega")).click()
+    page.get_by_role("link", name=re.compile(r"#\d+ Gráfico de Insights não carrega")).click()
     idle(page)
     expect(page.locator(".bubble--other")).to_contain_text("Corrigido na próxima versão")
     assert api(page, "/support/unread")["unread"] == 0
@@ -1483,6 +1483,24 @@ def theme_on_account(page: Page):
     expect(page.locator("html")).not_to_have_attribute("data-theme", "dark")
 
 
+@step("v1.1: 10 cores de destaque em Preferências, salvas na conta")
+def accent_colors(page: Page):
+    page.goto(f"{BASE}/ajustes/preferencias")
+    idle(page)
+    picker = page.get_by_role("group", name="Cor de destaque")
+    expect(picker.locator(".swatch")).to_have_count(10)
+    picker.get_by_label("Grafite").check()
+    expect(page.locator("html")).to_have_attribute("data-accent", "grafite")
+    page.wait_for_timeout(400)
+    assert api(page, "/auth/me")["accent"] == "grafite"
+    picker.scroll_into_view_if_needed()
+    page.screenshot(path=OUT / "v11-cores.png")
+    picker.get_by_label("Verde").check()
+    expect(page.locator("html")).to_have_attribute("data-accent", "verde")
+    page.wait_for_timeout(400)
+    assert api(page, "/auth/me")["accent"] == "verde"
+
+
 @step("v0.9: começar do zero — escolher áreas, backup, senha e frase; zera só as análises salvas")
 def start_over(page: Page):
     page.goto(f"{BASE}/ajustes/perfil")
@@ -1685,6 +1703,52 @@ def app_install(page: Page):
     expect(page.get_by_role("status").filter(has_text="Sem conexão")).to_have_count(0)
 
 
+@step("v1.1: solicitação numerada como tarefa (status, versão, quadro) e resposta a recado")
+def tasks_and_replies(page: Page):
+    [thread] = [t for t in api(page, "/support/threads") if "Gráfico de Insights" in t["title"]]
+    number = thread["number"]
+    # Administração: muda o status para "Planejada" na versão 1.2, com nota.
+    page.goto(f"{BASE}/admin?aba=solicitacoes&id={thread['id']}")
+    idle(page)
+    form = page.get_by_role("form", name=f"Andamento da solicitação #{number}")
+    form.get_by_label("Status").select_option("planned")
+    form.get_by_label("Versão").fill("1.2")
+    form.get_by_label(re.compile("^Nota para a pessoa")).fill("Entra na versão 1.2.")
+    form.get_by_role("button", name="Salvar status").click()
+    idle(page, 500)
+    detail = api(page, f"/support/threads/{thread['id']}")
+    assert (detail["status"], detail["planned_version"]) == ("planned", "1.2"), detail
+    # Quadro: o cartão aparece na coluna "Planejada".
+    page.goto(f"{BASE}/admin?aba=solicitacoes&visao=quadro")
+    idle(page)
+    column = page.get_by_role("region", name=re.compile(r"^Planejada \("))
+    expect(column).to_contain_text(f"#{number}")
+    page.screenshot(path=OUT / "v11-quadro.png", full_page=True)
+    # Busca pelo número.
+    page.goto(f"{BASE}/admin?aba=solicitacoes")
+    idle(page)
+    page.get_by_placeholder(re.compile("Buscar por #número")).fill(f"#{number}")
+    page.wait_for_timeout(700)
+    expect(page.locator(".thread-list__item")).to_have_count(1)
+    # A pessoa vê o status na conversa e o aviso na caixa.
+    page.goto(f"{BASE}/mensagens/conversas/{thread['id']}")
+    idle(page)
+    expect(page.locator(".thread-view")).to_contain_text("Planejada · versão 1.2")
+    expect(page.locator(".thread-view__status-note")).to_contain_text("Entra na versão 1.2.")
+    # Responder um recado vira conversa.
+    page.goto(f"{BASE}/mensagens")
+    idle(page)
+    notice = page.locator(".inbox-item", has_text="Manutenção programada")
+    notice.locator(".inbox-item__head").click()
+    notice.get_by_role("button", name="Responder").click()
+    notice.get_by_role("textbox").fill("Obrigada pelo aviso!")
+    notice.get_by_role("button", name=re.compile("^Enviar")).click()
+    page.wait_for_url("**/mensagens/conversas/**")
+    idle(page)
+    expect(page.get_by_role("heading", name=re.compile("Resposta ao recado: Manutenção programada"))).to_be_visible()
+    page.screenshot(path=OUT / "v11-conversa-recado.png", full_page=True)
+
+
 @step("Segurança: ativar 2FA, sair, entrar com código, desativar")
 def two_factor(page: Page):
     page.goto(f"{BASE}/seguranca")
@@ -1756,7 +1820,7 @@ def mobile(browser):
     page.screenshot(path=OUT / "celular-categorias.png", full_page=True)
     overflow = page.evaluate("document.documentElement.scrollWidth > window.innerWidth")
     assert not overflow, "rolagem lateral no celular"
-    for path in ("/orcamento", "/calendario", "/metas", "/analises", "/investimentos", "/investimentos?secao=cotacoes", "/historico", "/ajustes", "/ajustes/recorrencias", "/ajustes/dados", "/ajustes/dados?aba=exportar", "/ajustes/notas", "/mensagens", "/dividas", "/divisoes", "/ajustes/app", "/analises?secao=calculadoras", "/ajustes/seguranca", "/ajustes/ajuda", "/cartoes", "/contas", "/revisar", "/busca", "/ajustes/preferencias"):
+    for path in ("/orcamento", "/calendario", "/metas", "/analises", "/investimentos", "/investimentos?secao=cotacoes", "/historico", "/ajustes", "/ajustes/recorrencias", "/ajustes/dados", "/ajustes/dados?aba=exportar", "/ajustes/notas", "/mensagens", "/mensagens/conversas", "/dividas", "/divisoes", "/ajustes/app", "/analises?secao=calculadoras", "/ajustes/seguranca", "/ajustes/ajuda", "/cartoes", "/contas", "/revisar", "/busca", "/ajustes/preferencias"):
         page.goto(BASE + path)
         idle(page, 300)
         wide = page.evaluate("document.documentElement.scrollWidth - window.innerWidth")
@@ -1822,6 +1886,7 @@ def main():
         release_notes(page)
         inbox_and_announcement(page)
         theme_on_account(page)
+        accent_colors(page)
         start_over(page)
         debts(page)
         calculators(page)
@@ -1829,6 +1894,7 @@ def main():
         month_alerts(page)
         split_expenses(page)
         app_install(page)
+        tasks_and_replies(page)
         two_factor(page)
         banner_never(page)
         STATE["state"] = ctx.storage_state()

@@ -8,7 +8,8 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "typecheck": "tsc -b",
-    "test": "vitest run"
+    "test": "vitest run",
+    "theme": "node scripts/gen-theme.ts"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.75.0",
