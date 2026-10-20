@@ -7,12 +7,13 @@
  */
 export const LEGAL = {
   serviceName: "Meu Orçamento",
-  controllerName: "[NOME DO RESPONSÁVEL OU DA EMPRESA]",
-  controllerDocument: "[CPF OU CNPJ]",
-  contactEmail: "[E-MAIL DE CONTATO]",
-  forumCity: "[CIDADE/UF]",
+  controllerName: "Arthur Vinicius",
+  // Sem CNPJ no momento: o responsável é identificado pelo nome e pelo e-mail de contato.
+  controllerDocument: "",
+  contactEmail: "meuorcamento.app99@gmail.com",
+  forumCity: "Goiânia/GO",
   hostingProvider: "Oracle Cloud (região São Paulo)",
-  emailProvider: "[PROVEDOR DE E-MAIL TRANSACIONAL]",
+  emailProvider: "Google (Gmail)",
   // Mesmo valor de TERMS_VERSION no backend.
   version: "2026-10-16",
   updatedAt: "16 de outubro de 2026",
