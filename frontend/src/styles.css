@@ -4697,7 +4697,9 @@ kbd {
 
 /* ---------------------------------------------------------------- menu lateral */
 .sidebar__tools {
-  display: flex;
+  /* Busca em linha inteira; privacidade, tema e nova solicitação divididos embaixo. */
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 6px;
   margin-top: 10px;
   padding-top: 10px;
@@ -4729,7 +4731,7 @@ kbd {
 }
 
 .sidebar__tool--wide {
-  flex: 1;
+  grid-column: 1 / -1;
   justify-content: flex-start;
   min-width: 0;
 }
