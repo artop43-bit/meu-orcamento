@@ -1,7 +1,10 @@
 import json
-from typing import Literal
+import uuid
+from datetime import datetime
+from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, Response
+from fastapi import APIRouter, File, Form, Query, Response, UploadFile
+from pydantic import BaseModel, StringConstraints
 
 from app.api.deps import CurrentUser, DbSession
 from app.core.errors import AppError
@@ -63,6 +66,51 @@ def statement_commit(body: StatementImportIn, user: CurrentUser, db: DbSession) 
 # ---------------------------------------------------------------- exportar
 
 
+def _period(start: str, end: str | None) -> tuple[Any, Any]:
+    first = parse_month(start)
+    last = parse_month(end) if end else current_month()
+    if last < first:
+        raise AppError(400, "invalid_period", "O mês final não pode ser antes do inicial.")
+    if export.months_between(first, last) > MAX_EXPORT_MONTHS:
+        raise AppError(400, "invalid_period", "Exporte no máximo 10 anos por vez.")
+    return first, last
+
+
+def _filters(
+    kind: str, categories: list[uuid.UUID], accounts: list[uuid.UUID], cards: list[uuid.UUID]
+) -> export.Filters:
+    return export.Filters(
+        kind=kind, category_ids=set(categories), account_ids=set(accounts), card_ids=set(cards)
+    )
+
+
+ExportKind = Literal["all", "expense", "income"]
+IdList = Annotated[list[uuid.UUID], Query()]
+
+
+@router.get("/export/count")
+def export_count(
+    user: CurrentUser,
+    db: DbSession,
+    start: str,
+    end: str | None = None,
+    kind: ExportKind = "all",
+    category: IdList = [],  # noqa: B006 (padrão do FastAPI para listas na query)
+    account: IdList = [],  # noqa: B006
+    card: IdList = [],  # noqa: B006
+) -> dict[str, int]:
+    first, last = _period(start, end)
+    rows = export.transactions(db, user, first, last, _filters(kind, category, account, card))
+    return {"count": len(rows)}
+
+
+@router.get("/export/annual")
+def export_annual(
+    user: CurrentUser, db: DbSession, year: Annotated[int, Query(ge=2000, le=2100)]
+) -> dict[str, Any]:
+    return export.annual(db, user, year)
+
+
 @router.get("/export/transactions")
 def export_transactions(
     user: CurrentUser,
@@ -70,15 +118,13 @@ def export_transactions(
     start: str,
     end: str | None = None,
     format: Literal["csv", "xlsx"] = "csv",
+    kind: ExportKind = "all",
+    category: IdList = [],  # noqa: B006
+    account: IdList = [],  # noqa: B006
+    card: IdList = [],  # noqa: B006
 ) -> Response:
-    first = parse_month(start)
-    last = parse_month(end) if end else current_month()
-    if last < first:
-        raise AppError(400, "invalid_period", "O mês final não pode ser antes do inicial.")
-    if export.months_between(first, last) > MAX_EXPORT_MONTHS:
-        raise AppError(400, "invalid_period", "Exporte no máximo 10 anos por vez.")
-
-    rows = export.transactions(db, user, first, last)
+    first, last = _period(start, end)
+    rows = export.transactions(db, user, first, last, _filters(kind, category, account, card))
     name = f"meu-orcamento_{format_month(first)}_a_{format_month(last)}"
     if format == "csv":
         return _attachment(export.to_csv(rows), f"{name}.csv", "text/csv; charset=utf-8")
@@ -90,3 +136,111 @@ def export_transactions(
 def export_backup(user: CurrentUser, db: DbSession) -> Response:
     content = json.dumps(export.backup(db, user), ensure_ascii=False, indent=2).encode("utf-8")
     return _attachment(content, "meu-orcamento-backup.json", "application/json")
+
+
+# ---------------------------------------------------------------- importação única (v0.8)
+
+
+def _read_upload(upload: UploadFile) -> bytes:
+    from app.services import importer
+
+    raw = upload.file.read(importer.MAX_BYTES + 1)
+    if len(raw) > importer.MAX_BYTES:
+        raise AppError(413, "file_too_large", "O arquivo passa de 5 MB. Divida-o por período.")
+    return raw
+
+
+@router.post("/import/analyze")
+def import_analyze(
+    user: CurrentUser, db: DbSession, file: Annotated[UploadFile, File()]
+) -> dict[str, Any]:
+    """Passo 1: identifica o formato, o tipo (conta ou cartão) e as colunas do arquivo."""
+    from app.services import importer
+
+    return importer.analyze(db, user, _read_upload(file), file.filename or "arquivo")
+
+
+@router.post("/import/preview")
+def import_preview(
+    user: CurrentUser,
+    db: DbSession,
+    file: Annotated[UploadFile, File()],
+    mapping: Annotated[str | None, Form()] = None,
+    invert: Annotated[bool, Form()] = False,
+) -> StatementPreviewOut:
+    """Passo 3: lançamentos com categoria sugerida e repetidos marcados."""
+    from app.services import importer
+
+    parsed = None
+    if mapping:
+        try:
+            parsed = json.loads(mapping)
+        except ValueError as exc:
+            raise AppError(400, "invalid_mapping", "Mapeamento de colunas inválido.") from exc
+    data = importer.preview(
+        db, user, _read_upload(file), file.filename or "arquivo", parsed, invert
+    )
+    return StatementPreviewOut.model_validate(data)
+
+
+class ImportCommitIn(StatementImportIn):
+    filename: Annotated[str, StringConstraints(max_length=160)] = "arquivo"
+    file_format: Literal["ofx", "csv", "xlsx"] = "csv"
+    account_id: uuid.UUID | None = None
+    card_id: uuid.UUID | None = None
+    save_mapping: dict[str, Any] | None = None
+
+
+@router.post("/import/commit")
+def import_commit(body: ImportCommitIn, user: CurrentUser, db: DbSession) -> dict[str, Any]:
+    from app.services import importer
+
+    items = [t.model_dump() for t in body.transactions]
+    return importer.commit(
+        db,
+        user,
+        items,
+        filename=body.filename,
+        file_format=body.file_format,
+        account_id=body.account_id,
+        card_id=body.card_id,
+        save_mapping=body.save_mapping,
+    )
+
+
+@router.post("/import/restore")
+def import_restore(
+    user: CurrentUser, db: DbSession, file: Annotated[UploadFile, File()]
+) -> dict[str, int]:
+    """Backup do Meu Orçamento: recria o que não existe, sem duplicar."""
+    from app.services import importer
+
+    fmt, content = importer.detect_format(_read_upload(file), file.filename or "backup.json")
+    if fmt != "backup":
+        raise AppError(400, "invalid_file", "Este arquivo não é um backup do Meu Orçamento.")
+    return importer.restore_backup(db, user, content)
+
+
+class BatchOut(BaseModel):
+    id: uuid.UUID
+    filename: str
+    file_format: str
+    count: int
+    created_at: datetime
+    undone_at: datetime | None
+
+
+@router.get("/import/batches")
+def import_batches(user: CurrentUser, db: DbSession) -> list[BatchOut]:
+    from app.services import importer
+
+    return [
+        BatchOut.model_validate(b, from_attributes=True) for b in importer.list_batches(db, user)
+    ]
+
+
+@router.post("/import/batches/{batch_id}/undo")
+def import_undo(batch_id: uuid.UUID, user: CurrentUser, db: DbSession) -> dict[str, int]:
+    from app.services import importer
+
+    return {"removed": importer.undo(db, user, batch_id)}

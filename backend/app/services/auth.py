@@ -19,7 +19,8 @@ from app.services import budget
 
 # (destinatário, assunto, corpo). As rotas enviam em segundo plano, para o tempo
 # de resposta não revelar se um e-mail está cadastrado.
-Mailer = Callable[[str, str, str], None]
+# mail(para, assunto, texto, html=None, headers=None)
+Mailer = Callable[..., None]
 
 MAX_FAILED_ATTEMPTS = 5
 LOCK_DURATION = timedelta(minutes=15)
@@ -31,6 +32,8 @@ SESSION_TOUCH_INTERVAL = timedelta(minutes=5)
 PURPOSE_VERIFY_EMAIL = "verify_email"
 PURPOSE_RESET_PASSWORD = "reset_password"
 PURPOSE_LOGIN_2FA = "login_2fa"
+PURPOSE_NOT_ME = "not_me"
+NOT_ME_TTL = timedelta(days=7)
 
 
 def _invalid_credentials() -> AppError:
@@ -207,7 +210,9 @@ def _reset_failures(user: User) -> None:
     user.locked_until = None
 
 
-def login(db: Session, email: str, password: str, user_agent: str | None) -> LoginResult:
+def login(
+    db: Session, email: str, password: str, user_agent: str | None, mail: Mailer | None = None
+) -> LoginResult:
     user = _get_user_by_email(db, email)
     if user is None:
         security.burn_password_check(password)
@@ -245,12 +250,42 @@ def login(db: Session, email: str, password: str, user_agent: str | None) -> Log
     _reset_failures(user)
     session_token = _start_session(db, user, user_agent)
     _record(db, user, "login")
+    _alert_new_device(db, user, user_agent, mail)
     db.commit()
     return LoginResult(user=user, session_token=session_token)
 
 
+def _alert_new_device(db: Session, user: User, user_agent: str | None, mail: Mailer | None) -> None:
+    """Aparelho/navegador novo: e-mail com data, aparelho e o link "Não fui eu"."""
+    from app.services import notify
+
+    message = notify.register_login(db, user, user_agent, request_info().ip)
+    if message is None or mail is None:
+        return
+    token = _issue_token(db, user, PURPOSE_NOT_ME, NOT_ME_TTL)
+    message.button = ("Não fui eu: proteger a conta", _link("/nao-fui-eu", token))
+    message.outro = (
+        "O link encerra todas as sessões abertas e leva à criação de uma nova senha. "
+        "Ele vale por 7 dias."
+    )
+    text, body_html, _ = notify.render(message, user)
+    mail(user.email, message.subject, text, html=body_html)
+
+
+def not_me(db: Session, raw_token: str) -> str:
+    """Link "Não fui eu": encerra todas as sessões e devolve um link de troca de senha."""
+    token = _find_token(db, raw_token, PURPOSE_NOT_ME)
+    user = db.get_one(User, token.user_id)
+    token.used_at = utcnow()
+    _revoke_sessions(db, user)
+    _record(db, user, "not_me")
+    reset = _issue_token(db, user, PURPOSE_RESET_PASSWORD, RESET_PASSWORD_TTL)
+    db.commit()
+    return reset
+
+
 def complete_login_2fa(
-    db: Session, challenge: str, code: str, user_agent: str | None
+    db: Session, challenge: str, code: str, user_agent: str | None, mail: Mailer | None = None
 ) -> LoginResult:
     token = _find_token(db, challenge, PURPOSE_LOGIN_2FA)
     user = db.get_one(User, token.user_id)
@@ -264,6 +299,7 @@ def complete_login_2fa(
     _reset_failures(user)
     session_token = _start_session(db, user, user_agent)
     _record(db, user, "login")
+    _alert_new_device(db, user, user_agent, mail)
     db.commit()
     return LoginResult(user=user, session_token=session_token)
 

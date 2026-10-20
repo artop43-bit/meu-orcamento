@@ -10,6 +10,8 @@ export type User = {
   is_admin?: boolean;
   twofa_prompt_dismissed: boolean;
   created_at: string;
+  /** Configuração inicial guiada concluída (ou pulada). */
+  onboarded_at?: string | null;
 };
 
 export type LoginResult =

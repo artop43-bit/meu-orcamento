@@ -14,6 +14,7 @@ from app.api import (
     health,
     market,
     money,
+    notifications,
     planner,
     support,
 )
@@ -65,6 +66,9 @@ def create_app() -> FastAPI:
             request.method not in SAFE_METHODS
             and request.url.path.startswith("/api/")
             and request.headers.get(CSRF_HEADER) != "fetch"
+            # Descadastro com um clique (RFC 8058): o provedor de e-mail envia o POST sem o
+            # cabeçalho; não usa sessão, só o token assinado do próprio link.
+            and request.url.path != "/api/notifications/unsubscribe"
         ):
             response: Response = JSONResponse(
                 {"error": "csrf", "message": "Requisição bloqueada por segurança."},
@@ -102,6 +106,7 @@ def create_app() -> FastAPI:
     app.include_router(admin.router, prefix="/api")
     app.include_router(money.router, prefix="/api")
     app.include_router(support.router, prefix="/api")
+    app.include_router(notifications.router, prefix="/api")
     return app
 
 

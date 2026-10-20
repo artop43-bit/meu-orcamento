@@ -39,8 +39,12 @@ export function openPalette() {
   window.dispatchEvent(new Event(OPEN_PALETTE));
 }
 
-export function openFeedback() {
-  window.dispatchEvent(new Event(OPEN_FEEDBACK));
+export type FeedbackOptions = { kind?: "idea" | "bug" | "other"; context?: string };
+
+/** Abre a janela de nova solicitação (opcionalmente já com o tipo e uma referência). */
+export function openFeedback(options?: FeedbackOptions | unknown) {
+  const detail = options && typeof options === "object" && !("nativeEvent" in options) ? (options as FeedbackOptions) : {};
+  window.dispatchEvent(new CustomEvent<FeedbackOptions>(OPEN_FEEDBACK, { detail }));
 }
 
 export function openShortcuts() {
@@ -52,7 +56,7 @@ function isTyping(target: EventTarget | null): boolean {
   return !!el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName));
 }
 
-function useWindowEvent(name: string, fn: () => void) {
+function useWindowEvent(name: string, fn: (event: Event) => void) {
   useEffect(() => {
     window.addEventListener(name, fn);
     return () => window.removeEventListener(name, fn);
@@ -323,6 +327,7 @@ const SEEN_KEY = "novidades-vistas";
 
 export function WhatsNew() {
   const [open, setOpen] = useState(false);
+  const navigate = useNavigate();
   useEffect(() => {
     try {
       const seen = localStorage.getItem(SEEN_KEY);
@@ -355,6 +360,16 @@ export function WhatsNew() {
           ))}
         </ul>
         <div className="form-actions">
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => {
+              close();
+              navigate("/ajustes/notas");
+            }}
+          >
+            Ver todas as notas
+          </Button>
           <Button type="button" onClick={close}>
             Continuar
           </Button>
@@ -378,9 +393,13 @@ export function FeedbackSheet() {
   const location = useLocation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  useWindowEvent(OPEN_FEEDBACK, () => {
+  const [context, setContext] = useState("");
+  useWindowEvent(OPEN_FEEDBACK, (event) => {
+    const detail = (event as CustomEvent<FeedbackOptions>).detail ?? {};
     setSent(null);
     setError("");
+    if (detail.kind) setKind(detail.kind);
+    setContext(detail.context ?? "");
     setOpen(true);
   });
 
@@ -390,7 +409,15 @@ export function FeedbackSheet() {
     setBusy(true);
     try {
       const thread = await supportApi.create(
-        { title: title.trim(), kind, message: message.trim(), page: location.pathname + location.search, app_version: RELEASE.version },
+        {
+          title: title.trim(),
+          kind,
+          message: context ? `${message.trim()}
+
+(${context})` : message.trim(),
+          page: location.pathname + location.search,
+          app_version: RELEASE.version,
+        },
         images,
       );
       setTitle("");
@@ -431,6 +458,7 @@ export function FeedbackSheet() {
       ) : (
         <form className="inline-form" onSubmit={submit}>
           <Alert tone="error">{error}</Alert>
+          {context && <p className="muted small" style={{ margin: 0 }}>Referente a: {context}</p>}
           <fieldset className="radios">
             <legend className="field-label">Tipo</legend>
             <div className="segmented segmented--3">

@@ -105,6 +105,10 @@ class Income(Base):
     notes: Mapped[str | None] = mapped_column(String(500))
     # Identificador da origem (extrato bancário ou arquivo antigo), para não importar duas vezes.
     import_ref: Mapped[str | None] = mapped_column(String(80))
+    # Lote de importação (permite desfazer a importação inteira).
+    import_batch_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("import_batches.id", ondelete="SET NULL"), index=True
+    )
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
 
 
@@ -142,6 +146,9 @@ class Expense(Base):
     )
     # Veio do extrato e ainda não foi conferida (categoria, valor).
     needs_review: Mapped[bool] = mapped_column(default=False, server_default="0")
+    import_batch_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("import_batches.id", ondelete="SET NULL"), index=True
+    )
 
     # Compra parcelada: todas as parcelas compartilham o mesmo grupo.
     installment_group_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, index=True)
@@ -162,7 +169,54 @@ class Goal(Base):
     target_amount: Mapped[Decimal] = mapped_column(Money)
     current_amount: Mapped[Decimal] = mapped_column(Money, default=Decimal("0"))
     target_date: Mapped[date | None] = mapped_column(Date)
+    # Objetivo: tipo (reserva, bem, viagem, saúde...), motivação e plano de aporte mensal.
+    kind: Mapped[str] = mapped_column(String(20), default="other", server_default="other")
+    motivation: Mapped[str | None] = mapped_column(String(200))
+    monthly_plan: Mapped[Decimal | None] = mapped_column(Money)
+    # Meta principal: aparece em destaque no Orçamento.
+    is_main: Mapped[bool] = mapped_column(default=False, server_default="0")
+    completed_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, onupdate=utcnow)
+
+
+class GoalContribution(Base):
+    """Valor guardado (ou retirado) numa meta: base do ritmo e da projeção."""
+
+    __tablename__ = "goal_contributions"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    goal_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("goals.id", ondelete="CASCADE"), index=True
+    )
+    amount: Mapped[Decimal] = mapped_column(Money)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+
+
+class ImportBatch(Base):
+    """Uma importação de arquivo: guarda o que entrou para poder desfazer de uma vez."""
+
+    __tablename__ = "import_batches"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = _user_fk()
+    filename: Mapped[str] = mapped_column(String(160))
+    file_format: Mapped[str] = mapped_column(String(10))  # ofx | csv | xlsx | backup | legacy
+    count: Mapped[int] = mapped_column(default=0)
+    undone_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+
+
+class ImportMapping(Base):
+    """Mapeamento de colunas confirmado pelo usuário para um modelo de planilha (cabeçalho)."""
+
+    __tablename__ = "import_mappings"
+    __table_args__ = (UniqueConstraint("user_id", "signature"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = _user_fk()
+    signature: Mapped[str] = mapped_column(String(64))
+    mapping: Mapped[str] = mapped_column(Text)
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, onupdate=utcnow)
 
 

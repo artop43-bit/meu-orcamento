@@ -41,9 +41,78 @@ export type StatementTransaction = {
   category_id: string | null;
 };
 export type StatementPreview = {
-  format: "ofx" | "csv";
+  format: "ofx" | "csv" | "xlsx";
   transactions: (StatementTransaction & { duplicate: boolean; card_payment?: boolean })[];
+  period?: { start: string; end: string } | null;
 };
+
+/** Campos do arquivo: índice da coluna de cada um (null = não existe). */
+export type ColumnMapping = {
+  header_row: number;
+  date: number | null;
+  description: number | null;
+  amount: number | null;
+  credit: number | null;
+  debit: number | null;
+};
+
+export type ImportAnalysis = {
+  format: "ofx" | "csv" | "xlsx" | "backup" | "legacy";
+  kind: "account" | "card" | "backup" | "legacy";
+  invert?: boolean;
+  count?: number;
+  columns?: string[];
+  sample?: string[][];
+  mapping?: ColumnMapping;
+  mapping_source?: "auto" | "saved";
+  signature?: string | null;
+  ready?: boolean;
+  summary?: Record<string, number>;
+};
+
+export type ImportBatch = {
+  id: string;
+  filename: string;
+  file_format: string;
+  count: number;
+  created_at: string;
+  undone_at: string | null;
+};
+
+export type ExportFilters = {
+  start: string;
+  end: string;
+  kind: "all" | "expense" | "income";
+  categories: string[];
+  places: { accounts: string[]; cards: string[] };
+};
+
+export type AnnualSummary = {
+  year: number;
+  income: string;
+  expenses: string;
+  balance: string;
+  savings_rate: number | null;
+  months: { month: string; income: string; expenses: string; balance: string; committed_pct: number | null }[];
+  by_category: { name: string; total: string; share: number }[];
+  investments_total: string;
+  goals: { name: string; target_amount: string; current_amount: string; completed: boolean }[];
+};
+
+function fileForm(file: File, extra: Record<string, string> = {}): FormData {
+  const form = new FormData();
+  form.append("file", file, file.name);
+  for (const [key, value] of Object.entries(extra)) form.append(key, value);
+  return form;
+}
+
+export function exportQuery(f: ExportFilters): string {
+  const q = new URLSearchParams({ start: f.start, end: f.end, kind: f.kind });
+  for (const id of f.categories) q.append("category", id);
+  for (const id of f.places.accounts) q.append("account", id);
+  for (const id of f.places.cards) q.append("card", id);
+  return q.toString();
+}
 
 export const dataApi = {
   legacyPreview: (month: string, data: unknown) =>
@@ -53,6 +122,27 @@ export const dataApi = {
     api.post<StatementPreview>("/import/statement/preview", { filename, content, invert }),
   statementImport: (transactions: StatementTransaction[]) =>
     api.post<{ created: number; skipped: number }>("/import/statement", { transactions }),
+
+  analyze: (file: File) => api.form<ImportAnalysis>("POST", "/import/analyze", fileForm(file)),
+  preview: (file: File, mapping: ColumnMapping | undefined, invert: boolean) =>
+    api.form<StatementPreview>(
+      "POST",
+      "/import/preview",
+      fileForm(file, { ...(mapping ? { mapping: JSON.stringify(mapping) } : {}), invert: String(invert) }),
+    ),
+  commit: (payload: {
+    transactions: StatementTransaction[];
+    filename: string;
+    file_format: "ofx" | "csv" | "xlsx";
+    account_id?: string | null;
+    card_id?: string | null;
+    save_mapping?: { signature: string; mapping: ColumnMapping } | null;
+  }) => api.post<{ batch_id: string; created: number; skipped: number }>("/import/commit", payload),
+  restore: (file: File) => api.form<Record<string, number>>("POST", "/import/restore", fileForm(file)),
+  batches: () => api.get<ImportBatch[]>("/import/batches"),
+  undo: (id: string) => api.post<{ removed: number }>(`/import/batches/${id}/undo`),
+  exportCount: (f: ExportFilters) => api.get<{ count: number }>(`/export/count?${exportQuery(f)}`),
+  annual: (year: number) => api.get<AnnualSummary>(`/export/annual?year=${year}`),
 };
 
 /** Lê um arquivo como texto: UTF-8, ou Windows-1252 (comum em extratos de bancos brasileiros). */

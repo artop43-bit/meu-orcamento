@@ -13,6 +13,7 @@ import {
   Zap,
   Gauge,
   Search,
+  Paperclip,
   Pencil,
   Plus,
   Receipt,
@@ -43,6 +44,7 @@ import { Badge, Bar } from "../components/budget";
 import { ExpenseForm, IncomeForm, type ExpenseDraft } from "../components/entryForms";
 import { EmptyGuide, Tip } from "../components/help";
 import { ConsultantTeaser } from "../components/consultant";
+import { GoalTeaser } from "../components/GoalTeaser";
 import { Chart } from "../components/chart/Chart";
 import { extrasApi, saveQuickEntry, useCards, useDaily } from "../api/extras";
 import { moneyApi, useReviewCount } from "../api/money";
@@ -243,6 +245,12 @@ function LedgerRow({
           {expense.due_date ? `vence ${shortDate(expense.due_date)}` : "sem vencimento"}
           {expense.payment_method && ` · ${paymentLabel(expense.payment_method)}`}
           {expense.notes && <span title={expense.notes}> · com observação</span>}
+          {(expense.receipt_ids?.length ?? 0) > 0 && (
+            <span>
+              {" · "}
+              <Paperclip size={12} aria-hidden /> {expense.receipt_ids!.length === 1 ? "comprovante" : `${expense.receipt_ids!.length} comprovantes`}
+            </span>
+          )}
         </span>
       </button>
       <span className="ledger__status">
@@ -1000,6 +1008,7 @@ export default function MonthPage() {
             <ExpensesCard data={data.data} categories={cats} setEditing={setEditing} />
             <div className="stack" style={{ gap: 20 }}>
               <DailyCard month={month} />
+              <GoalTeaser showSuggestion={isCurrent} />
               <IncomesCard data={data.data} setEditing={setEditing} />
               <BreakdownCard data={data.data} categories={cats} />
             </div>

@@ -53,6 +53,8 @@ PAGES = [
     "/ajustes/recorrencias",
     "/ajustes/categorias",
     "/ajustes/dados",
+    "/ajustes/dados?aba=exportar",
+    "/ajustes/notas",
     "/ajustes/seguranca",
     "/ajustes/preferencias",
     "/ajustes/atalhos",

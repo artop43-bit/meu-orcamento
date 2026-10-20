@@ -421,13 +421,44 @@ def test_export_csv(user: TestClient) -> None:
     assert response.content.startswith(b"\xef\xbb\xbf")
 
     rows = list(csv.reader(io.StringIO(response.content.decode("utf-8-sig")), delimiter=";"))
-    assert rows[0][:6] == ["Mês", "Tipo", "Data", "Descrição", "Categoria", "Valor"]
-    assert rows[1][:6] == ["2030-01", "Renda", "", "Salário", "", "3000,00"]
+    assert rows[0] == [
+        "Mês",
+        "Tipo",
+        "Data",
+        "Descrição",
+        "Categoria",
+        "Conta ou cartão",
+        "Forma de pagamento",
+        "Valor",
+        "Pago",
+        "Parcela",
+        "Recorrente",
+    ]
+    salario = rows[1]
+    assert (salario[0], salario[1], salario[3], salario[7]) == (
+        "2030-01",
+        "Receita",
+        "Salário",
+        "3000,00",
+    )
     aluguel = next(r for r in rows if r[3] == "Aluguel; centro")
+    assert aluguel[1] == "Despesa"
     assert aluguel[2] == "10/01/2030"
     assert aluguel[4] == "Moradia"
-    assert aluguel[5] == "-1234,50"
-    assert [r[7] for r in rows if r[3] == "Celular"] == ["1/2", "2/2"]
+    assert aluguel[7] == "-1234,50"
+    assert [r[9] for r in rows if r[3] == "Celular"] == ["1/2", "2/2"]
+
+    # Filtros: só despesas, só uma categoria; a contagem acompanha.
+    only = user.get(f"/api/export/transactions?start={MONTH}&end=2030-02&kind=expense")
+    kinds = {
+        r[1]
+        for r in list(csv.reader(io.StringIO(only.content.decode("utf-8-sig")), delimiter=";"))[1:]
+    }
+    assert kinds == {"Despesa"}
+    moradia = next(c["id"] for c in user.get("/api/categories").json() if c["name"] == "Moradia")
+    count = user.get(f"/api/export/count?start={MONTH}&end=2030-02&category={moradia}").json()
+    assert count == {"count": 1}
+    assert user.get(f"/api/export/count?start={MONTH}&end=2030-02").json()["count"] == len(rows) - 1
 
 
 def test_export_xlsx(user: TestClient) -> None:
@@ -435,11 +466,13 @@ def test_export_xlsx(user: TestClient) -> None:
     response = user.get(f"/api/export/transactions?start={MONTH}&end={MONTH}&format=xlsx")
     assert response.status_code == 200
     workbook = load_workbook(io.BytesIO(response.content))
-    assert workbook.sheetnames == ["Lançamentos", "Resumo"]
+    assert workbook.sheetnames == ["Lançamentos", "Resumo mensal", "Por categoria"]
     sheet = workbook["Lançamentos"]
     assert sheet["D1"].value == "Descrição"
     assert sheet.max_row == 4  # cabeçalho + salário + aluguel + celular 1/2
-    resume = workbook["Resumo"]
+    categories = workbook["Por categoria"]
+    assert categories["A2"].value == "Moradia"
+    resume = workbook["Resumo mensal"]
     assert resume["A2"].value == MONTH
     assert resume["B2"].value == 3000
     assert resume["E2"].value == pytest.approx(3000 - 1234.5 - 100)

@@ -76,13 +76,27 @@ function QuoteCard({ q, onOpen }: { q: Quote; onOpen?: (s: string) => void }) {
   );
 }
 
+function hhmm(iso: string): string {
+  return new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+}
+
+/** A fonte recusou a atualização: os valores são da última consulta que deu certo. */
+function StaleNote({ since }: { since?: string }) {
+  if (!since) return null;
+  return (
+    <p className="muted small" style={{ margin: 0 }}>
+      Valores das {hhmm(since)}: a fonte limitou as consultas. Nova tentativa automática em instantes.
+    </p>
+  );
+}
+
 function Ranking({ title, items, onOpen }: { title: string; items: Quote[]; onOpen: (s: string) => void }) {
   return (
     <section className="card stack stack--tight">
       <h3 style={{ margin: 0 }}>{title}</h3>
       {items.length === 0 ? (
         <p className="muted small" style={{ margin: 0 }}>
-          Indisponível no momento (pregão fechado ou fonte inacessível).
+          Sem dados no momento (pregão fechado ou fonte inacessível). Nova tentativa automática em instantes.
         </p>
       ) : (
         <ol className="rank">
@@ -420,6 +434,9 @@ export function MarketSection() {
                 </li>
               ))}
             </ul>
+            <StaleNote
+              since={[data.stale_since?.indexes, data.stale_since?.currencies].filter(Boolean).sort()[0] as string | undefined}
+            />
             {data.indexes_need_token && (
               <p className="muted small" style={{ margin: 0 }}>
                 Ibovespa e IFIX ficam disponíveis após a configuração da chave da brapi.dev no servidor.
@@ -434,8 +451,10 @@ export function MarketSection() {
             <Ranking title="Maiores baixas do dia" items={data.losers} onOpen={setOpen} />
             <Ranking title="Mais negociadas" items={data.most_traded} onOpen={setOpen} />
           </div>
+          <StaleNote since={data.stale_since?.rankings} />
           <p className="muted small" style={{ margin: 0 }}>
-            Ações com volume relevante na B3. A presença na lista não constitui recomendação de compra ou venda.
+            Ações com volume relevante na B3 (entre as 100 mais negociadas do dia). A presença na lista não constitui recomendação de
+            compra ou venda.
           </p>
 
           <section className="card stack">

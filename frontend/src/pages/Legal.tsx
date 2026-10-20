@@ -35,7 +35,8 @@ export function Privacy() {
 
       <h2>1. Quem é o responsável</h2>
       <p>
-        O controlador dos dados é {LEGAL.controllerName} ({LEGAL.controllerDocument}). Para qualquer assunto sobre
+        O controlador dos dados é {LEGAL.controllerName}
+        {LEGAL.controllerDocument && ` (${LEGAL.controllerDocument})`}. Para qualquer assunto sobre
         seus dados, inclusive para falar com o encarregado, escreva para{" "}
         <strong>{LEGAL.contactEmail}</strong>.
       </p>
@@ -151,8 +152,8 @@ export function Terms() {
   return (
     <LegalPage title="Termos de uso">
       <p>
-        Estes termos regem o uso do {LEGAL.serviceName}, oferecido por {LEGAL.controllerName} (
-        {LEGAL.controllerDocument}). Ao criar uma conta, você concorda com eles e com a{" "}
+        Estes termos regem o uso do {LEGAL.serviceName}, oferecido por {LEGAL.controllerName}
+        {LEGAL.controllerDocument && ` (${LEGAL.controllerDocument})`}. Ao criar uma conta, você concorda com eles e com a{" "}
         <Link to="/privacidade">Política de privacidade</Link>.
       </p>
 

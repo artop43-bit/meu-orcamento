@@ -211,6 +211,25 @@ def login(page: Page):
     idle(page)
 
 
+@step("Conta nova: configuração inicial guiada aparece e todas as etapas podem ser puladas")
+def onboarding(page: Page):
+    d = dialog(page)
+    expect(d).to_contain_text("Configuração inicial")
+    page.screenshot(path=OUT / "v08-configuracao-inicial.png")
+    d.get_by_role("button", name="Começar").click()
+    for _ in range(4):
+        expect(d.get_by_role("list", name="Etapas")).to_be_visible()
+        d.get_by_role("button", name="Pular etapa").click()
+    expect(d).to_contain_text("Configuração concluída")
+    d.get_by_role("button", name="Ir para o orçamento").click()
+    expect(page.locator("dialog[open]")).to_have_count(0)
+    idle(page, 400)
+    assert api(page, "/auth/me")["onboarded_at"], "configuração inicial não ficou registrada"
+    page.reload()
+    idle(page, 400)
+    expect(page.locator("dialog[open]")).to_have_count(0)
+
+
 @step("Conta nova: orçamento vazio mostra orientação")
 def empty_state(page: Page):
     expect(page.get_by_role("heading", name="Nenhuma despesa no mês")).to_be_visible()
@@ -352,6 +371,35 @@ def edit_expense(page: Page, month: str):
     assert next(e for e in data["expenses"] if e["description"] == "Mercado")["amount"].startswith("395.5")
 
 
+@step("Comprovante: anexar foto na despesa, ver no lançamento e remover")
+def receipts(page: Page, month: str):
+    open_month(page, month)
+    page.locator(".ledger__row", has_text="Mercado").locator(".ledger__open").click()
+    d = dialog(page)
+    d.get_by_test_id("receipt-input").set_input_files(
+        {"name": "nota.png", "mimeType": "image/png", "buffer": png_bytes(200, 300, (240, 240, 230))}
+    )
+    expect(d.get_by_role("img", name="Comprovante 1")).to_be_visible()
+    page.keyboard.press("Escape")
+    expect(d).to_have_count(0)
+    idle(page)
+    expense = next(e for e in api(page, f"/months/{month}")["expenses"] if e["description"] == "Mercado")
+    assert len(expense["receipt_ids"]) == 1, expense
+    expect(page.locator(".ledger__row", has_text="Mercado").get_by_text("comprovante")).to_be_visible()
+    status = page.evaluate(
+        "async (id) => (await fetch(`/api/files/${id}`, {credentials: 'omit', cache: 'no-store'})).status", expense["receipt_ids"][0]
+    )
+    assert status in (401, 403, 404), f"comprovante aberto sem sessão ({status})"
+    page.locator(".ledger__row", has_text="Mercado").locator(".ledger__open").click()
+    d = dialog(page)
+    d.get_by_role("button", name="Remover comprovante 1").click()
+    expect(d.get_by_role("img", name="Comprovante 1")).to_have_count(0)
+    page.keyboard.press("Escape")
+    idle(page)
+    expense = next(e for e in api(page, f"/months/{month}")["expenses"] if e["description"] == "Mercado")
+    assert expense["receipt_ids"] == [], expense
+
+
 @step("Investimentos: reserva no Tesouro Selic e CDB")
 def investments(page: Page):
     page.goto(f"{BASE}/investimentos")
@@ -375,24 +423,67 @@ def investments(page: Page):
     assert len(api(page, "/investments")) == 2
 
 
-@step("Metas: viagem para o Nordeste com prazo e primeiro depósito")
+@step("Metas: objetivo de viagem com motivação, imagem, prazo, projeção e primeiro depósito")
 def goals(page: Page):
     page.goto(f"{BASE}/metas")
     idle(page)
+    expect(page.get_by_role("heading", name="Nenhuma meta cadastrada")).to_be_visible()
     page.get_by_role("button", name="Nova meta").first.click()
     d = dialog(page)
+    d.locator(".goal-kind", has_text="Viagem").click()
+    expect(d.get_by_label("Viagem", exact=True)).to_be_checked()
     d.get_by_label("Nome da meta").fill("Viagem para o Nordeste")
-    d.get_by_label("Quanto quer juntar").fill(money(4000))
+    d.get_by_label(re.compile("^Motivação")).fill("Conhecer Salvador com a família")
+    d.get_by_label("Escolher imagem do objetivo").set_input_files(
+        {"name": "praia.png", "mimeType": "image/png", "buffer": png_bytes(320, 180, (40, 140, 200))}
+    )
+    expect(d.get_by_role("img", name="Imagem do objetivo")).to_be_visible()
+    d.get_by_role("button", name="Continuar").click()
+    d.get_by_label("Valor total").fill(money(4000))
+    d.get_by_label("Tenho uma data").check()
     target = f"{TODAY.year + 1}-07-01"
-    d.get_by_label("Até quando (opcional)").fill(br_date(target))
+    d.get_by_label("Data desejada").fill(br_date(target))
+    expect(d.locator(".summary-box")).to_contain_text("por mês")
+    page.screenshot(path=OUT / "v08-meta-form.png")
     d.get_by_role("button", name="Criar meta").click()
     expect(d).to_have_count(0)
     idle(page)
+    card = page.locator(".goal-card", has_text="Viagem para o Nordeste")
+    expect(card.locator(".goal-card__motivation")).to_contain_text("Salvador")
+    assert image_loaded(page, ".goal-card__image"), "imagem da meta não carregou"
     page.get_by_label("Valor a guardar ou retirar da meta").fill(money(600))
     page.get_by_role("button", name="Guardar").click()
     idle(page)
     goal = api(page, "/goals")[0]
     assert goal["current_amount"].startswith("600"), goal
+    assert goal["is_main"] and goal["kind"] == "travel", goal
+    assert goal["projection"]["status"] in ("on_track", "ahead", "behind", "estimate"), goal["projection"]
+    expect(card.locator(".goal-status")).to_be_visible()
+    page.screenshot(path=OUT / "v08-metas.png", full_page=True)
+    # Imagem da meta é só do dono: sem sessão, o arquivo não abre.
+    status = page.evaluate(
+        "async (id) => (await fetch(`/api/files/${id}`, {credentials: 'omit', cache: 'no-store'})).status", goal["image_id"]
+    )
+    assert status in (401, 403, 404), f"imagem da meta aberta sem sessão ({status})"
+
+
+@step("Orçamento: quadro da meta principal com projeção e sugestão de aporte")
+def goal_teaser(page: Page, month: str):
+    open_month(page, month)
+    teaser = page.locator(".goal-teaser")
+    expect(teaser).to_contain_text("Viagem para o Nordeste")
+    expect(teaser.locator(".goal-status")).to_be_visible()
+    tip = api(page, "/goals/suggestion")
+    region = teaser.get_by_role("region", name="Sugestão de aporte")
+    if tip:
+        expect(region).to_be_visible()
+        region.get_by_role("button", name="Agora não").click()
+        expect(region).to_have_count(0)
+        page.reload()
+        idle(page)
+        expect(page.locator(".goal-teaser").get_by_role("region", name="Sugestão de aporte")).to_have_count(0)
+    else:
+        expect(region).to_have_count(0)
 
 
 @step("Consultor: tom correto em cada mês")
@@ -839,8 +930,18 @@ def png_bytes(width: int = 32, height: int = 24, rgb: tuple[int, int, int] = (31
     return b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", header) + chunk(b"IDAT", zlib.compress(raw)) + chunk(b"IEND", b"")
 
 
-def image_loaded(page: Page, selector: str) -> bool:
-    return page.locator(selector).first.evaluate("img => img.complete && img.naturalWidth > 0")
+def image_loaded(page: Page, selector: str, timeout: int = 10000) -> bool:
+    """Espera a imagem terminar de baixar (as miniaturas carregam sob demanda)."""
+    try:
+        page.locator(selector).first.scroll_into_view_if_needed()
+        page.wait_for_function(
+            "sel => { const img = document.querySelector(sel); return !!img && img.complete && img.naturalWidth > 0; }",
+            arg=selector,
+            timeout=timeout,
+        )
+        return True
+    except Exception:  # noqa: BLE001
+        return False
 
 
 @step("v0.7.5: solicitação com print, resposta da administração e aviso de resposta nova")
@@ -1097,11 +1198,23 @@ def history_report(page: Page, months: list[str]):
     expect(page.get_by_text("Aluguel").first).to_be_visible()
 
 
-@step("Exportar CSV, Excel e backup JSON")
+@step("Exportar: recorte com contagem ao vivo, Excel, CSV, relatório anual e backup")
 def exports(page: Page):
-    page.goto(f"{BASE}/dados")
-    idle(page)
-    for name in ("CSV", "Excel", "Baixar backup (JSON)"):
+    page.goto(f"{BASE}/ajustes/dados?aba=exportar")
+    idle(page, 500)
+    counter = page.locator("[aria-live]", has_text="no recorte")
+    expect(counter).to_contain_text(re.compile(r"\d+ lançamento"))
+    page.get_by_role("button", name="12 meses").click()
+    idle(page, 400)
+    total = int(re.search(r"(\d+) lançamento", counter.inner_text())[1])
+    page.get_by_label("Só despesas").check()
+    idle(page, 400)
+    only = int(re.search(r"(\d+) lançamento", counter.inner_text())[1])
+    assert 0 < only < total, (only, total)
+    page.get_by_label("Receitas e despesas").check()
+    idle(page, 300)
+    page.screenshot(path=OUT / "v08-exportar.png", full_page=True)
+    for name in ("Baixar Excel", "Baixar CSV", "Baixar backup"):
         with page.expect_download() as info:
             page.get_by_role("button", name=name).click()
         download = info.value
@@ -1111,9 +1224,61 @@ def exports(page: Page):
     # O último download é o backup: precisa ser um JSON com os lançamentos da persona.
     backup = json.loads(path.read_text(encoding="utf-8"))
     assert backup and "expenses" in json.dumps(backup), "backup sem os lançamentos"
+    page.get_by_role("link", name="Abrir resumo anual").click()
+    page.wait_for_url("**/relatorio/ano/**")
+    idle(page, 500)
+    expect(page.get_by_role("heading", name=re.compile(r"Resumo anual de \d{4}"))).to_be_visible()
+    page.screenshot(path=OUT / "v08-resumo-anual.png", full_page=True)
 
 
-@step("Importar extrato OFX no mês atual (prévia, importa e não duplica)")
+def import_file(page: Page, path: pathlib.Path):
+    page.goto(f"{BASE}/ajustes/dados")
+    idle(page)
+    page.get_by_test_id("import-input").set_input_files(str(path))
+    idle(page, 500)
+
+
+@step("Importar: PDF recusado com orientação")
+def import_pdf(page: Page):
+    pdf = OUT / "extrato.pdf"
+    pdf.write_bytes(b"%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF")
+    import_file(page, pdf)
+    expect(page.get_by_text(re.compile("PDF não é aceito: cada banco"))).to_be_visible()
+
+
+@step("Importar planilha CSV: colunas identificadas, prévia, importa e desfaz o lote")
+def import_csv(page: Page):
+    csv_file = OUT / "planilha.csv"
+    d = TODAY.strftime("%d/%m/%Y")
+    csv_file.write_text(
+        f"Data;Histórico;Valor\n{d};FARMACIA PAGUE MENOS;-48,90\n{d};UBER TRIP;-23,50\n{d};PIX RECEBIDO FREELA;350,00\n",
+        encoding="utf-8",
+    )
+    import_file(page, csv_file)
+    expect(page.get_by_role("list", name="Etapas da importação")).to_be_visible()
+    expect(page.locator(".mapping-grid select").first).to_have_value("0")
+    expect(page.locator("th.is-mapped").first).to_be_visible()
+    page.screenshot(path=OUT / "v08-importar-colunas.png", full_page=True)
+    page.get_by_role("button", name="Continuar").click()
+    idle(page, 500)
+    expect(page.get_by_text("FARMACIA PAGUE MENOS")).to_be_visible()
+    page.screenshot(path=OUT / "v08-importar-previa.png", full_page=True)
+    before = api(page, f"/months/{CURRENT}")
+    page.get_by_role("button", name=re.compile(r"^Importar 3 lançamento")).click()
+    idle(page, 600)
+    expect(page.get_by_role("button", name="Desfazer esta importação")).to_be_visible()
+    after = api(page, f"/months/{CURRENT}")
+    assert len(after["expenses"]) == len(before["expenses"]) + 2, (len(before["expenses"]), len(after["expenses"]))
+    assert len(after["incomes"]) == len(before["incomes"]) + 1
+    page.get_by_role("button", name="Desfazer esta importação").click()
+    idle(page, 600)
+    expect(page.get_by_text(re.compile("Importação desfeita"))).to_be_visible()
+    undone = api(page, f"/months/{CURRENT}")
+    assert len(undone["expenses"]) == len(before["expenses"]), "desfazer não removeu as despesas"
+    expect(page.get_by_role("heading", name="Importações recentes")).to_be_visible()
+
+
+@step("Importar extrato OFX no mês atual (prévia, importa e marca repetidos)")
 def import_ofx(page: Page):
     ofx = OUT / "extrato.ofx"
     d = TODAY.strftime("%Y%m")
@@ -1126,21 +1291,59 @@ DATA:OFXSGML
 </BANKTRANLIST></STMTRS></STMTTRNRS></BANKMSGSRSV1></OFX>""",
         encoding="latin-1",
     )
-    page.goto(f"{BASE}/dados")
-    idle(page)
     before = len(api(page, f"/months/{CURRENT}")["expenses"])
-    page.locator('input[type="file"][accept*=".ofx"]').set_input_files(str(ofx))
-    idle(page, 500)
+    import_file(page, ofx)
     expect(page.get_by_text("PADARIA PAO QUENTE")).to_be_visible()
-    page.get_by_role("button", name=re.compile(r"^Importar \d+ lançamento")).click()
+    page.get_by_role("button", name=re.compile(r"^Importar 2 lançamento")).click()
     idle(page, 600)
     after = len(api(page, f"/months/{CURRENT}")["expenses"])
     assert after == before + 2, (before, after)
-    page.locator('input[type="file"][accept*=".ofx"]').set_input_files(str(ofx))
-    idle(page, 500)
+    import_file(page, ofx)
+    expect(page.get_by_text("já importado").first).to_be_visible()
     page.screenshot(path=OUT / "import-repetido.png", full_page=True)
+    expect(page.get_by_role("button", name=re.compile(r"^Importar 0 lançamento"))).to_be_disabled()
     again = len(api(page, f"/months/{CURRENT}")["expenses"])
     assert again == after, "reimportar não pode duplicar sozinho"
+
+
+@step("Avisos por e-mail: lembrete de vencimentos, antecedência e resumo do mês")
+def email_notices(page: Page):
+    page.goto(f"{BASE}/ajustes/preferencias")
+    idle(page)
+    expect(page.get_by_role("heading", name="Avisos por e-mail")).to_be_visible()
+    page.get_by_label("7 dias").check()
+    page.get_by_label("Ocultar valores nos e-mails").check()
+    idle(page, 400)
+    prefs = api(page, "/notifications/prefs")
+    assert prefs["notify_due_days"] == 7 and prefs["notify_hide_values"] is True, prefs
+    page.get_by_label(re.compile("^Lembrete de vencimentos")).uncheck()
+    idle(page, 400)
+    expect(page.get_by_label("7 dias")).to_have_count(0)
+    assert api(page, "/notifications/prefs")["notify_due"] is False
+    page.get_by_label(re.compile("^Lembrete de vencimentos")).check()
+    page.get_by_label("Ocultar valores nos e-mails").uncheck()
+    idle(page, 400)
+    assert api(page, "/notifications/prefs")["notify_due"] is True
+
+
+@step("Notas da versão em Ajustes, com atalho para enviar sugestão")
+def release_notes(page: Page):
+    page.goto(f"{BASE}/ajustes")
+    idle(page)
+    page.get_by_role("link", name=re.compile("Notas da versão")).click()
+    page.wait_for_url("**/ajustes/notas")
+    idle(page)
+    current = page.locator(".release--current")
+    expect(current).to_contain_text(re.compile(r"Versão \d+\.\d+\.\d+"))
+    head = page.locator(".release__head").nth(1)
+    head.click()
+    expect(head).to_have_attribute("aria-expanded", "true")
+    page.get_by_role("button", name="Enviar sugestão").first.click()
+    d = dialog(page)
+    expect(d).to_contain_text("Nova solicitação")
+    expect(d).to_contain_text(re.compile(r"Referente a: Versão \d+\.\d+\.\d+"))
+    page.keyboard.press("Escape")
+    expect(d).to_have_count(0)
 
 
 @step("Segurança: ativar 2FA, sair, entrar com código, desativar")
@@ -1213,7 +1416,7 @@ def mobile(browser):
     page.screenshot(path=OUT / "celular-categorias.png", full_page=True)
     overflow = page.evaluate("document.documentElement.scrollWidth > window.innerWidth")
     assert not overflow, "rolagem lateral no celular"
-    for path in ("/orcamento", "/calendario", "/metas", "/analises", "/investimentos", "/investimentos?secao=cotacoes", "/historico", "/ajustes", "/ajustes/recorrencias", "/ajustes/dados", "/ajustes/seguranca", "/ajustes/ajuda", "/ajustes/atalhos", "/cartoes", "/contas", "/revisar", "/busca", "/ajustes/preferencias"):
+    for path in ("/orcamento", "/calendario", "/metas", "/analises", "/investimentos", "/investimentos?secao=cotacoes", "/historico", "/ajustes", "/ajustes/recorrencias", "/ajustes/dados", "/ajustes/dados?aba=exportar", "/ajustes/notas", "/ajustes/seguranca", "/ajustes/ajuda", "/ajustes/atalhos", "/cartoes", "/contas", "/revisar", "/busca", "/ajustes/preferencias"):
         page.goto(BASE + path)
         idle(page, 300)
         wide = page.evaluate("document.documentElement.scrollWidth - window.innerWidth")
@@ -1239,6 +1442,7 @@ def main():
 
         months = [months_back(n) for n in range(8, -1, -1)]
         login(page)
+        onboarding(page)
         empty_state(page)
         banner_later(page)
         limits(page)
@@ -1248,8 +1452,10 @@ def main():
         installments(page, months)
         undo_delete(page, months[-1])
         edit_expense(page, months[-1])
+        receipts(page, months[-1])
         investments(page)
         goals(page)
+        goal_teaser(page, months[-1])
         consultant(page, months)
         dashboard(page, months)
         other_tabs(page, months)
@@ -1269,7 +1475,11 @@ def main():
         version(page)
         history_report(page, months)
         exports(page)
+        import_pdf(page)
+        import_csv(page)
         import_ofx(page)
+        email_notices(page)
+        release_notes(page)
         two_factor(page)
         banner_never(page)
         STATE["state"] = ctx.storage_state()

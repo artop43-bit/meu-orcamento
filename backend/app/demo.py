@@ -93,6 +93,8 @@ def seed_demo(
         email_verified_at=now,
         terms_accepted_at=now,
         terms_version=get_settings().terms_version,
+        # Com dados de exemplo, a configuração inicial guiada já não faz sentido.
+        onboarded_at=now if with_data else None,
     )
     db.add(user)
     db.flush()

@@ -160,7 +160,8 @@ function readSeen(): boolean {
   }
 }
 
-function markSeen() {
+/** Marca a apresentação como vista (a configuração inicial já cumpre esse papel). */
+export function markTourSeen() {
   try {
     localStorage.setItem(TOUR_KEY, "1");
   } catch {
@@ -187,7 +188,7 @@ export function Tour() {
   }, []);
 
   function close() {
-    markSeen();
+    markTourSeen();
     setOpen(false);
   }
 

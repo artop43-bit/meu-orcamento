@@ -1,5 +1,5 @@
 import smtplib
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from email.message import EmailMessage
 
 from app.core.config import get_settings
@@ -10,15 +10,23 @@ class OutgoingEmail:
     to: str
     subject: str
     body: str
+    html: str | None = None
+    headers: dict[str, str] = field(default_factory=dict)
 
 
 # Usado pelo backend "memory" (testes).
 outbox: list[OutgoingEmail] = []
 
 
-def send_email(to: str, subject: str, body: str) -> None:
+def send_email(
+    to: str,
+    subject: str,
+    body: str,
+    html: str | None = None,
+    headers: dict[str, str] | None = None,
+) -> None:
     settings = get_settings()
-    message = OutgoingEmail(to=to, subject=subject, body=body)
+    message = OutgoingEmail(to=to, subject=subject, body=body, html=html, headers=headers or {})
 
     if settings.email_backend == "memory":
         outbox.append(message)
@@ -34,7 +42,11 @@ def _send_smtp(message: OutgoingEmail) -> None:
     msg["From"] = settings.email_from
     msg["To"] = message.to
     msg["Subject"] = message.subject
+    for name, value in message.headers.items():
+        msg[name] = value
     msg.set_content(message.body)
+    if message.html:
+        msg.add_alternative(message.html, subtype="html")
 
     with smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=15) as smtp:
         smtp.starttls()

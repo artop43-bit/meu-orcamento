@@ -6034,3 +6034,579 @@ textarea {
     align-self: end;
   }
 }
+
+/* ================================================================ v0.8 */
+
+/* ---------------------------------------------------------------- etapas */
+.steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 8px;
+  counter-reset: none;
+}
+
+.steps li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 8px 10px;
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.steps li.is-current {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.steps li.is-done {
+  color: var(--fg);
+}
+
+.steps__number {
+  display: inline-grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  font-size: 0.75rem;
+}
+
+.steps li.is-current .steps__number {
+  border-color: var(--accent);
+}
+
+@media (max-width: 599px) {
+  .steps {
+    grid-auto-flow: row;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.steps--compact li {
+  padding: 6px 8px;
+  font-size: 0.8rem;
+}
+
+/* ---------------------------------------------------------------- importação */
+.import-start {
+  display: grid;
+  gap: 20px;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (min-width: 900px) {
+  .import-start {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: start;
+  }
+}
+
+.dropzone {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding: 32px 20px;
+  border: 2px dashed var(--border-strong);
+  border-radius: var(--radius-lg);
+  text-align: center;
+  color: var(--muted);
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.dropzone.is-over {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.dropzone p {
+  margin: 0;
+}
+
+.dropzone__title {
+  font-weight: 700;
+  color: var(--fg);
+}
+
+.accepted {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.accepted li {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.accepted li > span:last-child {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.accepted__icon {
+  display: inline-grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.mapping-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr));
+}
+
+.mapping-grid > label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.table th.is-mapped,
+.table td.is-mapped {
+  background: var(--accent-soft);
+}
+
+.import-summary {
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+
+.import-target {
+  max-width: 420px;
+}
+
+.backup-summary {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 160px), 1fr));
+  gap: 8px;
+}
+
+.backup-summary li {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+/* ---------------------------------------------------------------- exportação */
+.export-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr));
+}
+
+.export-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--accent);
+}
+
+.export-card strong,
+.export-card p,
+.export-card label {
+  color: var(--fg);
+}
+
+.export-card p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.export-card > label {
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.export-card .btn {
+  margin-top: auto;
+}
+
+/* ---------------------------------------------------------------- metas */
+.goal-kinds {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 150px), 1fr));
+}
+
+.goal-kind {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center;
+  justify-content: center;
+  gap: 6px !important;
+  min-height: 84px;
+  padding: 10px 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  text-align: center;
+  font-size: 0.85rem !important;
+  cursor: pointer;
+}
+
+.goal-kind input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.goal-kind:has(input:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.goal-kind.is-active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.goal-kind__icon {
+  display: inline-grid;
+  place-items: center;
+}
+
+.goal-image-pick {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.goal-image-pick .field-label {
+  flex-basis: 100%;
+}
+
+.goal-image-pick__preview {
+  position: relative;
+  width: 160px;
+  aspect-ratio: 16 / 9;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+.goal-image-pick__preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.goal-image-pick__preview .icon-btn {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  background: rgb(0 0 0 / 60%);
+  color: #fff;
+}
+
+.goal-card {
+  overflow: hidden;
+}
+
+.goal-card--main {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+}
+
+.goal-card__image {
+  display: block;
+  width: calc(100% + 40px);
+  margin: -20px -20px 0;
+  aspect-ratio: 16 / 6;
+  object-fit: cover;
+}
+
+.goal-card__title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.goal-card__title > span:last-child {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.goal-card__title h2 {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.goal-card__motivation {
+  margin: 0;
+  font-style: italic;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.goal-card__amount {
+  font-size: 1.45rem;
+}
+
+.goal-card__actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 8px;
+  align-items: center;
+}
+
+@media (max-width: 420px) {
+  .goal-card__actions {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .goal-card__actions > :first-child {
+    grid-column: 1 / -1;
+  }
+}
+
+.goal-status {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 0.88rem;
+  background: var(--surface-2);
+  overflow-wrap: anywhere;
+}
+
+.goal-status--ok,
+.goal-status--done {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.goal-status--warn {
+  background: color-mix(in srgb, var(--warn, #b54708) 12%, transparent);
+  color: var(--warn, #b54708);
+}
+
+.goal-teaser__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.goal-teaser__image {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.goal-teaser__name {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.goal-suggestion {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px 10px;
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border));
+  border-radius: var(--radius);
+  color: var(--accent);
+}
+
+.goal-suggestion p {
+  margin: 0;
+  color: var(--fg);
+  font-size: 0.9rem;
+}
+
+.goal-suggestion > :not(svg) {
+  grid-column: 2;
+}
+
+.goal-suggestion__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* ---------------------------------------------------------------- comprovantes */
+.receipts {
+  display: grid;
+  gap: 8px;
+}
+
+.receipts__thumb {
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: zoom-in;
+}
+
+.receipts__thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* ---------------------------------------------------------------- notas da versão */
+.releases {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+
+.release {
+  padding: 0;
+}
+
+.release--current {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+}
+
+.release__head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 12px;
+  width: 100%;
+  padding: 16px 20px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.release__version {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+}
+
+.release__title {
+  grid-column: 1;
+  overflow-wrap: anywhere;
+}
+
+.release__head .muted {
+  grid-column: 1;
+}
+
+.release__chevron {
+  grid-column: 2;
+  grid-row: 1 / span 3;
+  align-self: center;
+  transition: transform 0.15s;
+}
+
+.release__head[aria-expanded="true"] .release__chevron {
+  transform: rotate(180deg);
+}
+
+.release__body {
+  display: grid;
+  gap: 12px;
+  padding: 0 20px 20px;
+}
+
+.release__body h3 {
+  margin: 0 0 4px;
+  font-size: 0.95rem;
+}
+
+.release__body ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+/* ---------------------------------------------------------------- configuração inicial */
+.onboarding-list {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.fixed-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.fixed-row {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) 72px auto;
+  gap: 8px;
+  align-items: start;
+}
+
+@media (max-width: 599px) {
+  .fixed-row {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  }
+
+  .fixed-row > :first-child {
+    grid-column: 1 / -1;
+  }
+}
+
+/* Seletor de mês: o limite de largura vale para a caixa inteira, para o ícone do calendário
+   ficar dentro do campo. */
+.month-picker .date-field {
+  max-width: 240px;
+}
+
+.month-picker .date-field input {
+  max-width: none;
+}
+
+/* Cartão da meta: ações ficam na linha do título, também no celular. */
+.goal-card .section-header {
+  flex-wrap: nowrap;
+  align-items: flex-start;
+}
+
+.export-card > label > select {
+  max-width: 240px;
+}

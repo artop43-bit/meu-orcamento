@@ -23,6 +23,7 @@ import {
 } from "../api/budget";
 import { extrasApi, hasCredit, hasDebit, useCards, type Card } from "../api/extras";
 import { CardForm } from "./CardForm";
+import { ReceiptsField } from "./Receipts";
 import { useAccounts } from "../api/money";
 import { DateField, DayField } from "./DateField";
 import { normalizeText } from "../lib/text";
@@ -269,6 +270,8 @@ export function ExpenseForm({
   const [savedCount, setSavedCount] = useState(0);
   const [cardId, setCardId] = useState<string>(expense?.card_id ?? "");
   const [debitCardId, setDebitCardId] = useState<string>(expense?.debit_card_id ?? "");
+  const [pendingReceipts, setPendingReceipts] = useState<File[]>([]);
+  const createdRef = useRef<Expense[] | null>(null);
   const [purchase, setPurchase] = useState(expense?.purchase_date ?? todayISO());
   const [duplicateOf, setDuplicateOf] = useState<string | null>(null);
   const [makeRule, setMakeRule] = useState(false);
@@ -351,7 +354,7 @@ export function ExpenseForm({
       return;
     }
     if (card) {
-      await budgetApi.createExpense(month, {
+      createdRef.current = await budgetApi.createExpense(month, {
         description,
         amount: value,
         category_id,
@@ -381,7 +384,7 @@ export function ExpenseForm({
         data.interval_months = interval;
         data.until_month = until || null;
       }
-      await budgetApi.createExpense(kind === "recurring" && dueDate ? dueDate.slice(0, 7) : month, data);
+      createdRef.current = await budgetApi.createExpense(kind === "recurring" && dueDate ? dueDate.slice(0, 7) : month, data);
       return;
     }
     const data: ExpenseInput = { description, amount: value, category_id, due_date: dueDate || null, paid, ...extra };
@@ -397,7 +400,7 @@ export function ExpenseForm({
     // Parcelada ou que se repete: a 1ª data define o mês de início (ex.: começa no mês que vem).
     // Conta avulsa fica no mês aberto (a fatura de outubro pode vencer em novembro).
     const target = kind !== "single" && dueDate ? dueDate.slice(0, 7) : month;
-    await budgetApi.createExpense(target, data);
+    createdRef.current = await budgetApi.createExpense(target, data);
   });
 
   function reset() {
@@ -432,7 +435,15 @@ export function ExpenseForm({
     }
     setDuplicateOf(null);
     try {
+      createdRef.current = null;
       await save.mutateAsync(undefined);
+      // Comprovantes escolhidos antes de salvar vão para a despesa criada (a 1ª parcela).
+      const first = (createdRef.current as Expense[] | null)?.[0];
+      if (first && pendingReceipts.length) {
+        await budgetApi.addReceipts(first.id, pendingReceipts);
+        setPendingReceipts([]);
+        await queryClient.invalidateQueries({ queryKey: ["budget"] });
+      }
       announce(`Despesa “${description}” salva`);
       if (another) reset();
       else onDone();
@@ -722,6 +733,13 @@ export function ExpenseForm({
           )}
         </div>
       )}
+
+      <ReceiptsField
+        expenseId={expense?.id}
+        saved={expense?.receipt_ids ?? []}
+        pending={pendingReceipts}
+        setPending={setPendingReceipts}
+      />
 
       <details className="more" open={moreOpen} onToggle={(e) => setMoreOpen((e.target as HTMLDetailsElement).open)}>
         <summary>Observação</summary>

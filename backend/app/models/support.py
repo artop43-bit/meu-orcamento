@@ -22,10 +22,17 @@ class StoredFile(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     owner_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
-    # "attachment" (anexo de mensagem), "avatar" ou "banner".
+    # "attachment" (anexo de mensagem), "avatar", "banner", "receipt" (comprovante) ou "goal".
     purpose: Mapped[str] = mapped_column(String(12))
     message_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("support_messages.id", ondelete="CASCADE"), index=True
+    )
+    # Comprovante de uma despesa ou imagem de uma meta.
+    expense_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("expenses.id", ondelete="CASCADE"), index=True
+    )
+    goal_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("goals.id", ondelete="CASCADE"), index=True
     )
     content_type: Mapped[str] = mapped_column(String(20))
     size: Mapped[int] = mapped_column(Integer)

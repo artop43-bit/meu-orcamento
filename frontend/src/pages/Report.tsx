@@ -30,7 +30,7 @@ export default function Report() {
   return (
     <article className="report stack">
       <div className="row no-print">
-        <Link className="btn btn--secondary" to="/dados">
+        <Link className="btn btn--secondary" to="/ajustes/dados?aba=exportar">
           Voltar
         </Link>
         <Button type="button" onClick={() => window.print()}>

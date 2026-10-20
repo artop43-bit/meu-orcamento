@@ -373,6 +373,8 @@ class MarketOverview(BaseModel):
     fixed_income: IndicatorsOut
     disclaimer: str
     fetched_at: datetime
+    # Seções exibindo o último dado bom porque a fonte recusou ou caiu: desde quando.
+    stale_since: dict[str, datetime] = {}
 
 
 class PricePoint(BaseModel):
