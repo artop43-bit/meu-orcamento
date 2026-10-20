@@ -5,6 +5,9 @@ from app.models.budget import (
     CreditCard,
     Expense,
     Goal,
+    GoalContribution,
+    ImportBatch,
+    ImportMapping,
     Income,
     Investment,
     MoneyAccount,
@@ -15,7 +18,16 @@ from app.models.budget import (
     WatchItem,
 )
 from app.models.support import StoredFile, SupportMessage, SupportThread
-from app.models.user import AuthToken, EmailLog, RecoveryCode, SecurityEvent, User, UserSession
+from app.models.user import (
+    AuthToken,
+    EmailLog,
+    KnownDevice,
+    NotificationLog,
+    RecoveryCode,
+    SecurityEvent,
+    User,
+    UserSession,
+)
 
 __all__ = [
     "AuthToken",
@@ -26,6 +38,11 @@ __all__ = [
     "EmailLog",
     "Expense",
     "Goal",
+    "GoalContribution",
+    "ImportBatch",
+    "ImportMapping",
+    "KnownDevice",
+    "NotificationLog",
     "Income",
     "Investment",
     "MoneyAccount",

@@ -1,10 +1,11 @@
 import uuid
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Query, status
+from fastapi import APIRouter, File, Query, UploadFile, status
 from pydantic import BaseModel
 
 from app.api.deps import CurrentUser, DbSession
+from app.core.errors import AppError
 from app.core.months import current_month, format_month, parse_month
 from app.schemas.budget import (
     CategoryIn,
@@ -18,6 +19,7 @@ from app.schemas.budget import (
     GoalIn,
     GoalOut,
     GoalPatch,
+    GoalSuggestion,
     HistoryPoint,
     IncomeIn,
     IncomeOut,
@@ -80,13 +82,58 @@ def get_current_month() -> dict[str, str]:
 
 @router.get("/months/{month}")
 def get_month(month: str, user: CurrentUser, db: DbSession) -> MonthOut:
+    from app.services import receipts
+
     data = service.get_month(db, user, parse_month(month))
+    attached = receipts.ids_for(db, [e.id for e in data.expenses])
+    expenses = []
+    for e in data.expenses:
+        out = ExpenseOut.model_validate(e)
+        out.receipt_ids = attached.get(e.id, [])
+        expenses.append(out)
     return MonthOut(
         month=format_month(data.month),
         incomes=[IncomeOut.model_validate(i) for i in data.incomes],
-        expenses=[ExpenseOut.model_validate(e) for e in data.expenses],
+        expenses=expenses,
         summary=MonthSummary.model_validate(data.summary),
     )
+
+
+# ---------------------------------------------------------------- comprovantes
+
+
+class ReceiptsOut(BaseModel):
+    receipt_ids: list[uuid.UUID]
+
+
+@router.post("/expenses/{expense_id}/receipts", status_code=status.HTTP_201_CREATED)
+def add_receipts(
+    expense_id: uuid.UUID,
+    user: CurrentUser,
+    db: DbSession,
+    images: Annotated[list[UploadFile], File(description="Até 3 imagens")],
+) -> ReceiptsOut:
+    from app.services import files, receipts
+
+    limit = files.RULES["receipt"].max_bytes
+    raws = []
+    for upload in images:
+        raw = upload.file.read(limit + 1)
+        if len(raw) > limit:
+            raise AppError(
+                413, "file_too_large", f"Cada imagem pode ter até {limit // files.MB} MB."
+            )
+        raws.append(raw)
+    return ReceiptsOut(receipt_ids=receipts.add(db, user, expense_id, raws))
+
+
+@router.delete("/expenses/{expense_id}/receipts/{file_id}", status_code=status.HTTP_204_NO_CONTENT)
+def remove_receipt(
+    expense_id: uuid.UUID, file_id: uuid.UUID, user: CurrentUser, db: DbSession
+) -> None:
+    from app.services import receipts
+
+    receipts.remove(db, user, expense_id, file_id)
 
 
 @router.get("/history")
@@ -192,7 +239,12 @@ def delete_recurring(item_id: uuid.UUID, user: CurrentUser, db: DbSession) -> No
 # ---------------------------------------------------------------- metas
 
 
-def _goal_out(goal: Any) -> GoalOut:
+def _goal_out(goal: Any, db: Any = None, user: Any = None, image_id: Any = None) -> GoalOut:
+    from app.services import goals as goal_service
+
+    projection = goal_service.projection(db, user, goal) if db is not None else None
+    if db is not None and image_id is None:
+        image_id = goal_service.image_ids(db, [goal.id]).get(goal.id)
     return GoalOut.model_validate(
         {
             "id": goal.id,
@@ -201,31 +253,81 @@ def _goal_out(goal: Any) -> GoalOut:
             "current_amount": goal.current_amount,
             "target_date": goal.target_date,
             "progress_pct": service.goal_progress(goal),
+            "kind": goal.kind,
+            "motivation": goal.motivation,
+            "monthly_plan": goal.monthly_plan,
+            "is_main": goal.is_main,
+            "completed_at": goal.completed_at,
+            "image_id": image_id,
+            "projection": projection,
         }
     )
 
 
 @router.get("/goals")
 def list_goals(user: CurrentUser, db: DbSession) -> list[GoalOut]:
-    return [_goal_out(g) for g in service.list_goals(db, user)]
+    from app.services import goals as goal_service
+
+    items = service.list_goals(db, user)
+    images = goal_service.image_ids(db, [g.id for g in items])
+    return [_goal_out(g, db, user, images.get(g.id)) for g in items]
+
+
+@router.get("/goals/suggestion")
+def goal_suggestion(user: CurrentUser, db: DbSession) -> GoalSuggestion | None:
+    """Sobra prevista no mês: sugere destinar parte à meta principal (nada é movido sozinho)."""
+    from app.services import goals as goal_service
+
+    found = goal_service.suggestion(db, user)
+    return GoalSuggestion.model_validate(found) if found else None
 
 
 @router.post("/goals", status_code=status.HTTP_201_CREATED)
 def create_goal(body: GoalIn, user: CurrentUser, db: DbSession) -> GoalOut:
-    return _goal_out(service.create_goal(db, user, body.model_dump()))
+    from app.services import goals as goal_service
+
+    return _goal_out(goal_service.create(db, user, body.model_dump()), db, user)
 
 
 @router.patch("/goals/{goal_id}")
 def update_goal(goal_id: uuid.UUID, body: GoalPatch, user: CurrentUser, db: DbSession) -> GoalOut:
-    changes = _changes(body, nullable={"target_date"})
-    return _goal_out(service.update_goal(db, user, goal_id, changes))
+    from app.services import goals as goal_service
+
+    changes = _changes(body, nullable={"target_date", "motivation", "monthly_plan"})
+    return _goal_out(goal_service.update_goal(db, user, goal_id, changes), db, user)
 
 
 @router.post("/goals/{goal_id}/contributions")
 def contribute(
     goal_id: uuid.UUID, body: ContributionIn, user: CurrentUser, db: DbSession
 ) -> GoalOut:
-    return _goal_out(service.contribute_to_goal(db, user, goal_id, body.amount))
+    from app.services import goals as goal_service
+
+    return _goal_out(goal_service.contribute(db, user, goal_id, body.amount), db, user)
+
+
+@router.put("/goals/{goal_id}/image")
+def set_goal_image(
+    goal_id: uuid.UUID,
+    user: CurrentUser,
+    db: DbSession,
+    image: Annotated[UploadFile, File()],
+) -> GoalOut:
+    from app.services import files
+    from app.services import goals as goal_service
+
+    limit = files.RULES["goal"].max_bytes
+    raw = image.file.read(limit + 1)
+    if len(raw) > limit:
+        raise AppError(413, "file_too_large", f"A imagem pode ter até {limit // files.MB} MB.")
+    return _goal_out(goal_service.set_image(db, user, goal_id, raw), db, user)
+
+
+@router.delete("/goals/{goal_id}/image")
+def remove_goal_image(goal_id: uuid.UUID, user: CurrentUser, db: DbSession) -> GoalOut:
+    from app.services import goals as goal_service
+
+    return _goal_out(goal_service.remove_image(db, user, goal_id), db, user)
 
 
 @router.delete("/goals/{goal_id}", status_code=status.HTTP_204_NO_CONTENT)

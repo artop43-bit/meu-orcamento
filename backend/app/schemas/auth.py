@@ -22,6 +22,8 @@ class UserOut(BaseModel):
     created_at: datetime
     # Vê as sugestões enviadas pelo app (ADMIN_EMAILS no servidor).
     is_admin: bool = False
+    # Configuração inicial guiada já concluída (ou pulada).
+    onboarded_at: datetime | None = None
 
     @model_validator(mode="after")
     def _admin(self) -> "UserOut":

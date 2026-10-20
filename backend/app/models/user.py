@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import BigInteger, ForeignKey, String, Text, Uuid
+from sqlalchemy import BigInteger, ForeignKey, SmallInteger, String, Text, UniqueConstraint, Uuid
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -45,6 +45,14 @@ class User(Base):
     city: Mapped[str | None] = mapped_column(String(80))
     profession: Mapped[str | None] = mapped_column(String(80))
     profile_prefs: Mapped[str | None] = mapped_column(Text)
+
+    # Avisos por e-mail (Ajustes › Preferências). O aviso de novo acesso é sempre enviado.
+    notify_due: Mapped[bool] = mapped_column(default=True, server_default="1")
+    notify_due_days: Mapped[int] = mapped_column(SmallInteger, default=3, server_default="3")
+    notify_hide_values: Mapped[bool] = mapped_column(default=False, server_default="0")
+    notify_monthly: Mapped[bool] = mapped_column(default=True, server_default="1")
+    # Configuração inicial guiada concluída (ou pulada).
+    onboarded_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
 
     # O usuário pediu para não ver mais o convite para ativar a verificação em duas etapas.
     twofa_prompt_dismissed_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
@@ -128,3 +136,35 @@ class EmailLog(Base):
     subject: Mapped[str] = mapped_column(String(200))
     body: Mapped[str] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, index=True)
+
+
+class KnownDevice(Base):
+    """Aparelho/navegador que já entrou na conta (para avisar acesso de um aparelho novo)."""
+
+    __tablename__ = "known_devices"
+    __table_args__ = (UniqueConstraint("user_id", "fingerprint"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    # Resumo do aparelho (navegador + sistema), sem dados que identifiquem a pessoa.
+    fingerprint: Mapped[str] = mapped_column(String(64))
+    label: Mapped[str] = mapped_column(String(80))
+    first_seen_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+    last_seen_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+
+
+class NotificationLog(Base):
+    """Avisos por e-mail já enviados: o mesmo aviso nunca sai duas vezes."""
+
+    __tablename__ = "notification_log"
+    __table_args__ = (UniqueConstraint("user_id", "kind", "ref"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    kind: Mapped[str] = mapped_column(String(20))  # "due" | "monthly"
+    ref: Mapped[str] = mapped_column(String(40))  # ex.: "2026-10-20", "2026-09"
+    sent_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)

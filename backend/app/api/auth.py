@@ -2,6 +2,7 @@ import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Header, Response, status
+from pydantic import BaseModel
 
 from app.api.deps import CurrentUser, DbSession, MailerDep, SessionToken, session_cookie_name
 from app.core.config import get_settings
@@ -93,18 +94,41 @@ def resend_verification(body: EmailIn, db: DbSession, mail: MailerDep) -> Messag
 
 @router.post("/login", dependencies=LIMIT_LOGIN)
 def login(
-    body: LoginIn, response: Response, db: DbSession, user_agent: UserAgent = None
+    body: LoginIn,
+    response: Response,
+    db: DbSession,
+    mail: MailerDep,
+    user_agent: UserAgent = None,
 ) -> LoginOut:
-    result = auth_service.login(db, body.email, body.password, user_agent)
+    result = auth_service.login(db, body.email, body.password, user_agent, mail)
     return _login_response(response, result)
 
 
 @router.post("/login/2fa", dependencies=LIMIT_2FA)
 def login_2fa(
-    body: Login2faIn, response: Response, db: DbSession, user_agent: UserAgent = None
+    body: Login2faIn,
+    response: Response,
+    db: DbSession,
+    mail: MailerDep,
+    user_agent: UserAgent = None,
 ) -> LoginOut:
-    result = auth_service.complete_login_2fa(db, body.challenge, body.code, user_agent)
+    result = auth_service.complete_login_2fa(db, body.challenge, body.code, user_agent, mail)
     return _login_response(response, result)
+
+
+class NotMeOut(BaseModel):
+    message: str
+    reset_token: str
+
+
+@router.post("/not-me", dependencies=LIMIT_TOKEN)
+def not_me(body: TokenIn, db: DbSession) -> NotMeOut:
+    """Link "Não fui eu" do aviso de novo acesso."""
+    reset = auth_service.not_me(db, body.token)
+    return NotMeOut(
+        message="Todas as sessões foram encerradas. Crie uma nova senha para proteger a conta.",
+        reset_token=reset,
+    )
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)

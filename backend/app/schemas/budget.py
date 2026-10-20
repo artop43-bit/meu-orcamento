@@ -158,6 +158,8 @@ class ExpenseOut(_MonthOut):
     debit_card_id: uuid.UUID | None
     account_id: uuid.UUID | None
     needs_review: bool
+    # Comprovantes anexados (preenchido na tela do mês).
+    receipt_ids: list[uuid.UUID] = []
     installment_group_id: uuid.UUID | None
     installment_number: int | None
     installment_total: int | None
@@ -261,22 +263,58 @@ class HistoryPoint(BaseModel):
 # ---------------------------------------------------------------- metas
 
 
+GoalKind = Literal[
+    "emergency",
+    "purchase",
+    "travel",
+    "health",
+    "education",
+    "home",
+    "vehicle",
+    "debt",
+    "retirement",
+    "other",
+]
+Motivation = Annotated[str, StringConstraints(strip_whitespace=True, max_length=200)]
+
+
 class GoalIn(BaseModel):
     name: GoalName
     target_amount: Money
     current_amount: Annotated[Decimal, Field(ge=0, max_digits=12, decimal_places=2)] = Decimal("0")
     target_date: SafeDate | None = None
+    kind: GoalKind = "other"
+    motivation: Motivation | None = None
+    # Planejar pelo valor mensal (o app calcula a data) em vez de pela data.
+    monthly_plan: Money | None = None
+    is_main: bool = False
 
 
 class GoalPatch(BaseModel):
     name: GoalName | None = None
     target_amount: Money | None = None
     target_date: SafeDate | None = None
+    kind: GoalKind | None = None
+    motivation: Motivation | None = None
+    monthly_plan: Money | None = None
+    is_main: bool | None = None
 
 
 class ContributionIn(BaseModel):
     # Negativo para retirar dinheiro da meta.
     amount: Annotated[Decimal, Field(max_digits=12, decimal_places=2)]
+
+
+class GoalProjection(BaseModel):
+    # completed | on_track | ahead | behind | estimate (sem prazo) | no_pace (sem ritmo)
+    status: str
+    remaining: Decimal
+    pace: Decimal | None
+    pace_source: str | None  # contributions | plan | surplus
+    eta: date | None
+    months_needed: int | None
+    required_monthly: Decimal | None
+    months_left: int | None
 
 
 class GoalOut(_Out):
@@ -286,6 +324,20 @@ class GoalOut(_Out):
     current_amount: Decimal
     target_date: date | None
     progress_pct: float
+    kind: str = "other"
+    motivation: str | None = None
+    monthly_plan: Decimal | None = None
+    is_main: bool = False
+    completed_at: datetime | None = None
+    image_id: uuid.UUID | None = None
+    projection: GoalProjection | None = None
+
+
+class GoalSuggestion(BaseModel):
+    goal_id: uuid.UUID
+    goal_name: str
+    surplus: Decimal
+    amount: Decimal
 
 
 # ---------------------------------------------------------------- planejados e calendário

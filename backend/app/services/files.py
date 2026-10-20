@@ -36,9 +36,16 @@ RULES = {
     "attachment": Rule(5 * MB, 2560, ("PNG", "JPEG", "WEBP", "GIF"), animated=True),
     "avatar": Rule(5 * MB, 512, ("PNG", "JPEG", "WEBP", "GIF"), animated=True),
     "banner": Rule(8 * MB, 1600, ("PNG", "JPEG", "WEBP", "GIF"), animated=True),
+    # Comprovante de despesa: foto do recibo, nota ou boleto (legível, sem animação).
+    "receipt": Rule(5 * MB, 2560, ("PNG", "JPEG", "WEBP"), animated=False),
+    # Imagem do objetivo de uma meta.
+    "goal": Rule(8 * MB, 1600, ("PNG", "JPEG", "WEBP", "GIF"), animated=True),
 }
+# Comprovantes e imagens de metas são só do dono (nem a administração abre).
+OWNER_ONLY = ("receipt", "goal")
 CONTENT_TYPES = {"PNG": "image/png", "JPEG": "image/jpeg", "WEBP": "image/webp", "GIF": "image/gif"}
 LABELS = "PNG, JPG, WebP ou GIF"
+STATIC_LABELS = "PNG, JPG ou WebP"
 
 
 def _too_big(rule: Rule) -> AppError:
@@ -63,7 +70,8 @@ def prepare(raw: bytes, purpose: str) -> tuple[bytes, str, int, int]:
             400, "invalid_image", f"Arquivo não é uma imagem válida ({LABELS})."
         ) from exc
     if fmt not in rule.formats:
-        raise AppError(400, "invalid_image", f"Formato não aceito. Use {LABELS}.")
+        accepted = LABELS if "GIF" in rule.formats else STATIC_LABELS
+        raise AppError(400, "invalid_image", f"Formato não aceito. Use {accepted}.")
     width, height = image.size
     if width * height > MAX_PIXELS or width < 1 or height < 1:
         raise AppError(400, "invalid_image", "Imagem com dimensões fora do permitido.")
@@ -145,7 +153,11 @@ def latest_ids(db: Session, owner_ids: list[uuid.UUID], purpose: str) -> dict[uu
 def can_read(db: Session, user: User, item: StoredFile) -> bool:
     from app.services.auth import is_admin
 
-    if item.owner_id == user.id or is_admin(user):
+    if item.owner_id == user.id:
+        return True
+    if item.purpose in OWNER_ONLY:
+        return False
+    if is_admin(user):
         return True
     if item.purpose == "attachment" and item.message_id is not None:
         thread_owner = db.scalar(

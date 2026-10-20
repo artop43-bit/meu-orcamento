@@ -1,7 +1,7 @@
 """Tarefas de manutenção.
 
 python -m app.cli cleanup    roda a limpeza uma vez
-python -m app.cli schedule   roda a limpeza agora e depois uma vez por dia (produção)
+python -m app.cli schedule   limpeza diária e avisos por e-mail às 8h (produção)
 python -m app.cli seed-demo  cria a conta de demonstração com dados (nunca em produção)
 """
 
@@ -50,14 +50,32 @@ def run_cleanup() -> None:
     print("Removidos:", ", ".join(f"{k}={v}" for k, v in removed.items()), flush=True)
 
 
-def schedule(interval: timedelta = timedelta(hours=24)) -> None:
-    """Roda a limpeza ao iniciar e depois a cada `interval` (contêiner "scheduler")."""
+def run_notifications() -> dict[str, int]:
+    from app.db.session import SessionLocal
+    from app.services import notify
+
+    with SessionLocal() as db:
+        return notify.run_daily(db)
+
+
+def schedule(tick: timedelta = timedelta(minutes=10)) -> None:
+    """Contêiner "scheduler": limpeza uma vez por dia e os avisos por e-mail a partir das 8h
+    (horário de Brasília). Rodar várias vezes no dia é seguro: nenhum aviso sai duplicado."""
+    last_cleanup = 0.0
     while True:
+        if time.monotonic() - last_cleanup >= 24 * 3600 or last_cleanup == 0.0:
+            try:
+                run_cleanup()
+                last_cleanup = time.monotonic()
+            except Exception as exc:  # um erro pontual (ex.: banco reiniciando) não derruba o loop
+                print(f"Falha na limpeza: {exc}", flush=True)
         try:
-            run_cleanup()
-        except Exception as exc:  # um erro pontual (ex.: banco reiniciando) não derruba o loop
-            print(f"Falha na limpeza: {exc}", flush=True)
-        time.sleep(interval.total_seconds())
+            sent = run_notifications()
+            if any(sent.values()):
+                print(f"Avisos enviados: {sent}", flush=True)
+        except Exception as exc:
+            print(f"Falha nos avisos: {exc}", flush=True)
+        time.sleep(tick.total_seconds())
 
 
 def run_seed_demo(credentials_file: str | None, *, with_data: bool, reset: bool) -> None:

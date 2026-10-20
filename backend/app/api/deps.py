@@ -47,10 +47,16 @@ AdminUser = Annotated[User, Depends(get_admin_user)]
 
 
 def get_mailer(background: BackgroundTasks, db: DbSession) -> Mailer:
-    def mail(to: str, subject: str, body: str) -> None:
+    def mail(
+        to: str,
+        subject: str,
+        body: str,
+        html: str | None = None,
+        headers: dict[str, str] | None = None,
+    ) -> None:
         # Cópia para o painel admin (vai junto com o commit da operação que enviou).
         db.add(EmailLog(to=to, subject=subject[:200], body=body))
-        background.add_task(send_email, to, subject, body)
+        background.add_task(send_email, to, subject, body, html, headers)
 
     return mail
 

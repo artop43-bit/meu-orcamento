@@ -1,4 +1,5 @@
 import uuid
+from datetime import date
 from decimal import Decimal
 from typing import Annotated, Any, Literal
 
@@ -97,9 +98,15 @@ class StatementPreviewItem(StatementTransaction):
     card_payment: bool = False
 
 
+class StatementPeriod(BaseModel):
+    start: date
+    end: date
+
+
 class StatementPreviewOut(BaseModel):
-    format: Literal["ofx", "csv"]
+    format: Literal["ofx", "csv", "xlsx"]
     transactions: list[StatementPreviewItem]
+    period: StatementPeriod | None = None
 
 
 class StatementImportIn(BaseModel):
