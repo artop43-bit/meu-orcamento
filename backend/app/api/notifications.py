@@ -18,6 +18,7 @@ class NotifyPrefs(BaseModel):
     notify_due_days: Literal[1, 3, 7]
     notify_hide_values: bool
     notify_monthly: bool
+    notify_messages: bool
 
 
 class NotifyPrefsPatch(BaseModel):
@@ -25,6 +26,7 @@ class NotifyPrefsPatch(BaseModel):
     notify_due_days: Literal[1, 3, 7] | None = None
     notify_hide_values: bool | None = None
     notify_monthly: bool | None = None
+    notify_messages: bool | None = None
 
 
 def _prefs(user) -> NotifyPrefs:  # type: ignore[no-untyped-def]
@@ -33,6 +35,7 @@ def _prefs(user) -> NotifyPrefs:  # type: ignore[no-untyped-def]
         notify_due_days=user.notify_due_days if user.notify_due_days in (1, 3, 7) else 3,
         notify_hide_values=user.notify_hide_values,
         notify_monthly=user.notify_monthly,
+        notify_messages=user.notify_messages,
     )
 
 

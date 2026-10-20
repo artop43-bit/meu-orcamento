@@ -51,6 +51,11 @@ class User(Base):
     notify_due_days: Mapped[int] = mapped_column(SmallInteger, default=3, server_default="3")
     notify_hide_values: Mapped[bool] = mapped_column(default=False, server_default="0")
     notify_monthly: Mapped[bool] = mapped_column(default=True, server_default="1")
+    # v0.9: cópia por e-mail do que chega na caixa de mensagens.
+    notify_messages: Mapped[bool] = mapped_column(default=True, server_default="1")
+    # v0.9: aparência salva na conta (vale em todos os aparelhos). None = ainda não escolheu.
+    theme: Mapped[str | None] = mapped_column(String(6))
+    accent: Mapped[str | None] = mapped_column(String(8))
     # Configuração inicial guiada concluída (ou pulada).
     onboarded_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
 

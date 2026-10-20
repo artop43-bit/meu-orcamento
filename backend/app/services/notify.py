@@ -53,7 +53,11 @@ MONTHS = [
     "novembro",
     "dezembro",
 ]
-KINDS = {"due": "lembretes de vencimento", "monthly": "resumo do mês"}
+KINDS = {
+    "due": "lembretes de vencimento",
+    "monthly": "resumo do mês",
+    "messages": "cópias das mensagens por e-mail",
+}
 SEND_HOUR = 8
 
 
@@ -101,8 +105,10 @@ def unsubscribe(db: Session, token: str) -> tuple[User, str] | None:
         return None
     if kind == "due":
         user.notify_due = False
-    else:
+    elif kind == "monthly":
         user.notify_monthly = False
+    else:
+        user.notify_messages = False
     db.commit()
     return user, kind
 

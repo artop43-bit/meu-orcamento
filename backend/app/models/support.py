@@ -77,3 +77,42 @@ class SupportMessage(Base):
     from_admin: Mapped[bool] = mapped_column(default=False)
     body: Mapped[str] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+
+
+class Announcement(Base):
+    """Recado da administração para todos os usuários (v0.9)."""
+
+    __tablename__ = "announcements"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    author_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    title: Mapped[str] = mapped_column(String(120))
+    body: Mapped[str] = mapped_column(Text)
+    # Fica fixado no topo da caixa de mensagens e sempre gera e-mail.
+    important: Mapped[bool] = mapped_column(default=False)
+    # Também para quem está aguardando a liberação do acesso.
+    include_pending: Mapped[bool] = mapped_column(default=False)
+    recipients: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+
+
+class InboxItem(Base):
+    """Mensagem na caixa do usuário: resposta a uma solicitação ou recado da administração."""
+
+    __tablename__ = "inbox_items"
+    __table_args__ = (Index("ix_inbox_items_user_created", "user_id", "created_at"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    kind: Mapped[str] = mapped_column(String(12))  # "reply" | "announcement"
+    title: Mapped[str] = mapped_column(String(160))
+    body: Mapped[str] = mapped_column(Text)
+    important: Mapped[bool] = mapped_column(default=False)
+    thread_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("support_threads.id", ondelete="CASCADE"), index=True
+    )
+    announcement_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("announcements.id", ondelete="CASCADE"), index=True
+    )
+    read_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)

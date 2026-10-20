@@ -96,6 +96,7 @@ def test_due_digest_preferences_and_unsubscribe(
         "notify_due_days": 3,
         "notify_hide_values": False,
         "notify_monthly": True,
+        "notify_messages": True,
     }
     assert user.patch("/api/notifications/prefs", json={"notify_due_days": 2}).status_code == 422
     user.patch("/api/notifications/prefs", json={"notify_due_days": 7, "notify_hide_values": True})
