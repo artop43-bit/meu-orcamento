@@ -204,12 +204,17 @@ export default function AppInstallPage() {
               No Chrome ou no Edge do computador, use o botão abaixo ou o ícone de instalar na barra de endereço. O app abre em janela própria.
             </p>
           )}
-          {!isIos() && (
+          {!isIos() && prompt && (
             <div>
-              <Button type="button" variant="secondary" disabled={!prompt} onClick={() => void install()}>
-                {prompt ? "Instalar no computador" : done ? "Já instalado" : "Instalação indisponível neste navegador"}
+              <Button type="button" variant="secondary" onClick={() => void install()}>
+                Instalar no computador
               </Button>
             </div>
+          )}
+          {!isIos() && !prompt && !done && (
+            <p className="muted small" style={{ margin: 0 }}>
+              Se o botão de instalar não aparecer, abra o menu do navegador e escolha “Instalar o app” (Chrome e Edge).
+            </p>
           )}
         </section>
         <Notifications />
