@@ -69,8 +69,8 @@ export default function ReleaseNotesPage() {
       <section className="card stack" style={{ marginTop: 20 }}>
         <h2>Sugira a próxima melhoria</h2>
         <p className="muted" style={{ margin: 0 }}>
-          A próxima versão é montada com as sugestões da comunidade. Envie a sua: a resposta da administração aparece em Ajustes › Minhas
-          solicitações.
+          A próxima versão é montada com as sugestões da comunidade. Envie a sua: cada solicitação ganha um número, e o andamento e a resposta
+          da administração aparecem em Mensagens › Conversas.
         </p>
         <div>
           <Button type="button" variant="secondary" onClick={() => openFeedback({ kind: "idea", context: `Versão ${RELEASE.version}` })}>

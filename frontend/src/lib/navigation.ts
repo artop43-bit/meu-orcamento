@@ -75,12 +75,12 @@ export function leafLabel(pathname: string): string | undefined {
  */
 export function parentOf(pathname: string): string | null {
   const parts = pathname.split("/").filter(Boolean);
-  if (parts[0] === "ajustes" && parts.length >= 2) {
-    return parts[1] === "solicitacoes" && parts.length >= 3 ? "/ajustes/solicitacoes" : "/ajustes";
+  if (parts[0] === "ajustes" && parts.length >= 2) return "/ajustes";
+  if (parts[0] === "mensagens" && parts[1] === "conversas") {
+    return parts.length >= 3 ? "/mensagens/conversas" : "/mensagens";
   }
   if (parts[0] === "dividas" && parts.length >= 2) return "/dividas";
   if (parts[0] === "relatorio") return "/ajustes/dados?aba=exportar";
-  if (["revisar", "busca", "mensagens", "admin"].includes(parts[0] ?? "")) return null;
   return null;
 }
 

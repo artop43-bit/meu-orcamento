@@ -3,18 +3,23 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "./client";
 
 export type ThreadKind = "idea" | "bug" | "other";
-export type ThreadStatus = "open" | "answered" | "resolved";
+export type ThreadStatus = "open" | "in_progress" | "planned" | "answered" | "resolved" | "declined";
 
 export type Attachment = { id: string; width: number; height: number; content_type: string };
 export type Message = { id: string; from_admin: boolean; body: string; created_at: string; attachments: Attachment[] };
 export type Thread = {
   id: string;
+  /** Número fixo da solicitação (#1, #2...). */
+  number: number;
   title: string;
   kind: ThreadKind;
   status: ThreadStatus;
   unread: boolean;
   created_at: string;
   last_message_at: string;
+  status_note: string | null;
+  planned_version: string | null;
+  announcement_id: string | null;
 };
 export type ThreadDetail = Thread & { messages: Message[] };
 export type Person = { id: string; email: string; display_name: string | null; avatar_id: string | null };
@@ -24,7 +29,15 @@ export type PersonRow = { user: Person; total: number; open: number; unread: num
 export type SupportCounts = Record<ThreadStatus | "unread", number>;
 
 export const KIND_LABEL: Record<ThreadKind, string> = { idea: "Sugestão", bug: "Problema", other: "Outro" };
-export const STATUS_LABEL: Record<ThreadStatus, string> = { open: "Aberta", answered: "Respondida", resolved: "Resolvida" };
+export const STATUS_LABEL: Record<ThreadStatus, string> = {
+  open: "Aberta",
+  in_progress: "Em andamento",
+  planned: "Planejada",
+  answered: "Respondida",
+  resolved: "Resolvida",
+  declined: "Recusada",
+};
+export const STATUSES: ThreadStatus[] = ["open", "in_progress", "planned", "answered", "resolved", "declined"];
 
 /** Limites iguais aos do servidor (conferidos lá também). */
 export const MAX_IMAGES = 3;
@@ -62,7 +75,7 @@ export const supportApi = {
     api.form<ThreadDetail>("POST", `/support/threads/${id}/messages`, messageForm(message, images)),
   resolve: (id: string) => api.post<Thread>(`/support/threads/${id}/resolve`),
 
-  adminThreads: (params: { q?: string; status?: ThreadStatus; user_id?: string }) => {
+  adminThreads: (params: { q?: string; status?: ThreadStatus; user_id?: string; kind?: ThreadKind; version?: string }) => {
     const query = new URLSearchParams();
     for (const [key, value] of Object.entries(params)) if (value) query.set(key, value);
     const suffix = query.toString() ? `?${query}` : "";
@@ -73,7 +86,11 @@ export const supportApi = {
   adminThread: (id: string) => api.get<AdminThreadDetail>(`/admin/support/threads/${id}`),
   adminReply: (id: string, message: string, images: File[]) =>
     api.form<AdminThreadDetail>("POST", `/admin/support/threads/${id}/messages`, messageForm(message, images)),
-  adminStatus: (id: string, status: ThreadStatus) => api.patch<AdminThreadDetail>(`/admin/support/threads/${id}`, { status }),
+  adminStatus: (id: string, data: { status: ThreadStatus; note?: string | null; version?: string | null }) =>
+    api.patch<AdminThreadDetail>(`/admin/support/threads/${id}`, data),
+  adminVersions: () => api.get<string[]>("/admin/support/versions"),
+  replyAnnouncement: (itemId: string, message: string, images: File[]) =>
+    api.form<ThreadDetail>("POST", `/inbox/${itemId}/reply`, messageForm(message, images)),
 };
 
 /** Respostas novas da administração (badge em Ajustes). Atualiza a cada minuto. */

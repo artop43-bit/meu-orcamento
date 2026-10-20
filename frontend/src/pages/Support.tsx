@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { CheckCircle2, ChevronLeft, Inbox, MessageSquarePlus } from "lucide-react";
-import { Link, useParams } from "react-router";
+import { CheckCircle2, ChevronLeft, MessagesSquare, MessageSquarePlus } from "lucide-react";
+import { Link, Navigate, useParams } from "react-router";
 
 import { errorMessage } from "../api/client";
 import { INBOX_KEY } from "../api/inbox";
@@ -9,13 +9,18 @@ import { KIND_LABEL, STATUS_LABEL, supportApi, type Thread, type ThreadStatus } 
 import { EmptyGuide } from "../components/help";
 import { Composer, Conversation } from "../components/media";
 import { openFeedback } from "../components/power";
-import { Alert, Button, LoadingRegion, PageHeader, Skeleton } from "../components/ui";
+import { Alert, Button, LoadingRegion, Skeleton } from "../components/ui";
 
 export const STATUS_TONE: Record<ThreadStatus, string> = {
   open: "badge--warn",
+  in_progress: "badge--accent",
+  planned: "badge--info",
   answered: "badge--accent",
   resolved: "badge--ok",
+  declined: "badge--muted",
 };
+
+export const CONVERSATIONS = "/mensagens/conversas";
 
 export function shortWhen(iso: string): string {
   const date = new Date(iso);
@@ -25,25 +30,32 @@ export function shortWhen(iso: string): string {
     : date.toLocaleDateString("pt-BR");
 }
 
+/** "Planejada · versão 1.2" */
+export function statusText(t: Pick<Thread, "status" | "planned_version">): string {
+  return t.status === "planned" && t.planned_version ? `${STATUS_LABEL[t.status]} · versão ${t.planned_version}` : STATUS_LABEL[t.status];
+}
+
 function ThreadList({ threads, current }: { threads: Thread[]; current?: string }) {
   return (
     <ul className="thread-list">
       {threads.map((t) => (
         <li key={t.id}>
           <Link
-            to={`/ajustes/solicitacoes/${t.id}`}
+            to={`${CONVERSATIONS}/${t.id}`}
             className={`thread-list__item ${t.unread ? "is-unread" : ""}`}
             aria-current={current === t.id ? "page" : undefined}
           >
             <span className="thread-list__top">
-              <strong className="thread-list__title">{t.title}</strong>
+              <strong className="thread-list__title">
+                <span className="thread-number">#{t.number}</span> {t.title}
+              </strong>
               <time className="muted small" dateTime={t.last_message_at}>
                 {shortWhen(t.last_message_at)}
               </time>
             </span>
             <span className="thread-list__meta">
-              <span className={`badge ${STATUS_TONE[t.status]}`}>{STATUS_LABEL[t.status]}</span>
-              <span className="muted small">{KIND_LABEL[t.kind]}</span>
+              <span className={`badge ${STATUS_TONE[t.status]}`}>{statusText(t)}</span>
+              <span className="muted small">{t.announcement_id ? "Resposta a recado" : KIND_LABEL[t.kind]}</span>
               {t.unread && <span className="badge badge--accent">Resposta nova</span>}
             </span>
           </Link>
@@ -73,22 +85,24 @@ function ThreadView({ id }: { id: string }) {
     );
   if (thread.isError) return <Alert tone="error">{errorMessage(thread.error)}</Alert>;
   const data = thread.data;
+  const closed = data.status === "resolved" || data.status === "declined";
   return (
     <section className="card thread-view" aria-labelledby="thread-title">
       <header className="thread-view__header">
-        <Link to="/ajustes/solicitacoes" className="thread-view__back small">
-          <ChevronLeft size={16} aria-hidden /> Todas as solicitações
+        <Link to={CONVERSATIONS} className="thread-view__back small">
+          <ChevronLeft size={16} aria-hidden /> Todas as conversas
         </Link>
-        <h2 id="thread-title">{data.title}</h2>
+        <h2 id="thread-title">
+          <span className="thread-number">#{data.number}</span> {data.title}
+        </h2>
         <p className="thread-list__meta">
-          <span className={`badge ${STATUS_TONE[data.status]}`}>{STATUS_LABEL[data.status]}</span>
-          <span className="muted small">{KIND_LABEL[data.kind]}</span>
+          <span className={`badge ${STATUS_TONE[data.status]}`}>{statusText(data)}</span>
+          <span className="muted small">{data.announcement_id ? "Resposta a recado" : KIND_LABEL[data.kind]}</span>
         </p>
+        {data.status_note && <p className="thread-view__status-note">{data.status_note}</p>}
       </header>
       <Conversation messages={data.messages} viewer="user" userName="Você" />
-      {data.status === "resolved" && (
-        <p className="muted small thread-view__note">Solicitação encerrada. Uma nova mensagem a reabre.</p>
-      )}
+      {closed && <p className="muted small thread-view__note">Conversa encerrada. Uma nova mensagem a reabre.</p>}
       <Composer
         onSend={async (message, images) => {
           const updated = await supportApi.reply(id, message, images);
@@ -96,7 +110,7 @@ function ThreadView({ id }: { id: string }) {
           await refresh();
         }}
       />
-      {data.status !== "resolved" && (
+      {!closed && (
         <div className="thread-view__actions">
           <Button
             type="button"
@@ -114,24 +128,16 @@ function ThreadView({ id }: { id: string }) {
   );
 }
 
-export default function SupportPage() {
+/** Mensagens › Conversas: solicitações e respostas a recados, com a administração. */
+export function Conversations() {
   const { id } = useParams();
   const threads = useQuery({ queryKey: ["support", "mine"], queryFn: supportApi.mine });
   const list = threads.data ?? [];
 
   return (
     <>
-      <PageHeader
-        title="Minhas solicitações"
-        subtitle="Sugestões, problemas e dúvidas enviados à administração, com as respostas."
-        actions={
-          <Button type="button" onClick={openFeedback}>
-            <MessageSquarePlus size={16} /> Nova solicitação
-          </Button>
-        }
-      />
       {threads.isPending && (
-        <LoadingRegion label="Carregando as solicitações">
+        <LoadingRegion label="Carregando as conversas">
           <Skeleton height={160} />
         </LoadingRegion>
       )}
@@ -139,9 +145,9 @@ export default function SupportPage() {
       {threads.data && list.length === 0 && (
         <section className="card">
           <EmptyGuide
-            icon={<Inbox size={22} />}
-            title="Nenhuma solicitação enviada"
-            text="Envie sugestões, relate problemas ou tire dúvidas. Você pode anexar prints, e a resposta aparece aqui."
+            icon={<MessagesSquare size={22} />}
+            title="Nenhuma conversa ainda"
+            text="Envie sugestões, relate problemas ou tire dúvidas com “Nova solicitação”, ou responda um recado da administração. Cada solicitação ganha um número para acompanhar o andamento."
             action={
               <Button type="button" onClick={openFeedback}>
                 <MessageSquarePlus size={16} /> Nova solicitação
@@ -152,15 +158,21 @@ export default function SupportPage() {
       )}
       {list.length > 0 && (
         <div className={`support-layout ${id ? "has-thread" : ""}`}>
-          <section className="card support-layout__list" aria-label="Solicitações">
+          <section className="card support-layout__list" aria-label="Conversas">
             <ThreadList threads={list} current={id} />
           </section>
           <div className="support-layout__detail">
-            {id ? <ThreadView key={id} id={id} /> : <p className="muted support-layout__hint">Selecione uma solicitação para ver a conversa.</p>}
+            {id ? <ThreadView key={id} id={id} /> : <p className="muted support-layout__hint">Selecione uma conversa.</p>}
           </div>
         </div>
       )}
       {id && threads.data && list.length === 0 && <ThreadView key={id} id={id} />}
     </>
   );
+}
+
+/** Endereço antigo (Ajustes › Minhas solicitações): leva para Mensagens › Conversas. */
+export default function SupportRedirect() {
+  const { id } = useParams();
+  return <Navigate to={id ? `${CONVERSATIONS}/${id}` : CONVERSATIONS} replace />;
 }

@@ -21,6 +21,7 @@ export type Announcement = {
   include_pending: boolean;
   recipients: number;
   read: number;
+  replies: number;
   created_at: string;
 };
 
