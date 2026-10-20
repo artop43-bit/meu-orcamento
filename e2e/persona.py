@@ -1475,7 +1475,7 @@ def debts(page: Page):
     d.get_by_label("Tipo").select_option("vehicle")
     d.get_by_label("Nome").fill("Financiamento do carro")
     d.get_by_label("Instituição (opcional)").fill("Banco do Brasil")
-    d.get_by_label("Valor financiado").fill(money(30000))
+    d.get_by_label("Valor financiado", exact=True).fill(money(30000))
     d.get_by_label(re.compile("^Taxa de juros")).fill("18,5")
     d.get_by_label("Ao ano").check()
     d.get_by_label("SAC (parcelas que caem)").check()
