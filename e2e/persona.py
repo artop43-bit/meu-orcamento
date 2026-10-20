@@ -839,8 +839,18 @@ def png_bytes(width: int = 32, height: int = 24, rgb: tuple[int, int, int] = (31
     return b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", header) + chunk(b"IDAT", zlib.compress(raw)) + chunk(b"IEND", b"")
 
 
-def image_loaded(page: Page, selector: str) -> bool:
-    return page.locator(selector).first.evaluate("img => img.complete && img.naturalWidth > 0")
+def image_loaded(page: Page, selector: str, timeout: int = 10000) -> bool:
+    """Espera a imagem terminar de baixar (as miniaturas carregam sob demanda)."""
+    try:
+        page.locator(selector).first.scroll_into_view_if_needed()
+        page.wait_for_function(
+            "sel => { const img = document.querySelector(sel); return !!img && img.complete && img.naturalWidth > 0; }",
+            arg=selector,
+            timeout=timeout,
+        )
+        return True
+    except Exception:  # noqa: BLE001
+        return False
 
 
 @step("v0.7.5: solicitação com print, resposta da administração e aviso de resposta nova")
