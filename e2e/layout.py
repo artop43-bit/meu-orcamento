@@ -47,6 +47,8 @@ PAGES = [
     ("dados-exportar", "/ajustes/dados?aba=exportar"),
     ("notas", "/ajustes/notas"),
     ("mensagens", "/mensagens"),
+    ("conversas", "/mensagens/conversas"),
+    ("admin-quadro", "/admin?aba=solicitacoes&visao=quadro"),
     ("dividas", "/dividas"),
     ("divisoes", "/divisoes"),
     ("app", "/ajustes/app"),
@@ -54,7 +56,6 @@ PAGES = [
     ("admin-recados", "/admin?aba=recados"),
     ("seguranca", "/ajustes/seguranca"),
     ("preferencias", "/ajustes/preferencias"),
-    ("atalhos", "/ajustes/atalhos"),
     ("ajuda", "/ajustes/ajuda"),
     ("admin", "/admin"),
     ("admin-emails", "/admin?aba=emails"),
@@ -62,7 +63,6 @@ PAGES = [
     ("admin-solicitacoes-usuarios", "/admin?aba=solicitacoes&visao=usuarios"),
     ("admin-solicitacoes-status", "/admin?aba=solicitacoes&visao=status"),
     ("perfil", "/ajustes/perfil"),
-    ("solicitacoes", "/ajustes/solicitacoes"),
 ]
 
 VIEWPORTS = {
@@ -275,7 +275,7 @@ def dialogs(page: Page, device: str):
         ("/metas", "Nova meta", "form-meta"),
         ("/dividas", "Novo financiamento", "form-financiamento"),
         ("/divisoes", "Nova anotação", "form-divisao-anotacao"),
-        ("/ajustes/solicitacoes", "Nova solicitação", "form-solicitacao"),
+        ("/mensagens/conversas", "Nova solicitação", "form-solicitacao"),
         ("/ajustes/perfil", "Editar perfil", "form-perfil"),
     ):
         page.goto(BASE + url)

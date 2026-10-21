@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 
+import type { AccentName } from "../theme/tokens";
 import { api, ApiError } from "./client";
 
 export type User = {
@@ -13,7 +14,7 @@ export type User = {
   /** Configuração inicial guiada concluída (ou pulada). */
   onboarded_at?: string | null;
   theme?: "system" | "light" | "dark" | null;
-  accent?: "verde" | "azul" | "roxo" | "laranja" | null;
+  accent?: AccentName | null;
   month_start_day?: number;
 };
 

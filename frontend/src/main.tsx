@@ -4,7 +4,9 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 import App from "./App";
 import { installFormErrors } from "./lib/formErrors";
+import { captureInstallPrompt } from "./lib/install";
 import { applyPrefs } from "./lib/prefs";
+import "./theme.css";
 import "./styles.css";
 
 // Tema, cor, tamanho do texto e privacidade escolhidos neste aparelho.
@@ -12,6 +14,9 @@ applyPrefs();
 
 // Erros de formulário em mensagens do app, junto do campo (sem balões do navegador).
 installFormErrors();
+
+// Convite de instalação ("Instalar no computador"): chega só uma vez, logo no início.
+captureInstallPrompt();
 
 // Dados ficam "frescos" por 30 s: navegar entre páginas não recarrega tudo a cada toque.
 // Depois de salvar algo, as telas afetadas são recarregadas na hora (invalidateQueries).

@@ -151,9 +151,8 @@ const PAGES: [string, string, string][] = [
   ["/ajustes/recorrencias", "Recorrências e assinaturas", "fixas"],
   ["/ajustes/categorias", "Categorias e regras", "limites"],
   ["/ajustes/dados", "Importar e exportar", "extrato ofx csv excel"],
-  ["/ajustes/preferencias", "Preferências", "tema cor texto privacidade aparencia"],
+  ["/ajustes/preferencias", "Preferências", "tema cor texto privacidade aparencia atalhos teclado teclas"],
   ["/ajustes/seguranca", "Segurança", "senha 2fa"],
-  ["/ajustes/atalhos", "Atalhos de teclado", "teclas"],
   ["/ajustes/ajuda", "Central de ajuda", "como usar tour"],
 ];
 
@@ -389,6 +388,7 @@ export function FeedbackSheet() {
   const [images, setImages] = useState<File[]>([]);
   const [error, setError] = useState("");
   const [sent, setSent] = useState<string | null>(null);
+  const [sentNumber, setSentNumber] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
@@ -424,6 +424,7 @@ export function FeedbackSheet() {
       setMessage("");
       setImages([]);
       setSent(thread.id);
+      setSentNumber(thread.number);
       haptic("success");
       await queryClient.invalidateQueries({ queryKey: ["support"] });
     } catch (err) {
@@ -438,7 +439,8 @@ export function FeedbackSheet() {
       {sent ? (
         <div className="stack">
           <Alert tone="success">
-            Solicitação enviada. A resposta da administração aparece em Ajustes › Minhas solicitações, com um aviso no menu.
+            Solicitação enviada{sentNumber ? `, com o número #${sentNumber}` : ""}. Acompanhe o andamento e a resposta da administração em Mensagens ›
+            Conversas.
           </Alert>
           <div className="form-actions">
             <Button type="button" variant="secondary" onClick={() => setOpen(false)}>
@@ -448,7 +450,7 @@ export function FeedbackSheet() {
               type="button"
               onClick={() => {
                 setOpen(false);
-                navigate(`/ajustes/solicitacoes/${sent}`);
+                navigate(`/mensagens/conversas/${sent}`);
               }}
             >
               Acompanhar solicitação

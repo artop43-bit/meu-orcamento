@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type CSSProperties } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { CalendarRange, Keyboard, Mail, MessageSquarePlus } from "lucide-react";
 
@@ -11,6 +11,7 @@ import { announce } from "../lib/announce";
 import { setAppearance } from "../lib/appearance";
 import { cycleLabel, setCycleStart, thisMonth } from "../lib/format";
 import { setPrefs, usePrefs, type Prefs } from "../lib/prefs";
+import { ACCENTS, type AccentName } from "../theme/tokens";
 
 function Choice<K extends keyof Prefs>({
   name,
@@ -42,6 +43,26 @@ function Choice<K extends keyof Prefs>({
               }
             />
             {text}
+          </label>
+        ))}
+      </div>
+    </fieldset>
+  );
+}
+
+/** Cor de destaque: amostras com nome (todas passam no contraste AA, no claro e no escuro). */
+function AccentPicker({ value }: { value: AccentName }) {
+  const queryClient = useQueryClient();
+  const accents = Object.entries(ACCENTS) as [AccentName, (typeof ACCENTS)[AccentName]][];
+  return (
+    <fieldset className="radios">
+      <legend className="field-label">Cor de destaque</legend>
+      <div className="accent-swatches">
+        {accents.map(([name, accent]) => (
+          <label key={name} className="accent-swatch" style={{ "--swatch": accent.light.accent, "--swatch-dark": accent.dark.accent } as CSSProperties}>
+            <input type="radio" name="accent" checked={value === name} onChange={() => setAppearance({ accent: name }, queryClient)} />
+            <span className="accent-swatch__dot" aria-hidden />
+            {accent.label}
           </label>
         ))}
       </div>
@@ -197,17 +218,7 @@ export default function Preferences() {
                 ["dark", "Escuro"],
               ]}
             />
-            <Choice
-              name="accent"
-              label="Cor de destaque"
-              value={prefs.accent}
-              options={[
-                ["verde", "Verde"],
-                ["azul", "Azul"],
-                ["roxo", "Roxo"],
-                ["laranja", "Laranja"],
-              ]}
-            />
+            <AccentPicker value={prefs.accent} />
             <Choice
               name="text"
               label="Tamanho do texto"
@@ -246,8 +257,8 @@ export default function Preferences() {
           </section>
         </div>
         <div className="stack" style={{ gap: 20 }}>
-          <section className="card stack">
-            <h2>Atalhos</h2>
+          <section className="card stack" id="atalhos">
+            <h2>Atalhos de teclado</h2>
             <dl className="shortcuts">
               {SHORTCUTS.map(([key, what]) => (
                 <div key={key}>

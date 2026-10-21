@@ -1,5 +1,7 @@
 import { useSyncExternalStore } from "react";
 
+import type { AccentName } from "../theme/tokens";
+
 /**
  * Preferências deste aparelho (aparência e privacidade). Ficam no navegador: cada
  * celular/computador pode ter as suas. Aplicadas como atributos no <html>, então o CSS
@@ -7,7 +9,7 @@ import { useSyncExternalStore } from "react";
  */
 export type Prefs = {
   theme: "system" | "light" | "dark";
-  accent: "verde" | "azul" | "roxo" | "laranja";
+  accent: AccentName;
   text: "normal" | "grande" | "maior";
   density: "confortavel" | "compacta";
   /** Esconde os valores (R$ ••••) — útil em público ou ao mostrar a tela. */

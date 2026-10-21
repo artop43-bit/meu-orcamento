@@ -970,7 +970,7 @@ def support_requests(page: Page):
     d.get_by_role("button", name="Enviar solicitação").click()
     expect(d).to_contain_text("Solicitação enviada", timeout=8000)
     d.get_by_role("button", name="Acompanhar solicitação").click()
-    page.wait_for_url("**/ajustes/solicitacoes/**")
+    page.wait_for_url("**/mensagens/conversas/**")
     idle(page)
     expect(page.get_by_role("heading", name="Gráfico de Insights não carrega")).to_be_visible()
     expect(page.get_by_role("img", name="Imagem anexada 1")).to_be_visible()
@@ -996,19 +996,19 @@ def support_requests(page: Page):
     idle(page)
     expect(page.locator(".thread-list__item").first).to_contain_text("1 solicitação(ões)")
     page.get_by_role("tab", name="Recentes").click()
-    page.get_by_placeholder("Buscar por assunto, mensagem ou e-mail").fill("print")
+    page.get_by_placeholder(re.compile("Buscar por #número")).fill("print")
     page.wait_for_timeout(700)
     expect(page.locator(".thread-list__item")).to_have_count(1)
     page.screenshot(path=OUT / "v075-admin-solicitacoes.png", full_page=True)
 
-    # Usuário: aviso de resposta nova em Ajustes; ao abrir, fica lida.
+    # Usuário: a conversa (com número) fica em Mensagens › Conversas; ao abrir, fica lida.
     assert api(page, "/support/unread")["unread"] == 1
-    page.goto(f"{BASE}/ajustes")
+    page.goto(f"{BASE}/mensagens")
     idle(page)
-    expect(page.get_by_text("1 resposta(s) nova(s)")).to_be_visible()
-    page.locator(".settings-list").get_by_role("link", name=re.compile("Minhas solicitações")).click()
+    page.get_by_role("navigation", name="Mensagens").get_by_role("link", name="Conversas").click()
+    page.wait_for_url("**/mensagens/conversas")
     idle(page)
-    page.get_by_role("link", name=re.compile("Gráfico de Insights não carrega")).click()
+    page.get_by_role("link", name=re.compile(r"#\d+ Gráfico de Insights não carrega")).click()
     idle(page)
     expect(page.locator(".bubble--other")).to_contain_text("Corrigido na próxima versão")
     assert api(page, "/support/unread")["unread"] == 0
@@ -1148,7 +1148,7 @@ def version(page: Page):
     expect(page.locator(".sidebar .app-version")).to_contain_text(re.compile(r"Versão \d+\.\d+\.\d+ · \d{2}/\d{2}/\d{4} às \d{2}:\d{2}"))
 
 
-@step("Celular: deslizar troca só as abas principais, em qualquer ponto da tela")
+@step("Celular: deslizar entre telas, abas dos grupos, voltar da sub-tela e arrastar a janela para fechar")
 def mobile_sections(browser):
     ctx = browser.new_context(
         storage_state=STATE["state"], viewport={"width": 390, "height": 844}, device_scale_factor=2, is_mobile=True, has_touch=True
@@ -1164,19 +1164,54 @@ def mobile_sections(browser):
         cdp.send("Input.dispatchTouchEvent", {"type": "touchEnd", "touchPoints": []})
         page.wait_for_timeout(700)
 
-    # Na Análise financeira, deslizar vai para a próxima aba principal (não troca de seção).
+    def drag_down(x, y0, y1):
+        cdp.send("Input.dispatchTouchEvent", {"type": "touchStart", "touchPoints": [{"x": x, "y": y0}]})
+        for i in range(1, 13):
+            cdp.send("Input.dispatchTouchEvent", {"type": "touchMove", "touchPoints": [{"x": x + 1, "y": y0 + (y1 - y0) * i / 12}]})
+            page.wait_for_timeout(16)
+        cdp.send("Input.dispatchTouchEvent", {"type": "touchEnd", "touchPoints": []})
+        page.wait_for_timeout(600)
+
+    # Deslizar anda pelas telas na ordem do menu (Insights → Histórico; Investimentos ← Insights).
+    # (abaixo da faixa de seções de Insights, que rola para o lado e por isso não troca de tela)
     page.goto(f"{BASE}/analises?secao=tendencias")
     idle(page, 700)
-    swipe(330, 60)
-    assert page.url.endswith("/investimentos"), page.url
+    swipe(330, 60, y=520)
+    assert page.url.endswith("/historico"), page.url
     page.goto(f"{BASE}/analises?secao=resumo")
     idle(page, 700)
-    swipe(60, 330)
-    assert page.url.endswith("/calendario"), page.url
+    swipe(60, 330, y=520)
+    assert page.url.endswith("/investimentos"), page.url
     # O gesto vale também na parte de baixo da tela.
     idle(page, 500)
     swipe(330, 60, y=720)
     assert "/analises" in page.url, page.url
+    # Abas de baixo são os grupos; no topo, as telas do grupo.
+    page.goto(f"{BASE}/cartoes")
+    idle(page, 600)
+    tabs = page.locator(".tabbar")
+    for name in ("Orçamento", "Carteira", "Planejamento", "Análises"):
+        expect(tabs.get_by_role("link", name=name)).to_be_visible()
+    expect(tabs.get_by_role("button", name=re.compile("^Mais"))).to_be_visible()
+    expect(tabs.get_by_role("link", name="Carteira")).to_have_attribute("aria-current", "page")
+    group = page.locator(".group-tabs")
+    expect(group.get_by_role("link")).to_have_text(["Contas", "Cartões", "Dívidas", "Divisões"])
+    group.get_by_role("link", name="Dívidas").click()
+    page.wait_for_url("**/dividas")
+    # Sub-tela: deslizar para a direita volta para a tela de cima.
+    page.goto(f"{BASE}/ajustes/perfil")
+    idle(page, 700)
+    swipe(60, 330)
+    page.wait_for_url("**/ajustes")
+    # Janela: arrastar o conteúdo para baixo fecha.
+    tabs.get_by_role("button", name="Mais").click()
+    menu = page.locator("dialog[open]", has_text="Mais opções")
+    expect(menu).to_be_visible()
+    page.wait_for_timeout(400)
+    # Começa no cartão do perfil (conteúdo da janela, fora de campos), qualquer que seja a fonte.
+    start = menu.locator(".menu-profile").bounding_box()
+    drag_down(start["x"] + start["width"] / 2, start["y"] + start["height"] / 2, 840)
+    expect(menu).to_have_count(0)
     # Construtor no celular: chips abrem a janela de filtros
     page.goto(f"{BASE}/analises?secao=monte")
     idle(page, 700)
@@ -1380,8 +1415,9 @@ def inbox_and_announcement(page: Page):
     # Menu: contador de não lidas em Mensagens; o importante fica no topo.
     page.goto(f"{BASE}/orcamento")
     idle(page)
-    expect(page.locator(".sidebar").get_by_role("link", name=re.compile("Mensagens")).locator(".nav-badge")).to_have_text("1")
-    page.locator(".sidebar").get_by_role("link", name=re.compile("Mensagens")).click()
+    balloon = page.locator(".sidebar .sidebar__tool--messages")
+    expect(balloon.locator(".sidebar__tool-badge")).to_have_text("1")
+    balloon.click()
     page.wait_for_url("**/mensagens")
     idle(page)
     first = page.locator(".inbox-item").first
@@ -1425,9 +1461,17 @@ def theme_on_account(page: Page):
     mobile.get_by_role("button", name="Entrar").click()
     mobile.wait_for_url("**/orcamento**")
     expect(mobile.locator("html")).to_have_attribute("data-theme", "dark")
-    # No celular, o tema também se troca pelo menu "Mais".
-    mobile.locator(".tabbar").get_by_role("button", name="Mais").click()
-    menu = mobile.locator("dialog[open]")
+    # No celular, o tema também se troca pelo menu "Mais". Espera a tela assentar: logo depois do
+    # login o endereço ainda se ajusta, e trocar de endereço fecha o menu (de propósito).
+    idle(mobile, 800)
+    menu = mobile.locator("dialog[open]", has_text="Mais opções")
+    for _ in range(3):
+        mobile.locator(".tabbar").get_by_role("button", name="Mais").click()
+        try:
+            expect(menu).to_be_visible(timeout=3000)
+            break
+        except AssertionError:
+            continue
     menu.get_by_label("Automático").check()
     expect(mobile.locator("html")).not_to_have_attribute("data-theme", "dark")
     mobile.screenshot(path=OUT / "v09-celular-menu-tema.png")
@@ -1437,6 +1481,26 @@ def theme_on_account(page: Page):
     page.reload()
     idle(page)
     expect(page.locator("html")).not_to_have_attribute("data-theme", "dark")
+
+
+@step("v1.1: 10 cores de destaque em Preferências, salvas na conta")
+def accent_colors(page: Page):
+    page.goto(f"{BASE}/ajustes/preferencias")
+    idle(page)
+    picker = page.get_by_role("group", name="Cor de destaque")
+    expect(picker.locator(".accent-swatch")).to_have_count(10)
+    # Clica na amostra (o rádio fica escondido sob ela).
+    picker.locator(".accent-swatch", has_text="Grafite").click()
+    expect(picker.get_by_label("Grafite")).to_be_checked()
+    expect(page.locator("html")).to_have_attribute("data-accent", "grafite")
+    page.wait_for_timeout(400)
+    assert api(page, "/auth/me")["accent"] == "grafite"
+    picker.scroll_into_view_if_needed()
+    page.screenshot(path=OUT / "v11-cores.png")
+    picker.locator(".accent-swatch", has_text="Verde").click()
+    expect(page.locator("html")).to_have_attribute("data-accent", "verde")
+    page.wait_for_timeout(400)
+    assert api(page, "/auth/me")["accent"] == "verde"
 
 
 @step("v0.9: começar do zero — escolher áreas, backup, senha e frase; zera só as análises salvas")
@@ -1641,6 +1705,52 @@ def app_install(page: Page):
     expect(page.get_by_role("status").filter(has_text="Sem conexão")).to_have_count(0)
 
 
+@step("v1.1: solicitação numerada como tarefa (status, versão, quadro) e resposta a recado")
+def tasks_and_replies(page: Page):
+    [thread] = [t for t in api(page, "/support/threads") if "Gráfico de Insights" in t["title"]]
+    number = thread["number"]
+    # Administração: muda o status para "Planejada" na versão 1.2, com nota.
+    page.goto(f"{BASE}/admin?aba=solicitacoes&id={thread['id']}")
+    idle(page)
+    form = page.get_by_role("form", name=f"Andamento da solicitação #{number}")
+    form.get_by_label("Status").select_option("planned")
+    form.get_by_label("Versão").fill("1.2")
+    form.get_by_label(re.compile("^Nota para a pessoa")).fill("Entra na versão 1.2.")
+    form.get_by_role("button", name="Salvar status").click()
+    idle(page, 500)
+    detail = api(page, f"/support/threads/{thread['id']}")
+    assert (detail["status"], detail["planned_version"]) == ("planned", "1.2"), detail
+    # Quadro: o cartão aparece na coluna "Planejada".
+    page.goto(f"{BASE}/admin?aba=solicitacoes&visao=quadro")
+    idle(page)
+    column = page.get_by_role("region", name=re.compile(r"^Planejada \("))
+    expect(column).to_contain_text(f"#{number}")
+    page.screenshot(path=OUT / "v11-quadro.png", full_page=True)
+    # Busca pelo número.
+    page.goto(f"{BASE}/admin?aba=solicitacoes")
+    idle(page)
+    page.get_by_placeholder(re.compile("Buscar por #número")).fill(f"#{number}")
+    page.wait_for_timeout(700)
+    expect(page.locator(".thread-list__item")).to_have_count(1)
+    # A pessoa vê o status na conversa e o aviso na caixa.
+    page.goto(f"{BASE}/mensagens/conversas/{thread['id']}")
+    idle(page)
+    expect(page.locator(".thread-view")).to_contain_text("Planejada · versão 1.2")
+    expect(page.locator(".thread-view__status-note")).to_contain_text("Entra na versão 1.2.")
+    # Responder um recado vira conversa.
+    page.goto(f"{BASE}/mensagens")
+    idle(page)
+    notice = page.locator(".inbox-item", has_text="Manutenção programada")
+    notice.locator(".inbox-item__head").click()
+    notice.get_by_role("button", name="Responder").click()
+    notice.get_by_role("textbox").fill("Obrigada pelo aviso!")
+    notice.get_by_role("button", name=re.compile("^Enviar")).click()
+    page.wait_for_url("**/mensagens/conversas/**")
+    idle(page)
+    expect(page.get_by_role("heading", name=re.compile("Resposta ao recado: Manutenção programada"))).to_be_visible()
+    page.screenshot(path=OUT / "v11-conversa-recado.png", full_page=True)
+
+
 @step("Segurança: ativar 2FA, sair, entrar com código, desativar")
 def two_factor(page: Page):
     page.goto(f"{BASE}/seguranca")
@@ -1712,7 +1822,7 @@ def mobile(browser):
     page.screenshot(path=OUT / "celular-categorias.png", full_page=True)
     overflow = page.evaluate("document.documentElement.scrollWidth > window.innerWidth")
     assert not overflow, "rolagem lateral no celular"
-    for path in ("/orcamento", "/calendario", "/metas", "/analises", "/investimentos", "/investimentos?secao=cotacoes", "/historico", "/ajustes", "/ajustes/recorrencias", "/ajustes/dados", "/ajustes/dados?aba=exportar", "/ajustes/notas", "/mensagens", "/dividas", "/divisoes", "/ajustes/app", "/analises?secao=calculadoras", "/ajustes/seguranca", "/ajustes/ajuda", "/ajustes/atalhos", "/cartoes", "/contas", "/revisar", "/busca", "/ajustes/preferencias"):
+    for path in ("/orcamento", "/calendario", "/metas", "/analises", "/investimentos", "/investimentos?secao=cotacoes", "/historico", "/ajustes", "/ajustes/recorrencias", "/ajustes/dados", "/ajustes/dados?aba=exportar", "/ajustes/notas", "/mensagens", "/mensagens/conversas", "/dividas", "/divisoes", "/ajustes/app", "/analises?secao=calculadoras", "/ajustes/seguranca", "/ajustes/ajuda", "/cartoes", "/contas", "/revisar", "/busca", "/ajustes/preferencias"):
         page.goto(BASE + path)
         idle(page, 300)
         wide = page.evaluate("document.documentElement.scrollWidth - window.innerWidth")
@@ -1778,6 +1888,7 @@ def main():
         release_notes(page)
         inbox_and_announcement(page)
         theme_on_account(page)
+        accent_colors(page)
         start_over(page)
         debts(page)
         calculators(page)
@@ -1785,6 +1896,7 @@ def main():
         month_alerts(page)
         split_expenses(page)
         app_install(page)
+        tasks_and_replies(page)
         two_factor(page)
         banner_never(page)
         STATE["state"] = ctx.storage_state()

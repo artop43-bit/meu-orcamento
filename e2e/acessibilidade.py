@@ -48,7 +48,6 @@ PAGES = [
     "/admin",
     "/admin?aba=solicitacoes",
     "/ajustes/perfil",
-    "/ajustes/solicitacoes",
     "/ajustes",
     "/ajustes/recorrencias",
     "/ajustes/categorias",
@@ -56,6 +55,8 @@ PAGES = [
     "/ajustes/dados?aba=exportar",
     "/ajustes/notas",
     "/mensagens",
+    "/mensagens/conversas",
+    "/admin?aba=solicitacoes&visao=quadro",
     "/dividas",
     "/divisoes",
     "/ajustes/app",
@@ -63,7 +64,6 @@ PAGES = [
     "/admin?aba=recados",
     "/ajustes/seguranca",
     "/ajustes/preferencias",
-    "/ajustes/atalhos",
     "/ajustes/ajuda",
 ]
 DEVICES = {
