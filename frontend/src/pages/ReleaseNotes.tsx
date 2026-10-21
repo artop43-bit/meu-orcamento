@@ -70,7 +70,7 @@ export default function ReleaseNotesPage() {
         <h2>Sugira a próxima melhoria</h2>
         <p className="muted" style={{ margin: 0 }}>
           A próxima versão é montada com as sugestões da comunidade. Envie a sua: cada solicitação ganha um número, e o andamento e a resposta
-          da administração aparecem em Mensagens › Conversas.
+          da administração aparecem em Mensagens › Solicitações.
         </p>
         <div>
           <Button type="button" variant="secondary" onClick={() => openFeedback({ kind: "idea", context: `Versão ${RELEASE.version}` })}>

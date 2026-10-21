@@ -3,7 +3,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Megaphone, Pin, Send } from "lucide-react";
 
 import { errorMessage } from "../api/client";
-import { inboxApi } from "../api/inbox";
+import { FEED_KEY, inboxApi, type FeedItem } from "../api/inbox";
+import { AnnouncementThread } from "../components/AnnouncementThread";
 import { Badge } from "../components/budget";
 import { Tip } from "../components/help";
 import { Alert, Button, Sheet, Skeleton } from "../components/ui";
@@ -17,6 +18,13 @@ function when(iso: string): string {
 export default function AdminAnnouncements() {
   const queryClient = useQueryClient();
   const history = useQuery({ queryKey: ["admin", "announcements"], queryFn: inboxApi.announcements });
+  // v1.3.1: a thread pública de cada recado (a administração vê todos).
+  const feed = useQuery({ queryKey: FEED_KEY, queryFn: inboxApi.feed });
+  const threads = new Map((feed.data ?? []).map((item) => [item.id, item]));
+  function updateThread(item: FeedItem) {
+    queryClient.setQueryData<FeedItem[]>(FEED_KEY, (list) => list?.map((i) => (i.id === item.id ? item : i)));
+    void queryClient.invalidateQueries({ queryKey: ["admin", "announcements"] });
+  }
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [important, setImportant] = useState(false);
@@ -115,9 +123,15 @@ export default function AdminAnnouncements() {
                   </span>
                   <span className="item__meta">
                     {when(a.created_at)} · {a.recipients} destinatário(s) · lido por {a.read}
-                    {a.replies > 0 && ` · ${a.replies} resposta(s) em Solicitações`}
+                    {` · ${a.replies} resposta(s)`}
                     {a.include_pending && " · incluiu quem aguarda liberação"}
                   </span>
+                  {threads.get(a.id) && (
+                    <details className="more admin-thread" open={a.replies > 0 && a.replies <= 5}>
+                      <summary>Respostas ({a.replies})</summary>
+                      <AnnouncementThread item={threads.get(a.id)!} onChange={updateThread} />
+                    </details>
+                  )}
                 </span>
               </li>
             ))}

@@ -128,7 +128,7 @@ function ThreadView({ id }: { id: string }) {
   );
 }
 
-/** Mensagens › Conversas: solicitações e respostas a recados, com a administração. */
+/** Mensagens › Solicitações: os pedidos numerados, com a conversa com a administração. */
 export function Conversations() {
   const { id } = useParams();
   const threads = useQuery({ queryKey: ["support", "mine"], queryFn: supportApi.mine });
@@ -158,7 +158,7 @@ export function Conversations() {
       )}
       {list.length > 0 && (
         <div className={`support-layout ${id ? "has-thread" : ""}`}>
-          <section className="card support-layout__list" aria-label="Conversas">
+          <section className="card support-layout__list" aria-label="Solicitações">
             <ThreadList threads={list} current={id} />
           </section>
           <div className="support-layout__detail">
@@ -171,7 +171,7 @@ export function Conversations() {
   );
 }
 
-/** Endereço antigo (Ajustes › Minhas solicitações): leva para Mensagens › Conversas. */
+/** Endereço antigo (Ajustes › Minhas solicitações): leva para Mensagens › Solicitações. */
 export default function SupportRedirect() {
   const { id } = useParams();
   return <Navigate to={id ? `${CONVERSATIONS}/${id}` : CONVERSATIONS} replace />;
