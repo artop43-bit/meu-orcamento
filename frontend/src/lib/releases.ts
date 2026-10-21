@@ -11,6 +11,20 @@ export type Release = {
 
 export const RELEASES: Release[] = [
   {
+    version: "1.3.2",
+    date: "21/10/2026 às 12:10",
+    title: "Mensagens com um só acesso",
+    sections: [
+      {
+        title: "Mensagens",
+        items: [
+          "Um só acesso no menu: o balão de Mensagens.",
+          "A nova solicitação fica na aba Solicitações; a aba Recados mostra só os recados e as respostas.",
+        ],
+      },
+    ],
+  },
+  {
     version: "1.3.1",
     date: "21/10/2026 às 11:50",
     title: "Mensagens: recados com respostas em thread e solicitações com tema e arquivos",

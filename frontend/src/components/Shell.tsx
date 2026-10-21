@@ -14,7 +14,6 @@ import {
   Landmark,
   LogOut,
   Mail,
-  MessageSquarePlus,
   Monitor,
   Moon,
   RefreshCw,
@@ -45,7 +44,7 @@ import { setCycleStart } from "../lib/format";
 import { releaseLabel } from "../release";
 import { Tour } from "./help";
 import { Avatar } from "./media";
-import { openFeedback, openPalette, PowerLayer } from "./power";
+import { openPalette, PowerLayer } from "./power";
 import { nextTheme, setAppearance, syncAppearance, THEMES } from "../lib/appearance";
 import { togglePrivacy, usePrefs } from "../lib/prefs";
 import { Brand, LoadingRegion, Sheet, Skeleton } from "./ui";
@@ -426,9 +425,6 @@ export function Shell() {
               </span>
             )}
           </NavLink>
-          <button type="button" className="sidebar__tool" onClick={openFeedback} aria-label="Nova solicitação" title="Nova solicitação (sugestão ou problema)">
-            <MessageSquarePlus size={17} />
-          </button>
         </div>
         <div className="sidebar__footer">
           <Link to="/ajustes/perfil" className="sidebar__profile" title="Meu perfil">
@@ -635,11 +631,6 @@ export function Shell() {
                 ))}
               </div>
             </fieldset>
-          </li>
-          <li>
-            <button type="button" onClick={openFeedback}>
-              <MessageSquarePlus size={20} /> Nova solicitação
-            </button>
           </li>
           <li>
             <button type="button" onClick={logout}>
