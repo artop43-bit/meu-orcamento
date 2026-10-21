@@ -2011,7 +2011,7 @@ def v14_money(page: Page):
     d.get_by_role("button", name="Adicionar conta").click()
     expect(d).to_have_count(0, timeout=8000)
     idle(page)
-    expect(page.get_by_text(re.compile("recarga de R\\$ 800,00 no dia 5"))).to_be_visible()
+    expect(page.get_by_text(re.compile(r"recarga de R\$\s800,00 no dia 5"))).to_be_visible()
 
     # MEI: ligar em Preferências mostra o faturamento e o campo na receita.
     page.goto(f"{BASE}/ajustes/preferencias")

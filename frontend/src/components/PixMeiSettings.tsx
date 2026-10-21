@@ -23,7 +23,8 @@ export function PixMeiSettings() {
   const [error, setError] = useState("");
   const [saved, setSaved] = useState("");
   const [busy, setBusy] = useState(false);
-  const mei = user?.mei ?? false;
+  // Muda na hora ao tocar; volta se o servidor recusar.
+  const [mei, setMei] = useState(user?.mei ?? false);
 
   async function save(data: Parameters<typeof inboxApi.financeSettings>[0], message: string) {
     setError("");
@@ -35,11 +36,18 @@ export function PixMeiSettings() {
       if (out.pix_key) setKey(out.pix_key);
       setSaved(message);
       announce(message);
+      return true;
     } catch (err) {
       setError(errorMessage(err));
+      return false;
     } finally {
       setBusy(false);
     }
+  }
+
+  function toggleMei(on: boolean) {
+    setMei(on);
+    void save({ mei: on }, on ? "MEI ligado" : "MEI desligado").then((ok) => ok || setMei(!on));
   }
 
   function submit(event: FormEvent) {
@@ -76,7 +84,7 @@ export function PixMeiSettings() {
         </div>
       </form>
       <label className="check" id="mei">
-        <input type="checkbox" checked={mei} onChange={(e) => void save({ mei: e.target.checked }, e.target.checked ? "MEI ligado" : "MEI desligado")} />
+        <input type="checkbox" checked={mei} onChange={(e) => toggleMei(e.target.checked)} />
         Sou MEI (microempreendedor individual)
       </label>
       {mei && <MeiPanel />}

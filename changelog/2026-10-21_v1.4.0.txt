@@ -38,5 +38,8 @@ Projetos
 Fora desta versão
 - [ ] Proventos automáticos dos investimentos: a fonte de cotações só entrega no plano pago
 
+Correções
+- [x] "Sou MEI" responde na hora ao toque (antes esperava o servidor)
+
 Técnico
 - [x] Migrações 0023 a 0026; testes de backend, frontend e ponta a ponta cobrindo as novidades
