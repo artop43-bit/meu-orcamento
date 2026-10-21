@@ -1,0 +1,27 @@
+MEU ORÇAMENTO · UPDATE LOG
+Versão 1.4.1 · Celular fluido
+Data: 21/10/2026 às 19:00 (horário de Brasília)
+
+Deslizar entre telas
+- [x] Deslizar troca direto as abas de baixo (Orçamento ↔ Carteira ↔ Planejamento ↔ Análises)
+- [x] Cada aba abre no submenu em que você estava (ou no primeiro)
+- [x] Submenus (Contas, Cartões, Dívidas, Divisões, Calendário, Metas, Insights, Histórico) só por toque
+- [x] Sem tela preta: a aba vizinha aparece colada à página enquanto o dedo arrasta, e a que sai continua o movimento junto com a que entra
+- [x] Dados das abas vizinhas adiantados: a tela já abre preenchida
+- [x] Rolar na diagonal não troca de aba; telas do "Mais" (Investimentos, Mensagens, Ajustes) não trocam por deslize
+- [x] Na primeira e na última aba, a tela resiste e volta ao lugar
+
+Menu "Mais opções"
+- [x] Ao tocar num item, o menu fecha na hora e a tela abre (sem a janela descendo por cima)
+- [x] Aberto pelo toque, o X não aparece com a moldura verde de foco (continua para quem usa teclado)
+- [x] Tema (Automático, Claro, Escuro) em três botões alinhados, numa linha só
+
+Telas
+- [x] Histórico: o gráfico dos 12 meses cabe na tela, sem rolar de lado, e os meses não se sobrepõem
+- [x] Gráficos em coluna estreita mostram só o mês ("Out"), com o ano em janeiro
+- [x] Barra de baixo com ícones e textos maiores e área de toque de pelo menos 44 px
+- [x] Seções de Insights que não cabem esmaecem na borda, indicando que dá para rolar
+
+Técnico
+- [x] Teste automático no motor do Safari (WebKit) em tamanho de iPhone 15 Pro
+- [x] Teste do deslize mede cada quadro: nenhum espaço vazio na tela durante a troca

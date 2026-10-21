@@ -11,6 +11,29 @@ export type Release = {
 
 export const RELEASES: Release[] = [
   {
+    version: "1.4.1",
+    date: "21/10/2026 às 19:00",
+    title: "Celular mais fluido",
+    sections: [
+      {
+        title: "Navegação",
+        items: [
+          "Deslize para o lado para trocar as abas de baixo; cada aba volta ao submenu em que você estava.",
+          "Os submenus (Contas, Cartões, Calendário, Metas…) ficam no toque.",
+          "Sem tela preta: a próxima aba aparece colada enquanto você desliza.",
+          "O menu Mais fecha na hora ao abrir uma tela.",
+        ],
+      },
+      {
+        title: "Telas",
+        items: [
+          "Gráfico do Histórico cabe na tela, com os meses legíveis.",
+          "Barra de baixo com ícones e textos maiores e o tema em três botões alinhados.",
+        ],
+      },
+    ],
+  },
+  {
     version: "1.4.0",
     date: "21/10/2026 às 17:00",
     title: "Pix, vale-refeição, MEI, Imposto de Renda e o raio-x dos gastos",

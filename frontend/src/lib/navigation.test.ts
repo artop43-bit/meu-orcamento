@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { groupEntry, groupOf, LEAVES, leafLabel, neighborLeaf, parentOf } from "./navigation";
+import { groupEntry, groupOf, LEAVES, leafLabel, neighborTab, parentOf } from "./navigation";
 
 describe("navegação em grupos", () => {
   it("encontra o grupo de cada tela", () => {
@@ -19,11 +19,19 @@ describe("navegação em grupos", () => {
 
   it("deslizar anda pelas telas na ordem do menu", () => {
     expect(LEAVES[0]).toBe("/orcamento");
-    expect(neighborLeaf("/orcamento", 1)).toBe("/contas");
-    expect(neighborLeaf("/divisoes", 1)).toBe("/calendario");
-    expect(neighborLeaf("/orcamento", -1)).toBeNull();
-    expect(neighborLeaf("/historico", 1)).toBeNull();
-    expect(neighborLeaf("/ajustes/perfil", 1)).toBeNull();
+    // Deslizar troca as abas de baixo, não os submenus.
+    expect(neighborTab("/orcamento", 1)).toBe("carteira");
+    expect(neighborTab("/orcamento/2026-10", 1)).toBe("carteira");
+    expect(neighborTab("/contas", 1)).toBe("planejamento");
+    expect(neighborTab("/divisoes", -1)).toBe("orcamento");
+    expect(neighborTab("/metas", 1)).toBe("analises");
+    expect(neighborTab("/orcamento", -1)).toBeNull();
+    expect(neighborTab("/historico", 1)).toBeNull();
+    // Telas do "Mais" e sub-telas não trocam de aba.
+    expect(neighborTab("/investimentos", 1)).toBeNull();
+    expect(neighborTab("/investimentos", -1)).toBeNull();
+    expect(neighborTab("/ajustes/perfil", 1)).toBeNull();
+    expect(neighborTab("/dividas/abc", 1)).toBeNull();
   });
 
   it("voltar das sub-telas", () => {

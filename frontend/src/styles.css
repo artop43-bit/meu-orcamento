@@ -6621,8 +6621,96 @@ textarea {
 }
 
 .menu-theme .segmented label {
-  flex: 1 1 0;
+  position: relative;
   justify-content: center;
+  padding: 10px 6px;
+  text-align: center;
+}
+
+/* Tema no menu (v1.4.1): três botões alinhados, sem a bolinha do rádio (o selecionado fica
+   destacado). O rádio continua lá para teclado e leitor de tela. */
+.menu-theme .segmented input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.menu-theme .segmented label:has(input:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ---------------------------------------------------------------- celular fluido (v1.4.1) */
+
+/* Tela vizinha que entra colada à página durante o deslize (nunca fica um vazio preto). */
+.swipe-peek {
+  position: fixed;
+  inset: 0;
+  z-index: 12;
+  padding: calc(56px + 20px) 16px 0;
+  background: var(--bg);
+  pointer-events: none;
+  will-change: transform;
+}
+
+.swipe-peek[hidden] {
+  display: none;
+}
+
+/* Página que sai, terminando o movimento ao lado da nova (removida ao fim da animação). */
+.swipe-ghost {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  z-index: 12;
+  overflow: hidden;
+  background: var(--bg);
+  pointer-events: none;
+  will-change: transform;
+}
+
+.swipe-peek__title {
+  display: block;
+  margin-bottom: 16px;
+  font-size: 1.6rem;
+  font-weight: 750;
+}
+
+@media (min-width: 1024px) {
+  .swipe-peek {
+    display: none;
+  }
+}
+
+/* Janela aberta pelo toque recebe o foco sem moldura (a moldura é para o teclado). */
+.sheet:focus {
+  outline: none;
+}
+
+@media (max-width: 1023px) {
+  /* Abas de baixo: texto e ícones um pouco maiores e a área de toque inteira da coluna. */
+  .tabbar a,
+  .tabbar button {
+    font-size: 0.72rem;
+    min-height: 48px;
+    padding: 0 2px;
+  }
+
+  .tabbar svg {
+    width: 22px;
+    height: 22px;
+  }
+
+  /* Seções de Insights que não cabem: esmaece as bordas para indicar que dá para rolar. */
+  .analysis__nav {
+    padding-right: 36px;
+    mask-image: linear-gradient(to right, transparent 0, #000 14px, #000 calc(100% - 32px), transparent);
+    -webkit-mask-image: linear-gradient(to right, transparent 0, #000 14px, #000 calc(100% - 32px), transparent);
+  }
 }
 
 /* ---------------------------------------------------------------- recados (administração) */

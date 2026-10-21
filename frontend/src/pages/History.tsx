@@ -35,6 +35,7 @@ export default function History() {
                 { key: "expenses", name: "Despesas", color: "var(--expense)", values: points.map((p) => Number(p.expenses)) },
               ]}
               monthLabels
+              fit
               description="Receitas e despesas por mês nos últimos 12 meses"
               onSelect={(key) => navigate(`/orcamento/${key}`)}
             />

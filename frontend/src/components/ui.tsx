@@ -139,12 +139,15 @@ export function Sheet({
   onClose,
   children,
   wide,
+  instantClose,
 }: {
   open: boolean;
   title: string;
   onClose: () => void;
   children: ReactNode;
   wide?: boolean;
+  /** Fecha sem animar (ex.: o menu "Mais" ao abrir uma tela: a tela nova já está aparecendo). */
+  instantClose?: boolean;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   // Mantém o conteúdo na tela enquanto a janela anima a saída.
@@ -170,6 +173,9 @@ export function Sheet({
         const focused = document.activeElement;
         dialog.showModal();
         if (focused instanceof HTMLElement && focused !== document.body && dialog.contains(focused)) focused.focus();
+        // No toque, o foco vai para a janela e não para o X (senão o X abre com a moldura de
+        // foco, que só faz sentido para quem usa teclado).
+        else if (matchMedia("(pointer: coarse)").matches && document.activeElement?.closest(".sheet__header")) dialog.focus();
       }
       return;
     }
@@ -181,8 +187,8 @@ export function Sheet({
       if (dialog.open) dialog.close();
       setRendered(false);
     };
-    // Já saiu arrastando, ou animações desligadas no sistema: fecha direto.
-    if (dialog.dataset.dragged || prefersReducedMotion()) {
+    // Já saiu arrastando, abriu outra tela ou animações desligadas no sistema: fecha direto.
+    if (dialog.dataset.dragged || instantClose || prefersReducedMotion()) {
       delete dialog.dataset.dragged;
       finish();
       return;
@@ -190,6 +196,7 @@ export function Sheet({
     dialog.classList.add("is-closing");
     const timer = window.setTimeout(finish, 180);
     return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   // Celular: arrastar a alça (ou o título) para baixo fecha a janela.
@@ -285,6 +292,7 @@ export function Sheet({
   return (
     <dialog
       ref={ref}
+      tabIndex={-1}
       className={`sheet ${wide ? "sheet--wide" : ""}`}
       aria-labelledby={titleId}
       onInput={() => {

@@ -41,7 +41,7 @@ export const GROUPS: NavGroup[] = [
 /** Grupos que viram abas embaixo no celular (Investimentos fica no "Mais"). */
 export const MOBILE_TABS = ["orcamento", "carteira", "planejamento", "analises"];
 
-/** Telas na ordem do menu: o gesto de deslizar anda por elas. */
+/** Telas na ordem do menu (direção da animação ao trocar de tela). */
 export const LEAVES: string[] = GROUPS.flatMap((g) => (g.children ? g.children.map((c) => c.to) : [g.to!]));
 
 /** Seção da URL ("/contas/abc" → "/contas"). */
@@ -84,9 +84,15 @@ export function parentOf(pathname: string): string | null {
   return null;
 }
 
-/** Tela vizinha na ordem do menu (1 = próxima, -1 = anterior). */
-export function neighborLeaf(pathname: string, dir: 1 | -1): string | null {
-  const index = LEAVES.indexOf(sectionOf(pathname));
+/**
+ * Aba de baixo vizinha (1 = próxima, -1 = anterior) para o gesto de deslizar no celular (v1.4.1).
+ * O gesto troca direto as abas de baixo; os submenus (Contas, Cartões…) são só por toque.
+ * Telas do "Mais" (Investimentos, Mensagens, Ajustes…) e sub-telas não trocam de aba.
+ */
+export function neighborTab(pathname: string, dir: 1 | -1): string | null {
+  if (parentOf(pathname) !== null) return null;
+  const group = groupOf(pathname);
+  const index = group ? MOBILE_TABS.indexOf(group.key) : -1;
   if (index < 0) return null;
-  return LEAVES[index + dir] ?? null;
+  return MOBILE_TABS[index + dir] ?? null;
 }
