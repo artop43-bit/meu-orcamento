@@ -12,7 +12,7 @@ export type Release = {
 export const RELEASES: Release[] = [
   {
     version: "1.4.2",
-    date: "21/10/2026 às 21:00",
+    date: "21/10/2026 às 19:52",
     title: "iPhone instalado e volta das sub-telas",
     sections: [
       {
