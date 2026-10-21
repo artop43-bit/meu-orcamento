@@ -2,10 +2,10 @@ import { useQuery } from "@tanstack/react-query";
 
 import { api } from "./client";
 
-export type ThreadKind = "idea" | "bug" | "other";
+export type ThreadKind = "idea" | "question" | "bug" | "praise" | "other";
 export type ThreadStatus = "open" | "in_progress" | "planned" | "answered" | "resolved" | "declined";
 
-export type Attachment = { id: string; width: number; height: number; content_type: string };
+export type Attachment = { id: string; width: number; height: number; content_type: string; filename?: string | null; size?: number };
 export type Message = { id: string; from_admin: boolean; body: string; created_at: string; attachments: Attachment[] };
 export type Thread = {
   id: string;
@@ -28,7 +28,8 @@ export type AdminThreadDetail = AdminThread & { user_agent: string | null; messa
 export type PersonRow = { user: Person; total: number; open: number; unread: number; last_message_at: string };
 export type SupportCounts = Record<ThreadStatus | "unread", number>;
 
-export const KIND_LABEL: Record<ThreadKind, string> = { idea: "Sugestão", bug: "Problema", other: "Outro" };
+/** Tema da solicitação (v1.3.1). */
+export const KIND_LABEL: Record<ThreadKind, string> = { idea: "Sugestão", question: "Dúvida", bug: "Erro", praise: "Elogio", other: "Outro" };
 export const STATUS_LABEL: Record<ThreadStatus, string> = {
   open: "Aberta",
   in_progress: "Em andamento",
@@ -43,6 +44,9 @@ export const STATUSES: ThreadStatus[] = ["open", "in_progress", "planned", "answ
 export const MAX_IMAGES = 3;
 export const MAX_IMAGE_MB = 5;
 export const IMAGE_ACCEPT = "image/png,image/jpeg,image/webp,image/gif";
+/** v1.3.1: anexos de mensagens também aceitam PDF e planilhas (o servidor confere o conteúdo). */
+export const ATTACHMENT_ACCEPT = `${IMAGE_ACCEPT},application/pdf,.pdf,.xlsx,.xls,.csv,.ods`;
+const DOCUMENT_EXTENSIONS = ["pdf", "xlsx", "xls", "csv", "ods"];
 
 export function fileUrl(id: string): string {
   return `/api/files/${id}`;
@@ -60,12 +64,11 @@ export const supportApi = {
   mine: () => api.get<Thread[]>("/support/threads"),
   unread: () => api.get<{ unread: number }>("/support/unread"),
   thread: (id: string) => api.get<ThreadDetail>(`/support/threads/${id}`),
-  create: (data: { title: string; kind: ThreadKind; message: string; page?: string; app_version?: string }, images: File[]) =>
+  create: (data: { kind: ThreadKind; message: string; page?: string; app_version?: string }, images: File[]) =>
     api.form<Thread>(
       "POST",
       "/support/threads",
       messageForm(data.message, images, {
-        title: data.title,
         kind: data.kind,
         ...(data.page ? { page: data.page } : {}),
         ...(data.app_version ? { app_version: data.app_version } : {}),
@@ -89,8 +92,6 @@ export const supportApi = {
   adminStatus: (id: string, data: { status: ThreadStatus; note?: string | null; version?: string | null }) =>
     api.patch<AdminThreadDetail>(`/admin/support/threads/${id}`, data),
   adminVersions: () => api.get<string[]>("/admin/support/versions"),
-  replyAnnouncement: (itemId: string, message: string, images: File[]) =>
-    api.form<ThreadDetail>("POST", `/inbox/${itemId}/reply`, messageForm(message, images)),
 };
 
 /** Respostas novas da administração (badge em Ajustes). Atualiza a cada minuto. */
@@ -102,6 +103,21 @@ export function useSupportUnread(enabled = true) {
     refetchInterval: 60_000,
     select: (d) => d.unread,
   });
+}
+
+/** Anexo de mensagem: imagem, PDF ou planilha, até 5 MB (o servidor confere o conteúdo). */
+export function checkAttachment(file: File, maxMb = MAX_IMAGE_MB): string | null {
+  const extension = file.name.split(".").pop()?.toLowerCase() ?? "";
+  if (extension === "xlsm") return `"${file.name}": planilhas com macros não são aceitas.`;
+  if (!IMAGE_ACCEPT.split(",").includes(file.type) && !DOCUMENT_EXTENSIONS.includes(extension)) {
+    return `"${file.name}": use imagem, PDF ou planilha (XLSX, XLS, CSV ou ODS).`;
+  }
+  if (file.size > maxMb * 1024 * 1024) return `"${file.name}" passa de ${maxMb} MB.`;
+  return null;
+}
+
+export function isImage(attachment: { content_type: string }): boolean {
+  return attachment.content_type.startsWith("image/");
 }
 
 /** Confere tipo e tamanho antes de enviar (o servidor confere de novo). */

@@ -960,20 +960,26 @@ def support_requests(page: Page):
     d.get_by_role("combobox").fill("solicitação")
     page.keyboard.press("Enter")
     d = page.locator("dialog[open]", has_text="Nova solicitação")
-    d.get_by_label("Problema").check()
-    d.get_by_label("Assunto").fill("Gráfico de Insights não carrega")
-    d.get_by_label("Mensagem").fill("Ao abrir Insights › Tendências o gráfico fica em branco. Segue o print.")
+    d.get_by_label("Erro", exact=True).check()
+    d.get_by_label("Mensagem").fill("Gráfico de Insights não carrega: ao abrir Insights › Tendências o gráfico fica em branco. Segue o print.")
+    expect(d.get_by_text(re.compile(r"^\d+ / 1000$"))).to_be_visible()
     d.locator("[data-testid=image-input]").set_input_files(
-        [{"name": "print.png", "mimeType": "image/png", "buffer": png_bytes(320, 200)}]
+        [
+            {"name": "print.png", "mimeType": "image/png", "buffer": png_bytes(320, 200)},
+            {"name": "extrato.csv", "mimeType": "text/csv", "buffer": "data;valor\n01/10/2026;120,50\n".encode()},
+        ]
     )
     expect(d.get_by_role("img", name="Prévia: print.png")).to_be_visible()
+    expect(d.locator(".image-picker__doc")).to_contain_text("CSV")
     d.get_by_role("button", name="Enviar solicitação").click()
     expect(d).to_contain_text("Solicitação enviada", timeout=8000)
     d.get_by_role("button", name="Acompanhar solicitação").click()
     page.wait_for_url("**/mensagens/conversas/**")
     idle(page)
-    expect(page.get_by_role("heading", name="Gráfico de Insights não carrega")).to_be_visible()
+    expect(page.get_by_role("heading", name=re.compile("Gráfico de Insights não carrega"))).to_be_visible()
     expect(page.get_by_role("img", name="Imagem anexada 1")).to_be_visible()
+    # Planilha anexada: só baixa (nunca abre dentro do app).
+    expect(page.locator(".doc-chip")).to_contain_text("extrato.csv")
     assert image_loaded(page, ".attachments img"), "a imagem enviada não abriu"
     [thread] = api(page, "/support/threads")
     assert (thread["status"], thread["kind"]) == ("open", "bug"), thread
@@ -983,7 +989,7 @@ def support_requests(page: Page):
     idle(page)
     page.get_by_role("button", name=re.compile("Gráfico de Insights não carrega")).click()
     idle(page)
-    expect(page.get_by_role("heading", name="Gráfico de Insights não carrega")).to_be_visible()
+    expect(page.get_by_role("heading", name=re.compile("Gráfico de Insights não carrega"))).to_be_visible()
     page.get_by_label("Mensagem", exact=True).fill("Corrigido na próxima versão. Obrigado pelo print.")
     page.get_by_role("button", name="Enviar mensagem").click()
     expect(page.locator(".bubble--mine")).to_contain_text("Corrigido na próxima versão", timeout=8000)
@@ -1001,14 +1007,14 @@ def support_requests(page: Page):
     expect(page.locator(".thread-list__item")).to_have_count(1)
     page.screenshot(path=OUT / "v075-admin-solicitacoes.png", full_page=True)
 
-    # Usuário: a conversa (com número) fica em Mensagens › Conversas; ao abrir, fica lida.
+    # Usuário: a conversa (com número) fica em Mensagens › Solicitações; ao abrir, fica lida.
     assert api(page, "/support/unread")["unread"] == 1
     page.goto(f"{BASE}/mensagens")
     idle(page)
-    page.get_by_role("navigation", name="Mensagens").get_by_role("link", name="Conversas").click()
+    page.get_by_role("navigation", name="Mensagens").get_by_role("link", name="Solicitações").click()
     page.wait_for_url("**/mensagens/conversas")
     idle(page)
-    page.get_by_role("link", name=re.compile(r"#\d+ Gráfico de Insights não carrega")).click()
+    page.get_by_role("link", name=re.compile(r"#\d+ .*Gráfico de Insights não carrega")).click()
     idle(page)
     expect(page.locator(".bubble--other")).to_contain_text("Corrigido na próxima versão")
     assert api(page, "/support/unread")["unread"] == 0
@@ -1391,12 +1397,6 @@ def release_notes(page: Page):
 
 @step("v0.9: caixa de Mensagens com a resposta da solicitação e recado da administração")
 def inbox_and_announcement(page: Page):
-    # A resposta dada em Administração › Solicitações também chegou na caixa (já lida, pois a
-    # conversa foi aberta).
-    page.goto(f"{BASE}/mensagens")
-    idle(page)
-    reply = page.locator(".inbox-item", has_text="Gráfico de Insights não carrega")
-    expect(reply).to_have_count(1)
     # Recado global: escreve, revisa e envia.
     page.goto(f"{BASE}/admin?aba=recados")
     idle(page)
@@ -1420,21 +1420,16 @@ def inbox_and_announcement(page: Page):
     balloon.click()
     page.wait_for_url("**/mensagens")
     idle(page)
-    first = page.locator(".inbox-item").first
+    # v1.3.1: Recados é uma lista só (sem "não lidas"); abrir já conta como lido.
+    first = page.locator(".notice").first
     expect(first).to_contain_text("Manutenção programada")
     expect(first).to_contain_text("Importante")
-    assert api(page, "/inbox/unread")["unread"] == 1
-    first.locator(".inbox-item__head").click()
-    expect(first.locator(".inbox-item__text")).to_contain_text("sábado")
-    idle(page)
+    expect(first.locator(".notice__body")).to_contain_text("sábado")
+    expect(page.get_by_role("radiogroup", name="Filtrar mensagens")).to_have_count(0)
+    idle(page, 500)
     page.screenshot(path=OUT / "v09-mensagens.png", full_page=True)
-    assert api(page, "/inbox/unread")["unread"] == 0, "abrir a mensagem deveria marcar como lida"
-    first.get_by_role("button", name="Marcar como não lida").click()
-    idle(page)
-    assert api(page, "/inbox/unread")["unread"] == 1
-    page.get_by_role("button", name="Marcar todas como lidas").click()
-    idle(page)
-    assert api(page, "/inbox/unread")["unread"] == 0
+    assert api(page, "/inbox/unread")["unread"] == 0, "abrir os recados deveria marcar como lidos"
+    expect(balloon.locator(".sidebar__tool-badge")).to_have_count(0)
     # A cópia por e-mail vai para o painel de e-mails enviados.
     emails = api(page, "/admin/emails")
     assert any("Manutenção programada" in e["subject"] for e in emails), "recado sem cópia por e-mail"
@@ -1790,18 +1785,28 @@ def tasks_and_replies(page: Page):
     idle(page)
     expect(page.locator(".thread-view")).to_contain_text("Planejada · versão 1.2")
     expect(page.locator(".thread-view__status-note")).to_contain_text("Entra na versão 1.2.")
-    # Responder um recado vira conversa.
+    # v1.3.1: responder um recado publica na thread do próprio recado (visível para todos).
     page.goto(f"{BASE}/mensagens")
     idle(page)
-    notice = page.locator(".inbox-item", has_text="Manutenção programada")
-    notice.locator(".inbox-item__head").click()
-    notice.get_by_role("button", name="Responder").click()
-    notice.get_by_role("textbox").fill("Obrigada pelo aviso!")
-    notice.get_by_role("button", name=re.compile("^Enviar")).click()
-    page.wait_for_url("**/mensagens/conversas/**")
+    notice = page.locator(".notice", has_text="Manutenção programada")
+    notice.get_by_label("Responder ao recado Manutenção programada").fill("Obrigada pelo aviso!")
+    expect(notice).to_contain_text("visível para todos que receberam o recado")
+    notice.get_by_role("button", name="Publicar resposta").click()
+    expect(notice.locator(".thread__reply")).to_contain_text("Obrigada pelo aviso!")
+    expect(notice.locator(".thread__reply")).to_contain_text("Você")
+    assert all("Resposta ao recado" not in t["title"] for t in api(page, "/support/threads"))
+    page.screenshot(path=OUT / "v131-thread-recado.png", full_page=True)
+    # A administração vê e responde na mesma thread.
+    page.goto(f"{BASE}/admin?aba=recados")
     idle(page)
-    expect(page.get_by_role("heading", name=re.compile("Resposta ao recado: Manutenção programada"))).to_be_visible()
-    page.screenshot(path=OUT / "v11-conversa-recado.png", full_page=True)
+    row = page.locator(".item", has_text="Manutenção programada")
+    expect(row).to_contain_text("1 resposta(s)")
+    thread = row.locator(".admin-thread")
+    expect(thread).to_contain_text("Obrigada pelo aviso!")
+    thread.get_by_label("Responder ao recado Manutenção programada").fill("Combinado, obrigado!")
+    thread.get_by_role("button", name="Publicar resposta").click()
+    expect(thread.locator(".thread__reply")).to_have_count(2)
+    expect(thread.locator(".thread__reply").nth(1)).to_contain_text("ADM")
 
 
 @step("v1.3: compra dividida em categorias, comprovante por foto e lançamento sem internet")

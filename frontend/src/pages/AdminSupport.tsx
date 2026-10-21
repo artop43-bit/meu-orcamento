@@ -215,7 +215,7 @@ function AdminThreadPanel({ id, onBack }: { id: string; onBack: () => void }) {
       </header>
       <Conversation messages={data.messages} viewer="admin" userName={name} />
       <Composer
-        placeholder="Responder (a pessoa vê em Mensagens › Conversas)"
+        placeholder="Responder (a pessoa vê em Mensagens › Solicitações)"
         onSend={async (message, images) => {
           const updated = await supportApi.adminReply(id, message, images);
           await saved(updated);

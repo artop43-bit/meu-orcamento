@@ -1,7 +1,7 @@
 import { useEffect, useId, useMemo, useRef, useState, type FormEvent } from "react";
-import { ImagePlus, Paperclip, Send, X } from "lucide-react";
+import { FileSpreadsheet, FileText, Paperclip, Send, X } from "lucide-react";
 
-import { fileUrl, IMAGE_ACCEPT, MAX_IMAGE_MB, MAX_IMAGES, checkImage, type Message } from "../api/support";
+import { ATTACHMENT_ACCEPT, fileUrl, isImage, MAX_IMAGE_MB, MAX_IMAGES, checkAttachment, type Message } from "../api/support";
 import { errorMessage } from "../api/client";
 import { Alert, Button, Sheet } from "./ui";
 
@@ -32,14 +32,33 @@ export function Avatar({
   );
 }
 
-/** Miniaturas das imagens de uma mensagem; um toque amplia. */
+function sizeLabel(bytes = 0): string {
+  return bytes >= 1024 * 1024 ? `${(bytes / 1024 / 1024).toFixed(1).replace(".", ",")} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`;
+}
+
+/** Miniaturas das imagens de uma mensagem (um toque amplia) e documentos para baixar. */
 export function AttachmentGrid({ items }: { items: Message["attachments"] }) {
   const [open, setOpen] = useState<string | null>(null);
   if (!items.length) return null;
+  const images = items.filter(isImage);
+  const docs = items.filter((item) => !isImage(item));
   return (
     <>
+      {docs.length > 0 && (
+        <ul className="doc-list">
+          {docs.map((doc) => (
+            <li key={doc.id}>
+              <a className="doc-chip" href={fileUrl(doc.id)} download={doc.filename ?? undefined}>
+                {doc.content_type === "application/pdf" ? <FileText size={16} aria-hidden /> : <FileSpreadsheet size={16} aria-hidden />}
+                <span className="doc-chip__name">{doc.filename ?? "arquivo"}</span>
+                <span className="muted small">{sizeLabel(doc.size)} · baixar</span>
+              </a>
+            </li>
+          ))}
+        </ul>
+      )}
       <div className="attachments">
-        {items.map((item, index) => (
+        {images.map((item, index) => (
           <button key={item.id} type="button" className="attachments__item" onClick={() => setOpen(item.id)} aria-label={`Ampliar imagem ${index + 1}`}>
             <img src={fileUrl(item.id)} alt={`Imagem anexada ${index + 1}`} loading="lazy" decoding="async" width={item.width} height={item.height} />
           </button>
@@ -60,24 +79,24 @@ export function AttachmentGrid({ items }: { items: Message["attachments"] }) {
 }
 
 /**
- * Seleção de imagens para anexar: até 3, com prévia e remoção. No celular, o seletor do
- * sistema oferece câmera e galeria.
+ * Seleção de anexos: até 3 (imagens, PDF ou planilhas), com prévia das imagens e remoção.
+ * No celular, o seletor do sistema oferece câmera, galeria e arquivos.
  */
 export function ImagePicker({ files, onChange }: { files: File[]; onChange: (files: File[]) => void }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState("");
   const hintId = useId();
-  const previews = useMemo(() => files.map((f) => URL.createObjectURL(f)), [files]);
-  useEffect(() => () => previews.forEach((url) => URL.revokeObjectURL(url)), [previews]);
+  const previews = useMemo(() => files.map((f) => (f.type.startsWith("image/") ? URL.createObjectURL(f) : "")), [files]);
+  useEffect(() => () => previews.forEach((url) => url && URL.revokeObjectURL(url)), [previews]);
 
   function add(list: FileList | null) {
     if (!list) return;
     const problems: string[] = [];
     const next = [...files];
     for (const file of Array.from(list)) {
-      const problem = checkImage(file);
+      const problem = checkAttachment(file);
       if (problem) problems.push(problem);
-      else if (next.length >= MAX_IMAGES) problems.push(`Limite de ${MAX_IMAGES} imagens por mensagem.`);
+      else if (next.length >= MAX_IMAGES) problems.push(`Limite de ${MAX_IMAGES} arquivos por mensagem.`);
       else next.push(file);
     }
     setError([...new Set(problems)].join(" "));
@@ -95,20 +114,20 @@ export function ImagePicker({ files, onChange }: { files: File[]; onChange: (fil
           disabled={files.length >= MAX_IMAGES}
           aria-describedby={hintId}
         >
-          <ImagePlus size={16} /> Anexar imagem
+          <Paperclip size={16} /> Anexar arquivos
         </Button>
         <span id={hintId} className="muted small">
-          Até {MAX_IMAGES} imagens (PNG, JPG, WebP ou GIF, até {MAX_IMAGE_MB} MB cada).
+          Até {MAX_IMAGES} arquivos de até {MAX_IMAGE_MB} MB: imagem, PDF ou planilha (XLSX, XLS, CSV ou ODS).
         </span>
       </div>
       <input
         ref={inputRef}
         type="file"
-        accept={IMAGE_ACCEPT}
+        accept={ATTACHMENT_ACCEPT}
         multiple
         hidden
         onChange={(e) => add(e.target.files)}
-        aria-label="Escolher imagens"
+        aria-label="Escolher arquivos"
         data-testid="image-input"
       />
       {error && (
@@ -120,7 +139,14 @@ export function ImagePicker({ files, onChange }: { files: File[]; onChange: (fil
         <ul className="image-picker__list">
           {files.map((file, index) => (
             <li key={`${file.name}-${index}`}>
-              <img src={previews[index]} alt={`Prévia: ${file.name}`} />
+              {previews[index] ? (
+                <img src={previews[index]} alt={`Prévia: ${file.name}`} />
+              ) : (
+                <span className="image-picker__doc" title={file.name}>
+                  <FileText size={18} aria-hidden />
+                  <span>{file.name.split(".").pop()?.toUpperCase()}</span>
+                </span>
+              )}
               <button
                 type="button"
                 className="icon-btn image-picker__remove"
@@ -220,7 +246,7 @@ export function Composer({
         <button
           type="button"
           className="icon-btn"
-          aria-label="Anexar imagens"
+          aria-label="Anexar arquivos"
           aria-pressed={showPicker || images.length > 0}
           onClick={() => setShowPicker((v) => !v)}
         >

@@ -11,6 +11,28 @@ export type Release = {
 
 export const RELEASES: Release[] = [
   {
+    version: "1.3.1",
+    date: "21/10/2026 às 11:50",
+    title: "Mensagens: recados com respostas em thread e solicitações com tema e arquivos",
+    sections: [
+      {
+        title: "Mensagens",
+        items: [
+          "Duas abas: Recados e Solicitações. O botão “Nova solicitação” e o balão do menu continuam iguais.",
+          "Recados numa lista só, com as respostas em thread no próprio recado, visíveis para todos que o receberam.",
+          "Respostas antigas a recados passaram para a thread do recado.",
+        ],
+      },
+      {
+        title: "Nova solicitação",
+        items: [
+          "Tema em botões (Sugestão, Dúvida, Erro, Elogio ou Outro) e mensagem de até 1000 caracteres.",
+          "Anexe até 3 arquivos de até 5 MB: imagens, PDF ou planilhas (XLSX, XLS, CSV ou ODS).",
+        ],
+      },
+    ],
+  },
+  {
     version: "1.3.0",
     date: "21/10/2026 às 10:45",
     title: "Voz, foto do comprovante, sem internet, desafios e painel personalizado",
