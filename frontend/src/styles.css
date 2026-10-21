@@ -7171,13 +7171,13 @@ textarea {
 }
 
 /* ---------------------------------------------------------------- v1.1: cores de destaque */
-.swatches {
+.accent-swatches {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
   gap: 8px;
 }
 
-.swatch {
+.accent-swatch {
   --dot: var(--swatch);
   position: relative;
   display: flex;
@@ -7192,23 +7192,23 @@ textarea {
   font-size: 0.9rem;
 }
 
-:root[data-theme="dark"] .swatch {
+:root[data-theme="dark"] .accent-swatch {
   --dot: var(--swatch-dark);
 }
 
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .swatch {
+  :root:not([data-theme="light"]) .accent-swatch {
     --dot: var(--swatch-dark);
   }
 }
 
-.swatch input {
+.accent-swatch input {
   position: absolute;
   opacity: 0;
   pointer-events: none;
 }
 
-.swatch__dot {
+.accent-swatch__dot {
   flex: none;
   width: 20px;
   height: 20px;
@@ -7217,19 +7217,19 @@ textarea {
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--fg) 15%, transparent);
 }
 
-.swatch:has(input:checked) {
+.accent-swatch:has(input:checked) {
   border-color: var(--accent);
   background: var(--accent-soft);
   font-weight: 600;
 }
 
-.swatch:has(input:checked) .swatch__dot {
+.accent-swatch:has(input:checked) .accent-swatch__dot {
   box-shadow:
     0 0 0 2px var(--surface),
     0 0 0 4px var(--dot);
 }
 
-.swatch:has(input:focus-visible) {
+.accent-swatch:has(input:focus-visible) {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }

@@ -721,7 +721,7 @@ function BreakdownCard({ data, categories }: { data: MonthData; categories: Cate
         </div>
         <div className="split small">
           <span>
-            <i className="swatch" style={{ background: "#4e79a7" }} />
+            <i className="swatch" style={{ background: "var(--info)" }} />
             Essencial <strong>{money(s.essential_total)}</strong>
           </span>
           <span>

@@ -1488,16 +1488,16 @@ def accent_colors(page: Page):
     page.goto(f"{BASE}/ajustes/preferencias")
     idle(page)
     picker = page.get_by_role("group", name="Cor de destaque")
-    expect(picker.locator(".swatch")).to_have_count(10)
+    expect(picker.locator(".accent-swatch")).to_have_count(10)
     # Clica na amostra (o rádio fica escondido sob ela).
-    picker.locator(".swatch", has_text="Grafite").click()
+    picker.locator(".accent-swatch", has_text="Grafite").click()
     expect(picker.get_by_label("Grafite")).to_be_checked()
     expect(page.locator("html")).to_have_attribute("data-accent", "grafite")
     page.wait_for_timeout(400)
     assert api(page, "/auth/me")["accent"] == "grafite"
     picker.scroll_into_view_if_needed()
     page.screenshot(path=OUT / "v11-cores.png")
-    picker.locator(".swatch", has_text="Verde").click()
+    picker.locator(".accent-swatch", has_text="Verde").click()
     expect(page.locator("html")).to_have_attribute("data-accent", "verde")
     page.wait_for_timeout(400)
     assert api(page, "/auth/me")["accent"] == "verde"
