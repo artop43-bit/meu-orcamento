@@ -8,6 +8,7 @@ from fastapi import APIRouter, Query
 from pydantic import BaseModel, Field, field_validator
 
 from app.api.deps import AdminUser, CurrentUser, DbSession, MailerDep
+from app.services import announcements as threads
 from app.services import inbox, reset
 
 router = APIRouter(tags=["mensagens e conta"])
@@ -119,6 +120,64 @@ def announcements(_: AdminUser, db: DbSession) -> list[AnnouncementOut]:
         )
         for row in inbox.list_announcements(db)
     ]
+
+
+# ---------------------------------------------------------------- respostas aos recados (v1.3.1)
+
+
+class ReplyOut(BaseModel):
+    id: uuid.UUID
+    author_name: str
+    avatar_id: uuid.UUID | None
+    from_admin: bool
+    mine: bool
+    migrated: bool
+    can_delete: bool
+    body: str
+    created_at: datetime
+
+
+class FeedItemOut(BaseModel):
+    id: uuid.UUID
+    title: str
+    body: str
+    important: bool
+    created_at: datetime
+    replies: list[ReplyOut]
+
+
+class ThreadReplyIn(BaseModel):
+    message: str = Field(min_length=1, max_length=1000)
+
+
+def _feed_item(row) -> FeedItemOut:  # type: ignore[no-untyped-def]
+    a = row["announcement"]
+    return FeedItemOut(
+        id=a.id,
+        title=a.title,
+        body=a.body,
+        important=a.important,
+        created_at=a.created_at,
+        replies=[ReplyOut(**r) for r in row["replies"]],
+    )
+
+
+@router.get("/announcements")
+def announcement_feed(user: CurrentUser, db: DbSession) -> list[FeedItemOut]:
+    """Recados recebidos, com as respostas em thread (pública)."""
+    return [_feed_item(row) for row in threads.feed(db, user)]
+
+
+@router.post("/announcements/{announcement_id}/replies")
+def reply_to_announcement(
+    announcement_id: uuid.UUID, body: ThreadReplyIn, user: CurrentUser, db: DbSession
+) -> FeedItemOut:
+    return _feed_item(threads.reply(db, user, announcement_id, body.message))
+
+
+@router.delete("/announcement-replies/{reply_id}", status_code=204)
+def delete_announcement_reply(reply_id: uuid.UUID, user: CurrentUser, db: DbSession) -> None:
+    threads.delete_reply(db, user, reply_id)
 
 
 @router.get("/admin/announcements/audience")

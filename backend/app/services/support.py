@@ -46,16 +46,34 @@ def _add_message(
     from_admin: bool,
 ) -> SupportMessage:
     if len(uploads) > MAX_FILES:
-        raise AppError(400, "too_many_files", f"Envie no máximo {MAX_FILES} imagens por mensagem.")
+        raise AppError(400, "too_many_files", f"Envie no máximo {MAX_FILES} arquivos por mensagem.")
     message = SupportMessage(
         thread_id=thread.id, author_id=author.id, from_admin=from_admin, body=body
     )
     db.add(message)
     db.flush()
-    for raw in uploads:
-        files.store(db, author, raw, "attachment", message_id=message.id)
+    for upload in uploads:
+        # Cada anexo chega como bytes ou (bytes, nome do arquivo) (v1.3.1: documentos).
+        raw, name = upload if isinstance(upload, tuple) else (upload, None)
+        files.store(db, author, raw, "attachment", message_id=message.id, filename=name)
     thread.last_message_at = message.created_at or utcnow()
     return message
+
+
+TOPICS = {
+    "idea": "Sugestão",
+    "question": "Dúvida",
+    "bug": "Erro",
+    "praise": "Elogio",
+    "other": "Outro",
+}
+
+
+def _title_from(kind: str, message: str) -> str:
+    """v1.3.1: a solicitação nova não tem assunto; o título é o tema e o começo do texto."""
+    text = " ".join(message.split())
+    excerpt = text if len(text) <= 70 else text[:70].rsplit(" ", 1)[0] + "…"
+    return f"{TOPICS.get(kind, 'Outro')}: {excerpt}"
 
 
 def _next_number(db: Session) -> int:
@@ -70,11 +88,12 @@ def create_thread(
     user_agent: str | None,
     announcement_id: uuid.UUID | None = None,
 ) -> SupportThread:
+    title = (data.get("title") or "").strip() or _title_from(data["kind"], data["message"])
     thread = SupportThread(
         number=_next_number(db),
         announcement_id=announcement_id,
         user_id=user.id,
-        title=data["title"],
+        title=title[:120],
         kind=data["kind"],
         status="open",
         user_unread=False,
@@ -148,7 +167,14 @@ def messages(db: Session, thread: SupportThread) -> list[dict[str, Any]]:
             "body": m.body,
             "created_at": m.created_at,
             "attachments": [
-                {"id": f.id, "width": f.width, "height": f.height, "content_type": f.content_type}
+                {
+                    "id": f.id,
+                    "width": f.width,
+                    "height": f.height,
+                    "content_type": f.content_type,
+                    "filename": f.filename,
+                    "size": f.size,
+                }
                 for f in attachments.get(m.id, [])
             ],
         }
@@ -245,39 +271,6 @@ def admin_set_status(
         inbox.notify_status(db, thread, mail)
     db.commit()
     return thread
-
-
-def reply_announcement(
-    db: Session, user: User, item_id: uuid.UUID, body: str, uploads: list[bytes]
-) -> SupportThread:
-    """Responder um recado: abre (ou continua) uma conversa ligada a ele."""
-    from app.models import Announcement, InboxItem
-
-    item = db.get(InboxItem, item_id)
-    if item is None or item.user_id != user.id or item.announcement_id is None:
-        raise AppError(404, "not_found", "Recado não encontrado.")
-    announcement = db.get(Announcement, item.announcement_id)
-    if announcement is None:
-        raise AppError(404, "not_found", "Recado não encontrado.")
-    thread = db.scalar(
-        select(SupportThread).where(
-            SupportThread.user_id == user.id, SupportThread.announcement_id == announcement.id
-        )
-    )
-    if thread is None:
-        return create_thread(
-            db,
-            user,
-            {
-                "title": f"Resposta ao recado: {announcement.title}"[:120],
-                "kind": "other",
-                "message": body,
-            },
-            uploads,
-            None,
-            announcement_id=announcement.id,
-        )
-    return reply_mine(db, user, thread.id, body, uploads)
 
 
 def _search(stmt: Select[Any], query: str | None) -> Select[Any]:

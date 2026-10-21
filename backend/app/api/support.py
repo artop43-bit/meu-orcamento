@@ -11,21 +11,26 @@ from app.api.deps import CurrentUser, DbSession, MailerDep
 from app.core.errors import AppError
 from app.core.months import parse_month
 from app.models import SupportThread, User
-from app.services import files, profile, support
+from app.services import documents, files, profile, support
 
 router = APIRouter(tags=["solicitações e perfil"])
 
 Title = Annotated[str, StringConstraints(strip_whitespace=True, min_length=3, max_length=120)]
 Body = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=4000)]
-Kind = Literal["idea", "bug", "other"]
+# v1.3.1: tema da solicitação.
+Kind = Literal["idea", "question", "bug", "praise", "other"]
 Status = Literal["open", "in_progress", "planned", "answered", "resolved", "declined"]
-Uploads = Annotated[list[UploadFile] | None, File(description="Até 3 imagens")]
+Uploads = Annotated[list[UploadFile] | None, File(description="Até 3 arquivos")]
+# Solicitação nova: tema e texto de até 1000 caracteres (o título sai do texto).
+FirstMessage = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=1000)
+]
 
 
 class ThreadIn(BaseModel):
-    title: Title
+    title: Title | None = None
     kind: Kind
-    message: Body
+    message: FirstMessage
     page: Annotated[str, StringConstraints(max_length=200)] | None = None
     app_version: Annotated[str, StringConstraints(max_length=20)] | None = None
 
@@ -39,6 +44,8 @@ class Attachment(BaseModel):
     width: int
     height: int
     content_type: str
+    filename: str | None = None
+    size: int = 0
 
 
 class MessageOut(BaseModel):
@@ -110,19 +117,19 @@ def _parse(model: type[BaseModel], **values: Any) -> Any:
         raise AppError(422, "validation_error", f"Campo inválido: {field}.") from exc
 
 
-def _read(uploads: list[UploadFile] | None) -> list[bytes]:
+def _read(uploads: list[UploadFile] | None) -> list[tuple[bytes, str | None]]:
     items = [u for u in (uploads or []) if u.filename]
     if len(items) > support.MAX_FILES:
-        raise AppError(400, "too_many_files", f"Envie no máximo {support.MAX_FILES} imagens.")
+        raise AppError(400, "too_many_files", f"Envie no máximo {support.MAX_FILES} arquivos.")
     limit = files.RULES["attachment"].max_bytes
     data = []
     for upload in items:
         raw = upload.file.read(limit + 1)  # lê no máximo o limite (+1 para detectar excesso)
         if len(raw) > limit:
             raise AppError(
-                413, "file_too_large", f"Cada imagem pode ter até {limit // files.MB} MB."
+                413, "file_too_large", f"Cada arquivo pode ter até {limit // files.MB} MB."
             )
-        data.append(raw)
+        data.append((raw, upload.filename))
     return data
 
 
@@ -165,9 +172,9 @@ def my_unread(user: CurrentUser, db: DbSession) -> dict[str, int]:
 def create_thread(
     user: CurrentUser,
     db: DbSession,
-    title: Annotated[str, Form()],
     kind: Annotated[str, Form()],
     message: Annotated[str, Form()],
+    title: Annotated[str | None, Form()] = None,
     page: Annotated[str | None, Form()] = None,
     app_version: Annotated[str | None, Form()] = None,
     images: Uploads = None,
@@ -321,22 +328,6 @@ def admin_versions(user: CurrentUser, db: DbSession) -> list[str]:
     return support.admin_versions(db, user)
 
 
-# ---------------------------------------------------------------- resposta a um recado
-
-
-@router.post("/inbox/{item_id}/reply")
-def reply_announcement(
-    item_id: uuid.UUID,
-    user: CurrentUser,
-    db: DbSession,
-    message: Annotated[str, Form()],
-    images: Uploads = None,
-) -> ThreadDetail:
-    data = _parse(ReplyIn, message=message)
-    thread = support.reply_announcement(db, user, item_id, data.message, _read(images))
-    return ThreadDetail(**_thread(thread, False), messages=support.messages(db, thread))
-
-
 # ---------------------------------------------------------------- perfil
 
 ProfileText = Annotated[str, StringConstraints(strip_whitespace=True, max_length=160)]
@@ -431,6 +422,22 @@ def profile_retrospective(
 @router.get("/files/{file_id}")
 def get_file(file_id: uuid.UUID, user: CurrentUser, db: DbSession) -> Response:
     item = files.get_for(db, user, file_id)
+    if item.content_type in documents.DOCUMENT_TYPES:
+        # PDF e planilhas (v1.3.1): só baixam, nunca abrem dentro do app.
+        name = item.filename or documents.safe_name(None, item.content_type)
+        ascii_name = name.encode("ascii", "replace").decode().replace("?", "_").replace('"', "")
+        return Response(
+            content=item.data,
+            media_type=item.content_type,
+            headers={
+                "Cache-Control": "private, no-store",
+                "Content-Disposition": (
+                    f'attachment; filename="{ascii_name}"; filename*=UTF-8{{quote(name)}}'
+                ),
+                "X-Content-Type-Options": "nosniff",
+                "Content-Security-Policy": "default-src 'none'; sandbox",
+            },
+        )
     return Response(
         content=item.data,
         media_type=item.content_type,

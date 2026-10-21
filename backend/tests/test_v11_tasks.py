@@ -81,31 +81,6 @@ def test_status_as_task_notifies_and_filters(
     assert bad.status_code == 422
 
 
-def test_reply_to_announcement_becomes_conversation(
-    people: TestClient, db: Session, outbox: list[OutgoingEmail]
-) -> None:
-    switch(people, "chefe@example.com")
-    people.post("/api/admin/announcements", json={"title": "Bom dia amigos!", "body": "Novidades."})
-    switch(people, "ana@example.com")
-    [item] = [i for i in people.get("/api/inbox").json() if i["kind"] == "announcement"]
-    reply = people.post(f"/api/inbox/{item['id']}/reply", data={"message": "Obrigada!"})
-    assert reply.status_code == 200, reply.text
-    thread = reply.json()
-    assert thread["title"] == "Resposta ao recado: Bom dia amigos!"
-    assert thread["announcement_id"] and thread["number"] == 1
-    # Responder de novo continua a mesma conversa.
-    again = people.post(f"/api/inbox/{item['id']}/reply", data={"message": "Mais uma coisa."})
-    assert again.json()["id"] == thread["id"] and len(again.json()["messages"]) == 2
-    # A administração vê a conversa e quantos responderam o recado.
-    switch(people, "chefe@example.com")
-    [row] = people.get("/api/admin/support/threads").json()
-    assert row["announcement_id"] == thread["announcement_id"] and row["unread"] is True
-    [announcement] = people.get("/api/admin/announcements").json()
-    assert announcement["replies"] == 1
-    # Ninguém responde em nome de outra pessoa nem a itens que não são recados.
-    assert people.post(f"/api/inbox/{item['id']}/reply", data={"message": "x"}).status_code == 404
-
-
 def test_numbers_survive_alongside_existing_threads(people: TestClient, db: Session) -> None:
     new_thread(people, "Primeira")
     db.expire_all()

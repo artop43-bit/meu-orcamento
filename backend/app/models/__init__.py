@@ -21,6 +21,7 @@ from app.models.budget import (
 from app.models.debts import Loan, NetWorthSnapshot, OtherDebt, SplitShare
 from app.models.support import (
     Announcement,
+    AnnouncementReply,
     ErrorEvent,
     InboxItem,
     StoredFile,
@@ -40,6 +41,7 @@ from app.models.user import (
 )
 
 __all__ = [
+    "AnnouncementReply",
     "ErrorEvent",
     "Challenge",
     "Announcement",

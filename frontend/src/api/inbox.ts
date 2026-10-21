@@ -25,6 +25,22 @@ export type Announcement = {
   created_at: string;
 };
 
+/** v1.3.1: recado com as respostas em thread (pública). */
+export type FeedReply = {
+  id: string;
+  author_name: string;
+  avatar_id: string | null;
+  from_admin: boolean;
+  mine: boolean;
+  migrated: boolean;
+  can_delete: boolean;
+  body: string;
+  created_at: string;
+};
+export type FeedItem = { id: string; title: string; body: string; important: boolean; created_at: string; replies: FeedReply[] };
+
+export const FEED_KEY = ["inbox", "feed"] as const;
+
 export type AnnouncementInput = { title: string; body: string; important: boolean; include_pending: boolean };
 
 export type ResetArea = "entries" | "recurring" | "accounts" | "cards" | "goals" | "investments" | "categories" | "analyses" | "debts";
@@ -34,6 +50,9 @@ export const inboxApi = {
   unread: () => api.get<{ unread: number }>("/inbox/unread"),
   mark: (id: string, read: boolean) => api.patch<InboxItem>(`/inbox/${id}`, { read }),
   readAll: () => api.post<{ unread: number }>("/inbox/read-all"),
+  feed: () => api.get<FeedItem[]>("/announcements"),
+  reply: (id: string, message: string) => api.post<FeedItem>(`/announcements/${id}/replies`, { message }),
+  deleteReply: (id: string) => api.delete(`/announcement-replies/${id}`),
 
   announcements: () => api.get<Announcement[]>("/admin/announcements"),
   audience: (includePending: boolean) =>

@@ -383,7 +383,6 @@ export function WhatsNew() {
 export function FeedbackSheet() {
   const [open, setOpen] = useState(false);
   const [kind, setKind] = useState<ThreadKind>("idea");
-  const [title, setTitle] = useState("");
   const [message, setMessage] = useState("");
   const [images, setImages] = useState<File[]>([]);
   const [error, setError] = useState("");
@@ -410,7 +409,6 @@ export function FeedbackSheet() {
     try {
       const thread = await supportApi.create(
         {
-          title: title.trim(),
           kind,
           message: context ? `${message.trim()}
 
@@ -420,7 +418,6 @@ export function FeedbackSheet() {
         },
         images,
       );
-      setTitle("");
       setMessage("");
       setImages([]);
       setSent(thread.id);
@@ -440,7 +437,7 @@ export function FeedbackSheet() {
         <div className="stack">
           <Alert tone="success">
             Solicitação enviada{sentNumber ? `, com o número #${sentNumber}` : ""}. Acompanhe o andamento e a resposta da administração em Mensagens ›
-            Conversas.
+            Solicitações.
           </Alert>
           <div className="form-actions">
             <Button type="button" variant="secondary" onClick={() => setOpen(false)}>
@@ -462,10 +459,10 @@ export function FeedbackSheet() {
           <Alert tone="error">{error}</Alert>
           {context && <p className="muted small" style={{ margin: 0 }}>Referente a: {context}</p>}
           <fieldset className="radios">
-            <legend className="field-label">Tipo</legend>
-            <div className="segmented segmented--3">
+            <legend className="field-label">Tema</legend>
+            <div className="chips topic-chips">
               {(Object.keys(KIND_LABEL) as ThreadKind[]).map((value) => (
-                <label key={value}>
+                <label key={value} className="chip-radio">
                   <input type="radio" name="kind" checked={kind === value} onChange={() => setKind(value)} />
                   {KIND_LABEL[value]}
                 </label>
@@ -473,26 +470,26 @@ export function FeedbackSheet() {
             </div>
           </fieldset>
           <label>
-            Assunto
-            <input
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              minLength={3}
-              maxLength={120}
-              required
-              placeholder={kind === "bug" ? "Ex.: Gráfico de Insights não carrega" : "Ex.: Exportar relatório anual em PDF"}
-            />
-          </label>
-          <label>
             Mensagem
             <textarea
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               rows={5}
-              maxLength={4000}
+              maxLength={1000}
               required
-              placeholder={kind === "bug" ? "Passos realizados, resultado esperado e resultado obtido." : "Descreva a sugestão."}
+              placeholder={
+                kind === "bug"
+                  ? "O que você fez, o que esperava e o que aconteceu."
+                  : kind === "question"
+                    ? "Qual é a sua dúvida?"
+                    : kind === "praise"
+                      ? "O que você mais gostou?"
+                      : "Conte a sua ideia ou o que você gostaria de ver no app."
+              }
             />
+            <small className={`muted ${message.length >= 950 ? "tone--warn" : ""}`} aria-live="polite" style={{ alignSelf: "flex-end" }}>
+              {message.length} / 1000
+            </small>
           </label>
           <ImagePicker files={images} onChange={setImages} />
           <p className="muted small" style={{ margin: 0 }}>

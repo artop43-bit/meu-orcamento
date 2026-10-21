@@ -242,9 +242,11 @@ def list_announcements(db: Session) -> list[dict[str, Any]]:
         .correlate(Announcement)
         .scalar_subquery()
     )
+    from app.models import AnnouncementReply
+
     replies = (
         select(func.count())
-        .where(SupportThread.announcement_id == Announcement.id)
+        .where(AnnouncementReply.announcement_id == Announcement.id)
         .correlate(Announcement)
         .scalar_subquery()
     )
