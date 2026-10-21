@@ -12,7 +12,7 @@ export type Release = {
 export const RELEASES: Release[] = [
   {
     version: "1.4.1",
-    date: "21/10/2026 às 19:00",
+    date: "21/10/2026 às 18:42",
     title: "Celular mais fluido",
     sections: [
       {
