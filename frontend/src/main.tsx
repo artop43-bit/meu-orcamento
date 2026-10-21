@@ -25,7 +25,11 @@ captureInstallPrompt();
 
 // Dados ficam "frescos" por 30 s: navegar entre páginas não recarrega tudo a cada toque.
 // Depois de salvar algo, as telas afetadas são recarregadas na hora (invalidateQueries).
-const queryClient = new QueryClient({ defaultOptions: { queries: { staleTime: 30_000 } } });
+// Gravações rodam mesmo sem rede: sem internet, a fila do aparelho (lib/offline) guarda o
+// lançamento; com a pausa padrão da biblioteca, ele ficaria preso sem aviso.
+const queryClient = new QueryClient({
+  defaultOptions: { queries: { staleTime: 30_000 }, mutations: { networkMode: "always" } },
+});
 
 // Lançamentos feitos sem internet sobem sozinhos quando a conexão volta; depois, as telas se atualizam.
 startOfflineSync(() => void queryClient.invalidateQueries({ queryKey: ["budget"] }));

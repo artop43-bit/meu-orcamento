@@ -1930,7 +1930,7 @@ def v13_planning(page: Page):
     # Personalizar o painel: esconder a meta principal e voltar ao padrão.
     page.get_by_role("button", name="Personalizar o painel").click()
     d = dialog(page)
-    d.get_by_label("Meta principal").uncheck()
+    d.get_by_role("checkbox", name="Meta principal").uncheck()
     d.get_by_role("button", name="Descer Lançamento rápido").click()
     page.screenshot(path=OUT / "v13-painel.png")
     d.get_by_role("button", name="Salvar painel").click()
