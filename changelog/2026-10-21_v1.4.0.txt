@@ -1,0 +1,42 @@
+MEU ORÇAMENTO · UPDATE LOG
+Versão 1.4.0 · Pix, vale-refeição, MEI, Imposto de Renda e o raio-x dos gastos
+Data: 21/10/2026 às 17:00 (horário de Brasília)
+
+Divisões e Pix
+- [x] Chave Pix em Preferências (CPF, CNPJ, celular, e-mail ou chave aleatória, validada e normalizada)
+- [x] "Cobrar via Pix" em cada pessoa das Divisões: QR Code e Pix copia e cola com o valor devido, para copiar ou compartilhar
+
+Contas
+- [x] Novo tipo "Vale-refeição ou alimentação": recarga mensal automática (vira receita no dia escolhido)
+- [x] O vale só paga despesas da categoria escolhida (padrão Alimentação); apagar a conta encerra a recarga
+
+MEI
+- [x] Opção "Sou MEI" em Preferências, com o faturamento do ano e o quanto falta para o teto de R$ 81.000
+- [x] Receita marcada como "Faturamento do MEI"; aviso (e push) ao chegar em 80% do teto
+- [x] Atalho para criar o lembrete mensal do DAS
+
+Imposto de Renda e conciliação
+- [x] Resumo anual com "Para o Imposto de Renda": despesas dedutíveis, rendimentos, bens em 31/12 e dívidas
+- [x] Categoria pode ser marcada como dedutível (saúde, educação, previdência, pensão)
+- [x] Importar extrato reconhece o que já foi lançado à mão (mesmo valor, até 3 dias de diferença) e não duplica
+
+Calendário
+- [x] Despesas grandes previstas mostram quanto guardar por mês até a data ("Guardar por mês")
+- [x] Vencimentos na agenda do celular: link secreto (Google Agenda, iPhone), que pode ser trocado ou desligado
+- [x] Aviso diário opcional "Disponível hoje" por notificação
+
+Insights e Investimentos
+- [x] Tarifas e juros pagos no ano (tarifas, anuidade, IOF, juros, multas e juros de financiamentos)
+- [x] Sua inflação × IPCA: variação dos gastos por categoria em 12 meses
+- [x] Calculadora "13º e restituição"
+- [x] Meta de alocação da carteira e quanto do próximo aporte vai para cada classe (sem recomendar produtos)
+
+Projetos
+- [x] Despesa pode ter um projeto (ex.: "Reforma", "Viagem Bahia"), em "Observação e projeto"
+- [x] Filtro por projeto na Busca, com total, teto opcional e gerenciamento
+
+Fora desta versão
+- [ ] Proventos automáticos dos investimentos: a fonte de cotações só entrega no plano pago
+
+Técnico
+- [x] Migrações 0023 a 0026; testes de backend, frontend e ponta a ponta cobrindo as novidades

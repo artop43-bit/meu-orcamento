@@ -3,14 +3,16 @@
  * do changelog (pasta changelog/), que tem a mesma versão, data e hora.
  */
 export const RELEASE = {
-  version: "1.3.2",
+  version: "1.4.0",
   // Data e hora (Brasília) em que o update foi publicado.
-  releasedAt: "2026-10-21T12:10:00-03:00",
+  releasedAt: "2026-10-21T17:00:00-03:00",
 };
 
 /** Mostrado uma vez em "Novidades" depois do update (curto: o detalhe fica no changelog). */
 export const RELEASE_NOTES: { title: string; text: string }[] = [
-  { title: "Mensagens num só lugar.", text: "Acesse pelo balão do menu; a nova solicitação fica na aba Solicitações." },
+  { title: "Cobre via Pix.", text: "Cadastre sua chave em Preferências e cobre quem te deve nas Divisões." },
+  { title: "Vale-refeição, MEI e IR.", text: "Novo tipo de conta, faturamento do MEI e o resumo do Imposto de Renda no relatório anual." },
+  { title: "Raio-x dos gastos.", text: "Tarifas e juros do ano, sua inflação e projetos para agrupar despesas." },
 ];
 
 export function releaseLabel(): string {
