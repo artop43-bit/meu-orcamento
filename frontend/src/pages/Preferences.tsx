@@ -57,11 +57,11 @@ function AccentPicker({ value }: { value: AccentName }) {
   return (
     <fieldset className="radios">
       <legend className="field-label">Cor de destaque</legend>
-      <div className="swatches">
+      <div className="accent-swatches">
         {accents.map(([name, accent]) => (
-          <label key={name} className="swatch" style={{ "--swatch": accent.light.accent, "--swatch-dark": accent.dark.accent } as CSSProperties}>
+          <label key={name} className="accent-swatch" style={{ "--swatch": accent.light.accent, "--swatch-dark": accent.dark.accent } as CSSProperties}>
             <input type="radio" name="accent" checked={value === name} onChange={() => setAppearance({ accent: name }, queryClient)} />
-            <span className="swatch__dot" aria-hidden />
+            <span className="accent-swatch__dot" aria-hidden />
             {accent.label}
           </label>
         ))}
