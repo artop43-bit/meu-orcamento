@@ -34,6 +34,7 @@ import { AnalysisResult, Builder, PRESETS, SavedCard, useSaved } from "../compon
 import { Bar } from "../components/budget";
 import { Calculators } from "../components/Calculators";
 import { Chart } from "../components/chart/Chart";
+import { FeesCard, PersonalInflationCard } from "../components/XRay";
 import { AlertsCard, ConsultantCard, useInsights } from "../components/consultant";
 import { Alert, Button, Kpi, LoadingRegion, PageHeader, Skeleton } from "../components/ui";
 import { useUndo } from "../components/undo";
@@ -467,6 +468,11 @@ function CategoriesSection({ month, setMonth }: { month: string; setMonth: (m: s
           </ul>
         )}
       </section>
+      {/* v1.4: onde o dinheiro escapa. */}
+      <div className="layout-2">
+        <FeesCard />
+        <PersonalInflationCard />
+      </div>
     </>
   );
 }

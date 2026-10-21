@@ -26,6 +26,10 @@ export type Account = {
   benefit_category_id?: string | null;
 };
 
+/** v1.4: projeto/etiqueta (despesas de categorias diferentes juntas, com teto opcional). */
+export type Project = { id: string; name: string; budget: string | null; total: string; count: number; pct: number | null };
+export const PROJECTS_KEY = ["budget", "projects"] as const;
+
 export type AccountBalance = { account: Account; balance: string; end_of_month: string };
 
 export type Transfer = {
@@ -113,6 +117,9 @@ export const moneyApi = {
   confirmReview: (ids: string[], categories?: Record<string, string | null>, category_id?: string | null) =>
     api.post<{ count: number }>("/review/confirm", { ids, categories, category_id: category_id ?? null }),
 
+  projects: () => api.get<Project[]>("/projects"),
+  updateProject: (id: string, data: { name?: string; budget?: string | null }) => api.patch<{ id: string; name: string }>(`/projects/${id}`, data),
+  deleteProject: (id: string) => api.delete(`/projects/${id}`),
   search: (params: Record<string, string>) => {
     const query = new URLSearchParams(Object.entries(params).filter(([, v]) => v !== "")).toString();
     return api.get<SearchResponse>(`/search${query ? `?${query}` : ""}`);

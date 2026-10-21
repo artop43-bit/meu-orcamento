@@ -11,6 +11,7 @@ import {
 } from "../api/analysis";
 import { useBudgetMutation } from "../api/budget";
 import { errorMessage } from "../api/client";
+import { AllocationTarget } from "../components/AllocationTarget";
 import { marketApi } from "../api/market";
 import { Badge, Bar, FormActions, MoneyInput, requireMoney } from "../components/budget";
 import { EmptyGuide, Tip } from "../components/help";
@@ -367,6 +368,7 @@ function Portfolio() {
                     </li>
                   ))}
                 </ul>
+                <AllocationTarget current={Object.fromEntries(byKind)} labels={INVESTMENT_KINDS as Record<string, string>} />
               </section>
             )}
             {refresh.data && <PortfolioComments comments={refresh.data.comments} />}

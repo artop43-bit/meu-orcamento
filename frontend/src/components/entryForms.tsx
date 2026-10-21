@@ -1,6 +1,6 @@
 import { useEffect, useId, useMemo, useRef, useState, type FormEvent } from "react";
 import { createPortal } from "react-dom";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { CreditCard, Plus, Sparkles, Split, Trash2, Users } from "lucide-react";
 
 import {
@@ -29,7 +29,7 @@ import { ReceiptsField } from "./Receipts";
 import { ReceiptReader } from "./ReceiptReader";
 import { discard, isQueued, OFFLINE_SAVED, sendOrQueue } from "../lib/offline";
 import { SplitForm } from "./SplitForm";
-import { useAccounts } from "../api/money";
+import { moneyApi, PROJECTS_KEY, useAccounts } from "../api/money";
 import { DateField, DayField } from "./DateField";
 import { normalizeText } from "../lib/text";
 import { errorMessage } from "../api/client";
@@ -272,7 +272,16 @@ export function ExpenseForm({
   const [interval, setInterval] = useState<Interval>(1);
   const [until, setUntil] = useState("");
   const [scope, setScope] = useState<EditScope>("one");
-  const [moreOpen, setMoreOpen] = useState(!!start?.notes);
+  // v1.4: projeto/etiqueta (opcional).
+  const projects = useQuery({ queryKey: PROJECTS_KEY, queryFn: moneyApi.projects });
+  const [project, setProject] = useState("");
+  const projectLoaded = useRef(false);
+  useEffect(() => {
+    if (projectLoaded.current || !expense?.project_id || !projects.data) return;
+    projectLoaded.current = true;
+    setProject(projects.data.find((p) => p.id === expense.project_id)?.name ?? "");
+  }, [expense?.project_id, projects.data]);
+  const [moreOpen, setMoreOpen] = useState(!!start?.notes || !!expense?.project_id);
   const [error, setError] = useState("");
   const [savedCount, setSavedCount] = useState(0);
   const [cardId, setCardId] = useState<string>(expense?.card_id ?? "");
@@ -385,6 +394,8 @@ export function ExpenseForm({
     const extra = {
       payment_method: payment || null,
       notes: notes.trim() || null,
+      // Na edição, só manda o projeto depois de carregado (senão apagaria o atual).
+      project_name: expense?.project_id && !projectLoaded.current ? undefined : project.trim(),
       account_id: card || debitCard ? null : accountId || null,
     };
     if (makeRule && canOfferRule && rulePatternText.trim().length >= 2) {
@@ -894,11 +905,22 @@ export function ExpenseForm({
       )}
 
       <details className="more" open={moreOpen} onToggle={(e) => setMoreOpen((e.target as HTMLDetailsElement).open)}>
-        <summary>Observação</summary>
+        <summary>Observação e projeto</summary>
         <div className="stack stack--tight" style={{ marginTop: 12 }}>
           <label>
             <span className="sr-only">Observação</span>
             <textarea value={notes} onChange={(e) => setNotes(e.target.value)} maxLength={500} rows={2} placeholder="Informações adicionais" />
+          </label>
+          <label>
+            <span className="field-label">
+              Projeto (opcional) <Tip>Junta despesas de categorias diferentes, como “Viagem Bahia” ou “Reforma”. O total aparece na Busca.</Tip>
+            </span>
+            <input value={project} onChange={(e) => setProject(e.target.value)} maxLength={40} list="projetos" placeholder="Ex.: Viagem Bahia" autoComplete="off" />
+            <datalist id="projetos">
+              {(projects.data ?? []).map((p) => (
+                <option key={p.id} value={p.name} />
+              ))}
+            </datalist>
           </label>
         </div>
       </details>

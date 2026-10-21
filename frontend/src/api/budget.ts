@@ -84,6 +84,8 @@ export type Expense = {
   recurring_id: string | null;
   /** v1.3: parte de uma compra dividida em categorias. */
   split_group_id?: string | null;
+  /** v1.4: projeto/etiqueta. */
+  project_id?: string | null;
 };
 
 export type CategoryTotal = {
@@ -217,6 +219,8 @@ export type ExpenseInput = {
   parts?: { category_id: string; amount: string }[] | null;
   /** v1.3: identificador do aparelho (lançamento sem internet, sem duplicar no reenvio). */
   client_ref?: string;
+  /** v1.4: projeto/etiqueta pelo nome ("" tira). */
+  project_name?: string | null;
 };
 
 /** Leitura da foto de um comprovante (v1.3). */

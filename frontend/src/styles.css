@@ -7790,3 +7790,43 @@ textarea {
   display: grid;
   gap: 4px;
 }
+
+.project-summary {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.project-row {
+  flex-wrap: wrap;
+}
+
+.project-row__budget {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.project-row__budget .money-input,
+.project-row__budget input {
+  max-width: 130px;
+}
+
+.allocation-target {
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.allocation-target__row {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) 90px auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.allocation-target__head {
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
