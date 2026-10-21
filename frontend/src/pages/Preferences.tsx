@@ -77,6 +77,7 @@ type NotifyPrefs = {
   notify_monthly: boolean;
   notify_messages: boolean;
   notify_alerts: boolean;
+  notify_weekly: boolean;
 };
 
 /** Mês financeiro: começa no dia 1 ou no dia do salário. Vale para toda a conta. */
@@ -185,6 +186,10 @@ function EmailNotices() {
           <label className="check">
             <input type="checkbox" checked={p.notify_alerts} onChange={(e) => void update({ notify_alerts: e.target.checked })} />
             Alertas de gastos fora do padrão e de assinaturas
+          </label>
+          <label className="check">
+            <input type="checkbox" checked={p.notify_weekly} onChange={(e) => void update({ notify_weekly: e.target.checked })} />
+            Resumo da semana, às segundas às 8h (gastos da semana e o que vence nos próximos 7 dias)
           </label>
           <p className="muted small" style={{ margin: 0 }}>
             O aviso de acesso por um aparelho novo é sempre enviado, por segurança.

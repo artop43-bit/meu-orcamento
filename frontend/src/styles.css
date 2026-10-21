@@ -7431,3 +7431,74 @@ label > .split-parts__start {
   display: grid;
   gap: 2px;
 }
+
+/* ---------------------------------------------------------------- desafios */
+.challenge__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 1rem;
+}
+
+.challenge-option {
+  align-items: flex-start !important;
+}
+
+/* ---------------------------------------------------------------- modo sem culpa */
+.recovery-card {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 16px;
+  border-left: 4px solid var(--accent);
+}
+
+.recovery-card h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.recovery-card__icon {
+  color: var(--accent);
+  flex: none;
+}
+
+.recovery-steps {
+  display: grid;
+  gap: 18px;
+  margin: 0;
+  padding-left: 22px;
+}
+
+.recovery-steps > li::marker {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.recovery-steps h3 {
+  margin: 0 0 6px;
+  font-size: 1rem;
+}
+
+.recovery-steps p {
+  margin: 6px 0 0;
+}
+
+.recovery-list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.recovery-list li {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px 12px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}

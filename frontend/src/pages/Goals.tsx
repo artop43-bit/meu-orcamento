@@ -4,6 +4,7 @@ import { ImagePlus, Pencil, Plus, Star, Target, Trash2, X } from "lucide-react";
 
 import { budgetApi, keys, useBudgetMutation, type Goal, type GoalKind } from "../api/budget";
 import { errorMessage } from "../api/client";
+import { Challenges } from "../components/Challenges";
 import { checkImage, fileUrl, IMAGE_ACCEPT } from "../api/support";
 import { Bar, MoneyInput, requireMoney } from "../components/budget";
 import { DateField } from "../components/DateField";
@@ -361,6 +362,7 @@ export default function Goals() {
           </div>
         </section>
       )}
+      <Challenges />
       <Sheet open={adding} title="Nova meta" onClose={() => setAdding(false)}>
         {adding && <GoalForm onDone={() => setAdding(false)} />}
       </Sheet>

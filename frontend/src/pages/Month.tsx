@@ -47,6 +47,7 @@ import { EmptyGuide, Tip } from "../components/help";
 import { ConsultantTeaser } from "../components/consultant";
 import { GoalTeaser } from "../components/GoalTeaser";
 import { MonthAlerts } from "../components/MonthAlerts";
+import { RecoveryCard } from "../components/RecoveryPlan";
 import { Chart } from "../components/chart/Chart";
 import { extrasApi, saveQuickEntry, useCards, useDaily } from "../api/extras";
 import { moneyApi, useReviewCount } from "../api/money";
@@ -1072,6 +1073,7 @@ export default function MonthPage() {
             <>
               <Kpis data={data.data} />
               <ConsultantTeaser month={month} />
+              {Number(data.data.summary.balance) < 0 && <RecoveryCard month={month} />}
             </>
           )}
           <div className="layout-main-side">
