@@ -31,6 +31,11 @@ class UserOut(BaseModel):
     month_start_day: int = 1
     # v1.3: cartões do Orçamento (ordem e visibilidade), em JSON; None = padrão.
     dashboard: str | None = None
+    # v1.4: chave Pix (para cobrar nas Divisões) e MEI.
+    pix_key: str | None = None
+    pix_name: str | None = None
+    pix_city: str | None = None
+    mei: bool = False
 
     @model_validator(mode="after")
     def _admin(self) -> "UserOut":

@@ -82,6 +82,10 @@ class RecurringItem(Base):
     income_type: Mapped[str | None] = mapped_column(String(10))
     payment_method: Mapped[str | None] = mapped_column(String(12))
     notes: Mapped[str | None] = mapped_column(String(500))
+    # v1.4: renda que entra numa conta (ex.: recarga do vale-refeição).
+    account_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("money_accounts.id", ondelete="SET NULL")
+    )
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
 
 
@@ -105,6 +109,8 @@ class Income(Base):
     )
     # Dia previsto do recebimento (opcional).
     day: Mapped[int | None] = mapped_column(SmallInteger)
+    # v1.4: faturamento do MEI (conta para o teto anual).
+    mei: Mapped[bool] = mapped_column(default=False, server_default="0")
     notes: Mapped[str | None] = mapped_column(String(500))
     # Identificador da origem (extrato bancário ou arquivo antigo), para não importar duas vezes.
     import_ref: Mapped[str | None] = mapped_column(String(80))
@@ -372,6 +378,14 @@ class MoneyAccount(Base):
     initial_balance: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=Decimal("0"))
     color: Mapped[str | None] = mapped_column(String(7))
     archived: Mapped[bool] = mapped_column(default=False, server_default="0")
+    # v1.4: vale-refeição/alimentação ("benefit"): só paga a categoria escolhida e recebe a
+    # recarga mensal por uma renda fixa ligada à conta.
+    benefit_category_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("categories.id", ondelete="SET NULL")
+    )
+    recurring_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("recurring_items.id", ondelete="SET NULL")
+    )
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
 
 

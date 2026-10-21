@@ -1,7 +1,9 @@
 """v0.9: caixa de mensagens, recados da administração, aparência na conta e começar do zero."""
 
+import re
 import uuid
 from datetime import datetime
+from decimal import Decimal
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Query
@@ -272,6 +274,83 @@ def dashboard(body: DashboardIn, user: CurrentUser, db: DbSession) -> DashboardO
         user.dashboard = json.dumps(cards, separators=(",", ":"))
     db.commit()
     return DashboardOut(dashboard=user.dashboard)
+
+
+# ---------------------------------------------------------------- Pix e MEI (v1.4)
+
+PIX_KEY = re.compile(
+    r"^(\d{11}|\d{14}|\+55\d{10,11}|[^@\s]{1,64}@[^@\s]+\.[^@\s]+|"
+    r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$"
+)
+
+
+def _pix_key(raw: str) -> str:
+    """CPF/CNPJ (só números), celular (+55...), e-mail ou chave aleatória."""
+    value = raw.strip()
+    digits = re.sub(r"\D", "", value)
+    if re.fullmatch(r"[\d.\-/ ]+", value) and len(digits) in (11, 14):
+        value = digits
+    elif (
+        re.fullmatch(r"[+\d() \-]+", value) and len(digits) in (12, 13) and digits.startswith("55")
+    ):
+        value = f"+{digits}"
+    elif re.fullmatch(r"[\d() \-]+", value) and len(digits) in (10, 11):
+        value = f"+55{digits}"
+    if not PIX_KEY.match(value):
+        raise ValueError("Chave Pix inválida. Use CPF, CNPJ, celular, e-mail ou a chave aleatória.")
+    return value
+
+
+class FinanceSettingsIn(BaseModel):
+    pix_key: str | None = Field(default=None, max_length=80)
+    pix_name: str | None = Field(default=None, max_length=25)
+    pix_city: str | None = Field(default=None, max_length=15)
+    mei: bool | None = None
+
+    @field_validator("pix_key")
+    @classmethod
+    def _key(cls, value: str | None) -> str | None:
+        return _pix_key(value) if value and value.strip() else None
+
+
+class FinanceSettingsOut(BaseModel):
+    pix_key: str | None
+    pix_name: str | None
+    pix_city: str | None
+    mei: bool
+
+
+@router.patch("/me/finance-settings")
+def finance_settings(
+    body: FinanceSettingsIn, user: CurrentUser, db: DbSession
+) -> FinanceSettingsOut:
+    """Chave Pix (nome e cidade entram no código Pix) e a opção "Sou MEI"."""
+    data = body.model_dump(exclude_unset=True)
+    for key in ("pix_key", "pix_name", "pix_city"):
+        if key in data:
+            setattr(user, key, (data[key] or "").strip() or None)
+    if data.get("mei") is not None:
+        user.mei = data["mei"]
+    db.commit()
+    return FinanceSettingsOut(
+        pix_key=user.pix_key, pix_name=user.pix_name, pix_city=user.pix_city, mei=user.mei
+    )
+
+
+class MeiOut(BaseModel):
+    year: int
+    total: Decimal
+    limit: Decimal
+    pct: float
+    count: int
+
+
+@router.get("/mei")
+def mei_summary(user: CurrentUser, db: DbSession, year: int | None = None) -> MeiOut:
+    """Faturamento do MEI no ano (receitas marcadas como MEI) contra o teto anual."""
+    from app.services import mei
+
+    return MeiOut(**mei.summary(db, user, year))
 
 
 # ---------------------------------------------------------------- mês financeiro

@@ -150,6 +150,7 @@ def _materialize(db: Session, item: RecurringItem, month: date) -> None:
                 day=item.due_day,
                 notes=item.notes,
                 recurring_id=item.id,
+                account_id=item.account_id,
             )
         )
     else:
@@ -348,6 +349,27 @@ def _check_account(db: Session, user: User, account_id: uuid.UUID | None) -> Non
         from app.models import MoneyAccount
 
         _owned(db, MoneyAccount, account_id, user)
+
+
+def _check_benefit(
+    db: Session, user: User, account_id: uuid.UUID | None, category_id: uuid.UUID | None
+) -> None:
+    """Vale-refeição/alimentação (v1.4) só paga a categoria escolhida na conta."""
+    if account_id is None:
+        return
+    from app.models import MoneyAccount
+
+    account = db.get(MoneyAccount, account_id)
+    if account is None or account.kind != "benefit" or account.benefit_category_id is None:
+        return
+    if category_id != account.benefit_category_id:
+        category = db.get(Category, account.benefit_category_id)
+        name = category.name if category else "a categoria do vale"
+        raise AppError(
+            400,
+            "benefit_category",
+            f"{account.name} só paga despesas de {name}. Escolha essa categoria ou outra conta.",
+        )
 
 
 MONTH_NAMES = (
@@ -582,6 +604,7 @@ def _create_expense(db: Session, user: User, month: date, data: dict[str, Any]) 
 
         data["category_id"] = rules.matcher(db, user)(data["description"])
     _check_category(db, user, data.get("category_id"))
+    _check_benefit(db, user, data.get("account_id"), data.get("category_id"))
 
     if card_id is not None:
         return _create_card_expense(
@@ -751,6 +774,12 @@ def update_expense(
     if "category_id" in changes:
         _check_category(db, user, changes["category_id"])
     _check_account(db, user, changes.get("account_id"))
+    _check_benefit(
+        db,
+        user,
+        changes["account_id"] if "account_id" in changes else expense.account_id,
+        changes["category_id"] if "category_id" in changes else expense.category_id,
+    )
     shared = {k: v for k, v in changes.items() if k in _EXPENSE_TO_RECURRING}
     if scope == "following" and shared:
         if expense.installment_group_id is not None:

@@ -534,6 +534,23 @@ def run_daily(db: Session, now: datetime | None = None) -> dict[str, int]:
                 if message and _claim(db, user, "monthly", f"{previous:%Y-%m}"):
                     deliver(db, user, message)
                     sent["monthly"] += 1
+            # v1.4: "Disponível hoje" no aparelho, todo dia (só para quem ligou).
+            if user.push_daily and _claim(db, user, "daily", today.isoformat()):
+                from app.services import daily, push
+
+                month = month_of(today, user.month_start_day)
+                can = daily.forecast(db, user, month, today=today).get("can_spend")
+                if can:
+                    value = "" if user.notify_hide_values else f" {brl(can['today'])}"
+                    push.send(
+                        db,
+                        user,
+                        "daily",
+                        f"Disponível hoje:{value}" if value else "Disponível hoje",
+                        f"{can['days_left']} dia(s) até o fim do mês. Toque para ver o saldo previsto.",
+                        "/orcamento",
+                    )
+                    sent["daily"] = sent.get("daily", 0) + 1
             # Resumo da semana às segundas (e-mail e aparelho, cada um com a sua opção).
             if today.weekday() == 0 and (user.notify_weekly or user.push_weekly):
                 message = weekly_message(db, user, today)

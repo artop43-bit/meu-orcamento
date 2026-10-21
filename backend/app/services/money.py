@@ -12,8 +12,24 @@ from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.core.errors import AppError
-from app.core.months import add_months, cycle_date, cycle_range, month_of, with_day
-from app.models import Category, CreditCard, Expense, Income, MoneyAccount, Transfer, User
+from app.core.months import (
+    add_months,
+    cycle_date,
+    cycle_range,
+    format_month,
+    month_of,
+    with_day,
+)
+from app.models import (
+    Category,
+    CreditCard,
+    Expense,
+    Income,
+    MoneyAccount,
+    RecurringItem,
+    Transfer,
+    User,
+)
 from app.services import budget
 from app.services.suggest import normalize
 
@@ -22,32 +38,120 @@ ZERO = Decimal("0.00")
 # ---------------------------------------------------------------- contas
 
 
+def _with_benefit(db: Session, account: MoneyAccount) -> MoneyAccount:
+    """Vale (v1.4): expõe o valor e o dia da recarga (guardados na renda fixa ligada)."""
+    item = db.get(RecurringItem, account.recurring_id) if account.recurring_id else None
+    account.benefit_amount = item.amount if item else None  # type: ignore[attr-defined]
+    account.benefit_day = item.due_day if item else None  # type: ignore[attr-defined]
+    return account
+
+
 def list_accounts(db: Session, user: User, include_archived: bool = False) -> list[MoneyAccount]:
     stmt = select(MoneyAccount).where(MoneyAccount.user_id == user.id)
     if not include_archived:
         stmt = stmt.where(MoneyAccount.archived.is_(False))
-    return list(db.scalars(stmt.order_by(MoneyAccount.created_at)))
+    return [_with_benefit(db, a) for a in db.scalars(stmt.order_by(MoneyAccount.created_at))]
+
+
+def _sync_benefit(
+    db: Session, user: User, account: MoneyAccount, amount: Decimal | None, day: int | None
+) -> None:
+    """Recarga do vale = renda fixa ligada à conta (entra no orçamento e no saldo do vale)."""
+    item = db.get(RecurringItem, account.recurring_id) if account.recurring_id else None
+    this_month = budget.current_month(user.month_start_day)
+    if account.kind != "benefit" or not amount:
+        if item is not None:
+            _end_benefit(db, user, item, this_month)
+            account.recurring_id = None
+        return
+    if item is None:
+        item = RecurringItem(
+            user_id=user.id,
+            kind="income",
+            description=f"Recarga: {account.name}"[:120],
+            amount=amount,
+            income_type="fixed",
+            due_day=day,
+            start_month=this_month,
+            account_id=account.id,
+        )
+        db.add(item)
+        db.flush()
+        account.recurring_id = item.id
+        budget._materialize_opened(db, user, item, this_month)
+        return
+    budget.update_recurring(
+        db,
+        user,
+        item.id,
+        {"amount": amount, "due_day": day, "description": f"Recarga: {account.name}"[:120]},
+        from_month=this_month,
+    )
+
+
+def _end_benefit(db: Session, user: User, item: RecurringItem, this_month: date) -> None:
+    """Para a recarga a partir deste mês (as já recebidas ficam no histórico)."""
+    if item.start_month >= this_month:
+        for income in db.scalars(select(Income).where(Income.recurring_id == item.id)):
+            db.delete(income)
+        db.delete(item)
+        return
+    budget.update_recurring(
+        db, user, item.id, {"end_month": format_month(add_months(this_month, -1))}
+    )
+
+
+def _benefit_fields(db: Session, user: User, data: dict[str, Any]) -> tuple[Any, Any]:
+    amount = data.pop("benefit_amount", None)
+    day = data.pop("benefit_day", None)
+    if data.get("benefit_category_id") is not None:
+        budget._check_category(db, user, data["benefit_category_id"])
+    return amount, day
 
 
 def create_account(db: Session, user: User, data: dict[str, Any]) -> MoneyAccount:
+    amount, day = _benefit_fields(db, user, data)
+    if data.get("kind") == "benefit" and data.get("benefit_category_id") is None:
+        food = db.scalar(
+            select(Category).where(Category.user_id == user.id, Category.name == "Alimentação")
+        )
+        data["benefit_category_id"] = food.id if food else None
     account = MoneyAccount(user_id=user.id, **data)
     db.add(account)
+    db.flush()
+    _sync_benefit(db, user, account, amount, day)
     db.commit()
-    return account
+    return _with_benefit(db, account)
 
 
 def update_account(
     db: Session, user: User, account_id: uuid.UUID, changes: dict[str, Any]
 ) -> MoneyAccount:
     account = budget._owned(db, MoneyAccount, account_id, user)
+    touches_benefit = "benefit_amount" in changes or "benefit_day" in changes or "kind" in changes
+    amount, day = _benefit_fields(db, user, changes)
     budget._apply(account, changes)
+    if touches_benefit:
+        current = _with_benefit(db, account)
+        _sync_benefit(
+            db,
+            user,
+            account,
+            amount if amount is not None else current.benefit_amount,  # type: ignore[attr-defined]
+            day if day is not None else current.benefit_day,  # type: ignore[attr-defined]
+        )
     db.commit()
-    return account
+    return _with_benefit(db, account)
 
 
 def delete_account(db: Session, user: User, account_id: uuid.UUID) -> None:
     """Exclui a conta; os lançamentos ficam sem conta e as transferências dela somem."""
     account = budget._owned(db, MoneyAccount, account_id, user)
+    if account.recurring_id:
+        item = db.get(RecurringItem, account.recurring_id)
+        account.recurring_id = None
+        if item is not None:
+            _end_benefit(db, user, item, budget.current_month(user.month_start_day))
     for model in (Expense, Income, CreditCard):
         for item in db.scalars(select(model).where(model.account_id == account.id)):
             item.account_id = None

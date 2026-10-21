@@ -90,6 +90,7 @@ class IncomeIn(BaseModel):
     until_month: MonthStr | None = None
     account_id: uuid.UUID | None = None
     client_ref: ClientRef | None = None
+    mei: bool = False
 
 
 class IncomePatch(BaseModel):
@@ -99,6 +100,7 @@ class IncomePatch(BaseModel):
     day: DueDay | None = None
     notes: Notes | None = None
     account_id: uuid.UUID | None = None
+    mei: bool | None = None
 
 
 class IncomeOut(_MonthOut):
@@ -110,6 +112,7 @@ class IncomeOut(_MonthOut):
     notes: str | None
     account_id: uuid.UUID | None
     recurring_id: uuid.UUID | None
+    mei: bool = False
 
 
 # ---------------------------------------------------------------- contas
@@ -579,7 +582,8 @@ class PromoteIn(BaseModel):
 
 
 AccountName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=60)]
-AccountKind = Literal["checking", "savings", "wallet", "other"]
+# v1.4: "benefit" = vale-refeição/alimentação.
+AccountKind = Literal["checking", "savings", "wallet", "other", "benefit"]
 Balance = Annotated[Decimal, Field(max_digits=14, decimal_places=2)]
 
 
@@ -588,6 +592,10 @@ class AccountIn(BaseModel):
     kind: AccountKind = "checking"
     initial_balance: Balance = Decimal("0")
     color: Color | None = None
+    # Vale (kind="benefit"): valor e dia da recarga e a categoria que ele paga.
+    benefit_amount: Money | None = None
+    benefit_day: DueDay | None = None
+    benefit_category_id: uuid.UUID | None = None
 
 
 class AccountPatch(BaseModel):
@@ -596,6 +604,9 @@ class AccountPatch(BaseModel):
     initial_balance: Balance | None = None
     color: Color | None = None
     archived: bool | None = None
+    benefit_amount: Money | None = None
+    benefit_day: DueDay | None = None
+    benefit_category_id: uuid.UUID | None = None
 
 
 class AccountOut(_Out):
@@ -605,6 +616,9 @@ class AccountOut(_Out):
     initial_balance: Decimal
     color: str | None
     archived: bool
+    benefit_category_id: uuid.UUID | None = None
+    benefit_amount: Decimal | None = None
+    benefit_day: int | None = None
 
 
 class AccountBalance(BaseModel):

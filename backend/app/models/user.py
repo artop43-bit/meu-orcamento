@@ -67,6 +67,14 @@ class User(Base):
     # v1.3: resumo da semana às segundas (e-mail e aparelho).
     notify_weekly: Mapped[bool] = mapped_column(default=True, server_default="1")
     push_weekly: Mapped[bool] = mapped_column(default=True, server_default="1")
+    # v1.4: chave Pix para cobrar nas Divisões (nome e cidade entram no código Pix).
+    pix_key: Mapped[str | None] = mapped_column(String(80))
+    pix_name: Mapped[str | None] = mapped_column(String(25))
+    pix_city: Mapped[str | None] = mapped_column(String(15))
+    # v1.4: microempreendedor individual (teto anual do faturamento e DAS).
+    mei: Mapped[bool] = mapped_column(default=False, server_default="0")
+    # v1.4: notificação diária "Disponível hoje" (desligada por padrão).
+    push_daily: Mapped[bool] = mapped_column(default=False, server_default="0")
     # v1.3: cartões do Orçamento na ordem escolhida (JSON: [{"key": ..., "visible": ...}]).
     dashboard: Mapped[str | None] = mapped_column(String(600))
     # Configuração inicial guiada concluída (ou pulada).
