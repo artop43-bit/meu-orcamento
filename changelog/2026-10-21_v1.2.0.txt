@@ -1,6 +1,6 @@
 MEU ORÇAMENTO · UPDATE LOG
 Versão 1.2.0 · Navegação fluida e cores consistentes
-Data: 20/10/2026 às 23:59 (horário de Brasília)
+Data: 21/10/2026 às 00:20 (horário de Brasília)
 
 Navegação mais fluida
 - [x] Vários grupos do menu abertos ao mesmo tempo; clicar no título do grupo só abre ou fecha
