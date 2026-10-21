@@ -12,7 +12,7 @@ export type Release = {
 export const RELEASES: Release[] = [
   {
     version: "1.1.0",
-    date: "20/10/2026 às 21:30",
+    date: "20/10/2026 às 22:00",
     title: "Menu em grupos, gestos no celular, solicitações como tarefas e 10 cores",
     sections: [
       {
