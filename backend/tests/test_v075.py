@@ -77,7 +77,7 @@ def as_admin(client: TestClient, monkeypatch: pytest.MonkeyPatch, outbox, addres
 def test_images_are_validated_and_cleaned(user: TestClient) -> None:
     # Texto com extensão de imagem não passa: o tipo é conferido abrindo o arquivo.
     fake = new_thread(user, [("foto.png", b"isto nao e uma imagem")])
-    assert fake.status_code == 400 and fake.json()["error"] == "invalid_image"
+    assert fake.status_code == 400 and fake.json()["error"] == "invalid_file"
     # Mais de 3 imagens por mensagem.
     many = new_thread(user, [(f"{i}.png", png()) for i in range(4)])
     assert many.status_code == 400 and many.json()["error"] == "too_many_files"

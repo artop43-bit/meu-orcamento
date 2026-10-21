@@ -34,7 +34,9 @@ class StoredFile(Base):
     goal_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("goals.id", ondelete="CASCADE"), index=True
     )
-    content_type: Mapped[str] = mapped_column(String(20))
+    content_type: Mapped[str] = mapped_column(String(100))
+    # v1.3.1: nome original dos documentos (PDF e planilhas); imagens não precisam.
+    filename: Mapped[str | None] = mapped_column(String(120))
     size: Mapped[int] = mapped_column(Integer)
     width: Mapped[int] = mapped_column(Integer)
     height: Mapped[int] = mapped_column(Integer)
@@ -55,7 +57,8 @@ class SupportThread(Base):
         ForeignKey("users.id", ondelete="CASCADE"), index=True
     )
     title: Mapped[str] = mapped_column(String(120))
-    kind: Mapped[str] = mapped_column(String(10))  # "idea" | "bug" | "other"
+    # Tema: "idea" (sugestão), "question" (dúvida), "bug" (erro), "praise" (elogio) ou "other".
+    kind: Mapped[str] = mapped_column(String(10))
     # "open" (aberta), "in_progress" (em andamento), "planned" (planejada), "answered"
     # (respondida), "resolved" (resolvida) ou "declined" (recusada).
     status: Mapped[str] = mapped_column(String(12), default="open")
@@ -103,6 +106,27 @@ class Announcement(Base):
     # Também para quem está aguardando a liberação do acesso.
     include_pending: Mapped[bool] = mapped_column(default=False)
     recipients: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+
+
+class AnnouncementReply(Base):
+    """Resposta a um recado (v1.3.1): thread pública, visível a todos que recebem o recado."""
+
+    __tablename__ = "announcement_replies"
+    __table_args__ = (
+        Index("ix_announcement_replies_announcement", "announcement_id", "created_at"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    announcement_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("announcements.id", ondelete="CASCADE")
+    )
+    # A conta excluída leva junto as respostas dela.
+    author_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    from_admin: Mapped[bool] = mapped_column(default=False)
+    body: Mapped[str] = mapped_column(Text)
+    # Veio de uma conversa privada antiga (antes da v1.3.1): a pessoa é avisada na tela.
+    migrated: Mapped[bool] = mapped_column(default=False)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
 
 

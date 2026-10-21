@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 
 from app.core.errors import AppError
 from app.models import StoredFile, SupportMessage, SupportThread, User
+from app.services import documents
 
 MB = 1024 * 1024
 # Proteção contra "bombas" de descompressão (imagens pequenas em bytes e enormes em pixels).
@@ -46,6 +47,10 @@ OWNER_ONLY = ("receipt", "goal")
 CONTENT_TYPES = {"PNG": "image/png", "JPEG": "image/jpeg", "WEBP": "image/webp", "GIF": "image/gif"}
 LABELS = "PNG, JPG, WebP ou GIF"
 STATIC_LABELS = "PNG, JPG ou WebP"
+ATTACHMENT_HELP = (
+    "Formato não aceito. Envie imagem (PNG, JPG, WebP ou GIF), PDF ou planilha "
+    "(XLSX, XLS, CSV ou ODS)."
+)
 
 
 def _too_big(rule: Rule) -> AppError:
@@ -112,12 +117,28 @@ def store(
     raw: bytes,
     purpose: str,
     message_id: uuid.UUID | None = None,
+    filename: str | None = None,
 ) -> StoredFile:
-    data, content_type, width, height = prepare(raw, purpose)
+    name = None
+    kind = documents.detect(raw) if purpose == "attachment" and raw else None
+    if kind is not None:
+        # v1.3.1: PDF e planilhas nas solicitações (guardados como vieram, só para baixar).
+        if len(raw) > RULES[purpose].max_bytes:
+            raise _too_big(RULES[purpose])
+        data, content_type, width, height = raw, kind, 0, 0
+        name = documents.safe_name(filename, kind)
+    else:
+        try:
+            data, content_type, width, height = prepare(raw, purpose)
+        except AppError as exc:
+            if purpose == "attachment" and exc.code == "invalid_image":
+                raise AppError(400, "invalid_file", ATTACHMENT_HELP) from exc
+            raise
     item = StoredFile(
         owner_id=owner.id,
         purpose=purpose,
         message_id=message_id,
+        filename=name,
         content_type=content_type,
         size=len(data),
         width=width,
