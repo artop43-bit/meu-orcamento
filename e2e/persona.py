@@ -1804,6 +1804,166 @@ def tasks_and_replies(page: Page):
     page.screenshot(path=OUT / "v11-conversa-recado.png", full_page=True)
 
 
+@step("v1.3: compra dividida em categorias, comprovante por foto e lançamento sem internet")
+def v13_entries(page: Page):
+    month = f"{TODAY:%Y-%m}"
+    open_month(page, month)
+    # Dividir em categorias: cada parte com o seu valor, nada lançado em dobro.
+    page.get_by_role("button", name="Nova despesa", exact=True).click()
+    d = dialog(page)
+    d.get_by_label("Descrição").fill("Supermercado e farmácia")
+    d.get_by_role("textbox", name=re.compile(r"^Valor")).fill(money(190))
+    d.get_by_role("button", name="Dividir em categorias").click()
+    d.get_by_label("Categoria da parte 1").select_option(label="Alimentação")
+    d.get_by_label("Valor da parte 1").fill(money(150))
+    d.get_by_label("Categoria da parte 2").select_option(label="Saúde")
+    d.get_by_label("Valor da parte 2").fill(money(30))
+    expect(d.locator(".split-parts .summary-box")).to_contain_text("Falta distribuir R$ 10,00")
+    d.get_by_role("button", name="Adicionar despesa").click()
+    expect(d.get_by_role("alert")).to_contain_text("A soma das partes precisa ser igual ao total")
+    d.get_by_label("Valor da parte 2").fill(money(40))
+    expect(d.locator(".split-parts .summary-box")).to_contain_text("As partes somam o total")
+    page.screenshot(path=OUT / "v13-dividir.png")
+    d.get_by_role("button", name="Adicionar despesa").click()
+    expect(d).to_have_count(0, timeout=8000)
+    idle(page, 300)
+    parts = [e for e in api(page, f"/months/{month}")["expenses"] if e["description"] == "Supermercado e farmácia"]
+    assert sorted(e["amount"] for e in parts) == ["150.00", "40.00"], parts
+    assert parts[0]["split_group_id"] and parts[0]["split_group_id"] == parts[1]["split_group_id"]
+
+    # Comprovante por foto: a leitura (servidor) preenche valor, data e descrição para conferir.
+    page.route(
+        "**/api/receipts/read",
+        lambda route: route.fulfill(
+            json={"kind": "cupom", "amount": "44.88", "date": f"{month}-03", "description": "Supermercado Bom Preco"}
+        ),
+    )
+    page.get_by_role("button", name="Nova despesa", exact=True).click()
+    d = dialog(page)
+    d.get_by_test_id("receipt-reader-input").set_input_files(
+        files=[{"name": "cupom.png", "mimeType": "image/png", "buffer": png_bytes()}]
+    )
+    expect(d.get_by_text(re.compile("Lido do comprovante"))).to_be_visible()
+    expect(d.get_by_label("Descrição")).to_have_value("Supermercado Bom Preco")
+    expect(d.get_by_role("textbox", name=re.compile(r"^Valor"))).to_have_value("44,88")
+    page.screenshot(path=OUT / "v13-comprovante.png")
+    d.get_by_label("Categoria").select_option(label="Alimentação")
+    d.get_by_role("button", name="Adicionar despesa").click()
+    expect(d).to_have_count(0, timeout=8000)
+    page.unroute("**/api/receipts/read")
+    idle(page, 300)
+    [read] = [e for e in api(page, f"/months/{month}")["expenses"] if e["description"] == "Supermercado Bom Preco"]
+    assert read["amount"] == "44.88" and len(read["receipt_ids"]) == 1, read
+
+    # Sem internet: o lançamento fica no aparelho e sobe sozinho quando a conexão volta.
+    page.context.set_offline(True)
+    quick = page.get_by_role("search", name="Lançamento rápido")
+    quick.get_by_role("textbox").fill("padaria offline 12,50 pix")
+    quick.get_by_role("button", name="Lançar").click()
+    banner = page.locator(".banner--offline")
+    expect(banner).to_contain_text("1 lançamento(s) guardado(s) neste aparelho")
+    page.screenshot(path=OUT / "v13-sem-internet.png")
+    page.context.set_offline(False)
+    expect(banner).to_have_count(0, timeout=15000)
+    idle(page, 500)
+    names = [e["description"] for e in api(page, f"/months/{month}")["expenses"]]
+    assert names.count("Padaria offline") == 1, names
+    # O microfone aparece no lançamento rápido (navegadores com reconhecimento de voz).
+    expect(quick.get_by_role("button", name="Lançar por voz")).to_be_visible()
+
+
+@step("v1.3: sobra do limite, plano de quitação, inflação, desafios, plano sem culpa, painel e erros")
+def v13_planning(page: Page):
+    month = f"{TODAY:%Y-%m}"
+    # Sobra do limite: opção da categoria com limite.
+    page.goto(f"{BASE}/categorias")
+    idle(page)
+    page.locator(".item__main", has_text="Lazer").first.click()
+    page.get_by_label(re.compile("Passar a sobra do limite")).check()
+    page.get_by_role("button", name="Salvar").click()
+    idle(page, 400)
+    lazer = next(c for c in api(page, "/categories") if c["name"] == "Lazer")
+    assert lazer["carry_over"] is True, lazer
+
+    # Plano de quitação em Dívidas (o financiamento do carro já existe).
+    page.goto(f"{BASE}/dividas")
+    idle(page)
+    plan = page.get_by_role("region", name="Plano de quitação")
+    expect(plan.locator(".payoff__plan")).to_have_count(3)
+    expect(plan).to_contain_text("Juros mais altos primeiro")
+    plan.scroll_into_view_if_needed()
+    page.screenshot(path=OUT / "v13-quitacao.png")
+
+    # Correção pela inflação (IPCA do Banco Central; sem internet no servidor, explica).
+    page.goto(f"{BASE}/analises?secao=calculadoras")
+    idle(page)
+    page.get_by_role("button", name="Correção pela inflação").click()
+    expect(page.locator(".calc-result, .calc-form [role=alert]").first).to_be_visible(timeout=15000)
+
+    # Desafio: 30 dias sem delivery.
+    page.goto(f"{BASE}/metas")
+    idle(page)
+    page.get_by_role("button", name="Novo desafio").click()
+    d = dialog(page)
+    d.get_by_label(re.compile("30 dias sem delivery")).check()
+    d.get_by_role("button", name="Começar desafio").click()
+    expect(d).to_have_count(0, timeout=8000)
+    challenges = page.get_by_role("region", name="Desafios")
+    expect(challenges.locator(".challenge")).to_have_count(1)
+    expect(challenges).to_contain_text("Em andamento")
+    page.screenshot(path=OUT / "v13-desafio.png", full_page=True)
+
+    # Plano sem culpa: o mês está no negativo.
+    open_month(page, month)
+    assert float(api(page, f"/months/{month}")["summary"]["balance"]) < 0
+    page.get_by_role("region", name="Plano para equilibrar o mês").get_by_role("button", name="Ver o plano").click()
+    d = dialog(page)
+    expect(d).to_contain_text("O tamanho da diferença")
+    expect(d).to_contain_text("Em quanto tempo cobrir")
+    d.get_by_label("Em 6 meses").check()
+    page.screenshot(path=OUT / "v13-sem-culpa.png")
+    d.get_by_role("button", name="Fechar").click()
+
+    # Personalizar o painel: esconder a meta principal e voltar ao padrão.
+    page.get_by_role("button", name="Personalizar o painel").click()
+    d = dialog(page)
+    d.get_by_label("Meta principal").uncheck()
+    d.get_by_role("button", name="Descer Lançamento rápido").click()
+    page.screenshot(path=OUT / "v13-painel.png")
+    d.get_by_role("button", name="Salvar painel").click()
+    expect(d).to_have_count(0, timeout=8000)
+    expect(page.get_by_role("heading", name="Meta principal")).to_have_count(0)
+    assert '"goal","visible":false' in api(page, "/auth/me")["dashboard"]
+    page.get_by_role("button", name="Personalizar o painel").click()
+    dialog(page).get_by_role("button", name="Restaurar padrão").click()
+    idle(page, 400)
+    assert api(page, "/auth/me")["dashboard"] is None
+
+    # Atalho do ícone "Nova despesa".
+    page.goto(f"{BASE}/orcamento?novo=conta")
+    expect(dialog(page)).to_contain_text("Nova despesa")
+    page.keyboard.press("Escape")
+
+    # Resumo da semana nas preferências.
+    page.goto(f"{BASE}/ajustes/preferencias")
+    idle(page)
+    expect(page.get_by_label(re.compile("^Resumo da semana"))).to_be_checked()
+
+    # Painel de erros: um erro de tela aparece agrupado e mascarado na Administração.
+    page.evaluate(
+        """() => fetch('/api/errors', {method: 'POST', credentials: 'include',
+          headers: {'Content-Type': 'application/json', 'X-Requested-With': 'fetch'},
+          body: JSON.stringify({name: 'TypeError', message: 'teste e2e 123456 de contato@exemplo.com', path: '/orcamento', release: '1.3.0'})})"""
+    )
+    page.goto(f"{BASE}/admin?aba=erros")
+    idle(page)
+    card = page.locator(".error-card", has_text="teste e2e")
+    expect(card).to_contain_text("[e-mail]")
+    expect(card).not_to_contain_text("123456")
+    card.get_by_role("button", name="Marcar como resolvido").click()
+    expect(page.locator(".error-card", has_text="teste e2e").get_by_role("button")).to_have_count(0)
+
+
 @step("Segurança: ativar 2FA, sair, entrar com código, desativar")
 def two_factor(page: Page):
     page.goto(f"{BASE}/seguranca")
@@ -1951,6 +2111,8 @@ def main():
         split_expenses(page)
         app_install(page)
         tasks_and_replies(page)
+        v13_entries(page)
+        v13_planning(page)
         two_factor(page)
         banner_never(page)
         STATE["state"] = ctx.storage_state()

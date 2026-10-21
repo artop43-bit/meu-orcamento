@@ -7308,15 +7308,12 @@ textarea {
 }
 
 .split-parts__start {
-  justify-self: start;
-  margin-top: 6px;
-}
-
-label > .split-parts__start {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  justify-self: start;
   width: fit-content;
+  margin-top: -6px;
 }
 
 .split-parts .summary-box {

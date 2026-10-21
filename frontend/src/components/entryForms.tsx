@@ -846,16 +846,16 @@ export function ExpenseForm({
             setCategoryTouched(true);
           }}
         />
-        {canSplitCategories && (
-          <button
-            type="button"
-            className="link-btn small split-parts__start"
-            onClick={() => setParts([{ categoryId, amount }, { categoryId: "", amount: "" }])}
-          >
-            <Split size={14} aria-hidden /> Dividir em categorias
-          </button>
-        )}
       </label>
+      )}
+      {!activeParts && canSplitCategories && (
+        <button
+          type="button"
+          className="link-btn small split-parts__start"
+          onClick={() => setParts([{ categoryId, amount }, { categoryId: "", amount: "" }])}
+        >
+          <Split size={14} aria-hidden /> Dividir em categorias
+        </button>
       )}
 
       {canOfferRule && (
