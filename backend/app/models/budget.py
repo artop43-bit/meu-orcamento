@@ -189,6 +189,29 @@ class Goal(Base):
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, onupdate=utcnow)
 
 
+class Challenge(Base):
+    """Desafio de economia (v1.3): o progresso é calculado pelos lançamentos do período."""
+
+    __tablename__ = "challenges"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = _user_fk()
+    title: Mapped[str] = mapped_column(String(80))
+    # "no_keyword" | "no_category" | "no_nonessential" | "max_category"
+    kind: Mapped[str] = mapped_column(String(20))
+    category_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("categories.id", ondelete="CASCADE")
+    )
+    keywords: Mapped[str | None] = mapped_column(String(200))
+    max_amount: Mapped[Decimal | None] = mapped_column(Money)
+    start_date: Mapped[date] = mapped_column(Date)
+    days: Mapped[int] = mapped_column(SmallInteger)
+    # Preenchidos quando o desafio termina: "won" ou "lost".
+    result: Mapped[str | None] = mapped_column(String(6))
+    finished_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+
+
 class GoalContribution(Base):
     """Valor guardado (ou retirado) numa meta: base do ritmo e da projeção."""
 

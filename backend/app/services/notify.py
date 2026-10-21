@@ -58,6 +58,7 @@ KINDS = {
     "monthly": "resumo do mês",
     "messages": "cópias das mensagens por e-mail",
     "alerts": "alertas de gastos e assinaturas",
+    "weekly": "resumo da semana",
 }
 SEND_HOUR = 8
 
@@ -110,6 +111,8 @@ def unsubscribe(db: Session, token: str) -> tuple[User, str] | None:
         user.notify_monthly = False
     elif kind == "alerts":
         user.notify_alerts = False
+    elif kind == "weekly":
+        user.notify_weekly = False
     else:
         user.notify_messages = False
     db.commit()
@@ -411,6 +414,95 @@ def monthly_message(db: Session, user: User, month: date) -> Message | None:
     )
 
 
+# ---------------------------------------------------------------- resumo da semana (v1.3)
+
+
+def weekly_message(db: Session, user: User, today: date) -> Message | None:
+    """Segunda-feira: como foi a semana anterior (segunda a domingo) e o que vence nos próximos 7 dias."""
+    from app.models import Category, Expense
+
+    start = today - timedelta(days=7)
+    end = today - timedelta(days=1)
+    before = start - timedelta(days=7)
+    hide = user.notify_hide_values
+    categories = {
+        c.id: c.name for c in db.scalars(select(Category).where(Category.user_id == user.id))
+    }
+    rows = list(
+        db.scalars(
+            select(Expense).where(
+                Expense.user_id == user.id,
+                Expense.month >= (before.replace(day=1) - timedelta(days=31)),
+            )
+        )
+    )
+
+    def day_of(e: Expense) -> date:
+        return e.purchase_date or e.due_date or e.created_at.date()
+
+    week = [e for e in rows if start <= day_of(e) <= end]
+    previous = [e for e in rows if before <= day_of(e) < start]
+    upcoming = sorted(
+        (
+            e
+            for e in rows
+            if not e.paid and e.due_date and today <= e.due_date <= today + timedelta(days=6)
+        ),
+        key=lambda e: e.due_date or today,
+    )
+    if not week and not upcoming:
+        return None
+    total = sum((e.amount for e in week), Decimal("0"))
+    last = sum((e.amount for e in previous), Decimal("0"))
+    by_category: dict[str, Decimal] = {}
+    for e in week:
+        name = categories.get(e.category_id, "Sem categoria") if e.category_id else "Sem categoria"
+        by_category[name] = by_category.get(name, Decimal("0")) + e.amount
+    compare = ""
+    if last > 0:
+        change = float((total - last) / last * 100)
+        compare = f"{abs(change):.0f}% {'acima' if change > 0 else 'abaixo'} da semana anterior"
+    sections = [
+        Section(
+            "Semana passada",
+            [("Gastos", f"{short_date(start)} a {short_date(end)}", "" if hide else brl(total))]
+            + ([("Comparação", compare, "")] if compare else []),
+        )
+    ]
+    top = sorted(by_category.items(), key=lambda kv: kv[1], reverse=True)[:3]
+    if top:
+        sections.append(
+            Section("Onde foi", [(name, "", "" if hide else brl(value)) for name, value in top])
+        )
+    if upcoming:
+        sections.append(
+            Section(
+                "Vence nos próximos 7 dias",
+                [
+                    (e.description, short_date(e.due_date), "" if hide else brl(e.amount))
+                    for e in upcoming[:8]
+                    if e.due_date
+                ],
+            )
+        )
+    intro = (
+        f"Você gastou {'' if hide else brl(total) + ' '}na semana passada"
+        f"{f' ({compare})' if compare else ''}."
+        if week
+        else "Sem gastos lançados na semana passada."
+    )
+    if upcoming:
+        intro += f" {len(upcoming)} conta(s) vence(m) nos próximos 7 dias."
+    return Message(
+        subject="Meu Orçamento: resumo da semana",
+        heading="Resumo da semana",
+        intro=intro,
+        sections=sections,
+        button=("Abrir o Orçamento", _link("/orcamento")),
+        unsubscribe_kind="weekly",
+    )
+
+
 # ---------------------------------------------------------------- execução diária
 
 
@@ -418,9 +510,9 @@ def run_daily(db: Session, now: datetime | None = None) -> dict[str, int]:
     """Envia os avisos do dia (chamado pelo agendador; pode rodar várias vezes: não duplica)."""
     now = now or local_now()
     if now.hour < SEND_HOUR:
-        return {"due": 0, "monthly": 0}
+        return {"due": 0, "monthly": 0, "weekly": 0}
     today = now.date()
-    sent = {"due": 0, "monthly": 0}
+    sent = {"due": 0, "monthly": 0, "weekly": 0}
     users = list(db.scalars(select(User)))
     for user in users:
         if not _eligible(user):
@@ -442,6 +534,16 @@ def run_daily(db: Session, now: datetime | None = None) -> dict[str, int]:
                 if message and _claim(db, user, "monthly", f"{previous:%Y-%m}"):
                     deliver(db, user, message)
                     sent["monthly"] += 1
+            # Resumo da semana às segundas (e-mail e aparelho, cada um com a sua opção).
+            if today.weekday() == 0 and (user.notify_weekly or user.push_weekly):
+                message = weekly_message(db, user, today)
+                if message and _claim(db, user, "weekly", today.isoformat()):
+                    if user.notify_weekly:
+                        deliver(db, user, message)
+                    from app.services import push
+
+                    push.send(db, user, "weekly", message.heading, message.intro, "/orcamento")
+                    sent["weekly"] += 1
         except Exception as exc:  # um usuário com problema não impede os outros
             db.rollback()
             logger.exception("Avisos do dia falharam para %s: %s", user.id, exc)

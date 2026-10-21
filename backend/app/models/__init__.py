@@ -2,6 +2,7 @@ from app.models.budget import (
     BudgetMonth,
     Category,
     CategoryRule,
+    Challenge,
     CreditCard,
     Expense,
     Goal,
@@ -38,6 +39,7 @@ from app.models.user import (
 )
 
 __all__ = [
+    "Challenge",
     "Announcement",
     "AuthToken",
     "BudgetMonth",

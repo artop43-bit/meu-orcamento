@@ -211,3 +211,111 @@ def test_inflation_without_bcb_explains(user: TestClient, monkeypatch: pytest.Mo
     monkeypatch.setattr(indicators, "ipca_monthly", lambda: {})
     out = user.get("/api/indicators/inflation?amount=100&start=2020-01&end=2024-01")
     assert out.status_code == 503 and "Banco Central" in out.json()["message"]
+
+
+# ---------------------------------------------------------------- desafios (v1.3 C)
+
+
+@pytest.fixture
+def jan10(monkeypatch: pytest.MonkeyPatch) -> date:
+    from app.services import challenges
+
+    today = date(2030, 1, 10)
+    monkeypatch.setattr(challenges, "today_local", lambda: today)
+    return today
+
+
+def test_delivery_challenge_is_lost_by_an_ifood_order(user: TestClient, jan10: date) -> None:
+    out = user.post("/api/challenges", json={"template": "delivery"})
+    assert out.status_code == 201, out.text
+    challenge = out.json()
+    assert (challenge["status"], challenge["days"], challenge["end_date"]) == (
+        "active",
+        30,
+        "2030-02-08",
+    )
+    add_expense(user, description="Mercado", amount="80.00", due_date="2030-01-10")
+    assert user.get("/api/challenges").json()[0]["status"] == "active"
+    add_expense(user, description="IFOOD *Pizzaria", amount="45.00", due_date="2030-01-10")
+    [row] = user.get("/api/challenges").json()
+    assert row["status"] == "lost" and row["slips"][0]["description"] == "IFOOD *Pizzaria"
+
+
+def test_category_ceiling_challenge(user: TestClient, jan10: date) -> None:
+    lazer = category_id(user, "Lazer")
+    out = user.post(
+        "/api/challenges",
+        json={"template": "leisure", "max_amount": "200.00", "category_id": lazer},
+    )
+    assert out.status_code == 201, out.text
+    add_expense(
+        user, description="Cinema", amount="150.00", category_id=lazer, due_date="2030-01-10"
+    )
+    [row] = user.get("/api/challenges").json()
+    assert (row["status"], row["spent"]) == ("active", "150.00")
+    add_expense(user, description="Show", amount="60.00", category_id=lazer, due_date="2030-01-10")
+    assert user.get("/api/challenges").json()[0]["status"] == "lost"
+
+
+def test_challenge_is_won_when_the_period_ends_clean(
+    user: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.services import challenges
+
+    monkeypatch.setattr(challenges, "today_local", lambda: date(2030, 1, 1))
+    user.post("/api/challenges", json={"template": "essentials"})
+    monkeypatch.setattr(challenges, "today_local", lambda: date(2030, 1, 9))
+    [row] = user.get("/api/challenges").json()
+    assert row["status"] == "won" and row["elapsed_days"] == 7
+    # Desafio personalizado sem as informações necessárias explica o que falta.
+    bad = user.post("/api/challenges", json={"title": "Sem bar", "kind": "no_keyword", "days": 7})
+    assert bad.status_code == 400 and "palavras" in bad.json()["message"]
+
+
+# ---------------------------------------------------------------- modo sem culpa (v1.3 C)
+
+
+def test_recovery_plan_for_a_negative_month(user: TestClient) -> None:
+    lazer = category_id(user, "Lazer")
+    user.post(f"/api/months/{MONTH}/incomes", json={"description": "Salário", "amount": "1000.00"})
+    add_expense(
+        user, description="Aluguel", amount="900.00", category_id=category_id(user, "Moradia")
+    )
+    add_expense(user, description="Viagem", amount="400.00", category_id=lazer)
+    add_expense(user, month="2029-12", description="Cinema", amount="90.00", category_id=lazer)
+    plan = user.get(f"/api/months/{MONTH}/recovery").json()
+    assert plan["deficit"] == "300.00"
+    assert [(s["months"], s["per_month"]) for s in plan["spread"]] == [
+        (1, "300.00"),
+        (3, "100.00"),
+        (6, "50.00"),
+    ]
+    # Lazer passou da média (90 / 3 = 30); Moradia é essencial e fica de fora.
+    assert plan["cuts"][0]["name"] == "Lazer" and plan["cuts"][0]["above_average"] == "370.00"
+    assert all(c["name"] != "Moradia" for c in plan["cuts"])
+    # Mês positivo: nada a planejar.
+    assert user.get("/api/months/2030-03/recovery").json()["deficit"] == "0"
+
+
+# ---------------------------------------------------------------- resumo semanal (v1.3 C)
+
+
+def test_weekly_summary_on_monday(user: TestClient, db, outbox: Outbox) -> None:  # type: ignore[no-untyped-def]
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    from app.services import notify
+
+    monday = date(2030, 1, 14)
+    add_expense(user, description="Mercado", amount="150.00", due_date="2030-01-09", paid=True)
+    add_expense(user, description="Internet", amount="99.90", due_date="2030-01-16")
+    outbox.clear()
+    at = datetime(2030, 1, 14, 8, 30, tzinfo=ZoneInfo("America/Sao_Paulo"))
+    assert monday.weekday() == 0
+    assert notify.run_daily(db, at)["weekly"] == 1
+    [mail] = [m for m in outbox if "semana" in m.subject]
+    assert "R$ 150,00" in mail.body and "Internet" in mail.body
+    assert notify.run_daily(db, at)["weekly"] == 0  # não repete
+    # Desligar pelo app.
+    prefs = user.patch("/api/notifications/prefs", json={"notify_weekly": False}).json()
+    assert prefs["notify_weekly"] is False

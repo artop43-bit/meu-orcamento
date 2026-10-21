@@ -12,6 +12,7 @@ from app.api import (
     data,
     debts,
     extras,
+    habits,
     health,
     inbox,
     market,
@@ -115,6 +116,7 @@ def create_app() -> FastAPI:
     app.include_router(sharing.router, prefix="/api")
     app.include_router(push.router, prefix="/api")
     app.include_router(debts.router, prefix="/api")
+    app.include_router(habits.router, prefix="/api")
     return app
 
 

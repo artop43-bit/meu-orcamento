@@ -17,6 +17,7 @@ class PushConfig(BaseModel):
     push_due: bool
     push_messages: bool
     push_alerts: bool
+    push_weekly: bool
 
 
 class SubscriptionKeys(BaseModel):
@@ -37,6 +38,7 @@ class PushPrefs(BaseModel):
     push_due: bool | None = None
     push_messages: bool | None = None
     push_alerts: bool | None = None
+    push_weekly: bool | None = None
 
 
 class TestOut(BaseModel):
@@ -51,6 +53,7 @@ def _config(db, user) -> PushConfig:  # type: ignore[no-untyped-def]
         push_due=user.push_due,
         push_messages=user.push_messages,
         push_alerts=user.push_alerts,
+        push_weekly=user.push_weekly,
     )
 
 
