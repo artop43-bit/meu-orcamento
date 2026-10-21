@@ -75,6 +75,8 @@ class User(Base):
     mei: Mapped[bool] = mapped_column(default=False, server_default="0")
     # v1.4: notificação diária "Disponível hoje" (desligada por padrão).
     push_daily: Mapped[bool] = mapped_column(default=False, server_default="0")
+    # v1.4: código secreto do link de calendário (vencimentos na agenda do celular).
+    calendar_token: Mapped[str | None] = mapped_column(String(64), unique=True)
     # v1.3: cartões do Orçamento na ordem escolhida (JSON: [{"key": ..., "visible": ...}]).
     dashboard: Mapped[str | None] = mapped_column(String(600))
     # Configuração inicial guiada concluída (ou pulada).

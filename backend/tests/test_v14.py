@@ -288,3 +288,37 @@ def test_tax_report_groups_deductions_incomes_assets_and_debts(user: TestClient)
     ]
     assert any(a["description"] == "Saldo em Banco" for a in tax["assets"])
     assert all("Cinema" not in str(d) for d in tax["deductions"])
+
+
+# ---------------------------------------------------------------- agenda (v1.4 C)
+
+
+def test_calendar_feed_by_secret_link(
+    user: TestClient, db: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.services import ical
+
+    monkeypatch.setattr(ical, "today_local", lambda: date(2030, 1, 5))
+    assert user.get("/api/calendar-link").json() == {"url": None}
+    add_expense(user, description="Aluguel; casa, centro", amount="1200.00", due_date="2030-01-10")
+    user.post(
+        "/api/planned", json={"date": "2030-03-15", "description": "IPVA", "amount": "1500.00"}
+    )
+    url = user.post("/api/calendar-link").json()["url"]
+    assert url.endswith(".ics") and "/api/calendar-feed/" in url
+    path = url[url.index("/api/") :]
+    user.post("/api/auth/logout")  # o link funciona sem login
+    feed = user.get(path)
+    assert feed.status_code == 200 and feed.headers["content-type"].startswith("text/calendar")
+    body = feed.text
+    assert body.startswith("BEGIN:VCALENDAR\r\n") and body.endswith("END:VCALENDAR\r\n")
+    assert r"SUMMARY:Aluguel\; casa\, centro · R$ 1.200\,00" in body
+    assert "DTSTART;VALUE=DATE:20300110" in body
+    assert r"SUMMARY:IPVA · R$ 1.500\,00" in body
+    # Trocar o link desliga o anterior.
+    login(user)
+    new_url = user.post("/api/calendar-link").json()["url"]
+    assert new_url != url
+    assert user.get(path).status_code == 404
+    assert user.delete("/api/calendar-link").status_code == 204
+    assert user.get(new_url[new_url.index("/api/") :]).status_code == 404
