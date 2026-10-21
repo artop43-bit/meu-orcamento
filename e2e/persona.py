@@ -1503,6 +1503,59 @@ def accent_colors(page: Page):
     assert api(page, "/auth/me")["accent"] == "verde"
 
 
+@step("v1.2: menu com vários grupos abertos e troca de tela sem a tela de carregamento")
+def fluid_navigation(page: Page):
+    page.goto(f"{BASE}/orcamento")
+    idle(page, 1500)  # telas baixadas em segundo plano depois de entrar
+    side = page.locator(".sidebar")
+    # Fecha tudo para começar do zero (o menu lembra os grupos abertos).
+    for name in ("Carteira", "Planejamento", "Análises"):
+        toggle = side.get_by_role("button", name=name)
+        if toggle.get_attribute("aria-expanded") == "true":
+            toggle.click()
+    # Abrir grupos não troca de tela, e vários ficam abertos juntos.
+    side.get_by_role("button", name="Carteira").click()
+    side.get_by_role("button", name="Planejamento").click()
+    side.get_by_role("button", name="Análises").click()
+    assert "/orcamento" in page.url, page.url
+    for name in ("Carteira", "Planejamento", "Análises"):
+        expect(side.get_by_role("button", name=name)).to_have_attribute("aria-expanded", "true")
+    for name in ("Contas", "Cartões", "Calendário", "Metas", "Insights", "Histórico"):
+        expect(side.get_by_role("link", name=name, exact=True)).to_be_visible()
+    page.screenshot(path=OUT / "v12-menu-grupos.png")
+    # Trocar de tela em sequência: a tela de carregamento nunca aparece.
+    page.evaluate("""() => {
+      window.__loadingSeen = 0;
+      new MutationObserver(() => {
+        if (document.querySelector('[aria-label="Carregando a tela"]')) window.__loadingSeen++;
+      }).observe(document.body, {childList: true, subtree: true});
+    }""")
+    for name, url in (("Contas", "/contas"), ("Cartões", "/cartoes"), ("Metas", "/metas"), ("Histórico", "/historico"), ("Insights", "/analises"), ("Dívidas", "/dividas")):
+        link = side.get_by_role("link", name=name, exact=True)
+        link.hover()
+        link.click()
+        page.wait_for_url(f"**{url}")
+    idle(page, 300)
+    assert page.evaluate("window.__loadingSeen") == 0, "a tela de carregamento apareceu ao trocar de tela"
+    # Os grupos continuam abertos depois de recarregar.
+    page.reload()
+    idle(page)
+    expect(side.get_by_role("button", name="Planejamento")).to_have_attribute("aria-expanded", "true")
+    # Celular: a aba do grupo volta para a última tela visitada nele.
+    ctx = page.context.browser.new_context(
+        storage_state=page.context.storage_state(), viewport={"width": 390, "height": 844}, is_mobile=True, has_touch=True
+    )
+    mobile = ctx.new_page()
+    mobile.goto(f"{BASE}/divisoes")
+    idle(mobile, 800)
+    mobile.locator(".tabbar").get_by_role("link", name="Planejamento").click()
+    mobile.wait_for_url("**/calendario**")
+    idle(mobile, 400)
+    mobile.locator(".tabbar").get_by_role("link", name="Carteira").click()
+    mobile.wait_for_url("**/divisoes")
+    ctx.close()
+
+
 @step("v0.9: começar do zero — escolher áreas, backup, senha e frase; zera só as análises salvas")
 def start_over(page: Page):
     page.goto(f"{BASE}/ajustes/perfil")
@@ -1889,6 +1942,7 @@ def main():
         inbox_and_announcement(page)
         theme_on_account(page)
         accent_colors(page)
+        fluid_navigation(page)
         start_over(page)
         debts(page)
         calculators(page)

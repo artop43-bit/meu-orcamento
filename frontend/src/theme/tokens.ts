@@ -99,6 +99,14 @@ export const BASE: Theme = {
   },
 };
 
+/**
+ * "Positivo" (saldo que sobra, "Paga", metas, gráficos de sobra, mensagens de sucesso) segue a
+ * cor de destaque, para a tela não misturar o verde fixo com a cor escolhida. Nas cores quentes,
+ * que se confundiriam com alerta (rosa, vermelho, laranja e âmbar), o positivo fica neutro; o vermelho continua
+ * só para o negativo. Cotações de mercado mantêm verde/vermelho (convenção da bolsa: --ok/--error).
+ */
+export const NEUTRAL_POSITIVE = ["rosa", "vermelho", "laranja", "ambar"] as const;
+
 /** Cores de destaque (a primeira é a padrão). A ordem é a do seletor em Preferências. */
 export const ACCENTS = {
   verde: {

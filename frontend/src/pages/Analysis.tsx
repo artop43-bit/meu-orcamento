@@ -43,8 +43,8 @@ import { cumulativeBalance, simulate, ZERO_SIM, type Sim } from "../lib/simulate
 import { DateField } from "../components/DateField";
 
 const SCORE_COLORS: Record<string, string> = {
-  Excelente: "var(--ok)",
-  Boa: "var(--ok)",
+  Excelente: "var(--positive)",
+  Boa: "var(--positive)",
   Regular: "var(--warn)",
   Atenção: "var(--warn)",
   Crítica: "var(--error)",
@@ -344,7 +344,7 @@ function TrendsSection({ month, setMonth }: { month: string; setMonth: (m: strin
           <Chart
             type="bar"
             labels={labels}
-            series={[{ key: "balance", name: "Sobra", color: "var(--ok)", values: points.map((p) => (p.has_data ? Number(p.balance) : null)) }]}
+            series={[{ key: "balance", name: "Sobra", color: "var(--positive)", values: points.map((p) => (p.has_data ? Number(p.balance) : null)) }]}
             compare={t.averages.balance_6m ? { name: "Média de 6 meses", values: points.map(() => num(t.averages.balance_6m)) } : null}
             monthLabels
             height={220}

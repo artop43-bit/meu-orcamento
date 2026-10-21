@@ -153,6 +153,10 @@ jobs:
       - name: Acessibilidade (axe, WCAG 2.1 AA)
         if: always()
         run: uv run --no-project --with playwright python e2e/acessibilidade.py
+      - name: Cores de destaque (nada de verde fixo com outra cor)
+        if: always()
+        timeout-minutes: 10
+        run: uv run --no-project --with playwright python e2e/cores.py
       - name: Logs dos servidores
         if: failure()
         run: tail -n 80 /tmp/api.log /tmp/web.log

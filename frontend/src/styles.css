@@ -95,7 +95,16 @@ svg {
   min-width: 0;
 }
 .tone--ok {
+  color: var(--positive);
+}
+
+/* Mercado: alta e queda seguem a convenção da bolsa (verde e vermelho), qualquer que seja a cor. */
+.tone--up {
   color: var(--ok);
+}
+
+.tone--down {
+  color: var(--error);
 }
 .tone--error {
   color: var(--error);
@@ -626,9 +635,9 @@ svg {
 }
 
 .badge--ok {
-  background: var(--ok-bg);
+  background: var(--positive-bg);
   border-color: transparent;
-  color: var(--ok);
+  color: var(--positive);
 }
 
 .badge--warn {
@@ -939,8 +948,8 @@ input.color {
 }
 
 .alert--success {
-  background: var(--ok-bg);
-  color: var(--ok);
+  background: var(--positive-bg);
+  color: var(--positive);
 }
 
 .alert--info {
@@ -1846,9 +1855,10 @@ input[type="range"]:focus-visible {
 
 /* ---------------------------------------------------------- fluidez: gestos, transições e toque */
 
-/* Troca de página: a nova entra pelo lado de onde veio (celular) ou aparece suave (desktop). */
+/* Troca de página: a nova entra pelo lado de onde veio (celular) ou assenta suave (desktop).
+   Nunca parte do transparente: o conteúdo aparece na hora e só se acomoda (sem "piscar"). */
 .page[data-enter] {
-  animation: page-fade 0.18s ease-out;
+  animation: page-fade 0.16s ease-out;
 }
 
 @media (max-width: 1023px) {
@@ -1874,21 +1884,33 @@ input[type="range"]:focus-visible {
 
 @keyframes page-fade {
   from {
-    opacity: 0;
+    transform: translateY(4px);
   }
 }
 
 @keyframes page-in-next {
   from {
-    opacity: 0;
-    transform: translateX(32%);
+    opacity: 0.6;
+    transform: translateX(18%);
   }
 }
 
 @keyframes page-in-prev {
   from {
+    opacity: 0.6;
+    transform: translateX(-18%);
+  }
+}
+
+/* Carregamento: o "esqueleto" só aparece se a espera passar de um instante. Em cargas
+   rápidas (o comum, com os dados adiantados), nada pisca entre uma tela e outra. */
+[role="status"][aria-busy="true"] {
+  animation: loading-appear 0.2s ease-out 0.25s both;
+}
+
+@keyframes loading-appear {
+  from {
     opacity: 0;
-    transform: translateX(-32%);
   }
 }
 
@@ -2147,8 +2169,8 @@ body:has(dialog[open]) {
 }
 
 .mood--great {
-  --mood: var(--ok);
-  --mood-bg: var(--ok-bg);
+  --mood: var(--positive);
+  --mood-bg: var(--positive-bg);
 }
 
 .mood--good {
@@ -2249,8 +2271,8 @@ body:has(dialog[open]) {
 }
 
 .insight--praise {
-  --tone: var(--ok);
-  --tone-bg: var(--ok-bg);
+  --tone: var(--positive);
+  --tone-bg: var(--positive-bg);
 }
 
 .insight--info {
@@ -3768,7 +3790,7 @@ ul.legend {
 }
 
 .ev--income {
-  --ev: var(--ok);
+  --ev: var(--positive);
 }
 
 .ev--expense {
@@ -4321,8 +4343,8 @@ kbd {
 }
 
 .ledger__row[data-swipe="pay"] {
-  background: var(--ok-bg);
-  box-shadow: inset 4px 0 0 var(--ok);
+  background: var(--positive-bg);
+  box-shadow: inset 4px 0 0 var(--positive);
 }
 
 .ledger__row[data-swipe="delete"] {
@@ -4531,7 +4553,7 @@ kbd {
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  background: var(--ok);
+  background: var(--positive);
   color: #fff;
   font-size: 0.75rem;
   animation: check-pop 0.3s ease-out;
@@ -6265,8 +6287,8 @@ textarea {
 
 .goal-status--ok,
 .goal-status--done {
-  background: var(--accent-soft);
-  color: var(--accent);
+  background: var(--positive-bg);
+  color: var(--positive);
 }
 
 .goal-status--warn {
