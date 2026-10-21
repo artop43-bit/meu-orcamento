@@ -235,10 +235,19 @@ export function Shell() {
   // Fecha o menu "Mais" ao trocar de página (na hora, sem animação: a tela nova já está
   // aparecendo); o grupo da tela atual fica aberto no menu.
   const [moreInstant, setMoreInstant] = useState(false);
+  // Endereço em que o menu foi aberto. A troca de tela pode terminar de desenhar um instante
+  // depois do toque; sem isso, abrir o menu logo após trocar de aba o fecharia sozinho.
+  const moreFrom = useRef<string | null>(null);
   useEffect(() => {
+    if (moreFrom.current === location.pathname) return;
     setMoreInstant(true);
     setMoreOpen(false);
   }, [location.pathname]);
+  // Tocar num item do menu fecha na hora (também quando o item é a própria tela atual).
+  const closeMoreNow = () => {
+    setMoreInstant(true);
+    setMoreOpen(false);
+  };
   useEffect(() => {
     if (group?.children) setOpenGroups((open) => (open.includes(group.key) ? open : [...open, group.key]));
   }, [group]);
@@ -651,6 +660,7 @@ export function Shell() {
           type="button"
           className={inMore ? "active" : undefined}
           onClick={() => {
+            moreFrom.current = window.location.pathname;
             setMoreInstant(false);
             setMoreOpen(true);
           }}
@@ -668,14 +678,14 @@ export function Shell() {
       </nav>
 
       <Sheet open={moreOpen} title="Mais opções" onClose={() => setMoreOpen(false)} instantClose={moreInstant}>
-        <Link to="/ajustes/perfil" className="menu-profile" onClick={() => setMoreOpen(false)}>
+        <Link to="/ajustes/perfil" className="menu-profile" onClick={closeMoreNow}>
           <Avatar fileId={profile.data?.avatar_id} name={displayName} size={44} />
           <span>
             <strong>{displayName}</strong>
             <span className="muted small">Ver meu perfil</span>
           </span>
         </Link>
-        <ul className="menu-list">
+        <ul className="menu-list" onClick={(e) => (e.target as Element).closest("a") && closeMoreNow()}>
           {MORE_GROUPS.map((g) => (
             <li key={g.key}>
               <Link to={groupEntry(g)} aria-current={group?.key === g.key ? "page" : undefined}>

@@ -13,6 +13,7 @@ Deslizar entre telas
 
 Menu "Mais opções"
 - [x] Ao tocar num item, o menu fecha na hora e a tela abre (sem a janela descendo por cima)
+- [x] Abrir o "Mais" logo depois de trocar de aba funciona (antes o menu podia fechar sozinho)
 - [x] Aberto pelo toque, o X não aparece com a moldura verde de foco (continua para quem usa teclado)
 - [x] Tema (Automático, Claro, Escuro) em três botões alinhados, numa linha só
 

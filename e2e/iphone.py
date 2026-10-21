@@ -113,7 +113,17 @@ def main():
         else:
             print("SKIP  deslizar (este WebKit não cria eventos de toque; coberto pela persona no Chromium)")
 
+        # Abrir o "Mais" logo depois de trocar de aba: o menu abre e continua aberto.
+        idle(page, 600)
+        tabbar.get_by_role("link", name="Carteira").tap()
+        page.wait_for_timeout(30)
+        tabbar.get_by_role("button", name="Mais").tap()
+        page.wait_for_timeout(700)
+        check(page.locator("dialog[open]", has_text="Mais opções").count() == 1, "Mais abre logo depois de trocar de aba")
+        page.keyboard.press("Escape")
+
         # Menu "Mais": abre, e ao tocar num item fecha na hora.
+        idle(page, 600)
         tabbar.get_by_role("button", name="Mais").tap()
         menu = page.locator("dialog[open]", has_text="Mais opções")
         expect(menu).to_be_visible()
