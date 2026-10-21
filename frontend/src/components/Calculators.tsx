@@ -9,7 +9,7 @@ import { addMonths, money, monthLabel, parseMoney, thisMonth } from "../lib/form
 import { MoneyInput } from "./budget";
 import { Tip } from "./help";
 
-type Kind = "compound" | "plan" | "cash" | "prepay" | "reserve" | "inflation";
+type Kind = "compound" | "plan" | "cash" | "prepay" | "reserve" | "inflation" | "bonus";
 
 const KINDS: { key: Kind; label: string; text: string }[] = [
   { key: "compound", label: "Juros compostos", text: "Quanto um valor rende com aportes mensais." },
@@ -18,6 +18,7 @@ const KINDS: { key: Kind; label: string; text: string }[] = [
   { key: "prepay", label: "Antecipar parcelas", text: "Antecipar parcelas de uma dívida ou deixar o dinheiro aplicado." },
   { key: "reserve", label: "Reserva de emergência", text: "O valor ideal da reserva a partir dos gastos essenciais." },
   { key: "inflation", label: "Correção pela inflação", text: "Quanto um valor de uma data antiga vale hoje, pelo IPCA do Banco Central." },
+  { key: "bonus", label: "13º e restituição", text: "Estimativa do 13º salário e como dividir o dinheiro extra antes de ele chegar." },
 ];
 
 const num = (v: string) => Number((v || "0").replace(",", "."));
@@ -275,6 +276,63 @@ function InflationCalc() {
   );
 }
 
+/** v1.4: 13º salário (proporcional aos meses) e a divisão do dinheiro extra. Só números. */
+function BonusCalc() {
+  const [salary, setSalary] = useState("3.000,00");
+  const [months, setMonths] = useState("12");
+  const [refund, setRefund] = useState("0,00");
+  const [shares, setShares] = useState({ debts: "40", reserve: "30", goals: "30" });
+  const gross = (m(salary) * Math.min(Math.max(Math.round(num(months)), 0), 12)) / 12;
+  const total = gross + m(refund);
+  const pct = (v: string) => Math.max(0, num(v));
+  const sum = pct(shares.debts) + pct(shares.reserve) + pct(shares.goals);
+  const part = (v: string) => (sum > 0 ? (total * pct(v)) / sum : 0);
+  return (
+    <>
+      <div className="grid-2">
+        <label>
+          Salário bruto
+          <MoneyInput value={salary} onChange={setSalary} required={false} />
+        </label>
+        <label>
+          <span className="field-label">
+            Meses trabalhados no ano <Tip>Conta o mês com 15 dias ou mais de trabalho.</Tip>
+          </span>
+          <input type="number" min={1} max={12} value={months} onChange={(e) => setMonths(e.target.value)} />
+        </label>
+        <label>
+          <span className="field-label">
+            Restituição do IR esperada <Tip>Opcional. O valor aparece na declaração, depois de enviada.</Tip>
+          </span>
+          <MoneyInput value={refund} onChange={setRefund} required={false} />
+        </label>
+      </div>
+      <fieldset className="radios">
+        <legend className="field-label">Como dividir (em %)</legend>
+        <div className="grid-3">
+          {(
+            [
+              ["debts", "Dívidas"],
+              ["reserve", "Reserva"],
+              ["goals", "Metas"],
+            ] as const
+          ).map(([key, label]) => (
+            <label key={key}>
+              {label}
+              <input type="number" min={0} max={100} value={shares[key]} onChange={(e) => setShares((s) => ({ ...s, [key]: e.target.value }))} />
+            </label>
+          ))}
+        </div>
+      </fieldset>
+      <Result>
+        13º bruto estimado: <strong>{money(gross)}</strong> (1ª parcela até 30/11, sem descontos: {money(gross / 2)}; a 2ª, até 20/12, vem com
+        INSS e IR). Com a restituição, o extra soma <strong>{money(total)}</strong>: {money(part(shares.debts))} para dívidas,{" "}
+        {money(part(shares.reserve))} para a reserva e {money(part(shares.goals))} para metas.
+      </Result>
+    </>
+  );
+}
+
 /** Insights › Ferramentas › Calculadoras: contas rápidas, sem recomendar produtos. */
 export function Calculators() {
   const [kind, setKind] = useState<Kind>("compound");
@@ -298,6 +356,7 @@ export function Calculators() {
         {kind === "prepay" && <PrepayCalc />}
         {kind === "reserve" && <ReserveCalc />}
         {kind === "inflation" && <InflationCalc />}
+        {kind === "bonus" && <BonusCalc />}
       </div>
       <p className="muted small" style={{ margin: 0 }}>
         Simulações aproximadas, com juros compostos e capitalização mensal. Não são recomendação de investimento ou de produto financeiro.

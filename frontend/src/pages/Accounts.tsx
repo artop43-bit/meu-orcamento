@@ -2,10 +2,10 @@ import { useState, type FormEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowRightLeft, Landmark, Pencil, Plus, Trash2 } from "lucide-react";
 
-import { useBudgetMutation } from "../api/budget";
+import { useBudgetMutation, useCategories } from "../api/budget";
 import { errorMessage } from "../api/client";
 import { ACCOUNT_KINDS, moneyApi, useAccounts, type Account, type AccountKind } from "../api/money";
-import { FormActions, MoneyInput, requireMoney } from "../components/budget";
+import { CategorySelect, FormActions, MoneyInput, requireMoney } from "../components/budget";
 import { DateField } from "../components/DateField";
 import { EmptyGuide, Tip } from "../components/help";
 import { Alert, Button, Kpi, LoadingRegion, PageHeader, Sheet, Skeleton } from "../components/ui";
@@ -15,13 +15,23 @@ function AccountForm({ account, onDone }: { account?: Account; onDone: () => voi
   const [name, setName] = useState(account?.name ?? "");
   const [kind, setKind] = useState<AccountKind>(account?.kind ?? "checking");
   const [initial, setInitial] = useState(account ? moneyInput(account.initial_balance) : "");
+  // v1.4: vale-refeição/alimentação — recarga mensal e a categoria que ele paga.
+  const [recharge, setRecharge] = useState(account?.benefit_amount ? moneyInput(account.benefit_amount) : "");
+  const [rechargeDay, setRechargeDay] = useState(account?.benefit_day ? String(account.benefit_day) : "");
+  const [benefitCategory, setBenefitCategory] = useState(account?.benefit_category_id ?? "");
+  const categories = useCategories();
   const [error, setError] = useState("");
   const save = useBudgetMutation(async () => {
     const raw = initial.trim();
     const negative = raw.startsWith("-");
     const parsed = raw ? parseMoney(raw.replace("-", "")) : "0.00";
     if (parsed === null) throw new Error("Saldo inicial inválido.");
-    const data = { name, kind, initial_balance: negative ? `-${parsed}` : parsed };
+    const data: Partial<Account> & { name: string } = { name, kind, initial_balance: negative ? `-${parsed}` : parsed };
+    if (kind === "benefit") {
+      data.benefit_amount = recharge.trim() ? requireMoney(recharge) : null;
+      data.benefit_day = rechargeDay ? Number(rechargeDay) : null;
+      if (benefitCategory) data.benefit_category_id = benefitCategory;
+    }
     if (account) await moneyApi.updateAccount(account.id, data);
     else await moneyApi.createAccount(data);
   });
@@ -58,6 +68,29 @@ function AccountForm({ account, onDone }: { account?: Account; onDone: () => voi
         </span>
         <input inputMode="decimal" value={initial} onChange={(e) => setInitial(e.target.value)} placeholder="0,00" />
       </label>
+      {kind === "benefit" && (
+        <>
+          <div className="grid-2">
+            <label>
+              <span className="field-label">
+                Recarga por mês <Tip>Valor creditado todo mês. Entra como receita no Orçamento e no saldo do vale.</Tip>
+              </span>
+              <MoneyInput value={recharge} onChange={setRecharge} required={false} />
+            </label>
+            <label>
+              Dia da recarga
+              <input type="number" inputMode="numeric" min={1} max={31} value={rechargeDay} onChange={(e) => setRechargeDay(e.target.value)} placeholder="Ex.: 5" />
+            </label>
+          </div>
+          <label>
+            <span className="field-label">
+              Paga só a categoria <Tip>Despesas pagas com o vale precisam ser desta categoria.</Tip>
+            </span>
+            <CategorySelect categories={categories.data ?? []} value={benefitCategory} onChange={setBenefitCategory} />
+            {!benefitCategory && <small className="muted">Sem escolha, o vale usa a categoria Alimentação.</small>}
+          </label>
+        </>
+      )}
       <FormActions loading={save.isPending} onCancel={onDone} label={account ? "Salvar" : "Adicionar conta"} />
     </form>
   );
@@ -194,7 +227,9 @@ export default function AccountsPage() {
                   <span className="item__main">
                     <span className="item__title">{account.name}</span>
                     <span className="item__meta">
-                      {ACCOUNT_KINDS[account.kind]} · fim do mês: {money(end_of_month)}
+                      {ACCOUNT_KINDS[account.kind]}
+                      {account.kind === "benefit" && account.benefit_amount && ` · recarga de ${money(account.benefit_amount)}${account.benefit_day ? ` no dia ${account.benefit_day}` : ""}`} · fim do mês:{" "}
+                      {money(end_of_month)}
                     </span>
                   </span>
                   <strong className={`item__amount ${Number(balance) < 0 ? "tone--error" : ""}`}>{money(balance)}</strong>

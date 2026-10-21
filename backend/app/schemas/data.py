@@ -90,10 +90,21 @@ class StatementTransaction(BaseModel):
     amount: Money
     kind: Literal["income", "expense"]
     category_id: uuid.UUID | None = None
+    # v1.4: na gravação, marca este lançamento como conferido em vez de criar outro.
+    match_id: uuid.UUID | None = None
+
+
+class StatementMatch(BaseModel):
+    id: uuid.UUID
+    kind: Literal["income", "expense"]
+    description: str
+    date: date
 
 
 class StatementPreviewItem(StatementTransaction):
     duplicate: bool
+    # v1.4: lançamento feito à mão que corresponde a esta linha (conciliação).
+    match: StatementMatch | None = None
     # Pagamento da fatura do cartão: as compras já estão no app, então vem desmarcado.
     card_payment: bool = False
 

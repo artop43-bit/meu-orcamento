@@ -3,13 +3,14 @@ import { useQuery } from "@tanstack/react-query";
 import type { Expense } from "./budget";
 import { api } from "./client";
 
-export type AccountKind = "checking" | "savings" | "wallet" | "other";
+export type AccountKind = "checking" | "savings" | "wallet" | "other" | "benefit";
 
 export const ACCOUNT_KINDS: Record<AccountKind, string> = {
   checking: "Conta corrente",
   savings: "Poupança",
   wallet: "Carteira (dinheiro)",
   other: "Outra",
+  benefit: "Vale-refeição ou alimentação",
 };
 
 export type Account = {
@@ -19,7 +20,15 @@ export type Account = {
   initial_balance: string;
   color: string | null;
   archived: boolean;
+  /** v1.4: vale (kind "benefit"): recarga mensal e a categoria que ele paga. */
+  benefit_amount?: string | null;
+  benefit_day?: number | null;
+  benefit_category_id?: string | null;
 };
+
+/** v1.4: projeto/etiqueta (despesas de categorias diferentes juntas, com teto opcional). */
+export type Project = { id: string; name: string; budget: string | null; total: string; count: number; pct: number | null };
+export const PROJECTS_KEY = ["budget", "projects"] as const;
 
 export type AccountBalance = { account: Account; balance: string; end_of_month: string };
 
@@ -108,6 +117,9 @@ export const moneyApi = {
   confirmReview: (ids: string[], categories?: Record<string, string | null>, category_id?: string | null) =>
     api.post<{ count: number }>("/review/confirm", { ids, categories, category_id: category_id ?? null }),
 
+  projects: () => api.get<Project[]>("/projects"),
+  updateProject: (id: string, data: { name?: string; budget?: string | null }) => api.patch<{ id: string; name: string }>(`/projects/${id}`, data),
+  deleteProject: (id: string) => api.delete(`/projects/${id}`),
   search: (params: Record<string, string>) => {
     const query = new URLSearchParams(Object.entries(params).filter(([, v]) => v !== "")).toString();
     return api.get<SearchResponse>(`/search${query ? `?${query}` : ""}`);

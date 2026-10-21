@@ -47,6 +47,8 @@ class Category(Base):
     # v1.3: a sobra do limite passa para o mês seguinte (a partir de carry_since).
     carry_over: Mapped[bool] = mapped_column(default=False, server_default="0")
     carry_since: Mapped[date | None] = mapped_column(Date)
+    # v1.4: dedutível no Imposto de Renda: "saude", "educacao", "previdencia" ou "pensao".
+    deductible: Mapped[str | None] = mapped_column(String(12))
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
 
 
@@ -82,6 +84,10 @@ class RecurringItem(Base):
     income_type: Mapped[str | None] = mapped_column(String(10))
     payment_method: Mapped[str | None] = mapped_column(String(12))
     notes: Mapped[str | None] = mapped_column(String(500))
+    # v1.4: renda que entra numa conta (ex.: recarga do vale-refeição).
+    account_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("money_accounts.id", ondelete="SET NULL")
+    )
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
 
 
@@ -105,6 +111,8 @@ class Income(Base):
     )
     # Dia previsto do recebimento (opcional).
     day: Mapped[int | None] = mapped_column(SmallInteger)
+    # v1.4: faturamento do MEI (conta para o teto anual).
+    mei: Mapped[bool] = mapped_column(default=False, server_default="0")
     notes: Mapped[str | None] = mapped_column(String(500))
     # Identificador da origem (extrato bancário ou arquivo antigo), para não importar duas vezes.
     import_ref: Mapped[str | None] = mapped_column(String(80))
@@ -166,6 +174,23 @@ class Expense(Base):
     )
     # v1.3: compra dividida em categorias (cada parte é uma conta com o seu valor).
     split_group_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, index=True)
+    # v1.4: projeto/etiqueta (ex.: "Viagem Bahia", "Reforma").
+    project_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("projects.id", ondelete="SET NULL"), index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+
+
+class Project(Base):
+    """Projeto ou etiqueta (v1.4): junta despesas de categorias diferentes, com teto opcional."""
+
+    __tablename__ = "projects"
+    __table_args__ = (UniqueConstraint("user_id", "name"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = _user_fk()
+    name: Mapped[str] = mapped_column(String(40))
+    budget: Mapped[Decimal | None] = mapped_column(Money)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
 
 
@@ -372,6 +397,14 @@ class MoneyAccount(Base):
     initial_balance: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=Decimal("0"))
     color: Mapped[str | None] = mapped_column(String(7))
     archived: Mapped[bool] = mapped_column(default=False, server_default="0")
+    # v1.4: vale-refeição/alimentação ("benefit"): só paga a categoria escolhida e recebe a
+    # recarga mensal por uma renda fixa ligada à conta.
+    benefit_category_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("categories.id", ondelete="SET NULL")
+    )
+    recurring_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("recurring_items.id", ondelete="SET NULL")
+    )
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
 
 

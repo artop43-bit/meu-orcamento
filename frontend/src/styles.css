@@ -7727,3 +7727,106 @@ textarea {
   color: var(--muted);
   background: var(--surface-2);
 }
+
+/* ================================================================ v1.4 */
+.pix-charge__qr {
+  display: grid;
+  place-items: center;
+  padding: 12px;
+  border-radius: var(--radius);
+  background: #fff;
+  justify-self: center;
+}
+
+.pix-charge__code {
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  word-break: break-all;
+}
+
+.mei-panel {
+  padding: 12px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+
+.mei-panel__das {
+  align-items: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.mei-panel__das label {
+  flex: 1 1 160px;
+}
+
+.import-match {
+  display: block;
+  margin-top: 2px;
+}
+
+.report__tax h3 {
+  margin: 16px 0 6px;
+  font-size: 1rem;
+}
+
+.report__tax-group {
+  margin-bottom: 10px;
+}
+
+.report__tax-title {
+  margin: 6px 0;
+}
+
+@media print {
+  .report__tax {
+    break-before: page;
+  }
+}
+
+.calendar-link__steps {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 4px;
+}
+
+.project-summary {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.project-row {
+  flex-wrap: wrap;
+}
+
+.project-row__budget {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.project-row__budget .money-input,
+.project-row__budget input {
+  max-width: 130px;
+}
+
+.allocation-target {
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.allocation-target__row {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) 90px auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.allocation-target__head {
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}

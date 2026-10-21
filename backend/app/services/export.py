@@ -268,7 +268,11 @@ def annual(db: Session, user: User, year: int) -> dict[str, Any]:
     expenses = sum((m["expenses"] for m in months), Decimal("0"))
     investments = list(db.scalars(select(Investment).where(Investment.user_id == user.id)))
     goals = list(db.scalars(select(Goal).where(Goal.user_id == user.id)))
+    from app.services import taxreport
+
     return {
+        # v1.4: relatório para o Imposto de Renda (deduções, rendimentos, bens e dívidas).
+        "tax": taxreport.report(db, user, year),
         "year": year,
         "income": income,
         "expenses": expenses,

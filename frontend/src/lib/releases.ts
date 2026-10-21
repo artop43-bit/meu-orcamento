@@ -11,6 +11,45 @@ export type Release = {
 
 export const RELEASES: Release[] = [
   {
+    version: "1.4.0",
+    date: "21/10/2026 às 17:00",
+    title: "Pix, vale-refeição, MEI, Imposto de Renda e o raio-x dos gastos",
+    sections: [
+      {
+        title: "Divisões e contas",
+        items: [
+          "Cobre via Pix: cadastre sua chave em Preferências e gere o QR Code e o copia e cola com o valor devido.",
+          "Novo tipo de conta: vale-refeição ou alimentação, com recarga mensal automática.",
+        ],
+      },
+      {
+        title: "MEI e Imposto de Renda",
+        items: [
+          "Sou MEI: acompanhe o faturamento do ano e receba um aviso ao chegar em 80% do teto.",
+          "O resumo anual mostra o que interessa para o Imposto de Renda: despesas dedutíveis, rendimentos, bens e dívidas.",
+          "Ao importar um extrato, o que você já lançou à mão é reconhecido e não entra duplicado.",
+        ],
+      },
+      {
+        title: "Calendário",
+        items: [
+          "Gastos grandes previstos mostram quanto guardar por mês até a data.",
+          "Leve os vencimentos para a agenda do celular com um link secreto.",
+          "Aviso diário opcional com o disponível do dia.",
+        ],
+      },
+      {
+        title: "Insights, investimentos e projetos",
+        items: [
+          "Tarifas e juros pagos no ano e a sua inflação comparada ao IPCA.",
+          "Calculadora do 13º e da restituição.",
+          "Meta de alocação da carteira, com a divisão do próximo aporte.",
+          "Projetos: junte despesas de categorias diferentes e acompanhe o total na Busca.",
+        ],
+      },
+    ],
+  },
+  {
     version: "1.3.2",
     date: "21/10/2026 às 12:10",
     title: "Mensagens com um só acesso",

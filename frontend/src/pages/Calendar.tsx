@@ -4,6 +4,7 @@ import {
   ArrowDownLeft,
   BellRing,
   CalendarPlus,
+  CalendarSync,
   ChevronLeft,
   ChevronRight,
   CreditCard,
@@ -30,7 +31,9 @@ import { CategorySelect, FormActions, MoneyInput, requireMoney } from "../compon
 import { EmptyGuide, Tip } from "../components/help";
 import { Alert, Button, LoadingRegion, PageHeader, Sheet, Skeleton } from "../components/ui";
 import { announce } from "../lib/announce";
-import { addMonths, money, moneyInput, monthLabel, thisMonth, todayISO } from "../lib/format";
+import { addMonths, money, moneyInput, monthLabel, parseMoney, thisMonth, todayISO } from "../lib/format";
+import { provisions, totalPerMonth } from "../lib/provisions";
+import { CalendarLink } from "../components/CalendarLink";
 import { DateField } from "../components/DateField";
 
 // Cor + ícone + texto: o tipo nunca é indicado só pela cor (acessível a daltônicos).
@@ -196,6 +199,9 @@ function PlannedForm({
   }
 
   const launched = !!planned?.expense_id;
+  // v1.4: quanto guardar por mês até a data (a partir do mês que vem).
+  const value = Number(parseMoney(amount) ?? 0);
+  const [provision] = value > 0 && !launched ? provisions([{ id: "x", date: day, description, amount: String(value), category_id: null, notes: null, expense_id: null }], [], todayISO()) : [];
   return (
     <form className="inline-form" onSubmit={submit}>
       <Alert tone="error">{error}</Alert>
@@ -224,6 +230,12 @@ function PlannedForm({
         Observação
         <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} maxLength={500} placeholder="Ex.: dividir com os irmãos" />
       </label>
+      {provision && (
+        <p className="summary-box small" style={{ margin: 0 }}>
+          Para pagar sem aperto, guarde <strong>{money(provision.perMonth)}</strong> por mês nos próximos {provision.months}{" "}
+          {provision.months === 1 ? "mês" : "meses"}.
+        </p>
+      )}
       <FormActions loading={save.isPending} onCancel={onDone} label={planned ? "Salvar" : "Agendar despesa"} />
       {planned && !launched && (
         <div className="stack stack--tight" style={{ borderTop: "1px solid var(--border)", paddingTop: 16 }}>
@@ -256,6 +268,12 @@ export default function CalendarPage() {
   const month = params.month && /^\d{4}-\d{2}$/.test(params.month) ? params.month : thisMonth();
   const calendar = useCalendar(month);
   const planned = useQuery({ queryKey: ["budget", "planned", month], queryFn: () => budgetApi.planned(month) });
+  // v1.4: provisões (gastos grandes que vêm aí) e o link da agenda.
+  const allPlanned = useQuery({ queryKey: ["budget", "planned", "all"], queryFn: () => budgetApi.planned() });
+  const recurring = useQuery({ queryKey: ["budget", "recurring"], queryFn: budgetApi.recurring });
+  const coming = provisions(allPlanned.data ?? [], recurring.data ?? [], todayISO());
+  const [showProvisions, setShowProvisions] = useState(false);
+  const [showLink, setShowLink] = useState(false);
   const categories = useCategories();
   const [search, setSearch] = useSearchParams();
   const [editing, setEditing] = useState<Editing>(() =>
@@ -333,9 +351,20 @@ export default function CalendarPage() {
           month === thisMonth() ? "Vencimentos, recebimentos e despesas previstas" : <Link to="/calendario">Voltar para o mês atual</Link>
         }
         actions={
-          <Button type="button" onClick={() => setEditing({ type: "new-planned", date: defaultDate })}>
-            <CalendarPlus size={16} /> Agendar despesa prevista
-          </Button>
+          <span className="row month-actions">
+            <button
+              type="button"
+              className="icon-btn icon-btn--bordered"
+              onClick={() => setShowLink(true)}
+              aria-label="Vencimentos na agenda do celular"
+              title="Vencimentos na agenda do celular"
+            >
+              <CalendarSync size={18} aria-hidden />
+            </button>
+            <Button type="button" onClick={() => setEditing({ type: "new-planned", date: defaultDate })}>
+              <CalendarPlus size={16} /> Agendar despesa prevista
+            </Button>
+          </span>
         }
       />
 
@@ -359,6 +388,14 @@ export default function CalendarPage() {
               Previstas <strong>{money(totals.plannedTotal)}</strong>
               <Tip>Despesas previstas ainda não confirmadas. Já são consideradas na projeção e nos Insights.</Tip>
             </span>
+            {coming.length > 0 && (
+              <span>
+                Guardar por mês <strong>{money(totalPerMonth(coming))}</strong>{" "}
+                <button type="button" className="link-btn small" onClick={() => setShowProvisions(true)}>
+                  ver
+                </button>
+              </span>
+            )}
           </div>
 
           {soon.length > 0 && (
@@ -503,6 +540,35 @@ export default function CalendarPage() {
       </Sheet>
       <Sheet open={editing?.type === "planned"} title="Despesa prevista" onClose={close}>
         {editing?.type === "planned" && <PlannedForm categories={cats} planned={editing.planned} date={editing.planned.date} onDone={close} />}
+      </Sheet>
+      <Sheet open={showProvisions} title="Gastos grandes que vêm aí" onClose={() => setShowProvisions(false)}>
+        {showProvisions && (
+          <div className="stack">
+            <p className="muted small" style={{ margin: 0 }}>
+              Despesas previstas e contas que se repetem a cada 6 ou 12 meses, nos próximos 12 meses. Guardando o valor de cada mês, o gasto chega
+              sem aperto.
+            </p>
+            <ul className="items">
+              {coming.map((p) => (
+                <li key={p.key} className="item">
+                  <span className="item__main">
+                    <span className="item__title">{p.description}</span>
+                    <span className="item__meta">
+                      {money(p.amount)} em {new Date(`${p.date}T12:00:00`).toLocaleDateString("pt-BR")} · {p.months} {p.months === 1 ? "mês" : "meses"}
+                    </span>
+                  </span>
+                  <strong className="num">{money(p.perMonth)}/mês</strong>
+                </li>
+              ))}
+            </ul>
+            <p style={{ margin: 0 }}>
+              Total para guardar por mês: <strong>{money(totalPerMonth(coming))}</strong>
+            </p>
+          </div>
+        )}
+      </Sheet>
+      <Sheet open={showLink} title="Vencimentos na agenda do celular" onClose={() => setShowLink(false)}>
+        {showLink && <CalendarLink />}
       </Sheet>
     </>
   );

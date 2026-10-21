@@ -13,6 +13,7 @@ from app.models.budget import (
     Investment,
     MoneyAccount,
     PlannedExpense,
+    Project,
     RecurringItem,
     SavedAnalysis,
     Transfer,
@@ -41,6 +42,7 @@ from app.models.user import (
 )
 
 __all__ = [
+    "Project",
     "AnnouncementReply",
     "ErrorEvent",
     "Challenge",

@@ -1,17 +1,18 @@
 import { useState, type FormEvent } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { Search as SearchIcon } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Search as SearchIcon, Trash2 } from "lucide-react";
 import { Link, useSearchParams } from "react-router";
 
 import { PAYMENT_METHODS, paymentLabel, useCategories } from "../api/budget";
 import { errorMessage } from "../api/client";
-import { moneyApi } from "../api/money";
-import { CategorySelect } from "../components/budget";
+import { moneyApi, PROJECTS_KEY, type Project } from "../api/money";
+import { Bar, CategorySelect, MoneyInput } from "../components/budget";
 import { DateField } from "../components/DateField";
-import { Alert, Button, LoadingRegion, PageHeader, Skeleton } from "../components/ui";
-import { money, monthLabel, parseMoney, shortDate } from "../lib/format";
+import { Alert, Button, LoadingRegion, PageHeader, Sheet, Skeleton } from "../components/ui";
+import { announce } from "../lib/announce";
+import { money, moneyInput, monthLabel, parseMoney, shortDate } from "../lib/format";
 
-const FIELDS = ["q", "start", "end", "min_amount", "max_amount", "payment_method", "category_id", "kind"] as const;
+const FIELDS = ["q", "start", "end", "min_amount", "max_amount", "payment_method", "category_id", "kind", "project_id"] as const;
 
 /** Busca em todos os meses (despesas e receitas). */
 export default function SearchPage() {
@@ -27,6 +28,10 @@ export default function SearchPage() {
     enabled: active,
   });
   const names = new Map((categories.data ?? []).map((c) => [c.id, c.name]));
+  // v1.4: projetos/etiquetas (filtro e o total de cada um, com teto opcional).
+  const projects = useQuery({ queryKey: PROJECTS_KEY, queryFn: moneyApi.projects });
+  const [managing, setManaging] = useState(false);
+  const selectedProject = (projects.data ?? []).find((p) => p.id === params.get("project_id"));
 
   function set<K extends keyof typeof form>(key: K, value: string) {
     setForm((f) => ({ ...f, [key]: value }));
@@ -47,6 +52,21 @@ export default function SearchPage() {
   return (
     <>
       <PageHeader title="Busca" subtitle="Encontre despesas e receitas de qualquer mês." />
+      <Sheet open={managing} title="Projetos" onClose={() => setManaging(false)}>
+        {managing && <ProjectsPanel projects={projects.data ?? []} />}
+      </Sheet>
+      {selectedProject && (
+        <section className="card project-summary" aria-label={`Projeto ${selectedProject.name}`}>
+          <strong>{selectedProject.name}</strong>
+          <span>
+            {money(selectedProject.total)}
+            {selectedProject.budget && ` de ${money(selectedProject.budget)}`} · {selectedProject.count} despesa(s)
+          </span>
+          {selectedProject.pct !== null && (
+            <Bar pct={Math.min(selectedProject.pct, 100)} color={selectedProject.pct >= 100 ? "var(--error)" : selectedProject.pct >= 80 ? "var(--warn)" : "var(--positive)"} />
+          )}
+        </section>
+      )}
       <form className="card stack" onSubmit={submit} role="search">
         <label className="list-tools__search">
           <SearchIcon size={16} aria-hidden />
@@ -93,6 +113,24 @@ export default function SearchPage() {
             Categoria
             <CategorySelect categories={categories.data ?? []} value={form.category_id} onChange={(v) => set("category_id", v)} />
           </label>
+          {(projects.data ?? []).length > 0 && (
+            <label>
+              <span className="field-label">
+                Projeto{" "}
+                <button type="button" className="link-btn small" onClick={() => setManaging(true)}>
+                  gerenciar
+                </button>
+              </span>
+              <select value={form.project_id} onChange={(e) => set("project_id", e.target.value)}>
+                <option value="">Todos</option>
+                {(projects.data ?? []).map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
         </div>
         <div className="form-actions">
           <Button
@@ -156,5 +194,61 @@ export default function SearchPage() {
         </section>
       )}
     </>
+  );
+}
+
+/** Busca › Projetos (v1.4): total de cada projeto, teto opcional, renomear e apagar. */
+function ProjectsPanel({ projects }: { projects: Project[] }) {
+  const queryClient = useQueryClient();
+  const [error, setError] = useState("");
+  async function run(fn: () => Promise<unknown>, message: string) {
+    setError("");
+    try {
+      await fn();
+      await queryClient.invalidateQueries({ queryKey: ["budget"] });
+      announce(message);
+    } catch (err) {
+      setError(errorMessage(err));
+    }
+  }
+  return (
+    <div className="stack">
+      <Alert tone="error">{error}</Alert>
+      <p className="muted small" style={{ margin: 0 }}>
+        Para colocar uma despesa num projeto, preencha “Projeto” no formulário da despesa (em Observação e projeto).
+      </p>
+      <ul className="items">
+        {projects.map((p) => (
+          <li key={p.id} className="item project-row">
+            <span className="item__main">
+              <span className="item__title">{p.name}</span>
+              <span className="item__meta">
+                {money(p.total)} · {p.count} despesa(s)
+                {p.budget && ` · teto ${money(p.budget)} (${p.pct?.toLocaleString("pt-BR")}%)`}
+              </span>
+            </span>
+            <ProjectBudget project={p} onSave={(value) => void run(() => moneyApi.updateProject(p.id, { budget: value }), "Teto salvo")} />
+            <button type="button" className="icon-btn" aria-label={`Apagar o projeto ${p.name}`} onClick={() => void run(() => moneyApi.deleteProject(p.id), "Projeto apagado")}>
+              <Trash2 size={16} aria-hidden />
+            </button>
+          </li>
+        ))}
+      </ul>
+      <p className="muted small" style={{ margin: 0 }}>
+        Apagar um projeto não apaga as despesas: elas só ficam sem a etiqueta.
+      </p>
+    </div>
+  );
+}
+
+function ProjectBudget({ project, onSave }: { project: Project; onSave: (value: string | null) => void }) {
+  const [value, setValue] = useState(project.budget ? moneyInput(project.budget) : "");
+  return (
+    <span className="project-row__budget">
+      <MoneyInput value={value} onChange={setValue} required={false} placeholder="Teto" label={`Teto do projeto ${project.name}`} />
+      <Button type="button" variant="secondary" onClick={() => onSave(value.trim() ? parseMoney(value) : null)}>
+        Salvar
+      </Button>
+    </span>
   );
 }
