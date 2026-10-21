@@ -126,3 +126,23 @@ class InboxItem(Base):
     )
     read_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+
+
+class ErrorEvent(Base):
+    """Erro das telas ou do servidor, agrupado pela impressão digital (tipo, mensagem e tela)."""
+
+    __tablename__ = "error_events"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    fingerprint: Mapped[str] = mapped_column(String(32), unique=True)
+    source: Mapped[str] = mapped_column(String(6))  # "web" | "api"
+    name: Mapped[str] = mapped_column(String(80))
+    message: Mapped[str] = mapped_column(String(300))
+    path: Mapped[str | None] = mapped_column(String(200))
+    detail: Mapped[str | None] = mapped_column(Text)
+    user_agent: Mapped[str | None] = mapped_column(String(200))
+    release: Mapped[str | None] = mapped_column(String(20))
+    count: Mapped[int] = mapped_column(default=0)
+    first_seen: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+    last_seen: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, index=True)
+    resolved_at: Mapped[datetime | None] = mapped_column(UTCDateTime)

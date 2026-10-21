@@ -115,6 +115,17 @@ export type Indicators = {
   fetched_at: string;
 };
 
+/** Correção de um valor pelo IPCA (v1.3). */
+export type Inflation = {
+  amount: number;
+  corrected: number;
+  inflation_pct: number;
+  start: string;
+  end: string;
+  months: number;
+  last_available: string;
+};
+
 export const analysisApi = {
   overview: (month: string) => api.get<Overview>(`/analysis/overview?month=${month}`),
   compare: (a: string, b: string) => api.get<Comparison>(`/analysis/compare?a=${a}&b=${b}`),
@@ -127,4 +138,6 @@ export const analysisApi = {
     api.patch<Investment>(`/investments/${id}`, data),
   deleteInvestment: (id: string) => api.delete(`/investments/${id}`),
   indicators: () => api.get<Indicators>("/indicators"),
+  inflation: (amount: string, start: string, end: string) =>
+    api.get<Inflation>(`/indicators/inflation?amount=${amount}&start=${start}&end=${end}`),
 };

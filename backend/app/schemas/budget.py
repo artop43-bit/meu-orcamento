@@ -19,6 +19,9 @@ Description = Annotated[str, StringConstraints(strip_whitespace=True, min_length
 CategoryName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=60)]
 GoalName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=80)]
 Notes = Annotated[str, StringConstraints(strip_whitespace=True, max_length=500)]
+# Identificador gerado no aparelho para um lançamento feito sem internet: se o envio for
+# repetido (a resposta se perdeu), o servidor devolve o mesmo lançamento em vez de duplicar.
+ClientRef = Annotated[str, StringConstraints(pattern=r"^[0-9a-fA-F-]{36}$")]
 Color = Annotated[str, Field(pattern=r"^#[0-9a-fA-F]{6}$")]
 MonthStr = Annotated[str, Field(pattern=r"^(20\d{2}|2100)-(0[1-9]|1[0-2])$")]
 DueDay = Annotated[int, Field(ge=1, le=31)]
@@ -52,6 +55,7 @@ class CategoryIn(BaseModel):
     is_essential: bool = False
     color: Color | None = None
     monthly_limit: Money | None = None
+    carry_over: bool = False
 
 
 class CategoryPatch(BaseModel):
@@ -59,6 +63,7 @@ class CategoryPatch(BaseModel):
     is_essential: bool | None = None
     color: Color | None = None
     monthly_limit: Money | None = None
+    carry_over: bool | None = None
 
 
 class CategoryOut(_Out):
@@ -67,6 +72,8 @@ class CategoryOut(_Out):
     is_essential: bool
     color: str | None
     monthly_limit: Decimal | None
+    carry_over: bool = False
+    carry_since: date | None = None
 
 
 # ---------------------------------------------------------------- rendas
@@ -82,6 +89,7 @@ class IncomeIn(BaseModel):
     repeat: Literal["once", "monthly", "period"] = "once"
     until_month: MonthStr | None = None
     account_id: uuid.UUID | None = None
+    client_ref: ClientRef | None = None
 
 
 class IncomePatch(BaseModel):
@@ -107,6 +115,11 @@ class IncomeOut(_MonthOut):
 # ---------------------------------------------------------------- contas
 
 
+class SplitPart(BaseModel):
+    category_id: uuid.UUID
+    amount: Money
+
+
 class ExpenseIn(BaseModel):
     description: Description
     amount: Money
@@ -130,6 +143,9 @@ class ExpenseIn(BaseModel):
     # Compra no débito com um cartão: entra paga e sai da conta vinculada ao cartão.
     debit_card_id: uuid.UUID | None = None
     account_id: uuid.UUID | None = None
+    # v1.3: compra dividida em categorias; a soma das partes tem de ser igual ao valor.
+    parts: Annotated[list[SplitPart], Field(min_length=2, max_length=6)] | None = None
+    client_ref: ClientRef | None = None
 
 
 class ExpensePatch(BaseModel):
@@ -164,6 +180,7 @@ class ExpenseOut(_MonthOut):
     installment_number: int | None
     installment_total: int | None
     recurring_id: uuid.UUID | None
+    split_group_id: uuid.UUID | None = None
 
 
 DeleteScope = Literal["one", "following"]
@@ -228,6 +245,8 @@ class CategoryTotal(BaseModel):
     total: Decimal
     limit: Decimal | None = None
     limit_pct: float | None = None
+    # v1.3: parte do limite que veio da sobra dos meses anteriores.
+    limit_carried: Decimal | None = None
 
 
 class MonthSummary(BaseModel):

@@ -29,6 +29,8 @@ class UserOut(BaseModel):
     accent: str | None = None
     # v1.0: dia em que começa o mês financeiro.
     month_start_day: int = 1
+    # v1.3: cartões do Orçamento (ordem e visibilidade), em JSON; None = padrão.
+    dashboard: str | None = None
 
     @model_validator(mode="after")
     def _admin(self) -> "UserOut":

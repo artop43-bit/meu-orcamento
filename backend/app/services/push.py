@@ -18,7 +18,12 @@ from app.models import PushSubscription, User
 
 logger = logging.getLogger(__name__)
 
-KINDS = {"due": "push_due", "messages": "push_messages", "alerts": "push_alerts"}
+KINDS = {
+    "due": "push_due",
+    "messages": "push_messages",
+    "alerts": "push_alerts",
+    "weekly": "push_weekly",
+}
 TIMEOUT = 5
 
 

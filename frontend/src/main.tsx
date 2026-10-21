@@ -5,6 +5,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import App from "./App";
 import { installFormErrors } from "./lib/formErrors";
 import { captureInstallPrompt } from "./lib/install";
+import { startOfflineSync } from "./lib/offline";
+import { installErrorReporting } from "./lib/errorReport";
 import { applyPrefs } from "./lib/prefs";
 import "./theme.css";
 import "./styles.css";
@@ -15,12 +17,22 @@ applyPrefs();
 // Erros de formulário em mensagens do app, junto do campo (sem balões do navegador).
 installFormErrors();
 
+// Erros inesperados das telas vão para Administração › Erros (só no site publicado).
+installErrorReporting();
+
 // Convite de instalação ("Instalar no computador"): chega só uma vez, logo no início.
 captureInstallPrompt();
 
 // Dados ficam "frescos" por 30 s: navegar entre páginas não recarrega tudo a cada toque.
 // Depois de salvar algo, as telas afetadas são recarregadas na hora (invalidateQueries).
-const queryClient = new QueryClient({ defaultOptions: { queries: { staleTime: 30_000 } } });
+// Gravações rodam mesmo sem rede: sem internet, a fila do aparelho (lib/offline) guarda o
+// lançamento; com a pausa padrão da biblioteca, ele ficaria preso sem aviso.
+const queryClient = new QueryClient({
+  defaultOptions: { queries: { staleTime: 30_000 }, mutations: { networkMode: "always" } },
+});
+
+// Lançamentos feitos sem internet sobem sozinhos quando a conexão volta; depois, as telas se atualizam.
+startOfflineSync(() => void queryClient.invalidateQueries({ queryKey: ["budget"] }));
 
 // App instalável e sem internet: o service worker só roda no site publicado (no desenvolvimento
 // ele atrapalharia a atualização automática das telas).

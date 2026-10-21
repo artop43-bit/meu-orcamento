@@ -2,6 +2,7 @@ import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Query, status
+from pydantic import BaseModel
 
 from app.api.budget import _changes
 from app.api.deps import CurrentUser, DbSession
@@ -140,6 +141,27 @@ def update_investment(
 @router.delete("/investments/{investment_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_investment(investment_id: uuid.UUID, user: CurrentUser, db: DbSession) -> None:
     investments.delete_investment(db, user, investment_id)
+
+
+class InflationOut(BaseModel):
+    amount: float
+    corrected: float
+    inflation_pct: float
+    start: str
+    end: str
+    months: int
+    last_available: str
+
+
+@router.get("/indicators/inflation")
+def inflation(
+    _: CurrentUser,
+    amount: Annotated[float, Query(gt=0, le=1_000_000_000)],
+    start: Annotated[str, Query(pattern=r"^\d{4}-\d{2}$")],
+    end: Annotated[str, Query(pattern=r"^\d{4}-\d{2}$")],
+) -> InflationOut:
+    """Quanto um valor de um mês antigo vale hoje, corrigido pelo IPCA (Banco Central)."""
+    return InflationOut.model_validate(indicators.correct_by_inflation(amount, start, end))
 
 
 @router.get("/indicators")

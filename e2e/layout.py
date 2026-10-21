@@ -49,6 +49,7 @@ PAGES = [
     ("mensagens", "/mensagens"),
     ("conversas", "/mensagens/conversas"),
     ("admin-quadro", "/admin?aba=solicitacoes&visao=quadro"),
+    ("admin-erros", "/admin?aba=erros"),
     ("dividas", "/dividas"),
     ("divisoes", "/divisoes"),
     ("app", "/ajustes/app"),

@@ -9,6 +9,8 @@ import {
   Copy,
   CopyPlus,
   ListChecks,
+  Mic,
+  SlidersHorizontal,
   TrendingDown,
   Zap,
   Gauge,
@@ -46,6 +48,10 @@ import { EmptyGuide, Tip } from "../components/help";
 import { ConsultantTeaser } from "../components/consultant";
 import { GoalTeaser } from "../components/GoalTeaser";
 import { MonthAlerts } from "../components/MonthAlerts";
+import { RecoveryCard } from "../components/RecoveryPlan";
+import { DashboardEditor } from "../components/DashboardEditor";
+import { useMe } from "../api/auth";
+import { areaOf, readDashboard, type DashboardKey } from "../lib/dashboard";
 import { Chart } from "../components/chart/Chart";
 import { extrasApi, saveQuickEntry, useCards, useDaily } from "../api/extras";
 import { moneyApi, useReviewCount } from "../api/money";
@@ -53,6 +59,8 @@ import { Alert, Button, Kpi, LoadingRegion, PageHeader, Sheet, Skeleton } from "
 import { useUndo } from "../components/undo";
 import { addMonths, cycleLabel, money, monthLabel, parseMoney, percent, shortDate, thisMonth, todayISO } from "../lib/format";
 import { normalizeText } from "../lib/text";
+import { sendOrQueue, useOfflineQueue } from "../lib/offline";
+import { listen, speechSupported } from "../lib/voice";
 
 type Editing =
   | { type: "new-expense"; draft?: ExpenseDraft }
@@ -135,9 +143,16 @@ function LedgerRow({
   selected: boolean;
   onSelect: (value: boolean) => void;
 }) {
-  const toggle = useBudgetMutation((paid: boolean) => budgetApi.updateExpense(expense.id, { paid }));
+  const toggle = useBudgetMutation((paid: boolean) =>
+    sendOrQueue(
+      { kind: "pay", method: "PATCH", path: `/expenses/${expense.id}`, body: { paid }, label: `${expense.description}: ${paid ? "paga" : "a pagar"}` },
+      () => budgetApi.updateExpense(expense.id, { paid }),
+    ),
+  );
+  // Marcada sem internet: vale o que está na fila até o envio.
+  const queuedPay = useOfflineQueue().find((i) => i.kind === "pay" && i.path === `/expenses/${expense.id}`);
   // Resposta imediata: mostra o novo estado enquanto o servidor confirma.
-  const paid = toggle.isPending && toggle.variables !== undefined ? toggle.variables : expense.paid;
+  const paid = toggle.isPending && toggle.variables !== undefined ? toggle.variables : queuedPay ? Boolean(queuedPay.body.paid) : expense.paid;
   const status = statusOf({ ...expense, paid });
 
   function onToggle(next: boolean) {
@@ -238,6 +253,7 @@ function LedgerRow({
             </Badge>
           )}
           {expense.recurring_id && <Badge>recorrente</Badge>}
+          {expense.split_group_id && <Badge>dividida</Badge>}
         </span>
         <span className="ledger__sub">
           <span className="dot" style={{ background: category?.color ?? undefined }} aria-hidden />
@@ -515,18 +531,55 @@ function ExpensesCard({
 type StatusFilter = "all" | "pending" | "late" | "paid";
 
 /** Campo "lançar numa frase": "mercado 120 pix ontem". */
-function QuickBar({ categories }: { categories: Category[] }) {
+function QuickBar({ categories, autoListen = false }: { categories: Category[]; autoListen?: boolean }) {
   const [text, setText] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [hearing, setHearing] = useState(false);
+  const [heard, setHeard] = useState(false);
+  const stopRef = useRef<(() => void) | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const cards = useCards();
+  // Sai da tela ouvindo: desliga o microfone.
+  useEffect(() => () => stopRef.current?.(), []);
+  // Atalho do ícone "Lançar por voz": já abre ouvindo.
+  useEffect(() => {
+    if (autoListen && speechSupported() && !stopRef.current) toggleVoice();
+    else if (autoListen) inputRef.current?.focus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoListen]);
   const undo = useUndo();
   const save = useBudgetMutation((value: string) => saveQuickEntry(value, categories, cards.data ?? []));
+
+  // Microfone: a fala vira a frase no campo; a pessoa confere e toca em "Lançar".
+  function toggleVoice() {
+    if (hearing) {
+      stopRef.current?.();
+      return;
+    }
+    setError("");
+    setHeard(false);
+    setHearing(true);
+    haptic("tap");
+    stopRef.current = listen(
+      (spoken, final) => {
+        setText(spoken);
+        if (final) setHeard(true);
+      },
+      (failure) => {
+        setHearing(false);
+        stopRef.current = null;
+        if (failure) setError(failure);
+        inputRef.current?.focus();
+      },
+    );
+  }
 
   async function submit(e: FormEvent) {
     e.preventDefault();
     if (!text.trim()) return;
     setError("");
+    setHeard(false);
     setBusy(true);
     try {
       const saved = await save.mutateAsync(text);
@@ -547,12 +600,30 @@ function QuickBar({ categories }: { categories: Category[] }) {
         <Zap size={16} aria-hidden />
         <span className="sr-only">Lançamento rápido</span>
         <input
+          ref={inputRef}
           value={text}
-          onChange={(e) => setText(e.target.value)}
-          placeholder="Ex.: mercado 120 pix ontem"
+          onChange={(e) => {
+            setText(e.target.value);
+            setHeard(false);
+          }}
+          placeholder={hearing ? "Pode falar: mercado 120 no pix ontem" : "Ex.: mercado 120 pix ontem"}
           autoComplete="off"
           enterKeyHint="send"
+          data-voice-target
         />
+        {speechSupported() && (
+          <button
+            type="button"
+            className={`quick-bar__mic ${hearing ? "is-listening" : ""}`}
+            onClick={toggleVoice}
+            aria-pressed={hearing}
+            aria-label={hearing ? "Parar de ouvir" : "Lançar por voz"}
+            title={hearing ? "Parar de ouvir" : "Lançar por voz"}
+            data-voice-button
+          >
+            <Mic size={16} aria-hidden />
+          </button>
+        )}
       </label>
       <Tip label="Como escrever o lançamento rápido">
         Descrição + valor, e opcionalmente forma de pagamento, data e parcelas. Exemplos: “mercado 120 pix ontem”, “uber 23,50
@@ -562,6 +633,11 @@ function QuickBar({ categories }: { categories: Category[] }) {
       <Button type="submit" loading={busy} disabled={!text.trim()}>
         Lançar
       </Button>
+      {heard && !error && (
+        <p className="muted small quick-bar__error" role="status">
+          Confira o texto entendido e toque em “Lançar”.
+        </p>
+      )}
       {error && (
         <p className="tone--error small quick-bar__error" role="alert">
           {error}
@@ -756,6 +832,7 @@ function BreakdownCard({ data, categories }: { data: MonthData; categories: Cate
                 />
                 <span className={`small ${c.limit_pct >= 100 ? "tone--error" : c.limit_pct >= 80 ? "tone--warn" : "muted"}`}>
                   {percent(c.limit_pct)} do limite de {money(c.limit)}
+                  {c.limit_carried && ` (inclui ${money(c.limit_carried)} de sobra)`}
                 </span>
               </>
             ) : (
@@ -918,11 +995,19 @@ export default function MonthPage() {
     const novo = search.get("novo");
     return novo === "conta" ? { type: "new-expense" } : novo === "renda" ? { type: "new-income" } : null;
   });
-  // Atalho "N" e Ctrl+K chegam com ?novo=…; abre o formulário e limpa o endereço.
+  const [voice, setVoice] = useState(() => search.get("voz") === "1");
+  const [customizing, setCustomizing] = useState(false);
+  const me = useMe();
+  const layout = readDashboard(me.data?.dashboard);
+  const shown = (area: "top" | "side"): DashboardKey[] =>
+    layout.filter((c) => (c.visible || (c.key === "quick" && voice)) && areaOf(c.key) === area).map((c) => c.key);
+  // Atalho "N", Ctrl+K e os atalhos do ícone chegam com ?novo=… ou ?voz=1; abre e limpa o endereço.
   useEffect(() => {
     const novo = search.get("novo");
-    if (!novo) return;
-    setEditing(novo === "renda" ? { type: "new-income" } : { type: "new-expense" });
+    const voz = search.get("voz");
+    if (!novo && !voz) return;
+    if (novo) setEditing(novo === "renda" ? { type: "new-income" } : { type: "new-expense" });
+    if (voz === "1") setVoice(true);
     setSearch({}, { replace: true });
   }, [search, setSearch]);
   const cats = categories.data ?? [];
@@ -960,6 +1045,15 @@ export default function MonthPage() {
         }
         actions={
           <span className="row month-actions">
+            <button
+              type="button"
+              className="icon-btn icon-btn--bordered"
+              onClick={() => setCustomizing(true)}
+              aria-label="Personalizar o painel"
+              title="Personalizar o painel"
+            >
+              <SlidersHorizontal size={18} aria-hidden />
+            </button>
             <Button type="button" variant="secondary" onClick={() => setEditing({ type: "new-income" })}>
               <Wallet size={16} /> Nova receita
             </Button>
@@ -979,7 +1073,13 @@ export default function MonthPage() {
           style={{ gap: 20 }}
           aria-busy={data.isPlaceholderData || undefined}
         >
-          <QuickBar categories={cats} />
+          {shown("top").map((key) => {
+            const empty = data.data!.incomes.length === 0 && data.data!.expenses.length === 0;
+            if (key === "quick") return <QuickBar key={key} categories={cats} autoListen={voice} />;
+            if (empty) return null;
+            if (key === "kpis") return <Kpis key={key} data={data.data!} />;
+            return <ConsultantTeaser key={key} month={month} />;
+          })}
           {reviewCount > 0 && (
             <Link to="/revisar" className="review-banner">
               <ListChecks size={18} aria-hidden />
@@ -1002,24 +1102,26 @@ export default function MonthPage() {
                 </p>
               </div>
             </div>
-          ) : (
-            <>
-              <Kpis data={data.data} />
-              <ConsultantTeaser month={month} />
-            </>
-          )}
+          ) : null}
+          {Number(data.data.summary.balance) < 0 && <RecoveryCard month={month} />}
           <div className="layout-main-side">
             <ExpensesCard data={data.data} categories={cats} setEditing={setEditing} />
             <div className="stack" style={{ gap: 20 }}>
-              <MonthAlerts month={month} />
-              <DailyCard month={month} />
-              <GoalTeaser showSuggestion={isCurrent} />
-              <IncomesCard data={data.data} setEditing={setEditing} />
-              <BreakdownCard data={data.data} categories={cats} />
+              {shown("side").map((key) => {
+                if (key === "alerts") return <MonthAlerts key={key} month={month} />;
+                if (key === "daily") return <DailyCard key={key} month={month} />;
+                if (key === "goal") return <GoalTeaser key={key} showSuggestion={isCurrent} />;
+                if (key === "incomes") return <IncomesCard key={key} data={data.data!} setEditing={setEditing} />;
+                return <BreakdownCard key={key} data={data.data!} categories={cats} />;
+              })}
             </div>
           </div>
         </div>
       )}
+
+      <Sheet open={customizing} title="Personalizar o painel" onClose={() => setCustomizing(false)}>
+        {customizing && <DashboardEditor saved={me.data?.dashboard} onDone={() => setCustomizing(false)} />}
+      </Sheet>
 
       <Sheet open={editing?.type === "copy"} title="Copiar do mês anterior" onClose={close}>
         {editing?.type === "copy" && <CopyPrevious month={month} onDone={close} />}

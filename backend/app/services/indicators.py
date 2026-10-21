@@ -82,3 +82,65 @@ def get_indicators() -> dict[str, Any]:
 def clear_cache() -> None:
     with _lock:
         _cache.clear()
+
+
+# ---------------------------------------------------------------- inflação (v1.3)
+
+IPCA_MONTHLY = 433  # IPCA, variação mensal (%)
+IPCA_URL = (
+    "https://api.bcb.gov.br/dados/serie/bcdata.sgs.433/dados?formato=json&dataInicial=01/01/1995"
+)
+_ipca: dict[str, Any] = {}
+
+
+def ipca_monthly() -> dict[str, float]:
+    """IPCA de cada mês desde 1995 ("AAAA-MM" → % no mês). Cache de 12 h; guarda o último bom."""
+    with _lock:
+        if _ipca and time.monotonic() < _ipca["expires"]:
+            return _ipca["value"]
+        previous = _ipca.get("value")
+    try:
+        request = Request(IPCA_URL, headers={"Accept": "application/json"})
+        with urlopen(request, timeout=TIMEOUT_SECONDS * 2) as response:  # noqa: S310 (URL fixa)
+            data = json.load(response)
+        value = {f"{row['data'][6:10]}-{row['data'][3:5]}": float(row["valor"]) for row in data}
+        expires = time.monotonic() + 12 * 3600
+    except Exception as exc:  # rede, formato inesperado etc.
+        logger.warning("Falha ao buscar o IPCA mensal do BCB: %s", exc)
+        value = previous or {}
+        expires = time.monotonic() + FAIL_SECONDS
+    with _lock:
+        _ipca.update({"expires": expires, "value": value})
+    return value
+
+
+def correct_by_inflation(amount: float, start: str, end: str) -> dict[str, Any]:
+    """Corrige um valor de `start` (AAAA-MM) até `end` pelo IPCA dos meses seguintes ao inicial."""
+    from app.core.errors import AppError
+
+    series = ipca_monthly()
+    if not series:
+        raise AppError(
+            503, "ipca_unavailable", "O IPCA do Banco Central não respondeu. Tente mais tarde."
+        )
+    last = max(series)
+    end = min(end, last)
+    if start >= end:
+        raise AppError(400, "invalid_period", "Escolha um mês inicial anterior ao final.")
+    if start < min(series):
+        raise AppError(400, "invalid_period", "O IPCA está disponível a partir de janeiro de 1995.")
+    factor = 1.0
+    months = 0
+    for month in sorted(series):
+        if start < month <= end:
+            factor *= 1 + series[month] / 100
+            months += 1
+    return {
+        "amount": round(amount, 2),
+        "corrected": round(amount * factor, 2),
+        "inflation_pct": round((factor - 1) * 100, 2),
+        "start": start,
+        "end": end,
+        "months": months,
+        "last_available": last,
+    }

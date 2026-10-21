@@ -1,9 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 
-import { budgetApi, type Category, type Expense, type Recurring } from "./budget";
+import { budgetApi, type Category, type Expense, type ExpenseInput, type Recurring } from "./budget";
 import { api } from "./client";
 import { parseQuickEntry, type QuickEntry } from "../lib/quickEntry";
 import { todayISO } from "../lib/format";
+import { discard, isQueued, OFFLINE_SAVED, sendOrQueue } from "../lib/offline";
 
 export type CardKind = "credit" | "debit" | "both";
 
@@ -121,12 +122,12 @@ export async function saveQuickEntry(
   const date = entry.date ?? todayISO();
   const month = date.slice(0, 7);
   if (entry.kind === "income") {
-    const income = await budgetApi.createIncome(month, {
-      description: entry.description,
-      amount: entry.amount,
-      income_type: "variable",
-      day: Number(date.slice(8)),
-    });
+    const body = { description: entry.description, amount: entry.amount, income_type: "variable" as const, day: Number(date.slice(8)) };
+    const income = await sendOrQueue(
+      { kind: "income", method: "POST", path: `/months/${month}/incomes`, body, label: `${entry.description} (receita)` },
+      (client_ref) => budgetApi.createIncome(month, { ...body, client_ref }),
+    );
+    if (isQueued(income)) return { message: OFFLINE_SAVED, revert: async () => discard(income.queued) };
     return { message: `Renda "${entry.description}" lançada`, revert: () => budgetApi.deleteIncome(income.id) };
   }
   const suggestion = await budgetApi.suggestCategory(entry.description).catch(() => null);
@@ -136,7 +137,7 @@ export async function saveQuickEntry(
   const debit = cards.map((c) => c.card).filter(hasDebit);
   const card = entry.payment === "credit" && credit.length === 1 ? credit[0] : null;
   const debitCard = entry.payment === "debit" && debit.length === 1 && !entry.installments ? debit[0] : null;
-  const created = await budgetApi.createExpense(month, {
+  const body: ExpenseInput = {
     description: entry.description,
     amount: entry.amount,
     category_id,
@@ -148,7 +149,12 @@ export async function saveQuickEntry(
     paid: Boolean(debitCard) || (!entry.installments && !card && date <= todayISO()),
     ...(card ? { card_id: card.id, purchase_date: date } : {}),
     ...(debitCard ? { debit_card_id: debitCard.id, purchase_date: date } : {}),
-  });
+  };
+  const created = await sendOrQueue(
+    { kind: "expense", method: "POST", path: `/months/${month}/expenses`, body, label: entry.description },
+    (client_ref) => budgetApi.createExpense(month, { ...body, client_ref }),
+  );
+  if (isQueued(created)) return { message: OFFLINE_SAVED, revert: async () => discard(created.queued) };
   const cat = suggestion?.name ? ` em ${suggestion.name}` : "";
   return {
     message: `"${entry.description}" lançada${cat}${card ? ` na fatura do ${card.name}` : debitCard ? ` no débito do ${debitCard.name}` : ""}`,
