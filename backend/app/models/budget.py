@@ -174,6 +174,23 @@ class Expense(Base):
     )
     # v1.3: compra dividida em categorias (cada parte é uma conta com o seu valor).
     split_group_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, index=True)
+    # v1.4: projeto/etiqueta (ex.: "Viagem Bahia", "Reforma").
+    project_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("projects.id", ondelete="SET NULL"), index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+
+
+class Project(Base):
+    """Projeto ou etiqueta (v1.4): junta despesas de categorias diferentes, com teto opcional."""
+
+    __tablename__ = "projects"
+    __table_args__ = (UniqueConstraint("user_id", "name"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = _user_fk()
+    name: Mapped[str] = mapped_column(String(40))
+    budget: Mapped[Decimal | None] = mapped_column(Money)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
 
 

@@ -310,6 +310,7 @@ def search(
     category_id: uuid.UUID | None = None,
     kind: str = "all",
     limit: int = 300,
+    project_id: uuid.UUID | None = None,
 ) -> dict[str, Any]:
     """Despesas e receitas de todos os meses que combinam com os filtros."""
     text = normalize(q)
@@ -328,6 +329,8 @@ def search(
             stmt = stmt.where(Expense.payment_method == payment_method)
         if category_id:
             stmt = stmt.where(Expense.category_id == category_id)
+        if project_id:
+            stmt = stmt.where(Expense.project_id == project_id)
         for e in db.scalars(stmt.order_by(Expense.month.desc(), Expense.due_date.desc())):
             if text and text not in normalize(f"{e.description} {e.notes or ''}"):
                 continue
@@ -344,7 +347,7 @@ def search(
                     "paid": e.paid,
                 }
             )
-    if kind in ("all", "income") and not category_id and not payment_method:
+    if kind in ("all", "income") and not category_id and not payment_method and not project_id:
         stmt = select(Income).where(Income.user_id == user.id)
         if start:
             stmt = stmt.where(Income.month >= start.replace(day=1))

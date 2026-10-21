@@ -1,8 +1,8 @@
 import uuid
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Query, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.api.budget import _changes
 from app.api.deps import CurrentUser, DbSession
@@ -153,6 +153,24 @@ class InflationOut(BaseModel):
     last_available: str
 
 
+@router.get("/analysis/fees")
+def fees(
+    user: CurrentUser, db: DbSession, year: Annotated[int, Query(ge=2000, le=2100)]
+) -> dict[str, Any]:
+    """v1.4: tarifas, anuidades, IOF, juros e multas pagos no ano."""
+    from app.services import xray
+
+    return xray.fees(db, user, year)
+
+
+@router.get("/analysis/personal-inflation")
+def personal_inflation(user: CurrentUser, db: DbSession) -> dict[str, Any]:
+    """v1.4: quanto subiram os gastos por categoria (12 meses × 12 anteriores) contra o IPCA."""
+    from app.services import xray
+
+    return xray.personal_inflation(db, user)
+
+
 @router.get("/indicators/inflation")
 def inflation(
     _: CurrentUser,
@@ -168,3 +186,34 @@ def inflation(
 def get_indicators(_: CurrentUser) -> IndicatorsOut:
     """Selic, CDI e IPCA (Banco Central). Exige login só para não virar proxy público."""
     return IndicatorsOut.model_validate(indicators.get_indicators())
+
+
+# ---------------------------------------------------------------- meta de alocação (v1.4)
+
+
+class TargetsIn(BaseModel):
+    # Percentual por classe da carteira (soma 100). Vazio apaga a meta.
+    targets: dict[str, Annotated[float, Field(ge=0, le=100)]] = Field(default_factory=dict)
+
+
+@router.get("/investments/targets")
+def get_targets(user: CurrentUser) -> dict[str, float]:
+    import json
+
+    return json.loads(user.investment_targets) if user.investment_targets else {}
+
+
+@router.put("/investments/targets")
+def set_targets(body: TargetsIn, user: CurrentUser, db: DbSession) -> dict[str, float]:
+    import json
+
+    from app.core.errors import AppError
+
+    targets = {k[:20]: round(v, 1) for k, v in body.targets.items() if v > 0}
+    if targets and abs(sum(targets.values()) - 100) > 0.5:
+        raise AppError(400, "invalid_targets", "Os percentuais da meta precisam somar 100%.")
+    if len(targets) > 12:
+        raise AppError(400, "invalid_targets", "No máximo 12 classes na meta.")
+    user.investment_targets = json.dumps(targets) if targets else None
+    db.commit()
+    return targets

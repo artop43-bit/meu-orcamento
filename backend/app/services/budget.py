@@ -534,6 +534,10 @@ def create_expense(db: Session, user: User, month: date, data: dict[str, Any]) -
         if existing:
             return existing
     parts = data.pop("parts", None)
+    if "project_name" in data:
+        from app.services import projects
+
+        data["project_id"] = projects.resolve(db, user, data.pop("project_name"))
     if parts:
         created = _create_split(db, user, month, data, parts)
     else:
@@ -783,6 +787,10 @@ def update_expense(
 ) -> Expense:
     """Altera a conta. Com scope="following", vale também para as próximas parcelas ou meses."""
     expense = _owned(db, Expense, expense_id, user)
+    if "project_name" in changes:
+        from app.services import projects
+
+        changes["project_id"] = projects.resolve(db, user, changes.pop("project_name"))
     if "category_id" in changes:
         _check_category(db, user, changes["category_id"])
     _check_account(db, user, changes.get("account_id"))

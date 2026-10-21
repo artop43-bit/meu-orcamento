@@ -6,6 +6,7 @@ from decimal import Decimal
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Query, status
+from pydantic import BaseModel, Field, StringConstraints
 
 from app.api.budget import _changes
 from app.api.deps import CurrentUser, DbSession
@@ -96,9 +97,20 @@ def search(
     payment_method: str | None = None,
     category_id: uuid.UUID | None = None,
     kind: Literal["all", "expense", "income"] = "all",
+    project_id: uuid.UUID | None = None,
 ) -> SearchOut:
     data = money.search(
-        db, user, q, start, end, min_amount, max_amount, payment_method, category_id, kind
+        db,
+        user,
+        q,
+        start,
+        end,
+        min_amount,
+        max_amount,
+        payment_method,
+        category_id,
+        kind,
+        project_id=project_id,
     )
     return SearchOut.model_validate(data)
 
@@ -119,3 +131,56 @@ def copy_candidates(month: str, user: CurrentUser, db: DbSession) -> list[Expens
 def copy_previous(month: str, body: CopyIn, user: CurrentUser, db: DbSession) -> list[ExpenseOut]:
     created = money.copy_previous(db, user, parse_month(month), body.ids)
     return [ExpenseOut.model_validate(e) for e in created]
+
+
+# ---------------------------------------------------------------- projetos (v1.4)
+
+
+class ProjectOut(BaseModel):
+    id: uuid.UUID
+    name: str
+    budget: Decimal | None
+    total: Decimal
+    count: int
+    pct: float | None
+
+
+class ProjectPatch(BaseModel):
+    name: (
+        Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=40)] | None
+    ) = None
+    budget: Annotated[Decimal, Field(gt=0, max_digits=12, decimal_places=2)] | None = None
+
+
+@router.get("/projects")
+def list_projects(user: CurrentUser, db: DbSession) -> list[ProjectOut]:
+    from app.services import projects
+
+    return [
+        ProjectOut(
+            id=r["project"].id,
+            name=r["project"].name,
+            budget=r["project"].budget,
+            total=r["total"],
+            count=r["count"],
+            pct=r["pct"],
+        )
+        for r in projects.overview(db, user)
+    ]
+
+
+@router.patch("/projects/{project_id}")
+def update_project(
+    project_id: uuid.UUID, body: ProjectPatch, user: CurrentUser, db: DbSession
+) -> dict[str, str]:
+    from app.services import projects
+
+    project = projects.update(db, user, project_id, body.model_dump(exclude_unset=True))
+    return {"id": str(project.id), "name": project.name}
+
+
+@router.delete("/projects/{project_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_project(project_id: uuid.UUID, user: CurrentUser, db: DbSession) -> None:
+    from app.services import projects
+
+    projects.remove(db, user, project_id)

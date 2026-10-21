@@ -156,6 +156,10 @@ class ExpenseIn(BaseModel):
     # v1.3: compra dividida em categorias; a soma das partes tem de ser igual ao valor.
     parts: Annotated[list[SplitPart], Field(min_length=2, max_length=6)] | None = None
     client_ref: ClientRef | None = None
+    # v1.4: projeto/etiqueta pelo nome (cria se ainda não existir).
+    project_name: Annotated[str, StringConstraints(strip_whitespace=True, max_length=40)] | None = (
+        None
+    )
 
 
 class ExpensePatch(BaseModel):
@@ -167,6 +171,10 @@ class ExpensePatch(BaseModel):
     notes: Notes | None = None
     payment_method: PaymentMethod | None = None
     account_id: uuid.UUID | None = None
+    # v1.4: "" tira o projeto; um nome usa (ou cria) o projeto.
+    project_name: Annotated[str, StringConstraints(strip_whitespace=True, max_length=40)] | None = (
+        None
+    )
 
 
 class ExpenseOut(_MonthOut):
@@ -191,6 +199,7 @@ class ExpenseOut(_MonthOut):
     installment_total: int | None
     recurring_id: uuid.UUID | None
     split_group_id: uuid.UUID | None = None
+    project_id: uuid.UUID | None = None
 
 
 DeleteScope = Literal["one", "following"]

@@ -322,3 +322,74 @@ def test_calendar_feed_by_secret_link(
     assert user.get(path).status_code == 404
     assert user.delete("/api/calendar-link").status_code == 204
     assert user.get(new_url[new_url.index("/api/") :]).status_code == 404
+
+
+# ---------------------------------------------------------------- raio-x (v1.4 D)
+
+
+def test_fees_xray_finds_bank_charges(user: TestClient) -> None:
+    for desc, value in (
+        ("Tarifa pacote de serviços", "35.00"),
+        ("ANUIDADE CARTAO", "40.00"),
+        ("IOF compra internacional", "12.30"),
+        ("Juros rotativo", "88.00"),
+        ("Multa por atraso", "15.00"),
+        ("Mercado", "300.00"),
+    ):
+        add_expense(user, month="2026-05", description=desc, amount=value)
+    data = user.get("/api/analysis/fees?year=2026").json()
+    totals = {g["key"]: g["total"] for g in data["groups"]}
+    assert totals == {
+        "tarifa": "35.00",
+        "anuidade": "40.00",
+        "iof": "12.30",
+        "juros": "88.00",
+        "multa": "15.00",
+    }
+    assert data["total"] == "190.30"
+
+
+def test_personal_inflation_compares_twelve_months(
+    user: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.services import indicators, xray
+
+    monkeypatch.setattr(xray, "today_local", lambda: date(2030, 1, 15))
+    monkeypatch.setattr(indicators, "get_indicators", lambda: {"ipca_12m": {"value": 4.5}})
+    food = category_id(user, "Alimentação")
+    add_expense(user, month="2028-06", description="Mercado", amount="1000.00", category_id=food)
+    add_expense(user, month="2029-06", description="Mercado", amount="1100.00", category_id=food)
+    data = user.get("/api/analysis/personal-inflation").json()
+    [row] = data["categories"]
+    assert (row["name"], row["change_pct"]) == ("Alimentação", 10.0)
+    assert (data["total_change_pct"], data["ipca_12m"]) == (10.0, 4.5)
+
+
+# ---------------------------------------------------------------- projetos e alocação (v1.4 D)
+
+
+def test_projects_group_expenses_with_optional_ceiling(user: TestClient) -> None:
+    add_expense(user, description="Passagem", amount="800.00", project_name="Viagem Bahia")
+    add_expense(user, description="Hotel", amount="1200.00", project_name="viagem bahia")
+    add_expense(user, description="Mercado", amount="300.00")
+    [project] = user.get("/api/projects").json()
+    assert (project["name"], project["total"], project["count"]) == ("Viagem Bahia", "2000.00", 2)
+    user.patch(f"/api/projects/{project['id']}", json={"budget": "2500.00"})
+    assert user.get("/api/projects").json()[0]["pct"] == 80.0
+    found = user.get(f"/api/search?project_id={project['id']}").json()
+    assert sorted(r["description"] for r in found["results"]) == ["Hotel", "Passagem"]
+    # Tirar a etiqueta de uma despesa e apagar o projeto (as despesas ficam).
+    hotel = next(e for e in month(user)["expenses"] if e["description"] == "Hotel")
+    user.patch(f"/api/expenses/{hotel['id']}", json={"project_name": ""})
+    assert user.get("/api/projects").json()[0]["count"] == 1
+    assert user.delete(f"/api/projects/{project['id']}").status_code == 204
+    assert len(month(user)["expenses"]) == 3
+
+
+def test_investment_targets_must_add_up(user: TestClient) -> None:
+    assert user.get("/api/investments/targets").json() == {}
+    bad = user.put("/api/investments/targets", json={"targets": {"renda_fixa": 60, "acoes": 30}})
+    assert bad.status_code == 400
+    ok = user.put("/api/investments/targets", json={"targets": {"renda_fixa": 60, "acoes": 40}})
+    assert ok.json() == {"renda_fixa": 60.0, "acoes": 40.0}
+    assert user.put("/api/investments/targets", json={"targets": {}}).json() == {}

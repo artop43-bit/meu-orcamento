@@ -77,6 +77,8 @@ class User(Base):
     push_daily: Mapped[bool] = mapped_column(default=False, server_default="0")
     # v1.4: código secreto do link de calendário (vencimentos na agenda do celular).
     calendar_token: Mapped[str | None] = mapped_column(String(64), unique=True)
+    # v1.4: meta de alocação da carteira por classe (JSON: {"renda_fixa": 60, ...}).
+    investment_targets: Mapped[str | None] = mapped_column(String(400))
     # v1.3: cartões do Orçamento na ordem escolhida (JSON: [{"key": ..., "visible": ...}]).
     dashboard: Mapped[str | None] = mapped_column(String(600))
     # Configuração inicial guiada concluída (ou pulada).
