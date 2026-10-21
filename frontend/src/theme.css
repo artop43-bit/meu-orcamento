@@ -92,6 +92,19 @@
   color-scheme: light;
 }
 
+:root {
+  --positive: var(--accent);
+  --positive-bg: var(--accent-soft);
+}
+
+:root[data-accent="rosa"],
+:root[data-accent="vermelho"],
+:root[data-accent="laranja"],
+:root[data-accent="ambar"] {
+  --positive: var(--fg);
+  --positive-bg: var(--surface-2);
+}
+
 /* Azul */
 
 :root[data-accent="azul"] {

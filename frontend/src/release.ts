@@ -3,17 +3,16 @@
  * do changelog (pasta changelog/), que tem a mesma versão, data e hora.
  */
 export const RELEASE = {
-  version: "1.1.0",
+  version: "1.2.0",
   // Data e hora (Brasília) em que o update foi publicado.
-  releasedAt: "2026-10-20T22:00:00-03:00",
+  releasedAt: "2026-10-20T23:59:00-03:00",
 };
 
 /** Mostrado uma vez em "Novidades" depois do update (curto: o detalhe fica no changelog). */
 export const RELEASE_NOTES: { title: string; text: string }[] = [
-  { title: "Menu em grupos.", text: "Carteira, Planejamento e Análises reúnem as telas; Mensagens virou um balão no menu." },
-  { title: "Gestos no celular.", text: "Arraste janelas para baixo para fechar e deslize para voltar ou trocar de tela." },
-  { title: "Solicitações numeradas.", text: "Acompanhe o andamento de cada pedido em Mensagens › Conversas e responda aos recados." },
-  { title: "10 cores.", text: "Escolha a cor de destaque em Ajustes › Preferências." },
+  { title: "Navegação fluida.", text: "As telas abrem na hora, sem piscar, e os dados chegam antes do clique." },
+  { title: "Vários grupos abertos.", text: "Abra Carteira, Planejamento e Análises juntos; o menu lembra o que ficou aberto." },
+  { title: "Cores consistentes.", text: "O positivo agora segue a cor de destaque escolhida; o vermelho fica só para o negativo." },
 ];
 
 export function releaseLabel(): string {

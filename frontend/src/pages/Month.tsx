@@ -619,7 +619,7 @@ function DailyCard({ month }: { month: string }) {
           {
             key: "saldo",
             name: "Saldo previsto",
-            color: "#1f7a62",
+            color: "var(--positive)",
             values: data.days.map((d) => Number(d.balance) - (extra && d.date >= todayISO() ? extra : 0)),
           },
         ]}

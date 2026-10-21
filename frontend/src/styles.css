@@ -95,7 +95,16 @@ svg {
   min-width: 0;
 }
 .tone--ok {
+  color: var(--positive);
+}
+
+/* Mercado: alta e queda seguem a convenção da bolsa (verde e vermelho), qualquer que seja a cor. */
+.tone--up {
   color: var(--ok);
+}
+
+.tone--down {
+  color: var(--error);
 }
 .tone--error {
   color: var(--error);
@@ -626,9 +635,9 @@ svg {
 }
 
 .badge--ok {
-  background: var(--ok-bg);
+  background: var(--positive-bg);
   border-color: transparent;
-  color: var(--ok);
+  color: var(--positive);
 }
 
 .badge--warn {
@@ -939,8 +948,8 @@ input.color {
 }
 
 .alert--success {
-  background: var(--ok-bg);
-  color: var(--ok);
+  background: var(--positive-bg);
+  color: var(--positive);
 }
 
 .alert--info {
@@ -1905,18 +1914,6 @@ input[type="range"]:focus-visible {
   }
 }
 
-/* Grupo do menu abrindo: as telas descem suave. */
-.nav-group__items {
-  animation: nav-group-open 0.16s ease-out;
-}
-
-@keyframes nav-group-open {
-  from {
-    opacity: 0;
-    transform: translateY(-4px);
-  }
-}
-
 /* Indicador do "puxar para atualizar". */
 .pull {
   position: fixed;
@@ -2172,8 +2169,8 @@ body:has(dialog[open]) {
 }
 
 .mood--great {
-  --mood: var(--ok);
-  --mood-bg: var(--ok-bg);
+  --mood: var(--positive);
+  --mood-bg: var(--positive-bg);
 }
 
 .mood--good {
@@ -2274,8 +2271,8 @@ body:has(dialog[open]) {
 }
 
 .insight--praise {
-  --tone: var(--ok);
-  --tone-bg: var(--ok-bg);
+  --tone: var(--positive);
+  --tone-bg: var(--positive-bg);
 }
 
 .insight--info {
@@ -3793,7 +3790,7 @@ ul.legend {
 }
 
 .ev--income {
-  --ev: var(--ok);
+  --ev: var(--positive);
 }
 
 .ev--expense {
@@ -4346,8 +4343,8 @@ kbd {
 }
 
 .ledger__row[data-swipe="pay"] {
-  background: var(--ok-bg);
-  box-shadow: inset 4px 0 0 var(--ok);
+  background: var(--positive-bg);
+  box-shadow: inset 4px 0 0 var(--positive);
 }
 
 .ledger__row[data-swipe="delete"] {
@@ -4556,7 +4553,7 @@ kbd {
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  background: var(--ok);
+  background: var(--positive);
   color: #fff;
   font-size: 0.75rem;
   animation: check-pop 0.3s ease-out;
@@ -6290,8 +6287,8 @@ textarea {
 
 .goal-status--ok,
 .goal-status--done {
-  background: var(--accent-soft);
-  color: var(--accent);
+  background: var(--positive-bg);
+  color: var(--positive);
 }
 
 .goal-status--warn {

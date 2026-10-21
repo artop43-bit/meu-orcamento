@@ -41,7 +41,7 @@ function Change({ value }: { value: number | null | undefined }) {
   const down = value < 0;
   const text = `${up ? "+" : ""}${value.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}%`;
   return (
-    <span className={`change small ${up ? "tone--ok" : down ? "tone--error" : "muted"}`}>
+    <span className={`change small ${up ? "tone--up" : down ? "tone--down" : "muted"}`}>
       {up ? <TrendingUp size={13} aria-hidden /> : down ? <TrendingDown size={13} aria-hidden /> : null}
       <span className="sr-only">{up ? "alta de " : down ? "queda de " : "variação "}</span>
       {text}
