@@ -21,6 +21,7 @@ from app.models.budget import (
 from app.models.debts import Loan, NetWorthSnapshot, OtherDebt, SplitShare
 from app.models.support import (
     Announcement,
+    ErrorEvent,
     InboxItem,
     StoredFile,
     SupportMessage,
@@ -39,6 +40,7 @@ from app.models.user import (
 )
 
 __all__ = [
+    "ErrorEvent",
     "Challenge",
     "Announcement",
     "AuthToken",

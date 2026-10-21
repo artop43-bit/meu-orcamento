@@ -16,6 +16,36 @@ class AppError(Exception):
         self.headers = headers
 
 
+def _record_server_error(request: Request, exc: Exception) -> None:
+    import logging
+    import traceback
+
+    from app.db.session import get_db
+    from app.services import errors
+
+    logging.getLogger("app").exception("Erro inesperado em %s", request.url.path, exc_info=exc)
+    # Usa a mesma fábrica de sessões da API (nos testes, a sessão de teste).
+    factory = request.app.dependency_overrides.get(get_db, get_db)
+    session = factory()
+    try:
+        db = next(session)
+        frames = traceback.format_exception(type(exc), exc, exc.__traceback__)
+        errors.record(
+            db,
+            source="api",
+            name=type(exc).__name__,
+            message=str(exc),
+            path=f"{request.method} {request.url.path}",
+            user_agent=request.headers.get("user-agent"),
+            release=None,
+            detail="".join(frames[-6:]),
+        )
+    except Exception:  # o registro nunca pode derrubar a resposta
+        logging.getLogger("app").warning("Não foi possível registrar o erro no painel.")
+    finally:
+        session.close()
+
+
 def _validation_message(exc: RequestValidationError) -> str:
     for error in exc.errors():
         field = str(error["loc"][-1]) if error.get("loc") else ""
@@ -53,6 +83,18 @@ def register_error_handlers(app: FastAPI) -> None:
             {"error": exc.code, "message": exc.message},
             status_code=exc.status_code,
             headers=exc.headers,
+        )
+
+    @app.exception_handler(Exception)
+    async def handle_unexpected(request: Request, exc: Exception) -> JSONResponse:
+        """Erro inesperado: registra no painel de erros (v1.3) e responde sem detalhes técnicos."""
+        _record_server_error(request, exc)
+        return JSONResponse(
+            {
+                "error": "internal_error",
+                "message": "Erro inesperado no servidor. O problema foi registrado; tente de novo.",
+            },
+            status_code=500,
         )
 
     @app.exception_handler(RequestValidationError)

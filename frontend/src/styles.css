@@ -7502,3 +7502,58 @@ label > .split-parts__start {
   border-radius: var(--radius-sm);
   background: var(--surface-2);
 }
+
+/* ---------------------------------------------------------------- personalizar o painel */
+.dashboard-editor__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.dashboard-editor__list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 6px 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+
+.dashboard-editor__moves {
+  display: inline-flex;
+  gap: 2px;
+  flex: none;
+}
+
+/* ---------------------------------------------------------------- painel de erros */
+.error-card__title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 1rem;
+}
+
+.error-card__message {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 0.88rem;
+  overflow-wrap: anywhere;
+}
+
+.error-card__detail {
+  margin: 8px 0 0;
+  padding: 10px;
+  max-height: 220px;
+  overflow: auto;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  font-size: 0.78rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

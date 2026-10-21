@@ -176,6 +176,45 @@ def appearance(body: AppearanceIn, user: CurrentUser, db: DbSession) -> Appearan
     return AppearanceOut(theme=user.theme, accent=user.accent)
 
 
+# ---------------------------------------------------------------- painel do Orçamento (v1.3)
+
+DashboardKey = Literal[
+    "quick", "kpis", "consultant", "alerts", "daily", "goal", "incomes", "breakdown"
+]
+
+
+class DashboardCard(BaseModel):
+    key: DashboardKey
+    visible: bool
+
+
+class DashboardIn(BaseModel):
+    cards: list[DashboardCard] | None = Field(default=None, max_length=12)
+
+
+class DashboardOut(BaseModel):
+    dashboard: str | None
+
+
+@router.put("/me/dashboard")
+def dashboard(body: DashboardIn, user: CurrentUser, db: DbSession) -> DashboardOut:
+    """Ordem e visibilidade dos cartões do Orçamento (vale em todos os aparelhos). None = padrão."""
+    import json
+
+    if body.cards is None:
+        user.dashboard = None
+    else:
+        seen: set[str] = set()
+        cards = []
+        for card in body.cards:
+            if card.key not in seen:
+                seen.add(card.key)
+                cards.append({"key": card.key, "visible": card.visible})
+        user.dashboard = json.dumps(cards, separators=(",", ":"))
+    db.commit()
+    return DashboardOut(dashboard=user.dashboard)
+
+
 # ---------------------------------------------------------------- mês financeiro
 
 

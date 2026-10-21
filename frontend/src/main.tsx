@@ -6,6 +6,7 @@ import App from "./App";
 import { installFormErrors } from "./lib/formErrors";
 import { captureInstallPrompt } from "./lib/install";
 import { startOfflineSync } from "./lib/offline";
+import { installErrorReporting } from "./lib/errorReport";
 import { applyPrefs } from "./lib/prefs";
 import "./theme.css";
 import "./styles.css";
@@ -15,6 +16,9 @@ applyPrefs();
 
 // Erros de formulário em mensagens do app, junto do campo (sem balões do navegador).
 installFormErrors();
+
+// Erros inesperados das telas vão para Administração › Erros (só no site publicado).
+installErrorReporting();
 
 // Convite de instalação ("Instalar no computador"): chega só uma vez, logo no início.
 captureInstallPrompt();

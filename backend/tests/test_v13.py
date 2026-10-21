@@ -319,3 +319,90 @@ def test_weekly_summary_on_monday(user: TestClient, db, outbox: Outbox) -> None:
     # Desligar pelo app.
     prefs = user.patch("/api/notifications/prefs", json={"notify_weekly": False}).json()
     assert prefs["notify_weekly"] is False
+
+
+# ---------------------------------------------------------------- painel do Orçamento (v1.3 D)
+
+
+def test_dashboard_order_is_saved_on_the_account(user: TestClient) -> None:
+    import json
+
+    assert user.get("/api/auth/me").json()["dashboard"] is None
+    cards = [
+        {"key": "daily", "visible": True},
+        {"key": "kpis", "visible": False},
+        {"key": "daily", "visible": False},
+    ]
+    out = user.put("/api/me/dashboard", json={"cards": cards})
+    assert out.status_code == 200
+    saved = json.loads(user.get("/api/auth/me").json()["dashboard"])
+    assert saved == [{"key": "daily", "visible": True}, {"key": "kpis", "visible": False}]
+    assert (
+        user.put(
+            "/api/me/dashboard", json={"cards": [{"key": "outro", "visible": True}]}
+        ).status_code
+        == 422
+    )
+    # Restaurar o padrão.
+    user.put("/api/me/dashboard", json={"cards": None})
+    assert user.get("/api/auth/me").json()["dashboard"] is None
+
+
+# ---------------------------------------------------------------- painel de erros (v1.3 D)
+
+
+def test_screen_errors_are_grouped_and_scrubbed(
+    client: TestClient, outbox: Outbox, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.core.config import get_settings
+
+    monkeypatch.setattr(get_settings(), "admin_emails", "chefe@example.com")
+    error = {
+        "name": "TypeError",
+        "message": "Cannot read 'amount' of ana@example.com 1234,56 "
+        "(id 0b1e0f0e-1111-4222-8333-944445555666)",
+        "path": "/dividas/0b1e0f0e-1111-4222-8333-944445555666?x=1",
+        "release": "1.3.0",
+    }
+    for _ in range(3):
+        assert client.post("/api/errors", json=error).status_code == 204
+    create_verified_user(client, outbox, "chefe@example.com")
+    login(client, "chefe@example.com")
+    [row] = client.get("/api/admin/errors").json()
+    assert row["count"] == 3 and row["source"] == "web" and row["path"] == "/dividas/[id]"
+    assert "ana@example.com" not in row["message"] and "1234" not in row["message"]
+    assert "[e-mail]" in row["message"] and "[id]" in row["message"]
+    assert client.post(f"/api/admin/errors/{row['id']}/resolve").status_code == 204
+    assert client.get("/api/admin/errors").json()[0]["resolved_at"] is not None
+    # Quem não é administrador não vê o painel.
+    client.post("/api/auth/logout")
+    create_verified_user(client, outbox, "ana@example.com")
+    login(client)
+    assert client.get("/api/admin/errors").status_code == 403
+
+
+def test_unexpected_server_error_is_recorded(
+    client: TestClient, outbox: Outbox, monkeypatch: pytest.MonkeyPatch, db
+) -> None:  # type: ignore[no-untyped-def]
+    from fastapi.testclient import TestClient as Client
+
+    from app.models import ErrorEvent
+    from app.services import budget as budget_service
+
+    create_verified_user(client, outbox)
+    login(client)
+
+    def boom(*_args, **_kwargs):  # type: ignore[no-untyped-def]
+        raise RuntimeError("falhou ao somar 987654 reais")
+
+    monkeypatch.setattr(budget_service, "get_month", boom)
+    quiet = Client(client.app, raise_server_exceptions=False, cookies=client.cookies)
+    out = quiet.get(f"/api/months/{MONTH}")
+    assert out.status_code == 500 and "registrado" in out.json()["message"]
+    event = db.query(ErrorEvent).one()
+    assert (event.source, event.name, event.path) == (
+        "api",
+        "RuntimeError",
+        "GET /api/months/[data]",
+    )
+    assert "987654" not in event.message
