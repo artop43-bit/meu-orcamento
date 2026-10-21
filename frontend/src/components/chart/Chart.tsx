@@ -54,8 +54,11 @@ function useWidth<T extends HTMLElement>() {
 
 // Só formata como mês o que é mês ("2026-05"): durante a troca de agrupamento o gráfico
 // anterior continua na tela por um instante, com rótulos de categoria.
-function displayLabel(label: string, monthLabels?: boolean) {
-  return monthLabels && /^\d{4}-\d{2}$/.test(label) ? monthLabel(label, true) : label;
+function displayLabel(label: string, monthLabels?: boolean, compact = false) {
+  if (!monthLabels || !/^\d{4}-\d{2}$/.test(label)) return label;
+  // Coluna estreita (celular): só o mês ("Out"); o ano aparece em janeiro.
+  if (compact && !label.endsWith("-01")) return monthLabel(label, true).split("/")[0];
+  return monthLabel(label, true);
 }
 
 export function Chart(props: ChartProps) {
@@ -179,7 +182,11 @@ function XYChart({ type, labels, series, compare, unit = "money", monthLabels, h
       .filter(Boolean)
       .join(" ");
 
-  const labelEvery = Math.ceil((count * 34) / Math.max(innerW, 1));
+  // Rótulos do eixo nunca se sobrepõem: mês curto quando a coluna é estreita e, se ainda
+  // não couber, mostra um sim, um não.
+  const compactLabels = Boolean(monthLabels) && col < 46;
+  const labelWidth = monthLabels ? (compactLabels ? 30 : 46) : 34;
+  const labelEvery = Math.max(1, Math.ceil((count * labelWidth) / Math.max(innerW, 1)));
 
   return (
     <div className="chart2" ref={boxRef}>
@@ -224,9 +231,9 @@ function XYChart({ type, labels, series, compare, unit = "money", monthLabels, h
             </g>
           ))}
           {labels.map((l, i) =>
-            i % labelEvery === 0 || i === count - 1 ? (
+            (count - 1 - i) % labelEvery === 0 ? (
               <text key={l.key} x={x(i)} y={height - 8} textAnchor="middle" className={`chart2__axis ${active === i ? "is-active" : ""}`}>
-                {displayLabel(l.label, monthLabels)}
+                {displayLabel(l.label, monthLabels, compactLabels)}
               </text>
             ) : null,
           )}

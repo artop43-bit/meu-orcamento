@@ -9,6 +9,8 @@ describe("gestureAxis", () => {
   it("horizontal só quando claramente para o lado", () => {
     expect(gestureAxis(-40, 5)).toBe("x");
     expect(gestureAxis(30, 28)).toBe("y");
+    // Diagonal (rolando a página) não troca de aba.
+    expect(gestureAxis(-40, 25)).toBe("y");
     expect(gestureAxis(2, 50)).toBe("y");
   });
 });

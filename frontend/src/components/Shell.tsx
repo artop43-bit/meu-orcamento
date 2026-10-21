@@ -36,9 +36,9 @@ import { moneyApi } from "../api/money";
 import { useProfile } from "../api/profile";
 import { useInboxUnread } from "../api/inbox";
 import { announce, prefersReducedMotion } from "../lib/announce";
-import { GROUPS, groupEntry, groupOf, leafLabel, LEAVES, MOBILE_TABS, neighborLeaf, parentOf, sectionOf, type NavGroup } from "../lib/navigation";
+import { GROUPS, groupEntry, groupOf, leafLabel, LEAVES, MOBILE_TABS, neighborTab, parentOf, sectionOf, type NavGroup } from "../lib/navigation";
 import { haptic } from "../lib/haptics";
-import { prefetchProps } from "../lib/prefetch";
+import { prefetchProps, prefetchRoute } from "../lib/prefetch";
 import { discard, setOfflineOwner, useOfflineQueue } from "../lib/offline";
 import { setCycleStart } from "../lib/format";
 import { releaseLabel } from "../release";
@@ -76,6 +76,29 @@ function saveOpenGroups(open: string[]) {
 }
 
 /** Enquanto a tela é baixada (primeira visita, conexão lenta). */
+/**
+ * Cópia da página que está saindo (deslize no celular): continua o movimento junto com a nova
+ * tela, como no iPhone, em vez de sumir de uma vez e deixar um vazio por um instante.
+ */
+function swipeGhost(page: HTMLElement | null, content: HTMLElement | null): HTMLElement | null {
+  if (!page || !content) return null;
+  const rect = page.getBoundingClientRect();
+  const pad = parseFloat(getComputedStyle(content).paddingLeft) || 0;
+  const ghost = document.createElement("div");
+  ghost.className = "swipe-ghost";
+  ghost.setAttribute("aria-hidden", "true");
+  ghost.inert = true;
+  ghost.style.left = `${rect.left - pad}px`;
+  ghost.style.width = `${rect.width + pad * 2}px`;
+  const copy = page.cloneNode(true) as HTMLElement;
+  copy.removeAttribute("data-enter");
+  copy.style.width = `${rect.width}px`;
+  copy.style.margin = `${rect.top}px 0 0 ${pad}px`;
+  ghost.append(copy);
+  document.body.append(ghost);
+  return ghost;
+}
+
 function PageLoading() {
   return (
     <LoadingRegion label="Carregando a tela">
@@ -185,6 +208,10 @@ export function Shell() {
   const contentRef = useRef<HTMLElement>(null);
   const pageRef = useRef<HTMLDivElement>(null);
   const pullRef = useRef<HTMLDivElement>(null);
+  const peekRef = useRef<HTMLDivElement>(null);
+  // Troca feita pelo deslize: a nova tela começa nesta posição (px) e termina o movimento.
+  const swipeFrom = useRef<number | null>(null);
+  const ghostRef = useRef<HTMLElement | null>(null);
   const previousSection = useRef<string | null>(null);
 
   const section = sectionOf(location.pathname);
@@ -205,8 +232,22 @@ export function Shell() {
     if (user) syncAppearance(user);
   }, [user]);
 
-  // Fecha o menu "Mais" ao trocar de página; o grupo da tela atual fica aberto no menu.
-  useEffect(() => setMoreOpen(false), [location.pathname]);
+  // Fecha o menu "Mais" ao trocar de página (na hora, sem animação: a tela nova já está
+  // aparecendo); o grupo da tela atual fica aberto no menu.
+  const [moreInstant, setMoreInstant] = useState(false);
+  // Endereço em que o menu foi aberto. A troca de tela pode terminar de desenhar um instante
+  // depois do toque; sem isso, abrir o menu logo após trocar de aba o fecharia sozinho.
+  const moreFrom = useRef<string | null>(null);
+  useEffect(() => {
+    if (moreFrom.current === location.pathname) return;
+    setMoreInstant(true);
+    setMoreOpen(false);
+  }, [location.pathname]);
+  // Tocar num item do menu fecha na hora (também quando o item é a própria tela atual).
+  const closeMoreNow = () => {
+    setMoreInstant(true);
+    setMoreOpen(false);
+  };
   useEffect(() => {
     if (group?.children) setOpenGroups((open) => (open.includes(group.key) ? open : [...open, group.key]));
   }, [group]);
@@ -252,10 +293,27 @@ export function Shell() {
   useLayoutEffect(() => {
     const from = previousSection.current;
     previousSection.current = section;
-    resetSwipe(contentRef.current);
+    resetSwipe(contentRef.current, peekRef.current);
+    const swiped = swipeFrom.current;
+    swipeFrom.current = null;
     if (from === null || from === section) return;
-    const dir = Math.sign(ORDER.indexOf(section) - ORDER.indexOf(from));
-    if (pageRef.current) pageRef.current.dataset.enter = String(dir);
+    const ghost = ghostRef.current;
+    ghostRef.current = null;
+    if (swiped !== null && pageRef.current) {
+      // Veio do deslize: a nova tela e a que sai continuam o movimento do dedo, coladas.
+      if (swiped !== 0) {
+        const timing = { duration: 220, easing: "cubic-bezier(0.2, 0.8, 0.2, 1)" };
+        pageRef.current.animate([{ transform: `translate3d(${swiped}px, 0, 0)` }, { transform: "translate3d(0, 0, 0)" }], timing);
+        if (ghost) {
+          ghost.animate([{ transform: "translate3d(0, 0, 0)" }, { transform: `translate3d(${-swiped}px, 0, 0)` }], { ...timing, fill: "forwards" });
+          window.setTimeout(() => ghost.remove(), timing.duration + 30);
+        }
+      }
+    } else {
+      ghost?.remove();
+      const dir = Math.sign(ORDER.indexOf(section) - ORDER.indexOf(from));
+      if (pageRef.current) pageRef.current.dataset.enter = String(dir);
+    }
     window.scrollTo(0, 0);
     const heading = pageRef.current?.querySelector("h1");
     if (heading) {
@@ -264,14 +322,39 @@ export function Shell() {
     }
   }, [section]);
 
-  // Deslizar anda pelas telas na ordem do menu; numa sub-tela (ex.: Ajustes › Perfil),
-  // deslizar para a direita volta para a tela de cima.
+  // Deslizar troca direto as abas de baixo (cada uma volta ao submenu em que estava); os
+  // submenus são só por toque. Numa sub-tela (ex.: Ajustes › Perfil), deslizar para a
+  // direita volta para a tela de cima.
   const parent = parentOf(location.pathname);
-  useMobileGestures(contentRef, pullRef, {
-    canGo: (dir) => (dir === -1 && parent !== null) || (parent === null && neighborLeaf(location.pathname, dir) !== null),
-    go: (dir) => {
-      const to = dir === -1 && parent !== null ? parent : neighborLeaf(location.pathname, dir);
-      if (to) navigate(to);
+  const swipeTarget = (dir: -1 | 1): string | null => {
+    if (dir === -1 && parent !== null) return parent;
+    const key = neighborTab(location.pathname, dir);
+    const target = key ? GROUPS.find((g) => g.key === key) : undefined;
+    return target ? (lastLeaf.get(target.key) ?? groupEntry(target)) : null;
+  };
+  // Na aba atual, adianta os dados das vizinhas: o deslize já abre a tela preenchida.
+  useEffect(() => {
+    for (const dir of [-1, 1] as const) {
+      const to = swipeTarget(dir);
+      if (to) prefetchRoute(queryClient, to);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [section]);
+  useMobileGestures(contentRef, pullRef, peekRef, {
+    canGo: (dir) => swipeTarget(dir) !== null,
+    peekLabel: (dir) => leafLabel(swipeTarget(dir) ?? "") ?? EXTRA_TITLES[sectionOf(swipeTarget(dir) ?? "")] ?? "",
+    prepare: (dir) => {
+      const to = swipeTarget(dir);
+      if (to) prefetchRoute(queryClient, to);
+      preloadPages();
+    },
+    go: (dir, from) => {
+      const to = swipeTarget(dir);
+      if (!to) return;
+      swipeFrom.current = from;
+      ghostRef.current?.remove();
+      ghostRef.current = from !== 0 ? swipeGhost(pageRef.current, contentRef.current) : null;
+      navigate(to);
     },
     refresh: async () => {
       await queryClient.refetchQueries({ type: "active" });
@@ -486,6 +569,16 @@ export function Shell() {
           <RefreshCw size={18} />
         </div>
 
+        {/* Tela vizinha que aparece colada à página enquanto o dedo desliza (celular). */}
+        <div ref={peekRef} className="swipe-peek no-print" aria-hidden hidden>
+          <strong className="swipe-peek__title" />
+          <div className="stack">
+            <Skeleton height={34} width="45%" />
+            <Skeleton height={160} />
+            <Skeleton height={220} />
+          </div>
+        </div>
+
         <main ref={contentRef} id="conteudo" className="content" tabIndex={-1}>
           <div ref={pageRef} key={section} className="page">
             {(offline || pendingQueue.length > 0) && (
@@ -566,7 +659,11 @@ export function Shell() {
         <button
           type="button"
           className={inMore ? "active" : undefined}
-          onClick={() => setMoreOpen(true)}
+          onClick={() => {
+            moreFrom.current = window.location.pathname;
+            setMoreInstant(false);
+            setMoreOpen(true);
+          }}
           aria-haspopup="dialog"
           aria-expanded={moreOpen}
           aria-current={inMore ? "page" : undefined}
@@ -580,15 +677,15 @@ export function Shell() {
         </button>
       </nav>
 
-      <Sheet open={moreOpen} title="Mais opções" onClose={() => setMoreOpen(false)}>
-        <Link to="/ajustes/perfil" className="menu-profile" onClick={() => setMoreOpen(false)}>
+      <Sheet open={moreOpen} title="Mais opções" onClose={() => setMoreOpen(false)} instantClose={moreInstant}>
+        <Link to="/ajustes/perfil" className="menu-profile" onClick={closeMoreNow}>
           <Avatar fileId={profile.data?.avatar_id} name={displayName} size={44} />
           <span>
             <strong>{displayName}</strong>
             <span className="muted small">Ver meu perfil</span>
           </span>
         </Link>
-        <ul className="menu-list">
+        <ul className="menu-list" onClick={(e) => (e.target as Element).closest("a") && closeMoreNow()}>
           {MORE_GROUPS.map((g) => (
             <li key={g.key}>
               <Link to={groupEntry(g)} aria-current={group?.key === g.key ? "page" : undefined}>
@@ -622,7 +719,7 @@ export function Shell() {
           <li>
             <fieldset className="radios menu-theme">
               <legend className="field-label">Tema</legend>
-              <div className="segmented">
+              <div className="segmented segmented--3 segmented--pills">
                 {THEMES.map(([value, label]) => (
                   <label key={value}>
                     <input type="radio" name="menu-theme" checked={prefs.theme === value} onChange={() => setAppearance({ theme: value }, queryClient)} />

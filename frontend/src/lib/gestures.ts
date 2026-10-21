@@ -1,7 +1,7 @@
 /** Regras dos gestos de toque, separadas da tela para poderem ser testadas. */
 
 /** Quanto o dedo precisa andar (px) antes de decidir se o gesto é para o lado ou vertical. */
-export const SLOP = 10;
+export const SLOP = 12;
 /** Quanto puxar para baixo (px, já com a resistência) para atualizar. */
 export const PULL_TRIGGER = 72;
 
@@ -11,10 +11,13 @@ export function rubberBand(distance: number, limit: number): number {
   return (Math.sign(distance) * (limit * d)) / (limit + d);
 }
 
-/** "x" se o dedo andou claramente mais para o lado; "y" se foi vertical; null se ainda não dá para saber. */
+/**
+ * "x" se o dedo andou claramente para o lado (pelo menos o dobro do vertical); "y" se não.
+ * Diagonal conta como rolagem: rolar a página nunca troca de aba sem querer.
+ */
 export function gestureAxis(dx: number, dy: number): "x" | "y" | null {
   if (Math.abs(dx) < SLOP && Math.abs(dy) < SLOP) return null;
-  return Math.abs(dx) > Math.abs(dy) * 1.2 ? "x" : "y";
+  return Math.abs(dx) > Math.abs(dy) * 2 ? "x" : "y";
 }
 
 /**

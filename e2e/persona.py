@@ -1178,20 +1178,104 @@ def mobile_sections(browser):
         cdp.send("Input.dispatchTouchEvent", {"type": "touchEnd", "touchPoints": []})
         page.wait_for_timeout(600)
 
-    # Deslizar anda pelas telas na ordem do menu (Insights → Histórico; Investimentos ← Insights).
-    # (abaixo da faixa de seções de Insights, que rola para o lado e por isso não troca de tela)
-    page.goto(f"{BASE}/analises?secao=tendencias")
+    # v1.4.1: deslizar troca direto as abas de baixo (Orçamento ↔ Carteira ↔ Planejamento ↔
+    # Análises); cada aba volta ao submenu em que estava. Submenus só por toque.
+    # Durante todo o gesto, a página e a tela vizinha cobrem a largura inteira (sem vazio).
+    record_gaps = """() => {
+      window.__gaps = [];
+      const W = innerWidth;
+      const end = performance.now() + 1400;
+      const tick = () => {
+        const r = document.querySelector('.page')?.getBoundingClientRect(); const pad = parseFloat(getComputedStyle(document.querySelector('.content')).paddingLeft) || 0; const page = r && { left: r.left - pad, right: r.right + pad };
+        const peek = document.querySelector('.swipe-peek:not([hidden])')?.getBoundingClientRect();
+        const ghost = document.querySelector('.swipe-ghost')?.getBoundingClientRect();
+    const spans = [page, peek, ghost].filter(Boolean).map((r) => [Math.max(0, r.left), Math.min(W, r.right)]).sort((a, b) => a[0] - b[0]);
+        let covered = 0, x = 0;
+        for (const [a, b] of spans) { if (b > x) { covered += b - Math.max(a, x); x = b; } }
+        window.__gaps.push(W - covered);
+        if (performance.now() < end) requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    }"""
+
+    def swipe_checked(x0, x1, y=520):
+        page.evaluate(record_gaps)
+        swipe(x0, x1, y=y)
+        page.wait_for_timeout(800)
+        gaps = page.evaluate("window.__gaps")
+        assert gaps and max(gaps) < 8, f"tela vazia durante o deslize: {max(gaps):.0f}px"
+
+    page.goto(f"{BASE}/cartoes")
     idle(page, 700)
-    swipe(330, 60, y=520)
-    assert page.url.endswith("/historico"), page.url
-    page.goto(f"{BASE}/analises?secao=resumo")
-    idle(page, 700)
-    swipe(60, 330, y=520)
-    assert page.url.endswith("/investimentos"), page.url
-    # O gesto vale também na parte de baixo da tela.
+    # No meio do arrasto, a próxima aba já aparece colada à página, com o nome dela.
+    cdp.send("Input.dispatchTouchEvent", {"type": "touchStart", "touchPoints": [{"x": 330, "y": 520}]})
+    for i in range(1, 11):
+        cdp.send("Input.dispatchTouchEvent", {"type": "touchMove", "touchPoints": [{"x": 330 - 20 * i, "y": 521}]})
+        page.wait_for_timeout(16)
+    # Arrastou mais de 1/3 da tela: ao soltar, troca mesmo devagar.
+    expect(page.locator(".swipe-peek")).to_be_visible()
+    expect(page.locator(".swipe-peek__title")).to_have_text("Calendário")
+    cdp.send("Input.dispatchTouchEvent", {"type": "touchEnd", "touchPoints": []})
+    page.wait_for_url("**/calendario")
+    expect(page.locator(".swipe-peek")).to_be_hidden()
+    # De volta para Carteira: abre no submenu em que estava (Cartões), não em Contas.
+    idle(page, 500)
+    swipe_checked(60, 330)
+    assert page.url.endswith("/cartoes"), page.url
+    # Dentro da aba, deslizar nunca anda pelos submenus: Cartões → Planejamento (não Dívidas).
+    idle(page, 500)
+    swipe_checked(330, 60)
+    assert page.url.endswith("/calendario"), page.url
+    idle(page, 500)
+    swipe_checked(330, 60)
+    assert page.url.endswith("/analises"), page.url
+    # Última aba: a tela resiste e volta ao lugar.
     idle(page, 500)
     swipe(330, 60, y=720)
+    assert page.url.endswith("/analises"), page.url
+    # Rolar na diagonal não troca de aba.
+    idle(page, 400)
+    cdp.send("Input.dispatchTouchEvent", {"type": "touchStart", "touchPoints": [{"x": 300, "y": 600}]})
+    for i in range(1, 13):
+        cdp.send("Input.dispatchTouchEvent", {"type": "touchMove", "touchPoints": [{"x": 300 - 12 * i, "y": 600 - 9 * i}]})
+        page.wait_for_timeout(16)
+    cdp.send("Input.dispatchTouchEvent", {"type": "touchEnd", "touchPoints": []})
+    page.wait_for_timeout(600)
     assert "/analises" in page.url, page.url
+    # Telas do "Mais" (Investimentos) não trocam de aba ao deslizar.
+    page.goto(f"{BASE}/investimentos")
+    idle(page, 700)
+    swipe(330, 60, y=600)
+    assert page.url.endswith("/investimentos"), page.url
+    swipe(60, 330, y=600)
+    assert page.url.endswith("/investimentos"), page.url
+    # Menu "Mais": ao tocar num item, fecha na hora e abre a tela.
+    page.locator(".tabbar").get_by_role("button", name="Mais").click()
+    menu = page.locator("dialog[open]", has_text="Mais opções")
+    expect(menu).to_be_visible()
+    # Aberto pelo toque, o X não ganha a moldura de foco.
+    assert page.evaluate("document.activeElement?.tagName") == "DIALOG"
+    # Tema: três opções alinhadas numa linha só.
+    heights = menu.locator(".menu-theme label").evaluate_all("els => els.map((e) => Math.round(e.getBoundingClientRect().height))")
+    assert len(set(heights)) == 1 and heights[0] < 52, heights
+    menu.get_by_role("link", name="Mensagens").click()
+    expect(menu).to_have_count(0, timeout=250)
+    page.wait_for_url("**/mensagens")
+    # Barra de baixo: área de toque de pelo menos 44 px em cada aba.
+    boxes = page.locator(".tabbar a, .tabbar button").evaluate_all("els => els.map((e) => { const r = e.getBoundingClientRect(); return [r.width, r.height]; })")
+    assert all(w >= 44 and h >= 44 for w, h in boxes), boxes
+    # Histórico: o gráfico cabe na tela e os meses não se sobrepõem.
+    page.goto(f"{BASE}/historico")
+    idle(page, 800)
+    expect(page.locator(".chart2__scroll.is-scrollable")).to_have_count(0)
+    overlaps = page.evaluate("""() => {
+      const svg = document.querySelector('.chart2__svg');
+      const h = svg.getBoundingClientRect().bottom;
+      const xs = [...svg.querySelectorAll('text.chart2__axis')].map((t) => t.getBoundingClientRect()).filter((r) => r.bottom > h - 20).sort((a, b) => a.left - b.left);
+      return xs.slice(1).filter((r, i) => r.left < xs[i].right - 0.5).length;
+    }""")
+    assert overlaps == 0, overlaps
+    page.screenshot(path=OUT / "v141-historico-celular.png")
     # Abas de baixo são os grupos; no topo, as telas do grupo.
     page.goto(f"{BASE}/cartoes")
     idle(page, 600)
