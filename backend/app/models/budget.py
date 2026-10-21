@@ -47,6 +47,8 @@ class Category(Base):
     # v1.3: a sobra do limite passa para o mês seguinte (a partir de carry_since).
     carry_over: Mapped[bool] = mapped_column(default=False, server_default="0")
     carry_since: Mapped[date | None] = mapped_column(Date)
+    # v1.4: dedutível no Imposto de Renda: "saude", "educacao", "previdencia" ou "pensao".
+    deductible: Mapped[str | None] = mapped_column(String(12))
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
 
 

@@ -11,6 +11,16 @@ export type Category = {
   /** v1.3: a sobra do limite passa para o mês seguinte. */
   carry_over?: boolean;
   carry_since?: string | null;
+  /** v1.4: dedutível no Imposto de Renda. */
+  deductible?: Deductible | null;
+};
+
+export type Deductible = "saude" | "educacao" | "previdencia" | "pensao";
+export const DEDUCTIBLE_LABEL: Record<Deductible, string> = {
+  saude: "Saúde",
+  educacao: "Educação",
+  previdencia: "Previdência privada (PGBL)",
+  pensao: "Pensão alimentícia",
 };
 
 export type IncomeType = "fixed" | "variable";

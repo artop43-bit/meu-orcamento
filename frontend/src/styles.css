@@ -7759,3 +7759,27 @@ textarea {
 .mei-panel__das label {
   flex: 1 1 160px;
 }
+
+.import-match {
+  display: block;
+  margin-top: 2px;
+}
+
+.report__tax h3 {
+  margin: 16px 0 6px;
+  font-size: 1rem;
+}
+
+.report__tax-group {
+  margin-bottom: 10px;
+}
+
+.report__tax-title {
+  margin: 6px 0;
+}
+
+@media print {
+  .report__tax {
+    break-before: page;
+  }
+}

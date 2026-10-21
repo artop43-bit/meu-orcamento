@@ -2,7 +2,7 @@ import { useState, type FormEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Plus, Trash2 } from "lucide-react";
 
-import { budgetApi, useBudgetMutation, useCategories, type Category } from "../api/budget";
+import { budgetApi, DEDUCTIBLE_LABEL, useBudgetMutation, useCategories, type Category, type Deductible } from "../api/budget";
 import { errorMessage } from "../api/client";
 import { extrasApi, extrasKeys } from "../api/extras";
 import { CategorySelect, FormActions, MoneyInput, requireMoney } from "../components/budget";
@@ -16,10 +16,11 @@ function CategoryForm({ category, onDone }: { category?: Category; onDone: () =>
   const [color, setColor] = useState(category?.color ?? "#4e79a7");
   const [limit, setLimit] = useState(category?.monthly_limit ? moneyInput(category.monthly_limit) : "");
   const [carry, setCarry] = useState(category?.carry_over ?? false);
+  const [deductible, setDeductible] = useState<Deductible | "">(category?.deductible ?? "");
   const [error, setError] = useState("");
   const save = useBudgetMutation(async () => {
     const hasLimit = Boolean(limit.trim());
-    const data = { name, is_essential: essential, color, monthly_limit: hasLimit ? requireMoney(limit) : null, carry_over: hasLimit && carry };
+    const data = { name, is_essential: essential, color, monthly_limit: hasLimit ? requireMoney(limit) : null, carry_over: hasLimit && carry, deductible: deductible || null };
     if (category) await budgetApi.updateCategory(category.id, data);
     else await budgetApi.createCategory(data);
   });
@@ -65,6 +66,19 @@ function CategoryForm({ category, onDone }: { category?: Category; onDone: () =>
           </span>
         </label>
       )}
+      <label>
+        <span className="field-label">
+          Dedutível no Imposto de Renda <Tip>As despesas desta categoria entram em “Para o Imposto de Renda” no resumo anual.</Tip>
+        </span>
+        <select value={deductible} onChange={(e) => setDeductible(e.target.value as Deductible | "")}>
+          <option value="">Não</option>
+          {(Object.keys(DEDUCTIBLE_LABEL) as Deductible[]).map((k) => (
+            <option key={k} value={k}>
+              {DEDUCTIBLE_LABEL[k]}
+            </option>
+          ))}
+        </select>
+      </label>
       <FormActions loading={save.isPending} onCancel={onDone} />
     </form>
   );
@@ -91,6 +105,7 @@ function CategoryRow({ category }: { category: Category }) {
           {category.is_essential ? "Essencial" : "Não essencial"}
           {category.monthly_limit && ` · limite de ${money(category.monthly_limit)} por mês`}
           {category.monthly_limit && category.carry_over && " · sobra passa para o mês seguinte"}
+          {category.deductible && ` · dedutível (${DEDUCTIBLE_LABEL[category.deductible].toLowerCase()})`}
         </span>
       </button>
       <button

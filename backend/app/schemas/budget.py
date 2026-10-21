@@ -50,12 +50,17 @@ class _MonthOut(_Out):
 # ---------------------------------------------------------------- categorias
 
 
+# v1.4: tipo de dedução no Imposto de Renda.
+Deductible = Literal["saude", "educacao", "previdencia", "pensao"]
+
+
 class CategoryIn(BaseModel):
     name: CategoryName
     is_essential: bool = False
     color: Color | None = None
     monthly_limit: Money | None = None
     carry_over: bool = False
+    deductible: Deductible | None = None
 
 
 class CategoryPatch(BaseModel):
@@ -64,6 +69,7 @@ class CategoryPatch(BaseModel):
     color: Color | None = None
     monthly_limit: Money | None = None
     carry_over: bool | None = None
+    deductible: Deductible | None = None
 
 
 class CategoryOut(_Out):
@@ -74,6 +80,7 @@ class CategoryOut(_Out):
     monthly_limit: Decimal | None
     carry_over: bool = False
     carry_since: date | None = None
+    deductible: str | None = None
 
 
 # ---------------------------------------------------------------- rendas

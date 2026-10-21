@@ -65,7 +65,7 @@ def create_category(body: CategoryIn, user: CurrentUser, db: DbSession) -> Categ
 def update_category(
     category_id: uuid.UUID, body: CategoryPatch, user: CurrentUser, db: DbSession
 ) -> CategoryOut:
-    changes = _changes(body, nullable={"color", "monthly_limit"})
+    changes = _changes(body, nullable={"color", "monthly_limit", "deductible"})
     return CategoryOut.model_validate(service.update_category(db, user, category_id, changes))
 
 

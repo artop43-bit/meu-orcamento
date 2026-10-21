@@ -173,3 +173,118 @@ def test_mei_warns_once_at_80_percent(user: TestClient) -> None:
     )
     warnings = [i for i in user.get("/api/inbox").json() if i["title"].startswith("MEI:")]
     assert [w["title"] for w in warnings] == ["MEI: 80% do teto anual"]
+
+
+# ---------------------------------------------------------------- conciliação (v1.4 B)
+
+
+def test_statement_lines_match_manual_entries_and_are_not_imported_twice(user: TestClient) -> None:
+    import json
+
+    from tests.test_v08 import CSV_ODD_HEADER, upload
+
+    # Lançado à mão antes de importar o extrato: Uber de R$ 23,50 no dia 03 (1 dia de diferença).
+    manual = add_expense(
+        user,
+        month="2026-09",
+        description="Uber pro trabalho",
+        amount="23.50",
+        due_date="2026-09-03",
+    )[0]
+    raw = CSV_ODD_HEADER.encode("cp1252")
+    analysis = upload(user, "/api/import/analyze", "extrato.txt", raw).json()
+    preview = upload(
+        user, "/api/import/preview", "extrato.txt", raw, mapping=json.dumps(analysis["mapping"])
+    ).json()
+    items = {i["description"]: i for i in preview["transactions"]}
+    assert items["UBER *TRIP"]["match"]["id"] == manual["id"]
+    assert items["UBER *TRIP"]["match"]["description"] == "Uber pro trabalho"
+    assert items["PAG*IFOOD"]["match"] is None
+    payload = {
+        "transactions": [
+            {
+                **{
+                    k: i[k] for k in ("ref", "date", "description", "amount", "kind", "category_id")
+                },
+                "match_id": i["match"]["id"] if i["match"] else None,
+            }
+            for i in preview["transactions"]
+        ],
+        "filename": "extrato.txt",
+        "file_format": "csv",
+    }
+    result = user.post("/api/import/commit", json=payload).json()
+    assert (result["created"], result["matched"]) == (2, 1)
+    expenses = month(user, "2026-09")["expenses"]
+    assert [e["description"] for e in expenses].count("Uber pro trabalho") == 1
+    assert all("UBER" not in e["description"] for e in expenses)
+    conferred = next(e for e in expenses if e["id"] == manual["id"])
+    assert conferred["paid"] is True
+    # Reimportar o mesmo extrato não casa de novo nem duplica.
+    again = user.post("/api/import/commit", json=payload).json()
+    assert (again["created"], again["skipped"], again["matched"]) == (0, 3, 0)
+
+
+# ---------------------------------------------------------------- Imposto de Renda (v1.4 B)
+
+
+def test_tax_report_groups_deductions_incomes_assets_and_debts(user: TestClient) -> None:
+    saude, educacao, lazer = (
+        category_id(user, "Saúde"),
+        category_id(user, "Educação"),
+        category_id(user, "Lazer"),
+    )
+    cats = {c["name"]: c for c in user.get("/api/categories").json()}
+    assert (
+        cats["Saúde"]["deductible"],
+        cats["Educação"]["deductible"],
+        cats["Lazer"]["deductible"],
+    ) == ("saude", "educacao", None)
+    add_expense(
+        user,
+        month="2026-03",
+        description="Dentista",
+        amount="350.00",
+        category_id=saude,
+        due_date="2026-03-10",
+    )
+    add_expense(
+        user,
+        month="2026-04",
+        description="Mensalidade escola",
+        amount="900.00",
+        category_id=educacao,
+        due_date="2026-04-05",
+    )
+    add_expense(user, month="2026-04", description="Cinema", amount="60.00", category_id=lazer)
+    user.post("/api/months/2026-05/incomes", json={"description": "Salário", "amount": "5000.00"})
+    user.post(
+        "/api/months/2026-05/incomes",
+        json={"description": "Freela", "amount": "800.00", "income_type": "variable"},
+    )
+    user.post(
+        "/api/accounts", json={"name": "Banco", "kind": "checking", "initial_balance": "1500.00"}
+    )
+    # Previdência marcada à mão numa categoria nova.
+    pgbl = user.post("/api/categories", json={"name": "PGBL", "deductible": "previdencia"}).json()
+    add_expense(
+        user,
+        month="2026-06",
+        description="Aporte PGBL",
+        amount="200.00",
+        category_id=pgbl["id"],
+        due_date="2026-06-15",
+    )
+    tax = user.get("/api/export/annual?year=2026").json()["tax"]
+    assert [(d["kind"], d["total"]) for d in tax["deductions"]] == [
+        ("saude", "350.00"),
+        ("educacao", "900.00"),
+        ("previdencia", "200.00"),
+    ]
+    assert tax["deductions_total"] == "1450.00"
+    assert [(i["kind"], i["total"]) for i in tax["incomes"]] == [
+        ("fixed", "5000.00"),
+        ("variable", "800.00"),
+    ]
+    assert any(a["description"] == "Saldo em Banco" for a in tax["assets"])
+    assert all("Cinema" not in str(d) for d in tax["deductions"])

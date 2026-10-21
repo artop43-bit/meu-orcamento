@@ -54,9 +54,21 @@ def _apply(item: Any, changes: dict[str, Any]) -> None:
 # ---------------------------------------------------------------- categorias
 
 
+# v1.4: categorias padrão que já entram como dedutíveis no relatório do Imposto de Renda.
+DEFAULT_DEDUCTIBLE = {"Saúde": "saude", "Educação": "educacao"}
+
+
 def create_default_categories(db: Session, user: User) -> None:
     for name, essential, color in DEFAULT_CATEGORIES:
-        db.add(Category(user_id=user.id, name=name, is_essential=essential, color=color))
+        db.add(
+            Category(
+                user_id=user.id,
+                name=name,
+                is_essential=essential,
+                color=color,
+                deductible=DEFAULT_DEDUCTIBLE.get(name),
+            )
+        )
 
 
 def list_categories(db: Session, user: User) -> list[Category]:
