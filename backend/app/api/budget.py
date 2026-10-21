@@ -183,6 +183,10 @@ def get_history(
 @router.post("/months/{month}/incomes", status_code=status.HTTP_201_CREATED)
 def create_income(month: str, body: IncomeIn, user: CurrentUser, db: DbSession) -> IncomeOut:
     income = service.create_income(db, user, parse_month(month), body.model_dump())
+    if income.mei:
+        from app.services import mei
+
+        mei.check_threshold(db, user, income.month.year)
     return IncomeOut.model_validate(income)
 
 

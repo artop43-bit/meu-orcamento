@@ -8,6 +8,7 @@ export type PushConfig = {
   push_messages: boolean;
   push_alerts: boolean;
   push_weekly: boolean;
+  push_daily: boolean;
 };
 
 export const PUSH_KEY = ["push"] as const;
@@ -16,7 +17,7 @@ export const pushApi = {
   config: () => api.get<PushConfig>("/push"),
   subscribe: (sub: PushSubscriptionJSON) => api.post<PushConfig>("/push/subscribe", sub),
   unsubscribe: (endpoint: string) => api.post<PushConfig>("/push/unsubscribe", { endpoint }),
-  prefs: (data: Partial<Pick<PushConfig, "push_due" | "push_messages" | "push_alerts" | "push_weekly">>) => api.patch<PushConfig>("/push/prefs", data),
+  prefs: (data: Partial<Pick<PushConfig, "push_due" | "push_messages" | "push_alerts" | "push_weekly" | "push_daily">>) => api.patch<PushConfig>("/push/prefs", data),
   test: () => api.post<{ sent: number }>("/push/test"),
 };
 

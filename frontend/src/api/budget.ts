@@ -47,6 +47,8 @@ export type Income = {
   notes: string | null;
   account_id: string | null;
   recurring_id: string | null;
+  /** v1.4: faturamento do MEI. */
+  mei?: boolean;
 };
 
 export type Expense = {
@@ -225,6 +227,7 @@ export type IncomeInput = {
   until_month?: string | null;
   account_id?: string | null;
   client_ref?: string;
+  mei?: boolean;
 };
 
 export type Planned = {

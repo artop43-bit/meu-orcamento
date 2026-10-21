@@ -33,6 +33,7 @@ import { useAccounts } from "../api/money";
 import { DateField, DayField } from "./DateField";
 import { normalizeText } from "../lib/text";
 import { errorMessage } from "../api/client";
+import { useMe } from "../api/auth";
 import { announce } from "../lib/announce";
 import { addMonths, money, moneyInput, monthLabel, parseMoney, shortDate, todayISO } from "../lib/format";
 import { CategorySelect, MoneyInput, requireMoney } from "./budget";
@@ -957,6 +958,9 @@ export function IncomeForm({ month, income, onDone }: { month: string; income?: 
   const [until, setUntil] = useState(addMonths(month, 2));
   const [scope, setScope] = useState<EditScope>("one");
   const [accountId, setAccountId] = useState(income?.account_id ?? "");
+  // v1.4: só aparece para quem ligou "Sou MEI" em Preferências.
+  const me = useMe();
+  const [mei, setMei] = useState(income?.mei ?? false);
   const accounts = useAccounts();
   const accountList = (accounts.data ?? []).map((b) => b.account);
   const [error, setError] = useState("");
@@ -971,6 +975,7 @@ export function IncomeForm({ month, income, onDone }: { month: string; income?: 
       day: day ? Number(day) : null,
       notes: notes.trim() || null,
       account_id: accountId || null,
+      ...(me.data?.mei ? { mei } : {}),
     };
     if (income) {
       await budgetApi.updateIncome(income.id, data, scope);
@@ -1089,6 +1094,12 @@ export function IncomeForm({ month, income, onDone }: { month: string; income?: 
               </option>
             ))}
           </select>
+        </label>
+      )}
+      {me.data?.mei && (
+        <label className="check">
+          <input type="checkbox" checked={mei} onChange={(e) => setMei(e.target.checked)} />
+          Faturamento do MEI (conta para o teto anual)
         </label>
       )}
       <label>

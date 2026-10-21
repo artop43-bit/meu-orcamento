@@ -33,3 +33,23 @@ def summary(db: Session, user: User, year: int | None = None) -> dict[str, Any]:
         "pct": round(float(total / LIMIT * 100), 1),
         "count": count,
     }
+
+
+def check_threshold(db: Session, user: User, year: int | None = None) -> bool:
+    """Aviso uma vez por ano quando o faturamento passa de 80% do teto (caixa e aparelho)."""
+    from app.models import InboxItem
+    from app.services import notify, push
+
+    data = summary(db, user, year)
+    if data["pct"] < WARN_PCT or not notify._claim(db, user, "mei80", str(data["year"])):
+        return False
+    title = f"MEI: {data['pct']:.0f}% do teto anual"
+    body = (
+        f"O faturamento de {data['year']} chegou a {notify.brl(data['total'])} "
+        f"de {notify.brl(data['limit'])}. Acima do teto, o MEI pode ser desenquadrado; "
+        "vale conversar com um contador."
+    )
+    db.add(InboxItem(user_id=user.id, kind="alert", title=title, body=body))
+    db.commit()
+    push.send(db, user, "alerts", title, body[:200], "/ajustes/preferencias#mei")
+    return True

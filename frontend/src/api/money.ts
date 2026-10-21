@@ -3,13 +3,14 @@ import { useQuery } from "@tanstack/react-query";
 import type { Expense } from "./budget";
 import { api } from "./client";
 
-export type AccountKind = "checking" | "savings" | "wallet" | "other";
+export type AccountKind = "checking" | "savings" | "wallet" | "other" | "benefit";
 
 export const ACCOUNT_KINDS: Record<AccountKind, string> = {
   checking: "Conta corrente",
   savings: "Poupança",
   wallet: "Carteira (dinheiro)",
   other: "Outra",
+  benefit: "Vale-refeição ou alimentação",
 };
 
 export type Account = {
@@ -19,6 +20,10 @@ export type Account = {
   initial_balance: string;
   color: string | null;
   archived: boolean;
+  /** v1.4: vale (kind "benefit"): recarga mensal e a categoria que ele paga. */
+  benefit_amount?: string | null;
+  benefit_day?: number | null;
+  benefit_category_id?: string | null;
 };
 
 export type AccountBalance = { account: Account; balance: string; end_of_month: string };

@@ -154,3 +154,22 @@ def test_daily_push_only_for_who_turned_it_on(
     assert [t for k, t in sent if k == "daily"] == ["Disponível hoje: R$ 42,50"]
     me = db.scalar(select(User).where(User.email == "ana@example.com"))
     assert me is not None and me.push_daily is True
+
+
+def test_mei_warns_once_at_80_percent(user: TestClient) -> None:
+    user.patch("/api/me/finance-settings", json={"mei": True})
+    user.post(
+        f"/api/months/{MONTH}/incomes",
+        json={"description": "Serviço", "amount": "60000.00", "mei": True},
+    )
+    assert not [i for i in user.get("/api/inbox").json() if i["title"].startswith("MEI:")]
+    user.post(
+        f"/api/months/{MONTH}/incomes",
+        json={"description": "Serviço 2", "amount": "5000.00", "mei": True},
+    )
+    user.post(
+        f"/api/months/{MONTH}/incomes",
+        json={"description": "Serviço 3", "amount": "1000.00", "mei": True},
+    )
+    warnings = [i for i in user.get("/api/inbox").json() if i["title"].startswith("MEI:")]
+    assert [w["title"] for w in warnings] == ["MEI: 80% do teto anual"]

@@ -17,6 +17,12 @@ export type User = {
   accent?: AccentName | null;
   /** v1.3: cartões do Orçamento (JSON); null = padrão. */
   dashboard?: string | null;
+  /** v1.4: chave Pix e MEI. */
+  pix_key?: string | null;
+  pix_name?: string | null;
+  pix_city?: string | null;
+  mei?: boolean;
+  display_name?: string | null;
   month_start_day?: number;
 };
 

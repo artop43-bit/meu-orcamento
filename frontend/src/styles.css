@@ -7727,3 +7727,35 @@ textarea {
   color: var(--muted);
   background: var(--surface-2);
 }
+
+/* ================================================================ v1.4 */
+.pix-charge__qr {
+  display: grid;
+  place-items: center;
+  padding: 12px;
+  border-radius: var(--radius);
+  background: #fff;
+  justify-self: center;
+}
+
+.pix-charge__code {
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  word-break: break-all;
+}
+
+.mei-panel {
+  padding: 12px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+
+.mei-panel__das {
+  align-items: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.mei-panel__das label {
+  flex: 1 1 160px;
+}
