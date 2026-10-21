@@ -1,0 +1,16 @@
+MEU ORÇAMENTO · UPDATE LOG
+Versão 1.4.2 · iPhone instalado e volta das sub-telas
+Data: 21/10/2026 às 19:52 (horário de Brasília)
+
+App instalado no iPhone
+- [x] O app passa a respeitar as áreas reservadas do iPhone (ilha/notch em cima e linha de "home" embaixo)
+- [x] Barra de baixo acima da linha de "home"; topo abaixo da ilha, com a cor do cabeçalho na faixa do relógio
+- [x] Janelas (menu Mais, formulários), avisos, botão flutuante, seções de Insights, "puxar para atualizar" e a tela vizinha do deslize respeitam essas áreas
+- [ ] Pode ser preciso remover o app da tela de início e instalar de novo para o iPhone aplicar
+
+Deslizar
+- [x] Voltar de uma sub-tela deslizando para a direita (Ajustes › Perfil, Preferências…, Mensagens › Conversas, detalhe de dívida) não deixa mais a tela travada e deslocada
+
+Técnico
+- [x] Teste do iPhone simula o app instalado (59 px em cima, 34 px embaixo) e confere barra do topo, abas de baixo, menu Mais e seções de Insights
+- [x] Teste do deslize cobre a volta das sub-telas: a página termina no lugar e nada sobra na tela

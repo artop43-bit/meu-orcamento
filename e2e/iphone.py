@@ -152,6 +152,45 @@ def main():
         }""")
         check(overlaps == 0, f"meses do Histórico sem sobreposição ({overlaps})")
         page.screenshot(path=OUT / "historico.png")
+
+        # App instalado no iPhone: simula as áreas da ilha (59 px) e da linha de "home" (34 px).
+        # Nada de conteúdo, barra de baixo ou janela fica embaixo delas.
+        ctx.add_init_script("""document.addEventListener('DOMContentLoaded', () => {
+          const s = document.createElement('style');
+          s.textContent = ':root:root { --safe-top: 59px; --safe-bottom: 34px; }';
+          document.head.append(s);
+        });""")
+        page.goto(f"{BASE}/orcamento")
+        idle(page, 600)
+        height = page.evaluate("innerHeight")
+        bar = page.evaluate(
+            "(() => { const b = document.querySelector('.mobile-bar'); const r = b.getBoundingClientRect();"
+            " const icons = [...b.querySelectorAll('a, button')].map((e) => e.getBoundingClientRect().top);"
+            " return [r.top, r.bottom, Math.min(...icons)]; })()"
+        )
+        check(bar[0] <= 0 and bar[2] >= 59, f"instalado: barra do topo preenche a faixa da ilha e os ícones ficam abaixo dela ({bar})")
+        tabs = page.locator(".tabbar a, .tabbar button").evaluate_all("els => els.map((e) => Math.round(e.getBoundingClientRect().bottom))")
+        check(max(tabs) <= height - 34 + 1, f"instalado: abas de baixo acima da linha de home ({max(tabs)} de {height - 34})")
+        page.screenshot(path=OUT / "instalado-orcamento.png")
+        page.locator(".tabbar").get_by_role("button", name="Mais").tap()
+        menu = page.locator("dialog[open]", has_text="Mais opções")
+        expect(menu).to_be_visible()
+        page.wait_for_timeout(400)
+        box = page.evaluate(
+            "(() => { const d = document.querySelector('dialog[open]'); const items = [...d.querySelectorAll('.menu-list li')];"
+            " return [d.getBoundingClientRect().top, items[items.length - 1].getBoundingClientRect().bottom]; })()"
+        )
+        check(box[0] >= 59 and box[1] <= height - 34 + 1, f"instalado: menu Mais entre a ilha e a linha de home ({box})")
+        page.screenshot(path=OUT / "instalado-menu.png")
+        page.keyboard.press("Escape")
+        page.goto(f"{BASE}/analises?secao=tendencias")
+        idle(page, 800)
+        page.evaluate("window.scrollTo(0, 900)")
+        page.wait_for_timeout(500)
+        nav = page.evaluate(
+            "[document.querySelector('.mobile-bar').getBoundingClientRect().bottom, document.querySelector('.analysis__nav').getBoundingClientRect().top]"
+        )
+        check(nav[1] >= nav[0] - 1, f"instalado: seções de Insights presas logo abaixo da barra do topo ({nav})")
         browser.close()
 
     print(f"\niPhone (WebKit): {len(problems)} problema(s).")

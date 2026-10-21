@@ -269,8 +269,10 @@ export function Shell() {
       setCondensed(true);
       return;
     }
+    // Altura real da barra do topo (no iPhone instalado ela inclui a faixa da ilha/notch).
+    const barHeight = Math.round(document.querySelector(".mobile-bar")?.getBoundingClientRect().height || 56);
     const observer = new IntersectionObserver(([entry]) => setCondensed(!entry.isIntersecting), {
-      rootMargin: "-56px 0px 0px 0px",
+      rootMargin: `-${barHeight}px 0px 0px 0px`,
     });
     // A tela pode ainda estar sendo baixada: espera o título aparecer (até ~3 s).
     let tries = 0;
@@ -288,31 +290,33 @@ export function Shell() {
     };
   }, [location.pathname, location.search]);
 
-  // Troca de seção: animação de entrada na direção certa, volta ao topo e leva o foco
-  // ao título (quem usa leitor de tela ou teclado fica sabendo que a página mudou).
+  // A cada troca de tela: termina o deslize (também numa sub-tela que volta para a tela de
+  // cima na mesma seção, ex.: Ajustes › Perfil → Ajustes). Na troca de seção: animação de
+  // entrada na direção certa, volta ao topo e leva o foco ao título (quem usa leitor de tela
+  // ou teclado fica sabendo que a página mudou).
   useLayoutEffect(() => {
     const from = previousSection.current;
     previousSection.current = section;
     resetSwipe(contentRef.current, peekRef.current);
     const swiped = swipeFrom.current;
     swipeFrom.current = null;
-    if (from === null || from === section) return;
     const ghost = ghostRef.current;
     ghostRef.current = null;
-    if (swiped !== null && pageRef.current) {
+    if (swiped !== null && swiped !== 0 && pageRef.current) {
       // Veio do deslize: a nova tela e a que sai continuam o movimento do dedo, coladas.
-      if (swiped !== 0) {
-        const timing = { duration: 220, easing: "cubic-bezier(0.2, 0.8, 0.2, 1)" };
-        pageRef.current.animate([{ transform: `translate3d(${swiped}px, 0, 0)` }, { transform: "translate3d(0, 0, 0)" }], timing);
-        if (ghost) {
-          ghost.animate([{ transform: "translate3d(0, 0, 0)" }, { transform: `translate3d(${-swiped}px, 0, 0)` }], { ...timing, fill: "forwards" });
-          window.setTimeout(() => ghost.remove(), timing.duration + 30);
-        }
+      const timing = { duration: 220, easing: "cubic-bezier(0.2, 0.8, 0.2, 1)" };
+      pageRef.current.animate([{ transform: `translate3d(${swiped}px, 0, 0)` }, { transform: "translate3d(0, 0, 0)" }], timing);
+      if (ghost) {
+        ghost.animate([{ transform: "translate3d(0, 0, 0)" }, { transform: `translate3d(${-swiped}px, 0, 0)` }], { ...timing, fill: "forwards" });
+        window.setTimeout(() => ghost.remove(), timing.duration + 30);
       }
     } else {
       ghost?.remove();
+    }
+    if (from === null || from === section) return;
+    if (swiped === null && pageRef.current) {
       const dir = Math.sign(ORDER.indexOf(section) - ORDER.indexOf(from));
-      if (pageRef.current) pageRef.current.dataset.enter = String(dir);
+      pageRef.current.dataset.enter = String(dir);
     }
     window.scrollTo(0, 0);
     const heading = pageRef.current?.querySelector("h1");
@@ -320,7 +324,7 @@ export function Shell() {
       heading.setAttribute("tabindex", "-1");
       heading.focus({ preventScroll: true });
     }
-  }, [section]);
+  }, [location.pathname, section]);
 
   // Deslizar troca direto as abas de baixo (cada uma volta ao submenu em que estava); os
   // submenus são só por toque. Numa sub-tela (ex.: Ajustes › Perfil), deslizar para a

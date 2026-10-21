@@ -1288,11 +1288,19 @@ def mobile_sections(browser):
     expect(group.get_by_role("link")).to_have_text(["Contas", "Cartões", "Dívidas", "Divisões"])
     group.get_by_role("link", name="Dívidas").click()
     page.wait_for_url("**/dividas")
-    # Sub-tela: deslizar para a direita volta para a tela de cima.
-    page.goto(f"{BASE}/ajustes/perfil")
-    idle(page, 700)
-    swipe(60, 330)
-    page.wait_for_url("**/ajustes")
+    # Sub-tela: deslizar para a direita volta para a tela de cima (mesma seção) e a página
+    # termina no lugar, sem sobras do gesto na tela (v1.4.2).
+    for sub, top in (("/ajustes/perfil", "/ajustes"), ("/mensagens/conversas", "/mensagens")):
+        page.goto(f"{BASE}{sub}")
+        idle(page, 700)
+        swipe_checked(60, 330)
+        page.wait_for_url(f"**{top}")
+        page.wait_for_timeout(400)
+        leftovers = page.evaluate(
+            "[document.querySelectorAll('.swipe-ghost').length, getComputedStyle(document.querySelector('.content')).transform,"
+            " document.querySelector('.swipe-peek').hidden]"
+        )
+        assert leftovers == [0, "none", True], f"{sub}: sobra do deslize na tela {leftovers}"
     # Janela: arrastar o conteúdo para baixo fecha.
     tabs.get_by_role("button", name="Mais").click()
     menu = page.locator("dialog[open]", has_text="Mais opções")
