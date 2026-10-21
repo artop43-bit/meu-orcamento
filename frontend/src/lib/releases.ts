@@ -11,6 +11,30 @@ export type Release = {
 
 export const RELEASES: Release[] = [
   {
+    version: "1.2.0",
+    date: "21/10/2026 às 00:20",
+    title: "Navegação fluida e cores consistentes",
+    sections: [
+      {
+        title: "Navegação",
+        items: [
+          "As telas abrem na hora, sem o cartão de carregamento piscando entre uma e outra.",
+          "Os dados da tela começam a chegar quando você aponta ou toca no item do menu.",
+          "Vários grupos do menu abertos ao mesmo tempo; clicar no título só abre ou fecha.",
+          "No celular, a aba de cada grupo volta para a última tela que você abriu nele.",
+        ],
+      },
+      {
+        title: "Cores",
+        items: [
+          "Saldo positivo, \"Paga\", metas e gráficos seguem a cor de destaque escolhida.",
+          "Com rosa, vermelho, laranja ou âmbar, o positivo fica neutro para não parecer alerta.",
+          "O vermelho fica só para valores negativos e atrasos; cotações mantêm verde e vermelho.",
+        ],
+      },
+    ],
+  },
+  {
     version: "1.1.0",
     date: "20/10/2026 às 22:00",
     title: "Menu em grupos, gestos no celular, solicitações como tarefas e 10 cores",

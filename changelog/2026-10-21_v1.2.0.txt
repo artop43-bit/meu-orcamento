@@ -1,0 +1,25 @@
+MEU ORÇAMENTO · UPDATE LOG
+Versão 1.2.0 · Navegação fluida e cores consistentes
+Data: 21/10/2026 às 00:20 (horário de Brasília)
+
+Navegação mais fluida
+- [x] Vários grupos do menu abertos ao mesmo tempo; clicar no título do grupo só abre ou fecha
+      (não troca de tela) e o menu lembra quais ficaram abertos neste aparelho
+- [x] Telas já baixadas abrem na hora: o cartão vazio de "carregando" não pisca mais ao trocar de tela
+- [x] Dados da tela pedidos antes do clique (ao passar o mouse, focar ou tocar no item do menu)
+- [x] Troca de tela sem partir do transparente: o conteúdo aparece e só se acomoda
+- [x] O "esqueleto" de carregamento só aparece se a espera passar de um instante
+- [x] Celular: a aba de cada grupo volta para a última tela visitada nele; dados adiantados ao tocar
+
+Cores consistentes
+- [x] Valores neutros por padrão; o negativo continua em vermelho
+- [x] "Positivo" segue a cor de destaque: saldo e "Disponível hoje", "Paga", metas adiantadas,
+      gráfico do saldo previsto, faixa de desempenho e mensagens de sucesso
+- [x] Rosa, vermelho, laranja e âmbar: o positivo fica neutro, para não se confundir com alerta
+- [x] Cotações de mercado mantêm verde (alta) e vermelho (queda), como na bolsa
+- [x] Auditoria automática: 9 telas × 5 cores × claro e escuro, sem nenhum verde fixo (e2e/cores.py)
+
+Técnico
+- [x] Token --positive/--positive-bg gerado com o tema (src/theme)
+- [x] e2e local com limite de tempo por etapa: se algo travar, é encerrado e repetido
+- [x] Testes: servidor (pytest), telas (vitest), ponta a ponta, layout em 5 tamanhos, acessibilidade e cores

@@ -39,6 +39,7 @@ import { useInboxUnread } from "../api/inbox";
 import { announce, prefersReducedMotion } from "../lib/announce";
 import { GROUPS, groupEntry, groupOf, leafLabel, LEAVES, MOBILE_TABS, neighborLeaf, parentOf, sectionOf, type NavGroup } from "../lib/navigation";
 import { haptic } from "../lib/haptics";
+import { prefetchProps } from "../lib/prefetch";
 import { setCycleStart } from "../lib/format";
 import { releaseLabel } from "../release";
 import { Tour } from "./help";
@@ -51,6 +52,28 @@ import { UndoProvider } from "./undo";
 import { ErrorBoundary } from "./ErrorBoundary";
 import { OnboardingPage, preloadPages } from "../pages/lazy";
 import { resetSwipe, useMobileGestures } from "./useMobileGestures";
+
+const OPEN_GROUPS_KEY = "menu-grupos-abertos";
+const lastLeaf = new Map<string, string>();
+
+function readOpenGroups(current?: string): string[] {
+  let open: string[] = [];
+  try {
+    const saved = JSON.parse(localStorage.getItem(OPEN_GROUPS_KEY) ?? "[]");
+    if (Array.isArray(saved)) open = saved.filter((k): k is string => typeof k === "string");
+  } catch {
+    // Sem acesso ao armazenamento (janela privada): começa só com o grupo da tela atual.
+  }
+  return current && !open.includes(current) ? [...open, current] : open;
+}
+
+function saveOpenGroups(open: string[]) {
+  try {
+    localStorage.setItem(OPEN_GROUPS_KEY, JSON.stringify(open));
+  } catch {
+    // Sem armazenamento: o menu só não lembra na próxima visita.
+  }
+}
 
 /** Enquanto a tela é baixada (primeira visita, conexão lenta). */
 function PageLoading() {
@@ -167,7 +190,8 @@ export function Shell() {
   const section = sectionOf(location.pathname);
   const title = leafLabel(location.pathname) ?? EXTRA_TITLES[section] ?? "Meu Orçamento";
   const group = groupOf(location.pathname);
-  const [openGroup, setOpenGroup] = useState<string | null>(group?.key ?? null);
+  // Grupos abertos no menu: vários ao mesmo tempo, lembrados neste aparelho.
+  const [openGroups, setOpenGroups] = useState<string[]>(() => readOpenGroups(group?.key));
   const [twoFactorLater, setTwoFactorLater] = useState(() => readSession(LATER_KEY));
   const showTwoFactorBanner =
     user && !user.totp_enabled && !user.twofa_prompt_dismissed && !twoFactorLater && location.pathname !== "/seguranca";
@@ -184,8 +208,13 @@ export function Shell() {
   // Fecha o menu "Mais" ao trocar de página; o grupo da tela atual fica aberto no menu.
   useEffect(() => setMoreOpen(false), [location.pathname]);
   useEffect(() => {
-    if (group?.children) setOpenGroup(group.key);
+    if (group?.children) setOpenGroups((open) => (open.includes(group.key) ? open : [...open, group.key]));
   }, [group]);
+  useEffect(() => saveOpenGroups(openGroups), [openGroups]);
+  // Última tela visitada em cada grupo: a aba de baixo (celular) volta para ela.
+  useEffect(() => {
+    if (group?.children) lastLeaf.set(group.key, section);
+  }, [group, section]);
 
   useEffect(() => {
     document.title = `${title} · Meu Orçamento`;
@@ -291,14 +320,9 @@ export function Shell() {
     queryClient.clear();
   }
 
-  // Grupo do menu: abre (e leva à primeira tela, se a atual for de outro grupo) ou fecha.
+  // Grupo do menu: só abre ou fecha (sem trocar de tela); vários podem ficar abertos.
   function toggleGroup(g: NavGroup) {
-    if (openGroup === g.key) {
-      setOpenGroup(null);
-      return;
-    }
-    setOpenGroup(g.key);
-    if (group?.key !== g.key) navigate(groupEntry(g));
+    setOpenGroups((open) => (open.includes(g.key) ? open.filter((k) => k !== g.key) : [...open, g.key]));
   }
 
   // Tocar de novo na aba em que já está volta ao topo (como nos apps nativos).
@@ -324,7 +348,7 @@ export function Shell() {
                 <button
                   type="button"
                   className="sidebar__link nav-group__toggle"
-                  aria-expanded={openGroup === g.key}
+                  aria-expanded={openGroups.includes(g.key)}
                   aria-controls={`grupo-${g.key}`}
                   onClick={() => toggleGroup(g)}
                 >
@@ -332,10 +356,16 @@ export function Shell() {
                   {g.label}
                   <ChevronDown size={16} className="nav-group__chevron" aria-hidden />
                 </button>
-                {openGroup === g.key && (
+                {openGroups.includes(g.key) && (
                   <div id={`grupo-${g.key}`} className="nav-group__items">
                     {g.children.map((c) => (
-                      <NavLink key={c.to} to={c.to} className="sidebar__link sidebar__sublink" onClick={(e) => onNavClick(e, c.to)}>
+                      <NavLink
+                        key={c.to}
+                        to={c.to}
+                        className="sidebar__link sidebar__sublink"
+                        onClick={(e) => onNavClick(e, c.to)}
+                        {...prefetchProps(queryClient, c.to)}
+                      >
                         {LEAF_ICONS[c.to]}
                         {c.label}
                       </NavLink>
@@ -344,7 +374,7 @@ export function Shell() {
                 )}
               </div>
             ) : (
-              <NavLink key={g.key} to={g.to!} className="sidebar__link" onClick={(e) => onNavClick(e, g.to!)}>
+              <NavLink key={g.key} to={g.to!} className="sidebar__link" onClick={(e) => onNavClick(e, g.to!)} {...prefetchProps(queryClient, g.to!)}>
                 {GROUP_ICONS[g.key]}
                 {g.label}
               </NavLink>
@@ -481,7 +511,7 @@ export function Shell() {
             {group?.children && (
               <nav className="group-tabs no-print" aria-label={group.label}>
                 {group.children.map((c) => (
-                  <NavLink key={c.to} to={c.to}>
+                  <NavLink key={c.to} to={c.to} {...prefetchProps(queryClient, c.to)}>
                     {c.label}
                   </NavLink>
                 ))}
@@ -500,9 +530,16 @@ export function Shell() {
       <nav className="tabbar no-print" aria-label="Navegação">
         {TAB_GROUPS.map((g) => {
           const active = group?.key === g.key;
-          const to = active ? section : groupEntry(g);
+          const to = active ? section : (lastLeaf.get(g.key) ?? groupEntry(g));
           return (
-            <Link key={g.key} to={to} className={active ? "active" : undefined} aria-current={active ? "page" : undefined} onClick={(e) => onNavClick(e, to)}>
+            <Link
+              key={g.key}
+              to={to}
+              className={active ? "active" : undefined}
+              aria-current={active ? "page" : undefined}
+              onClick={(e) => onNavClick(e, to)}
+              {...prefetchProps(queryClient, to)}
+            >
               {GROUP_ICONS[g.key]}
               {g.label}
             </Link>

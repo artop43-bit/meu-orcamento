@@ -1,4 +1,4 @@
-import { ACCENTS, BASE, TOKENS, type AccentPalette, type Palette } from "./tokens.ts";
+import { ACCENTS, BASE, NEUTRAL_POSITIVE, TOKENS, type AccentPalette, type Palette } from "./tokens.ts";
 
 const HEADER = `/* =====================================================================
    ARQUIVO GERADO por src/theme/tokens.ts (npm run theme). Não edite aqui.
@@ -21,6 +21,10 @@ export function themeCss(): string {
   parts.push(`@media (prefers-color-scheme: dark) {\n${block(':root:not([data-theme="light"])', dark, "  ")}}\n`);
   parts.push(block(':root[data-theme="dark"]', dark, "", "  color-scheme: dark;"));
   parts.push(':root[data-theme="light"] {\n  color-scheme: light;\n}\n');
+  // Positivo: segue a cor de destaque (neutro nas cores quentes; ver NEUTRAL_POSITIVE).
+  parts.push(":root {\n  --positive: var(--accent);\n  --positive-bg: var(--accent-soft);\n}\n");
+  const neutral = NEUTRAL_POSITIVE.map((name) => `:root[data-accent="${name}"]`).join(",\n");
+  parts.push(`${neutral} {\n  --positive: var(--fg);\n  --positive-bg: var(--surface-2);\n}\n`);
   for (const [name, accent] of Object.entries(ACCENTS)) {
     if (name === "verde") continue; // é o padrão do tema base
     parts.push(`/* ${accent.label} */\n`);
