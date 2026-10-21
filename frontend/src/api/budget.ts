@@ -61,6 +61,8 @@ export type Expense = {
   installment_number: number | null;
   installment_total: number | null;
   recurring_id: string | null;
+  /** v1.3: parte de uma compra dividida em categorias. */
+  split_group_id?: string | null;
 };
 
 export type CategoryTotal = {
@@ -188,6 +190,18 @@ export type ExpenseInput = {
   purchase_date?: string | null;
   debit_card_id?: string | null;
   account_id?: string | null;
+  /** v1.3: compra dividida em categorias (a soma das partes é igual ao valor). */
+  parts?: { category_id: string; amount: string }[] | null;
+  /** v1.3: identificador do aparelho (lançamento sem internet, sem duplicar no reenvio). */
+  client_ref?: string;
+};
+
+/** Leitura da foto de um comprovante (v1.3). */
+export type ReceiptReading = {
+  kind: "boleto" | "cupom" | "desconhecido";
+  amount: string | null;
+  date: string | null;
+  description: string | null;
 };
 
 export type IncomeInput = {
@@ -199,6 +213,7 @@ export type IncomeInput = {
   repeat?: "once" | "monthly" | "period";
   until_month?: string | null;
   account_id?: string | null;
+  client_ref?: string;
 };
 
 export type Planned = {
@@ -305,6 +320,11 @@ export const budgetApi = {
     return api.form<{ receipt_ids: string[] }>("POST", `/expenses/${expenseId}/receipts`, form);
   },
   removeReceipt: (expenseId: string, fileId: string) => api.delete(`/expenses/${expenseId}/receipts/${fileId}`),
+  readReceipt: (file: File) => {
+    const form = new FormData();
+    form.append("image", file, file.name);
+    return api.form<ReceiptReading>("POST", "/receipts/read", form);
+  },
   contribute: (id: string, amount: string) =>
     api.post<Goal>(`/goals/${id}/contributions`, { amount }),
   deleteGoal: (id: string) => api.delete(`/goals/${id}`),

@@ -1,4 +1,6 @@
 import uuid
+from datetime import date
+from decimal import Decimal
 from typing import Annotated, Any
 
 from fastapi import APIRouter, File, Query, UploadFile, status
@@ -125,6 +127,31 @@ def add_receipts(
             )
         raws.append(raw)
     return ReceiptsOut(receipt_ids=receipts.add(db, user, expense_id, raws))
+
+
+class ReceiptReading(BaseModel):
+    kind: str
+    amount: Decimal | None
+    date: date | None
+    description: str | None
+
+
+@router.post("/receipts/read")
+def read_receipt(user: CurrentUser, image: Annotated[UploadFile, File()]) -> ReceiptReading:
+    """Lê a foto de um cupom, nota ou boleto e devolve o que encontrou (nada é salvo)."""
+    from app.services import files, ocr
+
+    limit = files.RULES["receipt"].max_bytes
+    raw = image.file.read(limit + 1)
+    if len(raw) > limit:
+        raise AppError(413, "file_too_large", f"A imagem pode ter até {limit // files.MB} MB.")
+    reading = ocr.read(raw)
+    return ReceiptReading(
+        kind=reading.kind,
+        amount=reading.amount,
+        date=reading.date,
+        description=reading.description,
+    )
 
 
 @router.delete("/expenses/{expense_id}/receipts/{file_id}", status_code=status.HTTP_204_NO_CONTENT)

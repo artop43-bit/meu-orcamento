@@ -372,6 +372,18 @@ def check_day_in_month(day: int | None, month: date) -> None:
 
 def create_income(db: Session, user: User, month: date, data: dict[str, Any]) -> Income:
     """Lança a renda. Com repetição, cria uma fixa a partir deste mês e devolve a deste mês."""
+    client_ref = data.pop("client_ref", None)
+    if client_ref:
+        ref = f"app:{client_ref.lower()}"
+        existing = db.scalar(
+            select(Income).where(Income.user_id == user.id, Income.import_ref == ref)
+        )
+        if existing is not None:
+            return existing
+        income = create_income(db, user, month, data)
+        income.import_ref = ref
+        db.commit()
+        return income
     _check_account(db, user, data.get("account_id"))
     account_id = data.pop("account_id", None)
     repeat = data.pop("repeat", "once")
@@ -460,6 +472,69 @@ def delete_income(db: Session, user: User, income_id: uuid.UUID, scope: str) -> 
 
 
 def create_expense(db: Session, user: User, month: date, data: dict[str, Any]) -> list[Expense]:
+    """Cria a conta (ou as parcelas, ou as partes de uma compra dividida em categorias)."""
+    client_ref = data.pop("client_ref", None)
+    ref = f"app:{client_ref.lower()}" if client_ref else None
+    if ref:
+        # Lançamento feito sem internet e reenviado: devolve o que já entrou, sem duplicar.
+        existing = list(
+            db.scalars(
+                select(Expense)
+                .where(Expense.user_id == user.id, Expense.import_ref == ref)
+                .order_by(Expense.month, Expense.created_at)
+            )
+        )
+        if existing:
+            return existing
+    parts = data.pop("parts", None)
+    if parts:
+        created = _create_split(db, user, month, data, parts)
+    else:
+        created = _create_expense(db, user, month, data)
+    if ref:
+        for expense in created:
+            expense.import_ref = ref
+        db.commit()
+    return created
+
+
+def _create_split(
+    db: Session, user: User, month: date, data: dict[str, Any], parts: list[dict[str, Any]]
+) -> list[Expense]:
+    """Uma compra, várias categorias: cada parte vira uma conta com o seu valor (sem duplicar)."""
+    if data.get("installments") or data.get("repeat"):
+        raise AppError(
+            400,
+            "split_single",
+            "A divisão em categorias vale para compras sem parcelas e sem repetição.",
+        )
+    total = sum((Decimal(p["amount"]) for p in parts), Decimal("0"))
+    if total != data["amount"]:
+        raise AppError(
+            400,
+            "split_sum",
+            f"A soma das partes (R$ {_brl(total)}) precisa ser igual ao total "
+            f"(R$ {_brl(data['amount'])}).",
+        )
+    for part in parts:
+        _check_category(db, user, part["category_id"])
+    group = uuid.uuid4()
+    created: list[Expense] = []
+    for part in parts:
+        values = {**data, "amount": part["amount"], "category_id": part["category_id"]}
+        rows = _create_expense(db, user, month, values)
+        for row in rows:
+            row.split_group_id = group
+        created.extend(rows)
+    db.commit()
+    return created
+
+
+def _brl(value: Decimal) -> str:
+    return f"{value:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+
+def _create_expense(db: Session, user: User, month: date, data: dict[str, Any]) -> list[Expense]:
     installments = data.pop("installments", None)
     paid = data.pop("paid", False)
     amount_mode = data.pop("amount_mode", "parcel")
@@ -680,6 +755,16 @@ def update_expense(
             db.refresh(expense)
     if "paid" in changes and changes["paid"] is not None and changes["paid"] != expense.paid:
         expense.paid_at = utcnow() if changes["paid"] else None
+        if expense.split_group_id is not None:
+            # Compra dividida: pagar uma parte paga a compra inteira.
+            for other in db.scalars(
+                select(Expense).where(
+                    Expense.user_id == user.id,
+                    Expense.split_group_id == expense.split_group_id,
+                    Expense.id != expense.id,
+                )
+            ):
+                other.paid, other.paid_at = changes["paid"], expense.paid_at
     if changes.get("paid") is None:
         changes.pop("paid", None)
     _apply(expense, changes)

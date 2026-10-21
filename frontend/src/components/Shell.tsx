@@ -40,6 +40,7 @@ import { announce, prefersReducedMotion } from "../lib/announce";
 import { GROUPS, groupEntry, groupOf, leafLabel, LEAVES, MOBILE_TABS, neighborLeaf, parentOf, sectionOf, type NavGroup } from "../lib/navigation";
 import { haptic } from "../lib/haptics";
 import { prefetchProps } from "../lib/prefetch";
+import { discard, setOfflineOwner, useOfflineQueue } from "../lib/offline";
 import { setCycleStart } from "../lib/format";
 import { releaseLabel } from "../release";
 import { Tour } from "./help";
@@ -295,6 +296,11 @@ export function Shell() {
 
   const inboxUnread = useInboxUnread(Boolean(user)).data ?? 0;
   const offline = useOffline();
+  // Lançamentos feitos sem internet (fila deste aparelho, de cada conta).
+  const queue = useOfflineQueue();
+  const pendingQueue = queue.filter((i) => !i.error);
+  const failedQueue = queue.filter((i) => i.error);
+  useEffect(() => setOfflineOwner(user?.id ?? null), [user?.id]);
   const profile = useProfile();
   const adminOverview = useQuery({
     queryKey: ["admin", "overview"],
@@ -486,12 +492,28 @@ export function Shell() {
 
         <main ref={contentRef} id="conteudo" className="content" tabIndex={-1}>
           <div ref={pageRef} key={section} className="page">
-            {offline && (
+            {(offline || pendingQueue.length > 0) && (
               <div className="banner banner--offline no-print" role="status">
                 <WifiOff size={18} />
-                <span>Sem conexão. Mostrando os últimos dados salvos neste aparelho; para salvar alterações, conecte-se à internet.</span>
+                <span>
+                  {offline ? "Sem conexão. Mostrando os últimos dados salvos neste aparelho. " : ""}
+                  {pendingQueue.length > 0
+                    ? `${pendingQueue.length} lançamento(s) guardado(s) neste aparelho, enviado(s) sozinho(s) quando a conexão voltar.`
+                    : "Novas despesas e receitas e o “pagar” ficam guardados e são enviados depois."}
+                </span>
               </div>
             )}
+            {failedQueue.map((item) => (
+              <div key={item.id} className="banner banner--error no-print" role="alert">
+                <WifiOff size={18} />
+                <span>
+                  Lançamento feito sem internet não foi aceito: <strong>{item.label}</strong>. {item.error}
+                </span>
+                <button type="button" className="link-btn small" onClick={() => discard(item.id)}>
+                  Descartar
+                </button>
+              </div>
+            ))}
             {showTwoFactorBanner && (
               <div className="banner no-print" role="region" aria-label="Sugestão de segurança">
                 <ShieldAlert size={18} />

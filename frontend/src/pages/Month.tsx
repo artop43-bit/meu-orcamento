@@ -9,6 +9,7 @@ import {
   Copy,
   CopyPlus,
   ListChecks,
+  Mic,
   TrendingDown,
   Zap,
   Gauge,
@@ -53,6 +54,8 @@ import { Alert, Button, Kpi, LoadingRegion, PageHeader, Sheet, Skeleton } from "
 import { useUndo } from "../components/undo";
 import { addMonths, cycleLabel, money, monthLabel, parseMoney, percent, shortDate, thisMonth, todayISO } from "../lib/format";
 import { normalizeText } from "../lib/text";
+import { sendOrQueue, useOfflineQueue } from "../lib/offline";
+import { listen, speechSupported } from "../lib/voice";
 
 type Editing =
   | { type: "new-expense"; draft?: ExpenseDraft }
@@ -135,9 +138,16 @@ function LedgerRow({
   selected: boolean;
   onSelect: (value: boolean) => void;
 }) {
-  const toggle = useBudgetMutation((paid: boolean) => budgetApi.updateExpense(expense.id, { paid }));
+  const toggle = useBudgetMutation((paid: boolean) =>
+    sendOrQueue(
+      { kind: "pay", method: "PATCH", path: `/expenses/${expense.id}`, body: { paid }, label: `${expense.description}: ${paid ? "paga" : "a pagar"}` },
+      () => budgetApi.updateExpense(expense.id, { paid }),
+    ),
+  );
+  // Marcada sem internet: vale o que está na fila até o envio.
+  const queuedPay = useOfflineQueue().find((i) => i.kind === "pay" && i.path === `/expenses/${expense.id}`);
   // Resposta imediata: mostra o novo estado enquanto o servidor confirma.
-  const paid = toggle.isPending && toggle.variables !== undefined ? toggle.variables : expense.paid;
+  const paid = toggle.isPending && toggle.variables !== undefined ? toggle.variables : queuedPay ? Boolean(queuedPay.body.paid) : expense.paid;
   const status = statusOf({ ...expense, paid });
 
   function onToggle(next: boolean) {
@@ -238,6 +248,7 @@ function LedgerRow({
             </Badge>
           )}
           {expense.recurring_id && <Badge>recorrente</Badge>}
+          {expense.split_group_id && <Badge>dividida</Badge>}
         </span>
         <span className="ledger__sub">
           <span className="dot" style={{ background: category?.color ?? undefined }} aria-hidden />
@@ -519,14 +530,45 @@ function QuickBar({ categories }: { categories: Category[] }) {
   const [text, setText] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [hearing, setHearing] = useState(false);
+  const [heard, setHeard] = useState(false);
+  const stopRef = useRef<(() => void) | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const cards = useCards();
+  // Sai da tela ouvindo: desliga o microfone.
+  useEffect(() => () => stopRef.current?.(), []);
   const undo = useUndo();
   const save = useBudgetMutation((value: string) => saveQuickEntry(value, categories, cards.data ?? []));
+
+  // Microfone: a fala vira a frase no campo; a pessoa confere e toca em "Lançar".
+  function toggleVoice() {
+    if (hearing) {
+      stopRef.current?.();
+      return;
+    }
+    setError("");
+    setHeard(false);
+    setHearing(true);
+    haptic("tap");
+    stopRef.current = listen(
+      (spoken, final) => {
+        setText(spoken);
+        if (final) setHeard(true);
+      },
+      (failure) => {
+        setHearing(false);
+        stopRef.current = null;
+        if (failure) setError(failure);
+        inputRef.current?.focus();
+      },
+    );
+  }
 
   async function submit(e: FormEvent) {
     e.preventDefault();
     if (!text.trim()) return;
     setError("");
+    setHeard(false);
     setBusy(true);
     try {
       const saved = await save.mutateAsync(text);
@@ -547,12 +589,30 @@ function QuickBar({ categories }: { categories: Category[] }) {
         <Zap size={16} aria-hidden />
         <span className="sr-only">Lançamento rápido</span>
         <input
+          ref={inputRef}
           value={text}
-          onChange={(e) => setText(e.target.value)}
-          placeholder="Ex.: mercado 120 pix ontem"
+          onChange={(e) => {
+            setText(e.target.value);
+            setHeard(false);
+          }}
+          placeholder={hearing ? "Pode falar: mercado 120 no pix ontem" : "Ex.: mercado 120 pix ontem"}
           autoComplete="off"
           enterKeyHint="send"
+          data-voice-target
         />
+        {speechSupported() && (
+          <button
+            type="button"
+            className={`quick-bar__mic ${hearing ? "is-listening" : ""}`}
+            onClick={toggleVoice}
+            aria-pressed={hearing}
+            aria-label={hearing ? "Parar de ouvir" : "Lançar por voz"}
+            title={hearing ? "Parar de ouvir" : "Lançar por voz"}
+            data-voice-button
+          >
+            <Mic size={16} aria-hidden />
+          </button>
+        )}
       </label>
       <Tip label="Como escrever o lançamento rápido">
         Descrição + valor, e opcionalmente forma de pagamento, data e parcelas. Exemplos: “mercado 120 pix ontem”, “uber 23,50
@@ -562,6 +622,11 @@ function QuickBar({ categories }: { categories: Category[] }) {
       <Button type="submit" loading={busy} disabled={!text.trim()}>
         Lançar
       </Button>
+      {heard && !error && (
+        <p className="muted small quick-bar__error" role="status">
+          Confira o texto entendido e toque em “Lançar”.
+        </p>
+      )}
       {error && (
         <p className="tone--error small quick-bar__error" role="alert">
           {error}

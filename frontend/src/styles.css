@@ -7255,3 +7255,110 @@ textarea {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
+
+/* ================================================================ v1.3 */
+
+/* ---------------------------------------------------------------- lançamento por voz */
+.quick-bar__mic {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  margin-right: -6px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.quick-bar__mic:hover {
+  background: var(--surface-2);
+  color: var(--fg);
+}
+
+.quick-bar__mic.is-listening {
+  background: var(--accent);
+  color: var(--accent-fg);
+  animation: mic-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes mic-pulse {
+  50% {
+    box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 25%, transparent);
+  }
+}
+
+/* ---------------------------------------------------------------- dividir em categorias */
+.split-parts {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+.split-parts__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(110px, 160px) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.split-parts__start {
+  justify-self: start;
+  margin-top: 6px;
+}
+
+label > .split-parts__start {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+}
+
+.split-parts .summary-box {
+  margin: 0;
+}
+
+.split-parts .link-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+@media (max-width: 480px) {
+  .split-parts__row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .split-parts__row > :nth-child(2) {
+    grid-column: 1;
+  }
+
+  .split-parts__row > .icon-btn {
+    grid-row: 1 / span 2;
+    grid-column: 2;
+  }
+}
+
+/* ---------------------------------------------------------------- comprovante por foto */
+.receipt-reader {
+  display: grid;
+  gap: 6px;
+  justify-items: start;
+}
+
+/* ---------------------------------------------------------------- sem internet */
+.banner--error {
+  background: var(--error-bg);
+  border-color: transparent;
+  color: var(--error);
+}
+
+.banner .link-btn {
+  margin-left: auto;
+  flex: none;
+}

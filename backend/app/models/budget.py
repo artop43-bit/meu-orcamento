@@ -161,6 +161,8 @@ class Expense(Base):
     loan_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("loans.id", ondelete="SET NULL"), index=True
     )
+    # v1.3: compra dividida em categorias (cada parte é uma conta com o seu valor).
+    split_group_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, index=True)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
 
 

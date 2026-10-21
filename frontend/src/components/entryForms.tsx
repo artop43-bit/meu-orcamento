@@ -1,7 +1,7 @@
 import { useEffect, useId, useMemo, useRef, useState, type FormEvent } from "react";
 import { createPortal } from "react-dom";
 import { useQueryClient } from "@tanstack/react-query";
-import { CreditCard, Sparkles, Trash2, Users } from "lucide-react";
+import { CreditCard, Plus, Sparkles, Split, Trash2, Users } from "lucide-react";
 
 import {
   budgetApi,
@@ -21,10 +21,13 @@ import {
   type Interval,
   type MonthData,
   type PaymentMethod,
+  type ReceiptReading,
 } from "../api/budget";
 import { extrasApi, hasCredit, hasDebit, useCards, type Card } from "../api/extras";
 import { CardForm } from "./CardForm";
 import { ReceiptsField } from "./Receipts";
+import { ReceiptReader } from "./ReceiptReader";
+import { discard, isQueued, OFFLINE_SAVED, sendOrQueue } from "../lib/offline";
 import { SplitForm } from "./SplitForm";
 import { useAccounts } from "../api/money";
 import { DateField, DayField } from "./DateField";
@@ -275,6 +278,11 @@ export function ExpenseForm({
   const [debitCardId, setDebitCardId] = useState<string>(expense?.debit_card_id ?? "");
   const [pendingReceipts, setPendingReceipts] = useState<File[]>([]);
   const createdRef = useRef<Expense[] | null>(null);
+  // Sem internet: o lançamento ficou na fila do aparelho (id para poder desfazer).
+  const queuedRef = useRef<string | null>(null);
+  // v1.3: compra dividida em categorias, cada parte com o seu valor.
+  const [parts, setParts] = useState<{ categoryId: string; amount: string }[] | null>(null);
+  const [readInfo, setReadInfo] = useState("");
   const [purchase, setPurchase] = useState(expense?.purchase_date ?? todayISO());
   const [duplicateOf, setDuplicateOf] = useState<string | null>(null);
   const [makeRule, setMakeRule] = useState(false);
@@ -317,6 +325,49 @@ export function ExpenseForm({
 
   const parsed = Number(parseMoney(amount) ?? 0);
   const count = Number(installments) || 0;
+  // Divisão em categorias: só para compra única (sem parcelas nem repetição).
+  const canSplitCategories = !expense && kind === "single";
+  const activeParts = canSplitCategories ? parts : null;
+  const partsRest = activeParts ? parsed - activeParts.reduce((sum, p) => sum + Number(parseMoney(p.amount) ?? 0), 0) : 0;
+
+  function setPart(index: number, change: Partial<{ categoryId: string; amount: string }>) {
+    setParts((list) => list && list.map((p, i) => (i === index ? { ...p, ...change } : p)));
+  }
+
+  /** Cria a despesa; sem internet, guarda na fila do aparelho. */
+  async function create(target: string, data: ExpenseInput): Promise<Expense[] | null> {
+    const body = activeParts
+      ? { ...data, category_id: activeParts[0]!.categoryId, parts: activeParts.map((p) => ({ category_id: p.categoryId, amount: requireMoney(p.amount) })) }
+      : data;
+    const result = await sendOrQueue(
+      { kind: "expense", method: "POST", path: `/months/${target}/expenses`, body, label: data.description },
+      (client_ref) => budgetApi.createExpense(target, { ...body, client_ref }),
+    );
+    if (isQueued(result)) {
+      queuedRef.current = result.queued;
+      return null;
+    }
+    return result;
+  }
+
+  /** Foto lida: preenche o que foi encontrado; a pessoa confere antes de salvar. */
+  function applyReading(reading: ReceiptReading, file: File) {
+    if (reading.description && !description.trim()) setDescription(reading.description);
+    if (reading.amount) setAmount(moneyInput(reading.amount));
+    if (reading.date) {
+      if (usesCard) setPurchase(reading.date);
+      else setDueDate(reading.date);
+      // Boleto: a data é o vencimento (ainda a pagar). Cupom: a compra já foi paga.
+      if (reading.kind === "boleto") setPaidChoice(false);
+    }
+    if (reading.kind === "boleto" && !payment) setPayment("boleto");
+    setPendingReceipts((list) => [...list, file].slice(0, 3));
+    setReadInfo(
+      reading.amount || reading.date
+        ? "Lido do comprovante: confira o valor, a data e a descrição antes de salvar. A foto fica anexada."
+        : "Não encontramos o valor nem a data na foto. Preencha à mão; a foto fica anexada.",
+    );
+  }
   const startMonth = (card ? invoiceDue(card, purchase) : dueDate || `${month}-01`).slice(0, 7);
   const installmentSummary =
     kind === "installments" && parsed > 0 && count >= 2
@@ -357,7 +408,7 @@ export function ExpenseForm({
       return;
     }
     if (card) {
-      createdRef.current = await budgetApi.createExpense(month, {
+      createdRef.current = await create(month, {
         description,
         amount: value,
         category_id,
@@ -387,7 +438,7 @@ export function ExpenseForm({
         data.interval_months = interval;
         data.until_month = until || null;
       }
-      createdRef.current = await budgetApi.createExpense(kind === "recurring" && dueDate ? dueDate.slice(0, 7) : month, data);
+      createdRef.current = await create(kind === "recurring" && dueDate ? dueDate.slice(0, 7) : month, data);
       return;
     }
     const data: ExpenseInput = { description, amount: value, category_id, due_date: dueDate || null, paid, ...extra };
@@ -403,7 +454,7 @@ export function ExpenseForm({
     // Parcelada ou que se repete: a 1ª data define o mês de início (ex.: começa no mês que vem).
     // Conta avulsa fica no mês aberto (a fatura de outubro pode vencer em novembro).
     const target = kind !== "single" && dueDate ? dueDate.slice(0, 7) : month;
-    createdRef.current = await budgetApi.createExpense(target, data);
+    createdRef.current = await create(target, data);
   });
 
   function reset() {
@@ -413,6 +464,8 @@ export function ExpenseForm({
     setCategoryTouched(false);
     setNotes("");
     setPaidChoice(null);
+    setParts(null);
+    setReadInfo("");
     setSavedCount((n) => n + 1);
     descRef.current?.querySelector("input")?.focus();
   }
@@ -437,9 +490,31 @@ export function ExpenseForm({
       }
     }
     setDuplicateOf(null);
+    if (activeParts) {
+      if (activeParts.some((p) => !p.categoryId || !parseMoney(p.amount))) {
+        setError("Escolha a categoria e o valor de cada parte.");
+        return;
+      }
+      if (Math.abs(partsRest) >= 0.005) {
+        setError(`A soma das partes precisa ser igual ao total. ${partsRest > 0 ? "Falta distribuir" : "As partes passam do total em"} ${money(Math.abs(partsRest))}.`);
+        return;
+      }
+    }
     try {
       createdRef.current = null;
+      queuedRef.current = null;
       await save.mutateAsync(undefined);
+      const queued = queuedRef.current;
+      if (queued) {
+        // Sem internet: fica na fila e sobe sozinho depois (comprovantes precisam de conexão).
+        undo.done({
+          message: pendingReceipts.length ? `${OFFLINE_SAVED} Anexe o comprovante depois, com internet.` : OFFLINE_SAVED,
+          revert: async () => discard(queued),
+        });
+        if (another) reset();
+        else onDone();
+        return;
+      }
       // Comprovantes escolhidos antes de salvar vão para a despesa criada (a 1ª parcela).
       const first = (createdRef.current as Expense[] | null)?.[0];
       if (first && pendingReceipts.length) {
@@ -479,6 +554,8 @@ export function ExpenseForm({
         </Alert>
       )}
       {savedCount > 0 && <Alert tone="success">{savedCount} despesa(s) salva(s). Preencha a próxima.</Alert>}
+      {!expense && <ReceiptReader onRead={applyReading} />}
+      {readInfo && <Alert tone="info">{readInfo}</Alert>}
 
       <div className="field" ref={descRef}>
         <span className="field-label">
@@ -696,6 +773,59 @@ export function ExpenseForm({
         </div>
       )}
 
+      {activeParts ? (
+        <fieldset className="split-parts">
+          <legend className="field-label">Categorias e valores</legend>
+          {activeParts.map((part, index) => (
+            <div className="split-parts__row" key={index}>
+              <CategorySelect
+                categories={categories}
+                value={part.categoryId}
+                onChange={(v) => setPart(index, { categoryId: v })}
+                label={`Categoria da parte ${index + 1}`}
+              />
+              <MoneyInput value={part.amount} onChange={(v) => setPart(index, { amount: v })} label={`Valor da parte ${index + 1}`} />
+              <button
+                type="button"
+                className="icon-btn"
+                aria-label={`Remover a parte ${index + 1}`}
+                disabled={activeParts.length <= 2}
+                onClick={() => setParts((list) => list && list.filter((_, i) => i !== index))}
+              >
+                <Trash2 size={16} aria-hidden />
+              </button>
+            </div>
+          ))}
+          <p className={`summary-box small ${Math.abs(partsRest) < 0.005 ? "" : "tone--warn"}`} aria-live="polite">
+            {Math.abs(partsRest) < 0.005
+              ? `As partes somam o total de ${money(parsed)}.`
+              : partsRest > 0
+                ? `Falta distribuir ${money(partsRest)} do total de ${money(parsed)}.`
+                : `As partes passam do total em ${money(-partsRest)}.`}
+          </p>
+          <div className="row" style={{ gap: 12, flexWrap: "wrap" }}>
+            {activeParts.length < 6 && (
+              <button
+                type="button"
+                className="link-btn small"
+                onClick={() => setParts((list) => list && [...list, { categoryId: "", amount: partsRest > 0 ? moneyInput(partsRest.toFixed(2)) : "" }])}
+              >
+                <Plus size={14} aria-hidden /> Adicionar categoria
+              </button>
+            )}
+            <button
+              type="button"
+              className="link-btn small"
+              onClick={() => {
+                setCategoryId(activeParts[0]!.categoryId);
+                setParts(null);
+              }}
+            >
+              Não dividir
+            </button>
+          </div>
+        </fieldset>
+      ) : (
       <label>
         <span className="field-label">
           Categoria
@@ -716,7 +846,17 @@ export function ExpenseForm({
             setCategoryTouched(true);
           }}
         />
+        {canSplitCategories && (
+          <button
+            type="button"
+            className="link-btn small split-parts__start"
+            onClick={() => setParts([{ categoryId, amount }, { categoryId: "", amount: "" }])}
+          >
+            <Split size={14} aria-hidden /> Dividir em categorias
+          </button>
+        )}
       </label>
+      )}
 
       {canOfferRule && (
         <div className="rule-offer">
@@ -832,15 +972,24 @@ export function IncomeForm({ month, income, onDone }: { month: string; income?: 
       notes: notes.trim() || null,
       account_id: accountId || null,
     };
-    if (income) await budgetApi.updateIncome(income.id, data, scope);
-    else await budgetApi.createIncome(month, { ...data, repeat, until_month: repeat === "period" ? until : null });
+    if (income) {
+      await budgetApi.updateIncome(income.id, data, scope);
+      return null;
+    }
+    const body = { ...data, repeat, until_month: repeat === "period" ? until : null };
+    const result = await sendOrQueue(
+      { kind: "income", method: "POST", path: `/months/${month}/incomes`, body, label: `${description} (receita)` },
+      (client_ref) => budgetApi.createIncome(month, { ...body, client_ref }),
+    );
+    return isQueued(result) ? result.queued : null;
   });
 
   async function submit(event: FormEvent) {
     event.preventDefault();
     setError("");
     try {
-      await save.mutateAsync(undefined);
+      const queued = await save.mutateAsync(undefined);
+      if (queued) undo.done({ message: OFFLINE_SAVED, revert: async () => discard(queued) });
       onDone();
     } catch (err) {
       setError(errorMessage(err));
