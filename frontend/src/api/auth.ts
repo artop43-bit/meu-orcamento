@@ -15,6 +15,8 @@ export type User = {
   onboarded_at?: string | null;
   theme?: "system" | "light" | "dark" | null;
   accent?: AccentName | null;
+  /** v1.3: cartões do Orçamento (JSON); null = padrão. */
+  dashboard?: string | null;
   month_start_day?: number;
 };
 

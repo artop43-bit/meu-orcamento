@@ -1,11 +1,15 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+
+import { analysisApi, type Inflation } from "../api/analysis";
+import { errorMessage } from "../api/client";
+import { DateField } from "./DateField";
 
 import { cashOrInstallments, compound, emergencyFund, prepay, savingPlan, type RatePeriod } from "../lib/calculators";
-import { money, parseMoney } from "../lib/format";
+import { addMonths, money, monthLabel, parseMoney, thisMonth } from "../lib/format";
 import { MoneyInput } from "./budget";
 import { Tip } from "./help";
 
-type Kind = "compound" | "plan" | "cash" | "prepay" | "reserve";
+type Kind = "compound" | "plan" | "cash" | "prepay" | "reserve" | "inflation";
 
 const KINDS: { key: Kind; label: string; text: string }[] = [
   { key: "compound", label: "Juros compostos", text: "Quanto um valor rende com aportes mensais." },
@@ -13,6 +17,7 @@ const KINDS: { key: Kind; label: string; text: string }[] = [
   { key: "cash", label: "À vista ou parcelado", text: "Se o desconto à vista compensa o parcelamento sem juros." },
   { key: "prepay", label: "Antecipar parcelas", text: "Antecipar parcelas de uma dívida ou deixar o dinheiro aplicado." },
   { key: "reserve", label: "Reserva de emergência", text: "O valor ideal da reserva a partir dos gastos essenciais." },
+  { key: "inflation", label: "Correção pela inflação", text: "Quanto um valor de uma data antiga vale hoje, pelo IPCA do Banco Central." },
 ];
 
 const num = (v: string) => Number((v || "0").replace(",", "."));
@@ -216,6 +221,60 @@ function ReserveCalc() {
   );
 }
 
+function InflationCalc() {
+  const [amount, setAmount] = useState("1.000,00");
+  const [start, setStart] = useState(addMonths(thisMonth(), -60));
+  const [result, setResult] = useState<Inflation | null>(null);
+  const [error, setError] = useState("");
+  const value = parseMoney(amount);
+  useEffect(() => {
+    if (!value || !start) return;
+    let current = true;
+    const timer = window.setTimeout(() => {
+      analysisApi
+        .inflation(value, start, thisMonth())
+        .then((r) => {
+          if (!current) return;
+          setResult(r);
+          setError("");
+        })
+        .catch((err) => current && setError(errorMessage(err)));
+    }, 300);
+    return () => {
+      current = false;
+      window.clearTimeout(timer);
+    };
+  }, [value, start]);
+  return (
+    <>
+      <div className="grid-2">
+        <label>
+          Valor na época
+          <MoneyInput value={amount} onChange={setAmount} required={false} />
+        </label>
+        <label>
+          <span className="field-label">
+            Mês do valor <Tip>A correção soma o IPCA de cada mês seguinte até o último divulgado pelo Banco Central.</Tip>
+          </span>
+          <DateField month value={start} min="1995-01" max={thisMonth()} onChange={setStart} />
+        </label>
+      </div>
+      {error ? (
+        <p className="tone--error small" role="alert" style={{ margin: 0 }}>
+          {error}
+        </p>
+      ) : (
+        result && (
+          <Result>
+            {money(result.amount)} em {monthLabel(result.start)} equivalem a <strong>{money(result.corrected)}</strong> em {monthLabel(result.end)}. A
+            inflação do período (IPCA) foi de <strong>{result.inflation_pct.toLocaleString("pt-BR")}%</strong> em {result.months} mês(es).
+          </Result>
+        )
+      )}
+    </>
+  );
+}
+
 /** Insights › Ferramentas › Calculadoras: contas rápidas, sem recomendar produtos. */
 export function Calculators() {
   const [kind, setKind] = useState<Kind>("compound");
@@ -238,6 +297,7 @@ export function Calculators() {
         {kind === "cash" && <CashCalc />}
         {kind === "prepay" && <PrepayCalc />}
         {kind === "reserve" && <ReserveCalc />}
+        {kind === "inflation" && <InflationCalc />}
       </div>
       <p className="muted small" style={{ margin: 0 }}>
         Simulações aproximadas, com juros compostos e capitalização mensal. Não são recomendação de investimento ou de produto financeiro.

@@ -7308,15 +7308,12 @@ textarea {
 }
 
 .split-parts__start {
-  justify-self: start;
-  margin-top: 6px;
-}
-
-label > .split-parts__start {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  justify-self: start;
   width: fit-content;
+  margin-top: -6px;
 }
 
 .split-parts .summary-box {
@@ -7361,4 +7358,199 @@ label > .split-parts__start {
 .banner .link-btn {
   margin-left: auto;
   flex: none;
+}
+
+/* ---------------------------------------------------------------- plano de quitação */
+.payoff {
+  margin-bottom: 20px;
+}
+
+.payoff__plans {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.payoff__plan {
+  display: grid;
+  gap: 6px;
+  align-content: start;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+
+.payoff__plan.is-best {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.payoff__plan h3 {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 1rem;
+}
+
+.payoff__plan p {
+  margin: 0;
+}
+
+.payoff__plan dl {
+  display: grid;
+  gap: 4px;
+  margin: 4px 0 0;
+}
+
+.payoff__plan dl > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.payoff__plan dt {
+  color: var(--muted);
+}
+
+.payoff__plan dd {
+  margin: 0;
+  font-weight: 600;
+  text-align: right;
+}
+
+.payoff__order {
+  margin: 4px 0 0;
+  padding-left: 20px;
+  font-size: 0.88rem;
+  display: grid;
+  gap: 2px;
+}
+
+/* ---------------------------------------------------------------- desafios */
+.challenge__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 1rem;
+}
+
+.challenge-option {
+  align-items: flex-start !important;
+}
+
+/* ---------------------------------------------------------------- modo sem culpa */
+.recovery-card {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 16px;
+  border-left: 4px solid var(--accent);
+}
+
+.recovery-card h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.recovery-card__icon {
+  color: var(--accent);
+  flex: none;
+}
+
+.recovery-steps {
+  display: grid;
+  gap: 18px;
+  margin: 0;
+  padding-left: 22px;
+}
+
+.recovery-steps > li::marker {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.recovery-steps h3 {
+  margin: 0 0 6px;
+  font-size: 1rem;
+}
+
+.recovery-steps p {
+  margin: 6px 0 0;
+}
+
+.recovery-list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.recovery-list li {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px 12px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+
+/* ---------------------------------------------------------------- personalizar o painel */
+.dashboard-editor__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.dashboard-editor__list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 6px 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+
+.dashboard-editor__moves {
+  display: inline-flex;
+  gap: 2px;
+  flex: none;
+}
+
+/* ---------------------------------------------------------------- painel de erros */
+.error-card__title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 1rem;
+}
+
+.error-card__message {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 0.88rem;
+  overflow-wrap: anywhere;
+}
+
+.error-card__detail {
+  margin: 8px 0 0;
+  padding: 10px;
+  max-height: 220px;
+  overflow: auto;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  font-size: 0.78rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }

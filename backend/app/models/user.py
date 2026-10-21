@@ -64,6 +64,11 @@ class User(Base):
     push_due: Mapped[bool] = mapped_column(default=True, server_default="1")
     push_messages: Mapped[bool] = mapped_column(default=True, server_default="1")
     push_alerts: Mapped[bool] = mapped_column(default=True, server_default="1")
+    # v1.3: resumo da semana às segundas (e-mail e aparelho).
+    notify_weekly: Mapped[bool] = mapped_column(default=True, server_default="1")
+    push_weekly: Mapped[bool] = mapped_column(default=True, server_default="1")
+    # v1.3: cartões do Orçamento na ordem escolhida (JSON: [{"key": ..., "visible": ...}]).
+    dashboard: Mapped[str | None] = mapped_column(String(600))
     # Configuração inicial guiada concluída (ou pulada).
     onboarded_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
 

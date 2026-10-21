@@ -57,6 +57,7 @@ PAGES = [
     "/mensagens",
     "/mensagens/conversas",
     "/admin?aba=solicitacoes&visao=quadro",
+    "/admin?aba=erros",
     "/dividas",
     "/divisoes",
     "/ajustes/app",

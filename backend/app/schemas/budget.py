@@ -55,6 +55,7 @@ class CategoryIn(BaseModel):
     is_essential: bool = False
     color: Color | None = None
     monthly_limit: Money | None = None
+    carry_over: bool = False
 
 
 class CategoryPatch(BaseModel):
@@ -62,6 +63,7 @@ class CategoryPatch(BaseModel):
     is_essential: bool | None = None
     color: Color | None = None
     monthly_limit: Money | None = None
+    carry_over: bool | None = None
 
 
 class CategoryOut(_Out):
@@ -70,6 +72,8 @@ class CategoryOut(_Out):
     is_essential: bool
     color: str | None
     monthly_limit: Decimal | None
+    carry_over: bool = False
+    carry_since: date | None = None
 
 
 # ---------------------------------------------------------------- rendas
@@ -241,6 +245,8 @@ class CategoryTotal(BaseModel):
     total: Decimal
     limit: Decimal | None = None
     limit_pct: float | None = None
+    # v1.3: parte do limite que veio da sobra dos meses anteriores.
+    limit_carried: Decimal | None = None
 
 
 class MonthSummary(BaseModel):

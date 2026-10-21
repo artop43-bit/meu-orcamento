@@ -11,6 +11,45 @@ export type Release = {
 
 export const RELEASES: Release[] = [
   {
+    version: "1.3.0",
+    date: "21/10/2026 às 10:45",
+    title: "Voz, foto do comprovante, sem internet, desafios e painel personalizado",
+    sections: [
+      {
+        title: "Lançamentos",
+        items: [
+          "Lançamento por voz: toque no microfone, fale (ex.: “mercado 120 no pix ontem”), confira e lance.",
+          "Compra dividida em categorias, cada parte com o seu valor, sem lançar nada em dobro.",
+          "Ler comprovante pela foto: valor, data e descrição preenchidos para conferir; a foto fica anexada.",
+          "Sem internet: despesas, receitas e o “pagar” ficam no aparelho e sobem sozinhos quando a conexão volta.",
+        ],
+      },
+      {
+        title: "Planejamento",
+        items: [
+          "Sobra do limite da categoria para o mês seguinte (opcional, em Categorias).",
+          "Plano de quitação em Dívidas: menor dívida primeiro ou juros mais altos primeiro, com juros e prazos.",
+          "Calculadora de correção pela inflação (IPCA), em Insights › Calculadoras.",
+        ],
+      },
+      {
+        title: "Hábito",
+        items: [
+          "Desafios de economia em Metas, com progresso pelos seus lançamentos.",
+          "Plano para equilibrar o mês quando ele fica no negativo, passo a passo e sem julgamento.",
+          "Resumo da semana às segundas, por e-mail e no aparelho (pode ser desligado em Preferências).",
+        ],
+      },
+      {
+        title: "Experiência",
+        items: [
+          "Personalize o painel do Orçamento: escolha os cartões e a ordem.",
+          "Atalhos ao segurar o ícone do app instalado: Nova despesa, Nova receita e Lançar por voz.",
+        ],
+      },
+    ],
+  },
+  {
     version: "1.2.0",
     date: "21/10/2026 às 00:20",
     title: "Navegação fluida e cores consistentes",

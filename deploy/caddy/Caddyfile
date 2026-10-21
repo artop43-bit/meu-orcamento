@@ -18,7 +18,7 @@
 		X-Content-Type-Options "nosniff"
 		X-Frame-Options "DENY"
 		Referrer-Policy "no-referrer"
-		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()"
+		Permissions-Policy "camera=(), microphone=(self), geolocation=(), payment=()"
 		Cross-Origin-Opener-Policy "same-origin"
 		# Só scripts e conexões do próprio site. 'unsafe-inline' em estilos é necessário
 		# para as larguras das barras dos gráficos (atributo style do React).

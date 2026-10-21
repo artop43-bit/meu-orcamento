@@ -75,7 +75,7 @@ def test_due_digest_once_a_day_with_everything_together(
     outbox.clear()
 
     # Antes das 8h nada sai.
-    assert notify.run_daily(db, at(today, 7)) == {"due": 0, "monthly": 0}
+    assert notify.run_daily(db, at(today, 7)) == {"due": 0, "monthly": 0, "weekly": 0}
     sent = notify.run_daily(db, at(today, 8))
     assert sent["due"] == 1
     [mail] = [m for m in outbox if "conta" in m.subject.lower() or "atraso" in m.subject.lower()]
@@ -98,6 +98,7 @@ def test_due_digest_preferences_and_unsubscribe(
         "notify_monthly": True,
         "notify_messages": True,
         "notify_alerts": True,
+        "notify_weekly": True,
     }
     assert user.patch("/api/notifications/prefs", json={"notify_due_days": 2}).status_code == 422
     user.patch("/api/notifications/prefs", json={"notify_due_days": 7, "notify_hide_values": True})

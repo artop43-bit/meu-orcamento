@@ -1,5 +1,7 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
 
+import { reportError } from "../lib/errorReport";
+
 type State = { error: Error | null };
 
 /**
@@ -15,6 +17,8 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, State> {
 
   componentDidCatch(error: Error, info: ErrorInfo) {
     console.error("Erro na tela:", error, info.componentStack);
+    // Painel de erros da administração (v1.3); só no site publicado.
+    if (import.meta.env.PROD) reportError(error, info.componentStack ?? undefined);
   }
 
   render() {

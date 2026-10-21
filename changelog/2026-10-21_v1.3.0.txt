@@ -1,0 +1,48 @@
+MEU ORÇAMENTO · UPDATE LOG
+Versão 1.3.0 · Voz, foto do comprovante, sem internet, desafios e painel personalizado
+Data: 21/10/2026 às 10:45 (horário de Brasília)
+
+Lançamentos
+- [x] Lançamento por voz: microfone no lançamento rápido; a frase falada ("mercado 120 no pix ontem")
+      vai para o campo e a pessoa confere antes de lançar. Entende valores falados ("23 reais e 50
+      centavos"), parcelas ("em 10 vezes"), forma de pagamento e receitas ("receita de freelance 600")
+- [x] Compra dividida em categorias: uma despesa vira partes com valores próprios (ex.: R$ 150 em
+      Alimentação + R$ 40 em Saúde); a soma precisa bater com o total e nada é lançado em dobro.
+      Pagar uma parte paga a compra inteira; a lista mostra "dividida"
+- [x] Comprovante por foto: "Ler comprovante" preenche valor, data e descrição (cupom, nota ou boleto)
+      para conferir; a foto fica anexada. Boleto: valor e vencimento exatos pela linha digitável.
+      A leitura roda no próprio servidor (Tesseract), sem serviço externo
+- [x] Lançar sem internet: despesas, receitas e o "pagar" ficam guardados no aparelho e sobem sozinhos
+      quando a conexão volta, sem duplicar (identificador do aparelho). Aviso com quantos estão na fila;
+      a fila é de cada conta
+
+Planejamento e dívidas
+- [x] Sobra do limite para o mês seguinte (opcional por categoria): o que não foi gasto soma ao limite
+      do mês seguinte; estourar não tira do seguinte. O Orçamento mostra quanto veio de sobra
+- [x] Plano de quitação em Dívidas: compara "menor dívida primeiro" e "juros mais altos primeiro" com
+      o mesmo dinheiro por mês (parcelas + extra): juros pagos, mês de quitação e ordem em que cada
+      dívida termina. Só números, sem recomendar produto
+- [x] Calculadora de correção pela inflação (Insights › Calculadoras), pelo IPCA mensal do Banco Central
+
+Hábito
+- [x] Desafios de economia em Metas: 30 dias sem delivery, semana sem compras por impulso, 7 dias só
+      com o essencial, lazer com teto no mês e desafios personalizados; progresso pelos lançamentos
+- [x] Modo sem culpa: quando o mês fica no negativo, "Plano para equilibrar o mês" mostra a diferença,
+      quanto separar por mês para cobrir em 1, 3 ou 6 meses, onde ajustar e contas fixas para rever
+- [x] Resumo da semana às segundas, às 8h, por e-mail e no aparelho (gastos da semana, comparação e o que
+      vence nos próximos 7 dias), com opção de desligar cada um
+
+Experiência
+- [x] Personalizar o painel do Orçamento: escolher quais cartões aparecem e a ordem, salvo na conta
+- [x] Atalhos no ícone do app instalado: Nova despesa, Nova receita e Lançar por voz
+      (no APK, entram na próxima compilação do app Android)
+
+Administração
+- [x] Painel de erros (Administração › Erros): erros das telas e do servidor agrupados, com contagem,
+      tela, aparelho e versão. Números, e-mails e identificadores mascarados; sem serviço externo;
+      grupos sem novidade há 90 dias são apagados
+
+Técnico
+- [x] Migrações 0018 a 0021 (partes da compra, sobra do limite, desafios e resumo semanal, painel e erros)
+- [x] Cabeçalho de segurança passa a permitir o microfone só no próprio site (para o lançamento por voz)
+- [x] Auditoria de cores, layout em 5 tamanhos, acessibilidade e roteiro de ponta a ponta com as novidades

@@ -13,6 +13,7 @@ import { DateField } from "../components/DateField";
 import { EmptyGuide, Tip } from "../components/help";
 import { Alert, Button, Kpi, LoadingRegion, PageHeader, Sheet, Skeleton } from "../components/ui";
 import { useUndo } from "../components/undo";
+import { PayoffPlan } from "../components/PayoffPlan";
 import { announce } from "../lib/announce";
 import { loanPreview } from "../lib/calculators";
 import { money, moneyInput, monthLabel, parseMoney, shortDate, thisMonth } from "../lib/format";
@@ -550,6 +551,7 @@ export default function DebtsPage() {
           ))}
         </div>
       )}
+      {data && !empty && <PayoffPlan loans={loans} others={others} />}
       {data && !empty && (
         <div className="layout-2">
           <section className="card stack">

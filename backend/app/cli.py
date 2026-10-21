@@ -39,8 +39,17 @@ def cleanup(db: Session) -> dict[str, int]:
     emails = db.execute(
         delete(EmailLog).where(EmailLog.created_at <= now - timedelta(days=30))
     ).rowcount
+    from app.services import errors
+
+    error_groups = errors.cleanup(db)
     db.commit()
-    return {"sessions": sessions, "tokens": tokens, "security_events": events, "emails": emails}
+    return {
+        "sessions": sessions,
+        "tokens": tokens,
+        "security_events": events,
+        "emails": emails,
+        "errors": error_groups,
+    }
 
 
 def run_cleanup() -> None:

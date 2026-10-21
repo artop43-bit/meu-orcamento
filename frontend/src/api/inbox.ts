@@ -41,6 +41,7 @@ export const inboxApi = {
   announce: (data: AnnouncementInput) => api.post<Announcement>("/admin/announcements", data),
 
   appearance: (data: { theme?: string; accent?: string }) => api.patch<{ theme: string | null; accent: string | null }>("/me/appearance", data),
+  dashboard: (cards: { key: string; visible: boolean }[] | null) => api.put<{ dashboard: string | null }>("/me/dashboard", { cards }),
 
   resetPreview: () => api.get<{ counts: Record<ResetArea, number> }>("/account/reset"),
   reset: (data: { areas: ResetArea[]; password: string; confirmation: string; code?: string }) =>
