@@ -189,7 +189,7 @@ function EmailNotices() {
           </label>
           <label className="check">
             <input type="checkbox" checked={p.notify_weekly} onChange={(e) => void update({ notify_weekly: e.target.checked })} />
-            Resumo da semana, às segundas às 8h (gastos da semana e o que vence nos próximos 7 dias)
+            Resumo da semana, às segundas às 8h (gastos da semana e as contas que vencem na semana)
           </label>
           <p className="muted small" style={{ margin: 0 }}>
             O aviso de acesso por um aparelho novo é sempre enviado, por segurança.

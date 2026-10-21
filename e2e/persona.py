@@ -1856,14 +1856,17 @@ def v13_entries(page: Page):
     assert read["amount"] == "44.88" and len(read["receipt_ids"]) == 1, read
 
     # Sem internet: o lançamento fica no aparelho e sobe sozinho quando a conexão volta.
-    page.context.set_offline(True)
     quick = page.get_by_role("search", name="Lançamento rápido")
-    quick.get_by_role("textbox").fill("padaria offline 12,50 pix")
-    quick.get_by_role("button", name="Lançar").click()
     banner = page.locator(".banner--offline")
-    expect(banner).to_contain_text("1 lançamento(s) guardado(s) neste aparelho")
-    page.screenshot(path=OUT / "v13-sem-internet.png")
-    page.context.set_offline(False)
+    page.context.set_offline(True)
+    try:
+        quick.get_by_role("textbox").fill("padaria offline 12,50 pix")
+        quick.get_by_role("button", name="Lançar", exact=True).click()
+        expect(banner).to_contain_text("1 lançamento(s) guardado(s) neste aparelho")
+        page.screenshot(path=OUT / "v13-sem-internet.png")
+    finally:
+        # Sempre volta a conexão (uma falha aqui não pode derrubar os passos seguintes).
+        page.context.set_offline(False)
     expect(banner).to_have_count(0, timeout=15000)
     idle(page, 500)
     names = [e["description"] for e in api(page, f"/months/{month}")["expenses"]]
