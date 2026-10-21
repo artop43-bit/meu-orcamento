@@ -91,9 +91,12 @@ export default function InboxPage() {
         title="Mensagens"
         subtitle="Recados da administração e as suas solicitações."
         actions={
-          <Button type="button" variant={requests ? "primary" : "secondary"} onClick={openFeedback}>
-            <MessageSquarePlus size={16} /> Nova solicitação
-          </Button>
+          // A nova solicitação fica só na aba Solicitações (v1.3.2).
+          requests ? (
+            <Button type="button" onClick={openFeedback}>
+              <MessageSquarePlus size={16} /> Nova solicitação
+            </Button>
+          ) : undefined
         }
       />
       <nav className="page-tabs no-print" aria-label="Mensagens" style={{ marginBottom: 20 }}>

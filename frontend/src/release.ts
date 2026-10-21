@@ -3,15 +3,14 @@
  * do changelog (pasta changelog/), que tem a mesma versão, data e hora.
  */
 export const RELEASE = {
-  version: "1.3.1",
+  version: "1.3.2",
   // Data e hora (Brasília) em que o update foi publicado.
-  releasedAt: "2026-10-21T11:50:00-03:00",
+  releasedAt: "2026-10-21T12:10:00-03:00",
 };
 
 /** Mostrado uma vez em "Novidades" depois do update (curto: o detalhe fica no changelog). */
 export const RELEASE_NOTES: { title: string; text: string }[] = [
-  { title: "Recados com respostas.", text: "Responda aos recados ali mesmo: as respostas ficam em thread, visíveis para todos." },
-  { title: "Solicitações com tema.", text: "Escolha Sugestão, Dúvida, Erro, Elogio ou Outro e anexe imagens, PDF ou planilhas." },
+  { title: "Mensagens num só lugar.", text: "Acesse pelo balão do menu; a nova solicitação fica na aba Solicitações." },
 ];
 
 export function releaseLabel(): string {

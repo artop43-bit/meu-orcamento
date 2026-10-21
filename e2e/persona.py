@@ -1426,6 +1426,12 @@ def inbox_and_announcement(page: Page):
     expect(first).to_contain_text("Importante")
     expect(first.locator(".notice__body")).to_contain_text("sábado")
     expect(page.get_by_role("radiogroup", name="Filtrar mensagens")).to_have_count(0)
+    # v1.3.2: um só acesso no menu (o balão) e, em Recados, sem o botão de nova solicitação.
+    expect(page.locator(".sidebar").get_by_role("button", name="Nova solicitação")).to_have_count(0)
+    expect(page.get_by_role("button", name="Nova solicitação")).to_have_count(0)
+    page.get_by_role("navigation", name="Mensagens").get_by_role("link", name="Solicitações").click()
+    expect(page.get_by_role("button", name="Nova solicitação")).to_be_visible()
+    page.get_by_role("navigation", name="Mensagens").get_by_role("link", name="Recados").click()
     idle(page, 500)
     page.screenshot(path=OUT / "v09-mensagens.png", full_page=True)
     assert api(page, "/inbox/unread")["unread"] == 0, "abrir os recados deveria marcar como lidos"

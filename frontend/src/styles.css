@@ -4574,9 +4574,9 @@ kbd {
 
 /* ---------------------------------------------------------------- menu lateral */
 .sidebar__tools {
-  /* Busca em linha inteira; privacidade, tema e nova solicitação divididos embaixo. */
+  /* Busca em linha inteira; embaixo, ocultar valores e Mensagens (único acesso, v1.3.2). */
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 6px;
   margin-top: 10px;
   padding-top: 10px;
