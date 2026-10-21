@@ -65,7 +65,7 @@ def create_category(body: CategoryIn, user: CurrentUser, db: DbSession) -> Categ
 def update_category(
     category_id: uuid.UUID, body: CategoryPatch, user: CurrentUser, db: DbSession
 ) -> CategoryOut:
-    changes = _changes(body, nullable={"color", "monthly_limit"})
+    changes = _changes(body, nullable={"color", "monthly_limit", "deductible"})
     return CategoryOut.model_validate(service.update_category(db, user, category_id, changes))
 
 
@@ -183,6 +183,10 @@ def get_history(
 @router.post("/months/{month}/incomes", status_code=status.HTTP_201_CREATED)
 def create_income(month: str, body: IncomeIn, user: CurrentUser, db: DbSession) -> IncomeOut:
     income = service.create_income(db, user, parse_month(month), body.model_dump())
+    if income.mei:
+        from app.services import mei
+
+        mei.check_threshold(db, user, income.month.year)
     return IncomeOut.model_validate(income)
 
 

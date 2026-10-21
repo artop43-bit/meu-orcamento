@@ -420,6 +420,9 @@ def preview(
                 and statement_import.is_card_payment(t.description),
             }
         )
+    from app.services import reconcile
+
+    reconcile.match(db, user, items)
     dates = [t.date for t in transactions]
     return {
         "format": fmt,
@@ -451,14 +454,20 @@ def commit(
     batch = ImportBatch(user_id=user.id, filename=filename[:160], file_format=file_format)
     db.add(batch)
     db.flush()
-    created = skipped = 0
+    created = skipped = matched = 0
     now = utcnow()
     today = date.today()
+    from app.services import reconcile
+
     for item in items:
         if item["ref"] in existing:
             skipped += 1
             continue
         existing.add(item["ref"])
+        if item.get("match_id") and reconcile.confirm(db, user, item):
+            # v1.4: já lançado à mão — fica conferido pelo extrato, sem entrar de novo.
+            matched += 1
+            continue
         category_id = item.get("category_id")
         if category_id is not None and category_id not in valid_categories:
             raise AppError(404, "not_found", "Categoria não encontrada.")
@@ -518,7 +527,7 @@ def commit(
     if save_mapping and save_mapping.get("signature"):
         _save_mapping(db, user, save_mapping["signature"], save_mapping.get("mapping") or {})
     db.commit()
-    return {"batch_id": batch.id, "created": created, "skipped": skipped}
+    return {"batch_id": batch.id, "created": created, "skipped": skipped, "matched": matched}
 
 
 def _save_mapping(db: Session, user: User, sig: str, mapping: dict[str, Any]) -> None:

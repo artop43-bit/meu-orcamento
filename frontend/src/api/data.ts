@@ -39,10 +39,13 @@ export type StatementTransaction = {
   amount: string;
   kind: "income" | "expense";
   category_id: string | null;
+  /** v1.4: lançamento feito à mão que esta linha confere (não entra de novo). */
+  match_id?: string | null;
 };
+export type StatementMatch = { id: string; kind: "income" | "expense"; description: string; date: string };
 export type StatementPreview = {
   format: "ofx" | "csv" | "xlsx";
-  transactions: (StatementTransaction & { duplicate: boolean; card_payment?: boolean })[];
+  transactions: (StatementTransaction & { duplicate: boolean; card_payment?: boolean; match?: StatementMatch | null })[];
   period?: { start: string; end: string } | null;
 };
 
@@ -97,6 +100,17 @@ export type AnnualSummary = {
   by_category: { name: string; total: string; share: number }[];
   investments_total: string;
   goals: { name: string; target_amount: string; current_amount: string; completed: boolean }[];
+  /** v1.4: relatório para o Imposto de Renda. */
+  tax?: TaxReport;
+};
+
+export type TaxReport = {
+  year: number;
+  deductions: { kind: string; label: string; total: string; items: { date: string; description: string; category: string; amount: string }[] }[];
+  deductions_total: string;
+  incomes: { kind: string; label: string; total: string }[];
+  assets: { description: string; value: string }[];
+  debts: { description: string; value: string }[];
 };
 
 function fileForm(file: File, extra: Record<string, string> = {}): FormData {
@@ -137,7 +151,7 @@ export const dataApi = {
     account_id?: string | null;
     card_id?: string | null;
     save_mapping?: { signature: string; mapping: ColumnMapping } | null;
-  }) => api.post<{ batch_id: string; created: number; skipped: number }>("/import/commit", payload),
+  }) => api.post<{ batch_id: string; created: number; skipped: number; matched?: number }>("/import/commit", payload),
   restore: (file: File) => api.form<Record<string, number>>("POST", "/import/restore", fileForm(file)),
   batches: () => api.get<ImportBatch[]>("/import/batches"),
   undo: (id: string) => api.post<{ removed: number }>(`/import/batches/${id}/undo`),

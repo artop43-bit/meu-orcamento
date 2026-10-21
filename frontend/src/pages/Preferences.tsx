@@ -11,6 +11,7 @@ import { announce } from "../lib/announce";
 import { setAppearance } from "../lib/appearance";
 import { cycleLabel, setCycleStart, thisMonth } from "../lib/format";
 import { setPrefs, usePrefs, type Prefs } from "../lib/prefs";
+import { PixMeiSettings } from "../components/PixMeiSettings";
 import { ACCENTS, type AccentName } from "../theme/tokens";
 
 function Choice<K extends keyof Prefs>({
@@ -245,6 +246,7 @@ export default function Preferences() {
             />
           </section>
           <FinancialMonth />
+          <PixMeiSettings />
           <EmailNotices />
           <section className="card stack">
             <h2>Privacidade</h2>

@@ -70,7 +70,7 @@ function Notifications() {
     }
   }
 
-  async function pref(key: "push_due" | "push_messages" | "push_alerts" | "push_weekly", value: boolean) {
+  async function pref(key: "push_due" | "push_messages" | "push_alerts" | "push_weekly" | "push_daily", value: boolean) {
     const previous = config.data;
     if (previous) queryClient.setQueryData(PUSH_KEY, { ...previous, [key]: value });
     try {
@@ -124,6 +124,10 @@ function Notifications() {
             <label className="check">
               <input type="checkbox" checked={data.push_weekly} onChange={(e) => void pref("push_weekly", e.target.checked)} />
               Resumo da semana (segundas, 8h)
+            </label>
+            <label className="check">
+              <input type="checkbox" checked={data.push_daily} onChange={(e) => void pref("push_daily", e.target.checked)} />
+              Disponível hoje (todo dia às 8h)
             </label>
           </fieldset>
           <p className="muted small" style={{ margin: 0 }}>

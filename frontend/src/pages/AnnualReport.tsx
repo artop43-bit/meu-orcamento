@@ -3,9 +3,83 @@ import { Link, useParams } from "react-router";
 
 import { useMe } from "../api/auth";
 import { errorMessage } from "../api/client";
-import { dataApi } from "../api/data";
+import { dataApi, type TaxReport } from "../api/data";
 import { Alert, Button } from "../components/ui";
 import { money, monthLabel, percent } from "../lib/format";
+
+/** v1.4: o ano na ordem das fichas da declaração do Imposto de Renda. */
+function TaxSection({ tax }: { tax: TaxReport }) {
+  const empty = !tax.deductions.length && !tax.incomes.length && !tax.assets.length && !tax.debts.length;
+  if (empty) return null;
+  return (
+    <section className="report__section report__tax" id="imposto-de-renda">
+      <h2>Para o Imposto de Renda</h2>
+      <p className="muted small">
+        Apoio para preencher a declaração. Confira com os informes de rendimentos do banco e da empresa e com os recibos.
+      </p>
+      {tax.deductions.length > 0 && (
+        <>
+          <h3>Pagamentos dedutíveis · {money(tax.deductions_total)}</h3>
+          {tax.deductions.map((d) => (
+            <div key={d.kind} className="report__tax-group">
+              <p className="report__tax-title">
+                {d.label}: <strong>{money(d.total)}</strong>
+              </p>
+              <table>
+                <tbody>
+                  {d.items.map((item, i) => (
+                    <tr key={i}>
+                      <td>{new Date(`${item.date}T12:00:00`).toLocaleDateString("pt-BR")}</td>
+                      <td>{item.description}</td>
+                      <td className="num">{money(item.amount)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ))}
+        </>
+      )}
+      {tax.incomes.length > 0 && (
+        <>
+          <h3>Rendimentos</h3>
+          <ul className="report__list">
+            {tax.incomes.map((i) => (
+              <li key={i.kind}>
+                {i.label}: {money(i.total)}
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+      {tax.assets.length > 0 && (
+        <>
+          <h3>Bens e direitos em 31/12</h3>
+          <ul className="report__list">
+            {tax.assets.map((a, i) => (
+              <li key={i}>
+                {a.description}: {money(a.value)}
+              </li>
+            ))}
+          </ul>
+          <p className="muted small">Investimentos pelo valor aplicado (custo), como pede a declaração.</p>
+        </>
+      )}
+      {tax.debts.length > 0 && (
+        <>
+          <h3>Dívidas e ônus em 31/12</h3>
+          <ul className="report__list">
+            {tax.debts.map((d, i) => (
+              <li key={i}>
+                {d.description}: {money(d.value)}
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+    </section>
+  );
+}
 
 /** Resumo anual pensado para impressão ("Salvar como PDF" no navegador). */
 export default function AnnualReport() {
@@ -141,6 +215,8 @@ export default function AnnualReport() {
           </ul>
         </section>
       )}
+
+      {d.tax && <TaxSection tax={d.tax} />}
 
       <p className="muted small">
         Documento informativo gerado pelo Meu Orçamento a partir dos lançamentos registrados. Não substitui informes de rendimentos nem

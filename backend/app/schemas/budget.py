@@ -50,12 +50,17 @@ class _MonthOut(_Out):
 # ---------------------------------------------------------------- categorias
 
 
+# v1.4: tipo de dedução no Imposto de Renda.
+Deductible = Literal["saude", "educacao", "previdencia", "pensao"]
+
+
 class CategoryIn(BaseModel):
     name: CategoryName
     is_essential: bool = False
     color: Color | None = None
     monthly_limit: Money | None = None
     carry_over: bool = False
+    deductible: Deductible | None = None
 
 
 class CategoryPatch(BaseModel):
@@ -64,6 +69,7 @@ class CategoryPatch(BaseModel):
     color: Color | None = None
     monthly_limit: Money | None = None
     carry_over: bool | None = None
+    deductible: Deductible | None = None
 
 
 class CategoryOut(_Out):
@@ -74,6 +80,7 @@ class CategoryOut(_Out):
     monthly_limit: Decimal | None
     carry_over: bool = False
     carry_since: date | None = None
+    deductible: str | None = None
 
 
 # ---------------------------------------------------------------- rendas
@@ -90,6 +97,7 @@ class IncomeIn(BaseModel):
     until_month: MonthStr | None = None
     account_id: uuid.UUID | None = None
     client_ref: ClientRef | None = None
+    mei: bool = False
 
 
 class IncomePatch(BaseModel):
@@ -99,6 +107,7 @@ class IncomePatch(BaseModel):
     day: DueDay | None = None
     notes: Notes | None = None
     account_id: uuid.UUID | None = None
+    mei: bool | None = None
 
 
 class IncomeOut(_MonthOut):
@@ -110,6 +119,7 @@ class IncomeOut(_MonthOut):
     notes: str | None
     account_id: uuid.UUID | None
     recurring_id: uuid.UUID | None
+    mei: bool = False
 
 
 # ---------------------------------------------------------------- contas
@@ -146,6 +156,10 @@ class ExpenseIn(BaseModel):
     # v1.3: compra dividida em categorias; a soma das partes tem de ser igual ao valor.
     parts: Annotated[list[SplitPart], Field(min_length=2, max_length=6)] | None = None
     client_ref: ClientRef | None = None
+    # v1.4: projeto/etiqueta pelo nome (cria se ainda não existir).
+    project_name: Annotated[str, StringConstraints(strip_whitespace=True, max_length=40)] | None = (
+        None
+    )
 
 
 class ExpensePatch(BaseModel):
@@ -157,6 +171,10 @@ class ExpensePatch(BaseModel):
     notes: Notes | None = None
     payment_method: PaymentMethod | None = None
     account_id: uuid.UUID | None = None
+    # v1.4: "" tira o projeto; um nome usa (ou cria) o projeto.
+    project_name: Annotated[str, StringConstraints(strip_whitespace=True, max_length=40)] | None = (
+        None
+    )
 
 
 class ExpenseOut(_MonthOut):
@@ -181,6 +199,7 @@ class ExpenseOut(_MonthOut):
     installment_total: int | None
     recurring_id: uuid.UUID | None
     split_group_id: uuid.UUID | None = None
+    project_id: uuid.UUID | None = None
 
 
 DeleteScope = Literal["one", "following"]
@@ -579,7 +598,8 @@ class PromoteIn(BaseModel):
 
 
 AccountName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=60)]
-AccountKind = Literal["checking", "savings", "wallet", "other"]
+# v1.4: "benefit" = vale-refeição/alimentação.
+AccountKind = Literal["checking", "savings", "wallet", "other", "benefit"]
 Balance = Annotated[Decimal, Field(max_digits=14, decimal_places=2)]
 
 
@@ -588,6 +608,10 @@ class AccountIn(BaseModel):
     kind: AccountKind = "checking"
     initial_balance: Balance = Decimal("0")
     color: Color | None = None
+    # Vale (kind="benefit"): valor e dia da recarga e a categoria que ele paga.
+    benefit_amount: Money | None = None
+    benefit_day: DueDay | None = None
+    benefit_category_id: uuid.UUID | None = None
 
 
 class AccountPatch(BaseModel):
@@ -596,6 +620,9 @@ class AccountPatch(BaseModel):
     initial_balance: Balance | None = None
     color: Color | None = None
     archived: bool | None = None
+    benefit_amount: Money | None = None
+    benefit_day: DueDay | None = None
+    benefit_category_id: uuid.UUID | None = None
 
 
 class AccountOut(_Out):
@@ -605,6 +632,9 @@ class AccountOut(_Out):
     initial_balance: Decimal
     color: str | None
     archived: bool
+    benefit_category_id: uuid.UUID | None = None
+    benefit_amount: Decimal | None = None
+    benefit_day: int | None = None
 
 
 class AccountBalance(BaseModel):

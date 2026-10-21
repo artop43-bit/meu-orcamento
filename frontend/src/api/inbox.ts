@@ -60,6 +60,9 @@ export const inboxApi = {
   announce: (data: AnnouncementInput) => api.post<Announcement>("/admin/announcements", data),
 
   appearance: (data: { theme?: string; accent?: string }) => api.patch<{ theme: string | null; accent: string | null }>("/me/appearance", data),
+  financeSettings: (data: { pix_key?: string | null; pix_name?: string | null; pix_city?: string | null; mei?: boolean }) =>
+    api.patch<{ pix_key: string | null; pix_name: string | null; pix_city: string | null; mei: boolean }>("/me/finance-settings", data),
+  mei: () => api.get<{ year: number; total: string; limit: string; pct: number; count: number }>("/mei"),
   dashboard: (cards: { key: string; visible: boolean }[] | null) => api.put<{ dashboard: string | null }>("/me/dashboard", { cards }),
 
   resetPreview: () => api.get<{ counts: Record<ResetArea, number> }>("/account/reset"),

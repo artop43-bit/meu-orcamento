@@ -11,6 +11,16 @@ export type Category = {
   /** v1.3: a sobra do limite passa para o mês seguinte. */
   carry_over?: boolean;
   carry_since?: string | null;
+  /** v1.4: dedutível no Imposto de Renda. */
+  deductible?: Deductible | null;
+};
+
+export type Deductible = "saude" | "educacao" | "previdencia" | "pensao";
+export const DEDUCTIBLE_LABEL: Record<Deductible, string> = {
+  saude: "Saúde",
+  educacao: "Educação",
+  previdencia: "Previdência privada (PGBL)",
+  pensao: "Pensão alimentícia",
 };
 
 export type IncomeType = "fixed" | "variable";
@@ -47,6 +57,8 @@ export type Income = {
   notes: string | null;
   account_id: string | null;
   recurring_id: string | null;
+  /** v1.4: faturamento do MEI. */
+  mei?: boolean;
 };
 
 export type Expense = {
@@ -72,6 +84,8 @@ export type Expense = {
   recurring_id: string | null;
   /** v1.3: parte de uma compra dividida em categorias. */
   split_group_id?: string | null;
+  /** v1.4: projeto/etiqueta. */
+  project_id?: string | null;
 };
 
 export type CategoryTotal = {
@@ -205,6 +219,8 @@ export type ExpenseInput = {
   parts?: { category_id: string; amount: string }[] | null;
   /** v1.3: identificador do aparelho (lançamento sem internet, sem duplicar no reenvio). */
   client_ref?: string;
+  /** v1.4: projeto/etiqueta pelo nome ("" tira). */
+  project_name?: string | null;
 };
 
 /** Leitura da foto de um comprovante (v1.3). */
@@ -225,6 +241,7 @@ export type IncomeInput = {
   until_month?: string | null;
   account_id?: string | null;
   client_ref?: string;
+  mei?: boolean;
 };
 
 export type Planned = {

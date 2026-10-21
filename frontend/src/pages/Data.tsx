@@ -492,7 +492,12 @@ function ImportWizard() {
     if (!preview || !file || !analysis) return;
     const chosen = preview.transactions
       .filter((t) => selected.has(t.ref))
-      .map(({ duplicate: _d, card_payment: _c, ...t }) => ({ ...t, category_id: t.kind === "expense" ? categoryOf[t.ref] || null : null }));
+      .map(({ duplicate: _d, card_payment: _c, match, ...t }) => ({
+        ...t,
+        category_id: t.kind === "expense" ? categoryOf[t.ref] || null : null,
+        // v1.4: linha que confere um lançamento feito à mão: marca como conferido, sem duplicar.
+        match_id: match?.id ?? null,
+      }));
     const [type, id] = target.split(":");
     const result = await run(() =>
       dataApi.commit({
@@ -509,7 +514,7 @@ function ImportWizard() {
     await queryClient.invalidateQueries({ queryKey: ["import"] });
     announce("Importação concluída");
     setDone({
-      text: `${result.created} lançamento(s) importado(s)${result.skipped ? `; ${result.skipped} já existiam e foram ignorados` : ""}.`,
+      text: `${result.created} lançamento(s) importado(s)${result.matched ? `; ${result.matched} já lançado(s) à mão, marcado(s) como conferido(s)` : ""}${result.skipped ? `; ${result.skipped} já existiam e foram ignorados` : ""}.`,
       batchId: result.batch_id,
     });
     setStep(3);
@@ -527,6 +532,7 @@ function ImportWizard() {
   const items = preview?.transactions ?? [];
   const chosen = items.filter((t) => selected.has(t.ref));
   const duplicates = items.filter((t) => t.duplicate).length;
+  const matches = items.filter((t) => t.match).length;
   const toggle = (ref: string) =>
     setSelected((s) => {
       const next = new Set(s);
@@ -634,6 +640,7 @@ function ImportWizard() {
             <p className="import-summary" style={{ margin: 0 }}>
               <strong>{items.length} lançamento(s)</strong>
               {duplicates > 0 && ` · ${duplicates} já importado(s), desmarcado(s)`}
+              {matches > 0 && ` · ${matches} já lançado(s) à mão: serão marcados como conferidos, sem duplicar`}
               {preview.period && ` · período ${shortDate(preview.period.start)} a ${shortDate(preview.period.end)}`}
               {" · "}
               {chosen.length} selecionado(s)
@@ -684,6 +691,14 @@ function ImportWizard() {
                       <td className="wrap">
                         {t.description} {t.duplicate && <Badge>já importado</Badge>}
                         {t.card_payment && <Badge>pagamento de fatura</Badge>}
+                        {t.match && (
+                          <span className="import-match">
+                            <Badge tone="accent">já lançado</Badge>{" "}
+                            <span className="muted small">
+                              {t.match.description} · {shortDate(t.match.date)}
+                            </span>
+                          </span>
+                        )}
                       </td>
                       <td>
                         {t.kind === "expense" ? (
@@ -974,7 +989,10 @@ function ExportPanel() {
           <div className="export-card">
             <FileText size={20} aria-hidden />
             <strong>Resumo anual</strong>
-            <p className="muted small">Receitas, despesas por categoria, mês a mês e patrimônio. Útil na conferência do Imposto de Renda; não é documento fiscal.</p>
+            <p className="muted small">
+              Receitas, despesas por categoria, mês a mês e uma parte para o Imposto de Renda: pagamentos dedutíveis, rendimentos, bens e dívidas em
+              31/12. Não é documento fiscal.
+            </p>
             <label>
               Ano
               <select value={year} onChange={(e) => setYear(e.target.value)}>

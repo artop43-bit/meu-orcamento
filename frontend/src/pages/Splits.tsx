@@ -1,11 +1,12 @@
 import { useState, type FormEvent } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowDownLeft, ArrowUpRight, Handshake, Plus, Trash2, Users } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, Handshake, Plus, QrCode, Trash2, Users } from "lucide-react";
 
 import { errorMessage } from "../api/client";
 import { SPLITS_KEY, sharingApi, type SplitBoard } from "../api/sharing";
 import { MoneyInput, requireMoney } from "../components/budget";
 import { EmptyGuide } from "../components/help";
+import { PixCharge } from "../components/PixCharge";
 import { Alert, Button, Kpi, LoadingRegion, PageHeader, Sheet, Skeleton } from "../components/ui";
 import { announce } from "../lib/announce";
 import { money, shortDate } from "../lib/format";
@@ -138,7 +139,7 @@ function SettleForm({ person, balance, onDone }: { person: string; balance: numb
   );
 }
 
-function PersonCard({ entry, onSettle }: { entry: SplitBoard["people"][number]; onSettle: () => void }) {
+function PersonCard({ entry, onSettle, onCharge }: { entry: SplitBoard["people"][number]; onSettle: () => void; onCharge: () => void }) {
   const queryClient = useQueryClient();
   const balance = Number(entry.balance);
   async function remove(id: string) {
@@ -169,7 +170,12 @@ function PersonCard({ entry, onSettle }: { entry: SplitBoard["people"][number]; 
           </li>
         ))}
       </ul>
-      <div>
+      <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>
+        {balance > 0 && (
+          <Button type="button" onClick={onCharge}>
+            <QrCode size={16} aria-hidden /> Cobrar via Pix
+          </Button>
+        )}
         <Button type="button" variant="secondary" onClick={onSettle}>
           <Handshake size={16} /> Acertar contas
         </Button>
@@ -183,6 +189,7 @@ export default function SplitsPage() {
   const board = useQuery({ queryKey: SPLITS_KEY, queryFn: sharingApi.board });
   const [adding, setAdding] = useState(false);
   const [settling, setSettling] = useState<{ person: string; balance: number } | null>(null);
+  const [charging, setCharging] = useState<{ person: string; balance: number } | null>(null);
   const data = board.data;
   return (
     <>
@@ -219,7 +226,12 @@ export default function SplitsPage() {
       {data && data.people.length > 0 && (
         <div className="grid-cards">
           {data.people.map((entry) => (
-            <PersonCard key={entry.person} entry={entry} onSettle={() => setSettling({ person: entry.person, balance: Number(entry.balance) })} />
+            <PersonCard
+              key={entry.person}
+              entry={entry}
+              onSettle={() => setSettling({ person: entry.person, balance: Number(entry.balance) })}
+              onCharge={() => setCharging({ person: entry.person, balance: Number(entry.balance) })}
+            />
           ))}
         </div>
       )}
@@ -243,6 +255,9 @@ export default function SplitsPage() {
       )}
       <Sheet open={adding} title="Nova anotação" onClose={() => setAdding(false)}>
         {adding && <ManualForm names={data?.names ?? []} onDone={() => setAdding(false)} />}
+      </Sheet>
+      <Sheet open={charging !== null} title={`Cobrar ${charging?.person ?? ""} via Pix`} onClose={() => setCharging(null)}>
+        {charging && <PixCharge person={charging.person} amount={charging.balance} />}
       </Sheet>
       <Sheet open={settling !== null} title={`Acertar contas${settling ? ` com ${settling.person}` : ""}`} onClose={() => setSettling(null)}>
         {settling && <SettleForm person={settling.person} balance={settling.balance} onDone={() => setSettling(null)} />}

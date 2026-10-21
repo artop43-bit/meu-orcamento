@@ -22,7 +22,7 @@ import re
 import sys
 import time
 import traceback
-from datetime import date
+from datetime import date, timedelta
 
 import pyotp
 from playwright.sync_api import Page, expect, sync_playwright
@@ -1978,6 +1978,147 @@ def v13_planning(page: Page):
     expect(page.locator(".error-card", has_text="teste e2e").get_by_role("button")).to_have_count(0)
 
 
+@step("v1.4: Pix nas Divisões, vale-refeição, MEI, projetos e provisões")
+def v14_money(page: Page):
+    # Chave Pix em Preferências e cobrança em Divisões (Caio ainda deve).
+    page.goto(f"{BASE}/ajustes/preferencias")
+    idle(page)
+    pix = page.locator("#pix")
+    pix.get_by_label(re.compile("^Chave Pix")).fill("123.456.789-09")
+    pix.get_by_label("Nome no Pix").fill("Carla Souza")
+    pix.get_by_label("Cidade").fill("Goiânia")
+    pix.get_by_role("button", name="Salvar chave Pix").click()
+    expect(pix.get_by_label(re.compile("^Chave Pix"))).to_have_value("12345678909")
+    page.goto(f"{BASE}/divisoes")
+    idle(page)
+    page.locator(".split-person", has_text="Caio").get_by_role("button", name="Cobrar via Pix").click()
+    d = dialog(page)
+    code = d.get_by_label("Pix copia e cola").input_value()
+    assert code.startswith("000201") and "12345678909" in code and "54071400.00" in code, code
+    expect(d.get_by_role("img", name=re.compile("QR Code Pix"))).to_be_visible()
+    page.screenshot(path=OUT / "v14-pix.png")
+    page.keyboard.press("Escape")
+
+    # Vale-refeição: conta com recarga mensal que só paga Alimentação.
+    page.goto(f"{BASE}/contas")
+    idle(page)
+    page.get_by_role("button", name=re.compile("Nova conta")).first.click()
+    d = dialog(page)
+    d.get_by_label("Nome").fill("VR Alelo")
+    d.get_by_label("Tipo").select_option(label="Vale-refeição ou alimentação")
+    d.get_by_label(re.compile("^Recarga por mês")).fill(money(800))
+    d.get_by_label("Dia da recarga").fill("5")
+    d.get_by_role("button", name="Adicionar conta").click()
+    expect(d).to_have_count(0, timeout=8000)
+    idle(page)
+    expect(page.get_by_text(re.compile(r"recarga de R\$\s800,00 no dia 5"))).to_be_visible()
+
+    # MEI: ligar em Preferências mostra o faturamento e o campo na receita.
+    page.goto(f"{BASE}/ajustes/preferencias")
+    idle(page)
+    page.get_by_label("Sou MEI (microempreendedor individual)").check()
+    expect(page.locator(".mei-panel")).to_contain_text("Faturamento de")
+    open_month(page, CURRENT)
+    page.get_by_role("button", name="Nova receita", exact=True).click()
+    d = dialog(page)
+    d.get_by_label("Descrição").fill("Serviço de design")
+    d.get_by_label("Valor", exact=True).fill(money(1500))
+    d.get_by_label(re.compile("^Faturamento do MEI")).check()
+    d.get_by_role("button", name="Adicionar receita").click()
+    expect(d).to_have_count(0, timeout=8000)
+    idle(page, 300)
+    assert float(api(page, "/mei")["total"]) >= 1500
+
+    # Projeto: uma despesa no projeto "Reforma" e o total na Busca.
+    page.get_by_role("button", name="Nova despesa", exact=True).click()
+    d = dialog(page)
+    d.get_by_label("Descrição").fill("Tinta para a sala")
+    d.get_by_role("textbox", name=re.compile(r"^Valor")).fill(money(320))
+    d.locator("summary", has_text="Observação e projeto").click()
+    d.get_by_label(re.compile("^Projeto")).fill("Reforma")
+    d.get_by_role("button", name="Adicionar despesa").click()
+    expect(d).to_have_count(0, timeout=8000)
+    idle(page, 300)
+    [project] = [p for p in api(page, "/projects") if p["name"] == "Reforma"]
+    page.goto(f"{BASE}/busca?project_id={project['id']}")
+    idle(page)
+    expect(page.locator(".project-summary")).to_contain_text("Reforma")
+    expect(page.locator(".project-summary")).to_contain_text("R$ 320,00")
+
+    # Provisões: um gasto grande previsto daqui a meses mostra quanto guardar por mês.
+    far = (TODAY.replace(day=1) + timedelta(days=130)).replace(day=10)
+    page.goto(f"{BASE}/calendario/{far:%Y-%m}")
+    idle(page)
+    page.get_by_role("button", name="Agendar despesa prevista").first.click()
+    d = dialog(page)
+    d.get_by_label("Descrição").fill("IPVA do carro")
+    d.get_by_role("textbox", name=re.compile(r"^Valor")).fill(money(1500))
+    d.get_by_placeholder("dd/mm/aaaa").first.fill(far.strftime("%d/%m/%Y"))
+    expect(d.locator(".summary-box")).to_contain_text("guarde")
+    d.get_by_role("button", name="Agendar despesa").click()
+    expect(d).to_have_count(0, timeout=8000)
+    page.goto(f"{BASE}/calendario")
+    idle(page)
+    expect(page.locator(".cal-summary")).to_contain_text("Guardar por mês")
+
+    # Agenda do celular: cria o link secreto.
+    page.get_by_role("button", name="Vencimentos na agenda do celular").click()
+    d = dialog(page)
+    d.get_by_role("button", name="Criar link da agenda").click()
+    expect(d.get_by_label("Link da agenda")).to_have_value(re.compile(r"/api/calendar-feed/.+\.ics$"))
+    feed = page.request.get(BASE + "/api/" + d.get_by_label("Link da agenda").input_value().split("/api/", 1)[1])
+    assert feed.ok and "BEGIN:VCALENDAR" in feed.text()
+    page.keyboard.press("Escape")
+
+
+@step("v1.4: conciliação, IR, tarifas, inflação pessoal, 13º e meta de alocação")
+def v14_insights(page: Page):
+    # Conciliação: o Uber lançado à mão casa com a linha do extrato e não entra de novo.
+    month = f"{TODAY:%Y-%m}"
+    day = TODAY.replace(day=2)
+    page.request.post(
+        f"{BASE}/api/months/{month}/expenses",
+        headers={"X-Requested-With": "fetch"},
+        data={"description": "Uber manual", "amount": "37.90", "due_date": day.isoformat(), "paid": True},
+    )
+    csv = f"Data;Descrição;Valor\n{day:%d/%m/%Y};UBER *TRIP;-37,90\n".encode()
+    analysis = page.request.post(f"{BASE}/api/import/analyze", headers={"X-Requested-With": "fetch"}, multipart={"file": {"name": "extrato.csv", "mimeType": "text/csv", "buffer": csv}}).json()
+    preview = page.request.post(
+        f"{BASE}/api/import/preview",
+        headers={"X-Requested-With": "fetch"},
+        multipart={"file": {"name": "extrato.csv", "mimeType": "text/csv", "buffer": csv}, "mapping": json.dumps(analysis["mapping"])},
+    ).json()
+    [line] = preview["transactions"]
+    assert line["match"] and line["match"]["description"] == "Uber manual", line
+
+    # Relatório do IR no resumo anual.
+    page.goto(f"{BASE}/relatorio/ano/{TODAY.year}")
+    idle(page)
+    expect(page.get_by_role("heading", name="Para o Imposto de Renda")).to_be_visible()
+
+    # Insights: tarifas e juros, inflação pessoal e a calculadora do 13º.
+    page.goto(f"{BASE}/analises?secao=categorias")
+    idle(page)
+    expect(page.get_by_role("heading", name=re.compile("^Tarifas e juros"))).to_be_visible()
+    page.goto(f"{BASE}/analises?secao=calculadoras")
+    idle(page)
+    page.get_by_role("button", name="13º e restituição").click()
+    expect(page.locator(".calc-result")).to_contain_text("13º bruto estimado")
+
+    # Meta de alocação na carteira.
+    page.goto(f"{BASE}/investimentos")
+    idle(page)
+    if page.get_by_role("button", name="Definir uma meta de alocação").count():
+        page.get_by_role("button", name="Definir uma meta de alocação").click()
+        inputs = page.locator(".allocation-target__row input")
+        n = inputs.count()
+        for i in range(n):
+            inputs.nth(i).fill("100" if i == 0 else "0")
+        page.get_by_role("button", name="Salvar meta").click()
+        expect(page.locator(".allocation-target")).to_contain_text("Próximo aporte")
+        page.screenshot(path=OUT / "v14-alocacao.png", full_page=True)
+
+
 @step("Segurança: ativar 2FA, sair, entrar com código, desativar")
 def two_factor(page: Page):
     page.goto(f"{BASE}/seguranca")
@@ -2127,6 +2268,8 @@ def main():
         tasks_and_replies(page)
         v13_entries(page)
         v13_planning(page)
+        v14_money(page)
+        v14_insights(page)
         two_factor(page)
         banner_never(page)
         STATE["state"] = ctx.storage_state()

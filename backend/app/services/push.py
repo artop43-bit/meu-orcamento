@@ -23,6 +23,7 @@ KINDS = {
     "messages": "push_messages",
     "alerts": "push_alerts",
     "weekly": "push_weekly",
+    "daily": "push_daily",
 }
 TIMEOUT = 5
 
