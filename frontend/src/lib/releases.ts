@@ -11,6 +11,21 @@ export type Release = {
 
 export const RELEASES: Release[] = [
   {
+    version: "1.4.2",
+    date: "21/10/2026 às 21:00",
+    title: "iPhone instalado e volta das sub-telas",
+    sections: [
+      {
+        title: "Correções",
+        items: [
+          "Com o app instalado no iPhone, a tela não fica mais cortada: a barra de baixo fica acima da linha de home e o topo abaixo da ilha.",
+          "Deslizar para voltar de uma sub-tela (como Ajustes › Perfil) não deixa mais a tela travada.",
+          "Se a tela ainda parecer cortada, remova o app da tela de início e instale de novo.",
+        ],
+      },
+    ],
+  },
+  {
     version: "1.4.1",
     date: "21/10/2026 às 18:42",
     title: "Celular mais fluido",

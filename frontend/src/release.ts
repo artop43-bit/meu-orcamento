@@ -3,14 +3,14 @@
  * do changelog (pasta changelog/), que tem a mesma versão, data e hora.
  */
 export const RELEASE = {
-  version: "1.4.1",
+  version: "1.4.2",
   // Data e hora (Brasília) em que o update foi publicado.
-  releasedAt: "2026-10-21T18:42:00-03:00",
+  releasedAt: "2026-10-21T21:00:00-03:00",
 };
 
 /** Mostrado uma vez em "Novidades" depois do update (curto: o detalhe fica no changelog). */
 export const RELEASE_NOTES: { title: string; text: string }[] = [
-  { title: "Celular mais fluido.", text: "Deslize para trocar as abas de baixo, sem tela preta; os submenus ficam no toque." },
+  { title: "iPhone instalado.", text: "A tela respeita a ilha e a linha de home; se ainda parecer cortada, instale o app de novo." },
 ];
 
 export function releaseLabel(): string {
