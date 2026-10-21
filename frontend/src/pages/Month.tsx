@@ -821,6 +821,7 @@ function BreakdownCard({ data, categories }: { data: MonthData; categories: Cate
                 />
                 <span className={`small ${c.limit_pct >= 100 ? "tone--error" : c.limit_pct >= 80 ? "tone--warn" : "muted"}`}>
                   {percent(c.limit_pct)} do limite de {money(c.limit)}
+                  {c.limit_carried && ` (inclui ${money(c.limit_carried)} de sobra)`}
                 </span>
               </>
             ) : (

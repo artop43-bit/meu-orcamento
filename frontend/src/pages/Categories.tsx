@@ -15,9 +15,11 @@ function CategoryForm({ category, onDone }: { category?: Category; onDone: () =>
   const [essential, setEssential] = useState(category?.is_essential ?? false);
   const [color, setColor] = useState(category?.color ?? "#4e79a7");
   const [limit, setLimit] = useState(category?.monthly_limit ? moneyInput(category.monthly_limit) : "");
+  const [carry, setCarry] = useState(category?.carry_over ?? false);
   const [error, setError] = useState("");
   const save = useBudgetMutation(async () => {
-    const data = { name, is_essential: essential, color, monthly_limit: limit.trim() ? requireMoney(limit) : null };
+    const hasLimit = Boolean(limit.trim());
+    const data = { name, is_essential: essential, color, monthly_limit: hasLimit ? requireMoney(limit) : null, carry_over: hasLimit && carry };
     if (category) await budgetApi.updateCategory(category.id, data);
     else await budgetApi.createCategory(data);
   });
@@ -51,6 +53,18 @@ function CategoryForm({ category, onDone }: { category?: Category; onDone: () =>
         </span>
         <small className="muted">Alertas em 80% e ao exceder o limite.</small>
       </label>
+      {limit.trim() && (
+        <label className="check">
+          <input type="checkbox" checked={carry} onChange={(e) => setCarry(e.target.checked)} />
+          <span>
+            Passar a sobra do limite para o mês seguinte{" "}
+            <Tip>
+              O que não for gasto soma ao limite do mês seguinte. Ex.: limite de R$ 300 com R$ 80 gastos → o próximo mês começa com R$ 520.
+              Estourar o limite não tira do mês seguinte. Começa a contar no mês atual.
+            </Tip>
+          </span>
+        </label>
+      )}
       <FormActions loading={save.isPending} onCancel={onDone} />
     </form>
   );
@@ -76,6 +90,7 @@ function CategoryRow({ category }: { category: Category }) {
         <span className="item__meta">
           {category.is_essential ? "Essencial" : "Não essencial"}
           {category.monthly_limit && ` · limite de ${money(category.monthly_limit)} por mês`}
+          {category.monthly_limit && category.carry_over && " · sobra passa para o mês seguinte"}
         </span>
       </button>
       <button

@@ -44,6 +44,9 @@ class Category(Base):
     color: Mapped[str | None] = mapped_column(String(7))
     # Quanto o usuário quer gastar no máximo por mês nesta categoria (opcional).
     monthly_limit: Mapped[Decimal | None] = mapped_column(Money)
+    # v1.3: a sobra do limite passa para o mês seguinte (a partir de carry_since).
+    carry_over: Mapped[bool] = mapped_column(default=False, server_default="0")
+    carry_since: Mapped[date | None] = mapped_column(Date)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
 
 

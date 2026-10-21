@@ -77,8 +77,20 @@ def _ensure_unique_category_name(
         raise AppError(409, "category_exists", "Já existe uma categoria com esse nome.")
 
 
+def _carry_changes(category: Category | None, user: User, changes: dict[str, Any]) -> None:
+    """Ligar a sobra marca o mês atual como início do acúmulo; desligar zera."""
+    if "carry_over" not in changes or changes["carry_over"] is None:
+        changes.pop("carry_over", None)
+        return
+    if changes["carry_over"] and not (category and category.carry_over):
+        changes["carry_since"] = current_month(user.month_start_day)
+    elif not changes["carry_over"]:
+        changes["carry_since"] = None
+
+
 def create_category(db: Session, user: User, data: dict[str, Any]) -> Category:
     _ensure_unique_category_name(db, user, data["name"])
+    _carry_changes(None, user, data)
     category = Category(user_id=user.id, **data)
     db.add(category)
     db.commit()
@@ -91,6 +103,7 @@ def update_category(
     category = _owned(db, Category, category_id, user)
     if changes.get("name"):
         _ensure_unique_category_name(db, user, changes["name"], ignore_id=category.id)
+    _carry_changes(category, user, changes)
     _apply(category, changes)
     db.commit()
     return category
@@ -832,6 +845,9 @@ def get_month(db: Session, user: User, month: date) -> MonthData:
     for expense in expenses:
         by_category[expense.category_id] += expense.amount
 
+    from app.services import limits
+
+    month_limits = limits.for_month(db, user, month, categories)
     essential_total = ZERO
     category_totals = []
     for category_id, total in by_category.items():
@@ -839,18 +855,16 @@ def get_month(db: Session, user: User, month: date) -> MonthData:
         essential = bool(category and category.is_essential)
         if essential:
             essential_total += total
+        limit = month_limits.get(category_id) if category_id else None
         category_totals.append(
             {
                 "category_id": category_id,
                 "name": category.name if category else "Sem categoria",
                 "is_essential": essential,
                 "total": total,
-                "limit": category.monthly_limit if category else None,
-                "limit_pct": (
-                    _pct(total, category.monthly_limit)
-                    if category and category.monthly_limit
-                    else None
-                ),
+                "limit": limit.total if limit else None,
+                "limit_pct": _pct(total, limit.total) if limit else None,
+                "limit_carried": limit.carried if limit and limit.carried else None,
             }
         )
     category_totals.sort(key=lambda c: c["total"], reverse=True)

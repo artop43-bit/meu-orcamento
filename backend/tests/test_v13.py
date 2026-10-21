@@ -139,3 +139,75 @@ def test_read_receipt_without_ocr_explains(
 
     out = user.post("/api/receipts/read", files={"image": ("cupom.png", png(), "image/png")})
     assert out.status_code == 503 and "não está disponível" in out.json()["message"]
+
+
+# ---------------------------------------------------------------- sobra do limite (v1.3 B)
+
+
+def test_unused_limit_carries_to_next_month_when_enabled(
+    user: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    lazer = category_id(user, "Lazer")
+    out = user.patch(
+        f"/api/categories/{lazer}", json={"monthly_limit": "300.00", "carry_over": True}
+    )
+    assert out.status_code == 200 and out.json()["carry_over"] is True
+    assert out.json()["carry_since"] == "2030-01-01"
+    add_expense(user, description="Cinema", amount="80.00", category_id=lazer)
+    # Fevereiro começa com 300 + 220 que sobraram de janeiro.
+    add_expense(user, month="2030-02", description="Show", amount="100.00", category_id=lazer)
+    [row] = [
+        c for c in month(user, "2030-02")["summary"]["by_category"] if c["category_id"] == lazer
+    ]
+    assert (row["limit"], row["limit_carried"]) == ("520.00", "220.00")
+    # Estourar não tira do mês seguinte: março volta a ter só o acumulado positivo.
+    add_expense(user, month="2030-02", description="Viagem", amount="600.00", category_id=lazer)
+    add_expense(user, month="2030-03", description="Bar", amount="10.00", category_id=lazer)
+    [row] = [
+        c for c in month(user, "2030-03")["summary"]["by_category"] if c["category_id"] == lazer
+    ]
+    assert (row["limit"], row["limit_carried"]) == ("300.00", None)
+    # Desligar volta ao limite simples.
+    user.patch(f"/api/categories/{lazer}", json={"carry_over": False})
+    [row] = [
+        c for c in month(user, "2030-02")["summary"]["by_category"] if c["category_id"] == lazer
+    ]
+    assert row["limit"] == "300.00"
+
+
+def test_limit_without_carry_over_stays_the_same(user: TestClient) -> None:
+    lazer = category_id(user, "Lazer")
+    user.patch(f"/api/categories/{lazer}", json={"monthly_limit": "300.00"})
+    add_expense(user, description="Cinema", amount="80.00", category_id=lazer)
+    add_expense(user, month="2030-02", description="Show", amount="100.00", category_id=lazer)
+    [row] = [
+        c for c in month(user, "2030-02")["summary"]["by_category"] if c["category_id"] == lazer
+    ]
+    assert (row["limit"], row["limit_carried"]) == ("300.00", None)
+
+
+# ---------------------------------------------------------------- inflação (v1.3 B)
+
+
+def test_inflation_correction_uses_months_after_the_start(
+    user: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.services import indicators
+
+    series = {"2024-01": 0.42, "2024-02": 0.83, "2024-03": 0.16, "2024-04": 0.38}
+    monkeypatch.setattr(indicators, "ipca_monthly", lambda: series)
+    out = user.get("/api/indicators/inflation?amount=100&start=2024-01&end=2030-01")
+    assert out.status_code == 200, out.text
+    data = out.json()
+    # Fevereiro a abril: 1,0083 × 1,0016 × 1,0038 = 1,01375...
+    assert data["corrected"] == 101.38 and data["months"] == 3 and data["end"] == "2024-04"
+    bad = user.get("/api/indicators/inflation?amount=100&start=2024-04&end=2024-02")
+    assert bad.status_code == 400
+
+
+def test_inflation_without_bcb_explains(user: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.services import indicators
+
+    monkeypatch.setattr(indicators, "ipca_monthly", lambda: {})
+    out = user.get("/api/indicators/inflation?amount=100&start=2020-01&end=2024-01")
+    assert out.status_code == 503 and "Banco Central" in out.json()["message"]

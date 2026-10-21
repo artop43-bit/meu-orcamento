@@ -307,10 +307,14 @@ def pace(db: Session, user: User, month: date, today: date | None = None) -> lis
     ):
         past[e.category_id] += e.amount
 
+    from app.services import limits
+
+    month_limits = limits.for_month(db, user, month, categories)
     rows = []
     for category_id in set(spent) | {c for c, cat in categories.items() if cat.monthly_limit}:
         category = categories.get(category_id) if category_id else None
-        limit = category.monthly_limit if category else None
+        found = month_limits.get(category_id) if category_id else None
+        limit = found.total if found else None
         reference = limit or (past[category_id] / 3).quantize(Decimal("0.01"))
         value = spent[category_id]
         if reference <= 0:

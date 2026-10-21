@@ -2,7 +2,16 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tansta
 
 import { api } from "./client";
 
-export type Category = { id: string; name: string; is_essential: boolean; color: string | null; monthly_limit: string | null };
+export type Category = {
+  id: string;
+  name: string;
+  is_essential: boolean;
+  color: string | null;
+  monthly_limit: string | null;
+  /** v1.3: a sobra do limite passa para o mês seguinte. */
+  carry_over?: boolean;
+  carry_since?: string | null;
+};
 
 export type IncomeType = "fixed" | "variable";
 export type PaymentMethod = "pix" | "debit" | "credit" | "boleto" | "cash";
@@ -68,6 +77,8 @@ export type Expense = {
 export type CategoryTotal = {
   limit?: string | null;
   limit_pct?: number | null;
+  /** v1.3: parte do limite que veio da sobra dos meses anteriores. */
+  limit_carried?: string | null;
   category_id: string | null;
   name: string;
   is_essential: boolean;
