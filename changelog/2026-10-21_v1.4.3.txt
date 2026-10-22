@@ -1,0 +1,25 @@
+MEU ORÇAMENTO · UPDATE LOG
+Versão 1.4.3 · Telas mais rápidas
+Data: 21/10/2026 às 23:00 (horário de Brasília)
+
+Verificação de desempenho (antes desta versão)
+- [x] Servidor: as 40 chamadas usadas pelos menus respondem em até 35 ms com os dados reais; CPU e banco folgados
+- [x] Entrega do site: compressão (zstd), cache longo dos arquivos e HTTP/2 já estavam corretos
+- [x] Gargalos encontrados: cotações esperando a fonte externa (brapi), sinal fraco do celular sem limite de espera e a primeira visita a cada tela esperando o código ser baixado
+- [ ] Endereço provisório (sslip.io): 0,5 a 0,7 s para achar o servidor ao abrir o app; resolve com o domínio próprio (pendência)
+
+Cotações e Investimentos
+- [x] Cotações vencidas são mostradas na hora e atualizadas em segundo plano (só a primeira consulta, sem dado guardado, espera a fonte)
+- [x] Uma atualização por vez para cada dado, respeitando o limite gratuito da brapi
+- [x] O aviso "dado de HH:MM" só aparece quando a atualização realmente falhou
+
+Celular com sinal fraco
+- [x] Se o servidor passar de 5 s sem responder, a tela mostra os últimos dados guardados no aparelho em vez de ficar carregando
+- [x] Quando a resposta chega, a tela se atualiza sozinha (no máximo uma vez a cada 10 s)
+
+Abertura das telas
+- [x] O código de todas as telas é baixado logo depois de entrar, sem esperar o aparelho ficar ocioso
+
+Técnico
+- [x] Teste de backend: cotação vencida responde na hora e atualiza em segundo plano, uma atualização por vez
+- [x] Teste do service worker com o site compilado: com a API atrasada 8 s, a tela ficou pronta em 5,1 s e se atualizou ao chegar a resposta
