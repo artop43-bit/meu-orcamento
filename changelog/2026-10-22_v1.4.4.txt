@@ -1,6 +1,6 @@
 MEU ORÇAMENTO · UPDATE LOG
 Versão 1.4.4 · Manutenção e otimização
-Data: 22/10/2026 às 12:00 (horário de Brasília)
+Data: 22/10/2026 às 16:04 (horário de Brasília)
 
 Carregamento
 - [x] Bibliotecas (React, rotas, dados) num arquivo próprio: ficam guardadas no aparelho entre as versões; a cada atualização o celular baixa só o código do app (58 KB comprimidos, antes 128 KB)
