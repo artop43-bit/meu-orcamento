@@ -51,10 +51,6 @@ export function setCycleStart(day: number) {
   cycleStart = day >= 1 && day <= 28 ? day : 1;
 }
 
-export function getCycleStart(): number {
-  return cycleStart;
-}
-
 /** Mês do orçamento de hoje: com o mês começando no dia 5, o dia 2/11 ainda é "outubro". */
 export function thisMonth(): string {
   const now = new Date();

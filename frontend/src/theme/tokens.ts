@@ -162,4 +162,3 @@ export const ACCENTS = {
 } satisfies Record<string, AccentTheme>;
 
 export type AccentName = keyof typeof ACCENTS;
-export const ACCENT_NAMES = Object.keys(ACCENTS) as AccentName[];

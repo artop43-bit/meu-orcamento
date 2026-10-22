@@ -1,8 +1,7 @@
-import { useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 
-import type { Category, DeleteScope } from "../api/budget";
-import { errorMessage } from "../api/client";
-import { money, parseMoney } from "../lib/format";
+import type { Category } from "../api/budget";
+import { parseMoney } from "../lib/format";
 import { Button } from "./ui";
 
 export function Badge({ children, tone = "neutral" }: { children: ReactNode; tone?: "neutral" | "accent" | "warn" }) {
@@ -89,71 +88,6 @@ export function requireMoney(input: string): string {
   const parsed = parseMoney(input);
   if (!parsed || Number(parsed) <= 0) throw new Error("Informe um valor válido, maior que zero.");
   return parsed;
-}
-
-/**
- * Excluir com escolha de escopo quando o item se repete (parcelas ou fixas).
- */
-export function DeleteControl({
-  repeats,
-  repeatLabel,
-  onDelete,
-}: {
-  repeats: boolean;
-  repeatLabel: string;
-  onDelete: (scope: DeleteScope) => Promise<void>;
-}) {
-  const [asking, setAsking] = useState(false);
-  const [error, setError] = useState("");
-
-  async function run(scope: DeleteScope) {
-    setError("");
-    try {
-      await onDelete(scope);
-    } catch (err) {
-      setError(errorMessage(err));
-    }
-  }
-
-  if (!asking) {
-    return (
-      <button
-        type="button"
-        className="icon-btn"
-        title="Excluir"
-        aria-label="Excluir"
-        onClick={() => (repeats ? setAsking(true) : run("one"))}
-      >
-        ✕
-      </button>
-    );
-  }
-  return (
-    <div className="delete-choice">
-      {error && <span className="tone--error">{error}</span>}
-      <button type="button" className="link" onClick={() => run("one")}>
-        Só esta
-      </button>
-      <button type="button" className="link" onClick={() => run("following")}>
-        {repeatLabel}
-      </button>
-      <button type="button" className="link muted" onClick={() => setAsking(false)}>
-        Cancelar
-      </button>
-    </div>
-  );
-}
-
-export function SectionHeader({ title, total, action }: { title: string; total?: string; action?: ReactNode }) {
-  return (
-    <div className="section-header">
-      <h2>
-        {title}
-        {total !== undefined && <span className="muted section-header__total"> · {money(total)}</span>}
-      </h2>
-      {action}
-    </div>
-  );
 }
 
 export function FormActions({ loading, onCancel, label = "Salvar" }: { loading: boolean; onCancel: () => void; label?: string }) {

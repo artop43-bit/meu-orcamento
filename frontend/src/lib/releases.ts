@@ -11,6 +11,21 @@ export type Release = {
 
 export const RELEASES: Release[] = [
   {
+    version: "1.4.4",
+    date: "22/10/2026 às 12:00",
+    title: "Manutenção e otimização",
+    sections: [
+      {
+        title: "Por dentro",
+        items: [
+          "A cada atualização o celular baixa menos da metade do que baixava: as bibliotecas ficam guardadas no aparelho.",
+          "O banco de dados ganhou índices para continuar rápido conforme os lançamentos crescem.",
+          "Bibliotecas atualizadas e limpeza de código antigo.",
+        ],
+      },
+    ],
+  },
+  {
     version: "1.4.3",
     date: "21/10/2026 às 21:39",
     title: "Telas mais rápidas",

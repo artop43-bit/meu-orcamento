@@ -1252,17 +1252,6 @@ input.color {
   margin-right: 6px;
 }
 
-.ledger__cat {
-  display: flex;
-  align-items: center;
-  min-width: 0;
-  color: var(--muted);
-  font-size: 0.9rem;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
 .ledger__amount {
   text-align: right;
   font-weight: 650;
@@ -1314,9 +1303,7 @@ input.color {
   .ledger__row > .ledger__desc {
     grid-area: desc;
   }
-  .ledger__row > .ledger__cat {
-    display: none;
-  }
+
   .ledger__row > .ledger__status {
     grid-area: status;
     justify-self: end;
@@ -1370,12 +1357,6 @@ input.color {
   color: var(--muted);
   cursor: pointer;
   white-space: nowrap;
-}
-
-.tab--active {
-  background: var(--surface);
-  color: var(--fg);
-  box-shadow: var(--shadow-sm);
 }
 
 /* ---------------------------------------------------------- tabelas */
@@ -1452,13 +1433,11 @@ input.color {
   margin-right: 5px;
 }
 
-.swatch--income,
-.chart__bar--income {
+.swatch--income {
   background: var(--accent);
 }
 
-.swatch--expense,
-.chart__bar--expense {
+.swatch--expense {
   background: var(--expense);
 }
 
@@ -1475,60 +1454,6 @@ input.color {
     height: 280px;
     gap: 12px;
   }
-}
-
-.chart__col {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  text-decoration: none;
-  color: var(--muted);
-  min-width: 0;
-}
-
-.chart__bars {
-  flex: 1;
-  display: flex;
-  gap: 3px;
-  align-items: flex-end;
-}
-
-.chart__bar {
-  flex: 1;
-  border-radius: 4px 4px 0 0;
-  min-height: 2px;
-}
-
-.chart__label {
-  font-size: 0.68rem;
-  text-align: center;
-  margin-top: 6px;
-  white-space: nowrap;
-  overflow: hidden;
-}
-
-.line-chart {
-  margin: 0;
-}
-
-.line-chart svg {
-  width: 100%;
-  height: auto;
-  display: block;
-}
-
-.line-chart__zero {
-  stroke: var(--border-strong);
-  stroke-width: 1;
-}
-
-.line-chart__label {
-  fill: var(--muted);
-  font-size: 11px;
-}
-
-.line-chart .legend {
-  margin-top: 10px;
 }
 
 /* ---------------------------------------------------------- análises */
@@ -2338,95 +2263,6 @@ body:has(dialog[open]) {
   gap: 10px;
 }
 
-/* Barras (renda × gastos e categorias empilhadas). */
-.bars-chart {
-  margin: 0;
-}
-
-.bars-chart__plot {
-  display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: minmax(0, 1fr);
-  gap: 6px;
-  height: 220px;
-}
-
-@media (min-width: 1024px) {
-  .bars-chart__plot {
-    gap: 12px;
-    height: 260px;
-  }
-}
-
-.bars-chart__col {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-
-.bars-chart__bars {
-  flex: 1;
-  display: flex;
-  gap: 2px;
-  align-items: flex-end;
-  border-bottom: 1px solid var(--border);
-}
-
-.bars-chart__bar {
-  flex: 1;
-  border-radius: 4px 4px 0 0;
-  min-height: 2px;
-}
-
-.bars-chart__stack {
-  flex: 1;
-  display: flex;
-  flex-direction: column-reverse;
-  border-radius: 4px 4px 0 0;
-  overflow: hidden;
-  min-height: 2px;
-}
-
-.bars-chart__stack > span {
-  flex-basis: 0;
-  min-height: 1px;
-}
-
-.bars-chart__balance {
-  font-size: 0.64rem;
-  font-weight: 650;
-  text-align: center;
-  margin-top: 4px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: clip;
-}
-
-.bars-chart__label {
-  font-size: 0.68rem;
-  text-align: center;
-  color: var(--muted);
-  white-space: nowrap;
-  overflow: hidden;
-}
-
-.bars-chart .legend {
-  margin-top: 12px;
-}
-
-/* Tabela recolhida com os dados do gráfico. */
-.chart-data summary {
-  cursor: pointer;
-  color: var(--accent);
-  font-size: 0.88rem;
-  font-weight: 600;
-  width: fit-content;
-}
-
-.chart-data[open] summary {
-  margin-bottom: 8px;
-}
-
 /* Rosca. */
 .donut {
   margin: 0;
@@ -2599,14 +2435,6 @@ body:has(dialog[open]) {
 .empty-hint p {
   margin: 0;
   color: var(--muted);
-}
-
-/* Celular: o gráfico de renda × gastos mostra só os 6 meses mais recentes (12 colunas não cabem
-   com os valores embaixo). A tabela "Ver dados" continua com todos. */
-@media (max-width: 599px) {
-  .bars-chart--recent .bars-chart__col:nth-last-child(n + 7) {
-    display: none;
-  }
 }
 
 /* Versão do app no fim do menu. */
@@ -3057,8 +2885,7 @@ body:has(dialog[open]) {
   min-width: 0;
 }
 
-.control > legend,
-.control__label {
+.control > legend {
   padding: 0;
   font-size: 0.78rem;
   font-weight: 700;
@@ -4252,8 +4079,7 @@ button.quote:hover {
 }
 
 /* Modo privacidade: gráficos também ficam borrados (os valores em texto já viram "R$ ••••"). */
-:root.privacy .chart svg text,
-:root.privacy .chart__tooltip {
+:root.privacy .chart svg text {
   filter: blur(5px);
 }
 
@@ -4631,24 +4457,6 @@ kbd {
   margin-left: auto;
 }
 
-/* ---------------------------------------------------------------- sugestões recebidas */
-.feedback-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.feedback-list .is-new {
-  border-left: 4px solid var(--accent);
-}
-
-.feedback-list select {
-  width: auto;
-}
-
 .rule-form input {
   flex: 1 1 200px;
 }
@@ -4971,17 +4779,6 @@ kbd {
     width: 100%;
     min-width: 0;
   }
-}
-
-/* Atalhos: a descrição quebra linha; só a tecla fica numa linha. */
-.shortcuts-table td,
-.shortcuts-table th {
-  white-space: normal;
-}
-
-.shortcuts-table td:first-child {
-  width: 1%;
-  white-space: nowrap;
 }
 
 /* ================================================================ v0.7.5 */
@@ -6498,17 +6295,6 @@ textarea {
   max-width: 240px;
 }
 
-/* ================================================================ v0.9 */
-
-/* ---------------------------------------------------------------- caixa de mensagens */
-.inbox-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: 8px;
-}
-
 .inbox-item {
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -6524,21 +6310,6 @@ textarea {
   background: color-mix(in srgb, var(--warn) 6%, var(--surface));
 }
 
-.inbox-item__head {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 12px;
-  width: 100%;
-  padding: 14px 16px;
-  border: 0;
-  background: none;
-  color: inherit;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
 .inbox-item__icon {
   display: inline-grid;
   place-items: center;
@@ -6552,60 +6323,6 @@ textarea {
 .inbox-item.is-unread .inbox-item__icon {
   background: var(--accent-soft);
   color: var(--accent);
-}
-
-.inbox-item__main {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-
-.inbox-item__title {
-  overflow-wrap: anywhere;
-}
-
-.inbox-item.is-unread .inbox-item__title {
-  font-weight: 700;
-}
-
-.inbox-item__meta {
-  color: var(--muted);
-  font-size: 0.82rem;
-}
-
-.inbox-item__body {
-  display: grid;
-  gap: 12px;
-  padding: 0 16px 16px 64px;
-}
-
-.inbox-item__text {
-  margin: 0;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  line-height: 1.55;
-}
-
-.inbox-item__actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-@media (max-width: 599px) {
-  .inbox-item__head {
-    grid-template-columns: auto minmax(0, 1fr);
-  }
-
-  .inbox-item__head .badge {
-    grid-column: 2;
-    justify-self: start;
-  }
-
-  .inbox-item__body {
-    padding: 0 16px 16px;
-  }
 }
 
 .icon-btn--badge {
@@ -7157,10 +6874,6 @@ textarea {
   border-radius: 8px;
   background: var(--surface-2);
   font-size: 0.9rem;
-}
-
-.inbox-item__reply {
-  padding-top: 4px;
 }
 
 .segmented--4 {
@@ -7903,7 +7616,6 @@ textarea {
   gap: 6px;
 }
 
-.project-row__budget .money-input,
 .project-row__budget input {
   max-width: 130px;
 }

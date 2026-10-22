@@ -18,6 +18,8 @@ deploy/scripts/compose.sh up -d --build --remove-orphans
 
 echo "==> Limpando imagens antigas"
 docker image prune -f > /dev/null
+# Cache de montagem com mais de 7 dias (v1.4.4): sem isso ele cresce a cada deploy.
+docker builder prune -f --filter "until=168h" > /dev/null
 
 deploy/scripts/compose.sh ps
 echo "==> Deploy concluído: $(git log -1 --format='%h %s')"
