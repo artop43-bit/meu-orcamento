@@ -62,6 +62,8 @@ def offline(monkeypatch: pytest.MonkeyPatch) -> None:
     market.clear_cache()
     indicators.clear_cache()
     monkeypatch.setattr(market, "get_json", fake_get_json)
+    # Atualização "em segundo plano" roda na hora nos testes (resultado determinístico).
+    monkeypatch.setattr(market, "_spawn", lambda job: job())
     rates = {432: 15.0, 4389: 14.9, 13522: 5.0}
     monkeypatch.setattr(indicators, "fetch_series", lambda code: (rates[code], "01/10/2026"))
 
@@ -222,3 +224,39 @@ def test_brapi_requests_are_spaced(monkeypatch: pytest.MonkeyPatch) -> None:
     market.fetch_json("https://brapi.dev/api/quote/PETR4", brapi=True)
     market.fetch_json("https://brapi.dev/api/quote/VALE3", brapi=True)
     assert waits and 0 < waits[0] <= market.BRAPI_GAP_SECONDS + 0.01
+
+
+# ---------------------------------------------------------------- dado vencido na hora (v1.4.3)
+
+
+def test_expired_cache_answers_at_once_and_refreshes_in_background(
+    user: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    first = user.get("/api/market/overview").json()
+    jobs: list[Any] = []
+    monkeypatch.setattr(market, "_spawn", jobs.append)
+    slow: list[str] = []
+
+    def must_not_wait(url: str) -> Any:
+        slow.append(url)
+        return fake_get_json(url)
+
+    monkeypatch.setattr(market, "get_json", must_not_wait)
+    with market._lock:
+        for key, entry in list(market._cache.items()):
+            market._cache[key] = (0.0, entry[1], entry[2], entry[3])
+    # Cache vencido: a resposta sai na hora com o último dado, sem consultar a fonte.
+    second = user.get("/api/market/overview").json()
+    assert second["gainers"] == first["gainers"]
+    assert slow == []
+    assert jobs
+    # Outra requisição durante a atualização não dispara uma segunda atualização.
+    count = len(jobs)
+    user.get("/api/market/overview")
+    assert len(jobs) == count
+    # A atualização em segundo plano busca na fonte e renova o cache.
+    for job in jobs:
+        job()
+    assert slow
+    with market._lock:
+        assert all(entry[0] > 0 for entry in market._cache.values())

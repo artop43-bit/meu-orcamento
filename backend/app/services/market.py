@@ -76,6 +76,13 @@ _lock = threading.Lock()
 _brapi_lock = threading.Lock()
 _brapi_last = 0.0
 _sleep = time.sleep  # substituído nos testes
+# Chaves sendo atualizadas em segundo plano (uma atualização por chave de cada vez).
+_refreshing: set[str] = set()
+
+
+def _spawn(job: Any) -> None:
+    """Roda a atualização fora da requisição (substituído nos testes)."""
+    threading.Thread(target=job, daemon=True).start()
 
 
 def clear_cache() -> None:
@@ -119,13 +126,38 @@ def fetch_json(url: str, *, brapi: bool = False) -> Any:
 
 
 def _cached(key: str, ttl: int, fetch: Any) -> Any:
-    """Resultado em cache. Se a atualização falhar, mantém o último dado bom (até 12 h) e
-    tenta de novo em 1 minuto; sem dado anterior, devolve None."""
+    """Resultado em cache. Vencido, a tela recebe na hora o último dado bom (até 12 h) e a
+    atualização roda em segundo plano (v1.4.3): ninguém espera a fonte externa, que pode
+    levar segundos ou recusar por limite. Só a primeira consulta, sem dado guardado, espera."""
     now = time.monotonic()
     with _lock:
         hit = _cache.get(key)
         if hit and hit[0] > now:
             return hit[1]
+        usable = hit is not None and hit[1] is not None and now - hit[2] <= STALE_MAX_SECONDS
+        if usable and key in _refreshing:
+            return hit[1]
+        if usable:
+            _refreshing.add(key)
+    if usable:
+        assert hit is not None
+
+        def job() -> None:
+            try:
+                _refresh(key, ttl, fetch, hit)
+            finally:
+                with _lock:
+                    _refreshing.discard(key)
+
+        _spawn(job)
+        return hit[1]
+    return _refresh(key, ttl, fetch, hit)
+
+
+def _refresh(key: str, ttl: int, fetch: Any, hit: Any) -> Any:
+    """Busca na fonte e guarda. Se falhar, mantém o último dado bom (até 12 h) e tenta de
+    novo em 1 minuto; sem dado anterior, devolve None."""
+    now = time.monotonic()
     try:
         value = fetch()
         entry = (now + ttl, value, now, datetime.now(UTC))
@@ -141,12 +173,13 @@ def _cached(key: str, ttl: int, fetch: Any) -> Any:
 
 
 def as_of(key: str, ttl: int) -> datetime | None:
-    """Quando o dado em cache foi obtido, se já passou da validade (dado antigo em uso)."""
+    """Quando o dado em cache foi obtido, se já passou da validade (dado antigo em uso).
+    Um minuto de folga: enquanto a atualização em segundo plano corre, o dado não é "antigo"."""
     with _lock:
         hit = _cache.get(key)
     if not hit or hit[1] is None:
         return None
-    return hit[3] if time.monotonic() - hit[2] > ttl else None
+    return hit[3] if time.monotonic() - hit[2] > ttl + 60 else None
 
 
 def normalize_symbol(symbol: str) -> str:

@@ -19,17 +19,40 @@ self.addEventListener("activate", (event) => {
   );
 });
 
-// Primeiro a rede; sem conexão, a última resposta guardada.
+// Sinal fraco (v1.4.3): passando disto sem resposta, a tela recebe a última resposta guardada.
+const SLOW_MS = 5000;
+
+// Primeiro a rede; sem conexão, a última resposta guardada. Com a rede lenta demais, também
+// a guardada, e a busca continua: quando a resposta chega, o app é avisado e atualiza a tela.
 async function networkFirst(request, cacheName) {
   const cache = await caches.open(cacheName);
-  try {
-    const response = await fetch(request);
+  const network = fetch(request).then((response) => {
     if (response.ok) cache.put(request, response.clone());
     return response;
+  });
+  let timer;
+  const slow = new Promise((resolve) => {
+    timer = setTimeout(() => resolve("lento"), SLOW_MS);
+  });
+  try {
+    const first = await Promise.race([network, slow]);
+    if (first !== "lento") return first;
+    const cached = await cache.match(request);
+    if (!cached) return await network;
+    network
+      .then(async (response) => {
+        if (!response.ok) return;
+        const clients = await self.clients.matchAll({ type: "window" });
+        clients.forEach((client) => client.postMessage({ type: "api-atualizada" }));
+      })
+      .catch(() => undefined);
+    return cached;
   } catch (error) {
     const cached = await cache.match(request);
     if (cached) return cached;
     throw error;
+  } finally {
+    clearTimeout(timer);
   }
 }
 

@@ -40,6 +40,15 @@ if (import.meta.env.PROD && "serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     void navigator.serviceWorker.register("/sw.js").catch(() => undefined);
   });
+  // Com sinal fraco a tela recebe os últimos dados guardados; quando a resposta de verdade
+  // chega, o service worker avisa e as telas abertas se atualizam.
+  // No máximo uma atualização a cada 10 s, para o sinal fraco não virar uma enxurrada de pedidos.
+  let lastRefresh = 0;
+  navigator.serviceWorker.addEventListener("message", (event) => {
+    if (event.data?.type !== "api-atualizada" || Date.now() - lastRefresh < 10_000) return;
+    lastRefresh = Date.now();
+    void queryClient.invalidateQueries();
+  });
 }
 
 createRoot(document.getElementById("root")!).render(

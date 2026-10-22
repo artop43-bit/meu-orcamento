@@ -99,6 +99,8 @@ export function preloadPages() {
   if (preloaded) return;
   preloaded = true;
   const run = () => warmers.forEach((warm) => void warm().catch(() => undefined));
-  if ("requestIdleCallback" in window) window.requestIdleCallback(run, { timeout: 3000 });
-  else setTimeout(run, 1200);
+  // Logo depois de entrar (v1.4.3): no celular o aparelho quase nunca fica "ocioso" a tempo e
+  // a primeira visita a cada tela esperava o código ser baixado.
+  if ("requestIdleCallback" in window) window.requestIdleCallback(run, { timeout: 600 });
+  else setTimeout(run, 300);
 }

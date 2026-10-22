@@ -11,6 +11,21 @@ export type Release = {
 
 export const RELEASES: Release[] = [
   {
+    version: "1.4.3",
+    date: "21/10/2026 às 21:39",
+    title: "Telas mais rápidas",
+    sections: [
+      {
+        title: "Desempenho",
+        items: [
+          "Cotações e investimentos aparecem na hora com o último dado e se atualizam em segundo plano.",
+          "Com sinal fraco, o app mostra os últimos dados guardados em até 5 segundos e se atualiza quando a resposta chega.",
+          "As telas ficam prontas para abrir logo depois de entrar no app.",
+        ],
+      },
+    ],
+  },
+  {
     version: "1.4.2",
     date: "21/10/2026 às 19:52",
     title: "iPhone instalado e volta das sub-telas",
