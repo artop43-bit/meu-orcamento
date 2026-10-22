@@ -1,6 +1,6 @@
 MEU ORÇAMENTO · UPDATE LOG
 Versão 1.4.3 · Telas mais rápidas
-Data: 21/10/2026 às 23:00 (horário de Brasília)
+Data: 21/10/2026 às 21:39 (horário de Brasília)
 
 Verificação de desempenho (antes desta versão)
 - [x] Servidor: as 40 chamadas usadas pelos menus respondem em até 35 ms com os dados reais; CPU e banco folgados
