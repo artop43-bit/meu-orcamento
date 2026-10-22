@@ -1,5 +1,3 @@
-import { useQuery } from "@tanstack/react-query";
-
 import { api } from "./client";
 
 export type ThreadKind = "idea" | "question" | "bug" | "praise" | "other";
@@ -93,17 +91,6 @@ export const supportApi = {
     api.patch<AdminThreadDetail>(`/admin/support/threads/${id}`, data),
   adminVersions: () => api.get<string[]>("/admin/support/versions"),
 };
-
-/** Respostas novas da administração (badge em Ajustes). Atualiza a cada minuto. */
-export function useSupportUnread(enabled = true) {
-  return useQuery({
-    queryKey: ["support", "unread"],
-    queryFn: supportApi.unread,
-    enabled,
-    refetchInterval: 60_000,
-    select: (d) => d.unread,
-  });
-}
 
 /** Anexo de mensagem: imagem, PDF ou planilha, até 5 MB (o servidor confere o conteúdo). */
 export function checkAttachment(file: File, maxMb = MAX_IMAGE_MB): string | null {

@@ -403,7 +403,8 @@ class MoneyAccount(Base):
         ForeignKey("categories.id", ondelete="SET NULL")
     )
     recurring_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey("recurring_items.id", ondelete="SET NULL")
+        # Conta e recorrência apontam uma para a outra: esta ligação é criada por último.
+        ForeignKey("recurring_items.id", ondelete="SET NULL", use_alter=True)
     )
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
 

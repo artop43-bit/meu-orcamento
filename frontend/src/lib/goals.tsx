@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { BookOpen, Car, HeartPulse, Home, Landmark, PiggyBank, Plane, ShieldCheck, ShoppingBag, Target, Wallet } from "lucide-react";
+import { BookOpen, Car, HeartPulse, Home, PiggyBank, Plane, ShieldCheck, ShoppingBag, Target, Wallet } from "lucide-react";
 
 import type { Goal, GoalKind } from "../api/budget";
 import { money, monthLabel } from "./format";
@@ -20,8 +20,6 @@ export const GOAL_KINDS: { value: GoalKind; label: string; icon: ReactNode; exam
 export function goalKind(kind: GoalKind | undefined) {
   return GOAL_KINDS.find((k) => k.value === kind) ?? GOAL_KINDS[GOAL_KINDS.length - 1]!;
 }
-
-export const GoalIcon = Landmark;
 
 function monthsText(n: number): string {
   return n === 1 ? "1 mês" : `${n} meses`;

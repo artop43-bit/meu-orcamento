@@ -52,7 +52,7 @@ import { RecoveryCard } from "../components/RecoveryPlan";
 import { DashboardEditor } from "../components/DashboardEditor";
 import { useMe } from "../api/auth";
 import { areaOf, readDashboard, type DashboardKey } from "../lib/dashboard";
-import { Chart } from "../components/chart/Chart";
+import { LazyChart } from "../components/chart/LazyChart";
 import { extrasApi, saveQuickEntry, useCards, useDaily } from "../api/extras";
 import { moneyApi, useReviewCount } from "../api/money";
 import { Alert, Button, Kpi, LoadingRegion, PageHeader, Sheet, Skeleton } from "../components/ui";
@@ -687,7 +687,7 @@ function DailyCard({ month }: { month: string }) {
         </span>
         <input inputMode="decimal" value={simulate} onChange={(e) => setSimulate(e.target.value)} placeholder="0,00" />
       </label>
-      <Chart
+      <LazyChart
         type="line"
         fit
         labels={data.days.map((d) => ({ key: d.date, label: d.date.slice(8) }))}

@@ -7,6 +7,17 @@ const apiTarget = process.env.API_PROXY_TARGET ?? "http://localhost:8000";
 
 export default defineConfig({
   plugins: [react()],
+  build: {
+    rolldownOptions: {
+      output: {
+        // Bibliotecas num arquivo próprio (v1.4.4): mudam raramente e ficam guardadas no
+        // aparelho entre as versões; a cada deploy só o código do app é baixado de novo.
+        codeSplitting: {
+          groups: [{ name: "vendor", test: /node_modules[\/](react|react-dom|scheduler|react-router|@tanstack)[\/]/ }],
+        },
+      },
+    },
+  },
   server: {
     host: true,
     port: 5173,

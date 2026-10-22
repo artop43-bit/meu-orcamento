@@ -1,0 +1,27 @@
+MEU ORÇAMENTO · UPDATE LOG
+Versão 1.4.4 · Manutenção e otimização
+Data: 22/10/2026 às 16:04 (horário de Brasília)
+
+Carregamento
+- [x] Bibliotecas (React, rotas, dados) num arquivo próprio: ficam guardadas no aparelho entre as versões; a cada atualização o celular baixa só o código do app (58 KB comprimidos, antes 128 KB)
+- [x] Código dos gráficos fora do arquivo principal: a tela de entrada não baixa mais os gráficos
+
+Banco de dados
+- [x] Índices em 18 ligações entre tabelas que não tinham (despesas por categoria, despesas previstas, transferências, cartões, recorrências, mensagens…)
+- [x] Ligação circular entre contas e recorrências declarada do jeito certo (o aviso de "pode virar erro numa versão futura" sumiu)
+
+Faxina
+- [x] CSS sem uso removido (cerca de 290 linhas de gráficos e mensagens antigos; 3 KB a menos)
+- [x] 6 trechos de código sem uso removidos
+
+Atualizações
+- [x] FastAPI 0.160, SQLAlchemy 2.1.6, Alembic 1.20.1, pydantic-settings 2.16.1
+- [x] React Query 5.104.5, React Router 8.5, ícones 1.61, Vite 8.3.5
+- [x] Nenhuma vulnerabilidade conhecida nas bibliotecas do site (npm audit)
+
+Servidor
+- [x] Limpeza de cache de montagem e imagens antigas de teste
+- [x] O deploy passa a limpar o cache de montagem antigo sozinho
+
+Técnico
+- [x] Migração 0027 (índices), com o ciclo de migrações e a cópia do banco de produção conferidos no Postgres do servidor

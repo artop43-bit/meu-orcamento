@@ -20,6 +20,7 @@ from app.models.budget import (
     WatchItem,
 )
 from app.models.debts import Loan, NetWorthSnapshot, OtherDebt, SplitShare
+from app.models.indexes import FOREIGN_KEY_INDEXES  # noqa: F401 (registra os índices)
 from app.models.support import (
     Announcement,
     AnnouncementReply,
