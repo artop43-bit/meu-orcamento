@@ -20,7 +20,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models import Category, Expense, Income, Investment, User
-from app.services import loans, money
+from app.services import budget, loans, money
 
 ZERO = Decimal("0")
 DEDUCTIBLE = {
@@ -85,7 +85,7 @@ def report(db: Session, user: User, year: int) -> dict[str, Any]:
     ]
     for row in money.balances(db, user, today=year_end):
         account = row["account"]
-        if account.kind != "benefit" and row["balance"] > 0:
+        if account.kind not in budget.VOUCHER_KINDS and row["balance"] > 0:
             assets.append({"description": f"Saldo em {account.name}", "value": row["balance"]})
 
     debts = []

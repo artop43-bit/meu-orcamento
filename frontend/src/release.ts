@@ -3,14 +3,15 @@
  * do changelog (pasta changelog/), que tem a mesma versão, data e hora.
  */
 export const RELEASE = {
-  version: "1.4.4",
+  version: "1.5.0",
   // Data e hora (Brasília) em que o update foi publicado.
-  releasedAt: "2026-10-22T16:04:00-03:00",
+  releasedAt: "2026-10-30T08:47:00-03:00",
 };
 
 /** Mostrado uma vez em "Novidades" depois do update (curto: o detalhe fica no changelog). */
 export const RELEASE_NOTES: { title: string; text: string }[] = [
-  { title: "Atualizações mais leves.", text: "A cada versão o celular baixa menos coisa, e o banco ficou preparado para crescer." },
+  { title: "Cupom item a item.", text: "A foto do cupom traz cada produto e já divide a compra pelas categorias." },
+  { title: "Vale-transporte e INSS.", text: "Nova conta de VT e o líquido do salário calculado pelo bruto." },
 ];
 
 export function releaseLabel(): string {

@@ -598,8 +598,8 @@ class PromoteIn(BaseModel):
 
 
 AccountName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=60)]
-# v1.4: "benefit" = vale-refeição/alimentação.
-AccountKind = Literal["checking", "savings", "wallet", "other", "benefit"]
+# v1.4: "benefit" = vale-refeição/alimentação; v1.5: "transport" = vale-transporte.
+AccountKind = Literal["checking", "savings", "wallet", "other", "benefit", "transport"]
 Balance = Annotated[Decimal, Field(max_digits=14, decimal_places=2)]
 
 

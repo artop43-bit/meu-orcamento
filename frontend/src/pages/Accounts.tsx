@@ -4,7 +4,7 @@ import { ArrowRightLeft, Landmark, Pencil, Plus, Trash2 } from "lucide-react";
 
 import { useBudgetMutation, useCategories } from "../api/budget";
 import { errorMessage } from "../api/client";
-import { ACCOUNT_KINDS, moneyApi, useAccounts, type Account, type AccountKind } from "../api/money";
+import { ACCOUNT_KINDS, moneyApi, useAccounts, VOUCHER_DEFAULT, type Account, type AccountKind } from "../api/money";
 import { CategorySelect, FormActions, MoneyInput, requireMoney } from "../components/budget";
 import { DateField } from "../components/DateField";
 import { EmptyGuide, Tip } from "../components/help";
@@ -15,7 +15,8 @@ function AccountForm({ account, onDone }: { account?: Account; onDone: () => voi
   const [name, setName] = useState(account?.name ?? "");
   const [kind, setKind] = useState<AccountKind>(account?.kind ?? "checking");
   const [initial, setInitial] = useState(account ? moneyInput(account.initial_balance) : "");
-  // v1.4: vale-refeição/alimentação — recarga mensal e a categoria que ele paga.
+  // Vale (refeição/alimentação ou transporte): recarga mensal e a categoria que ele paga.
+  const voucherCategory = VOUCHER_DEFAULT[kind];
   const [recharge, setRecharge] = useState(account?.benefit_amount ? moneyInput(account.benefit_amount) : "");
   const [rechargeDay, setRechargeDay] = useState(account?.benefit_day ? String(account.benefit_day) : "");
   const [benefitCategory, setBenefitCategory] = useState(account?.benefit_category_id ?? "");
@@ -27,7 +28,7 @@ function AccountForm({ account, onDone }: { account?: Account; onDone: () => voi
     const parsed = raw ? parseMoney(raw.replace("-", "")) : "0.00";
     if (parsed === null) throw new Error("Saldo inicial inválido.");
     const data: Partial<Account> & { name: string } = { name, kind, initial_balance: negative ? `-${parsed}` : parsed };
-    if (kind === "benefit") {
+    if (voucherCategory) {
       data.benefit_amount = recharge.trim() ? requireMoney(recharge) : null;
       data.benefit_day = rechargeDay ? Number(rechargeDay) : null;
       if (benefitCategory) data.benefit_category_id = benefitCategory;
@@ -68,7 +69,7 @@ function AccountForm({ account, onDone }: { account?: Account; onDone: () => voi
         </span>
         <input inputMode="decimal" value={initial} onChange={(e) => setInitial(e.target.value)} placeholder="0,00" />
       </label>
-      {kind === "benefit" && (
+      {voucherCategory && (
         <>
           <div className="grid-2">
             <label>
@@ -87,7 +88,7 @@ function AccountForm({ account, onDone }: { account?: Account; onDone: () => voi
               Paga só a categoria <Tip>Despesas pagas com o vale precisam ser desta categoria.</Tip>
             </span>
             <CategorySelect categories={categories.data ?? []} value={benefitCategory} onChange={setBenefitCategory} />
-            {!benefitCategory && <small className="muted">Sem escolha, o vale usa a categoria Alimentação.</small>}
+            {!benefitCategory && <small className="muted">Sem escolha, o vale usa a categoria {voucherCategory}.</small>}
           </label>
         </>
       )}
@@ -228,7 +229,7 @@ export default function AccountsPage() {
                     <span className="item__title">{account.name}</span>
                     <span className="item__meta">
                       {ACCOUNT_KINDS[account.kind]}
-                      {account.kind === "benefit" && account.benefit_amount && ` · recarga de ${money(account.benefit_amount)}${account.benefit_day ? ` no dia ${account.benefit_day}` : ""}`} · fim do mês:{" "}
+                      {VOUCHER_DEFAULT[account.kind] && account.benefit_amount && ` · recarga de ${money(account.benefit_amount)}${account.benefit_day ? ` no dia ${account.benefit_day}` : ""}`} · fim do mês:{" "}
                       {money(end_of_month)}
                     </span>
                   </span>

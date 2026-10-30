@@ -224,11 +224,15 @@ export type ExpenseInput = {
 };
 
 /** Leitura da foto de um comprovante (v1.3). */
+/** v1.5: produto lido do cupom, com a categoria sugerida. */
+export type ReceiptItem = { description: string; amount: string; category_id: string | null };
+
 export type ReceiptReading = {
   kind: "boleto" | "cupom" | "desconhecido";
   amount: string | null;
   date: string | null;
   description: string | null;
+  items?: ReceiptItem[];
 };
 
 export type IncomeInput = {

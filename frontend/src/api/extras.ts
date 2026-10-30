@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import { budgetApi, type Category, type Expense, type ExpenseInput, type Recurring } from "./budget";
 import { api } from "./client";
-import { parseQuickEntry, type QuickEntry } from "../lib/quickEntry";
+import { defaultEntryDate, parseQuickEntry, type QuickEntry } from "../lib/quickEntry";
 import { todayISO } from "../lib/format";
 import { discard, isQueued, OFFLINE_SAVED, sendOrQueue } from "../lib/offline";
 
@@ -108,18 +108,20 @@ export function useDaily(month: string) {
 
 /**
  * Salva um lançamento escrito numa frase. A categoria vem da sugestão automática
- * (regras, histórico, palavras-chave). Retorna um texto curto do que foi salvo.
+ * (regras, histórico, palavras-chave). Retorna um texto curto do que foi salvo. Com `openMonth`
+ * (o mês aberto na tela), a frase sem data é lançada nele.
  */
 export async function saveQuickEntry(
   text: string,
   categories: Category[],
   cards: CardSummary[] = [],
+  openMonth?: string,
 ): Promise<{ message: string; revert: () => Promise<unknown> }> {
-  const entry: QuickEntry = parseQuickEntry(text);
+  const entry: QuickEntry = parseQuickEntry(text, new Date(), openMonth);
   if (!entry.amount || entry.description.length < 2) {
     throw new Error("Escreva o que foi e o valor. Ex.: mercado 120 pix ontem");
   }
-  const date = entry.date ?? todayISO();
+  const date = entry.date ?? defaultEntryDate(openMonth);
   const month = date.slice(0, 7);
   if (entry.kind === "income") {
     const body = { description: entry.description, amount: entry.amount, income_type: "variable" as const, day: Number(date.slice(8)) };

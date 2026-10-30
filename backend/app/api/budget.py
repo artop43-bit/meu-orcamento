@@ -129,16 +129,28 @@ def add_receipts(
     return ReceiptsOut(receipt_ids=receipts.add(db, user, expense_id, raws))
 
 
+class ReceiptItem(BaseModel):
+    description: str
+    amount: Decimal
+    category_id: uuid.UUID | None
+
+
 class ReceiptReading(BaseModel):
     kind: str
     amount: Decimal | None
     date: date | None
     description: str | None
+    items: list[ReceiptItem] = []
 
 
 @router.post("/receipts/read")
-def read_receipt(user: CurrentUser, image: Annotated[UploadFile, File()]) -> ReceiptReading:
-    """Lê a foto de um cupom, nota ou boleto e devolve o que encontrou (nada é salvo)."""
+def read_receipt(
+    user: CurrentUser, db: DbSession, image: Annotated[UploadFile, File()]
+) -> ReceiptReading:
+    """Lê a foto de um cupom, nota ou boleto e devolve o que encontrou (nada é salvo).
+
+    v1.5: os produtos do cupom vêm com a categoria sugerida (regras, histórico, palavras).
+    """
     from app.services import files, ocr
 
     limit = files.RULES["receipt"].max_bytes
@@ -151,6 +163,18 @@ def read_receipt(user: CurrentUser, image: Annotated[UploadFile, File()]) -> Rec
         amount=reading.amount,
         date=reading.date,
         description=reading.description,
+        items=[_receipt_item(db, user, item) for item in reading.items],
+    )
+
+
+def _receipt_item(db: Any, user: Any, item: Any) -> ReceiptItem:
+    from app.services import suggest
+
+    found = suggest.suggest_category(db, user, item.description)
+    return ReceiptItem(
+        description=item.description,
+        amount=item.amount,
+        category_id=found["category_id"] if found else None,
     )
 
 

@@ -39,7 +39,11 @@ function parseAmount(token: string): string | null {
   return value > 0 ? value.toFixed(2) : null;
 }
 
-export function parseQuickEntry(input: string, today: Date = new Date()): QuickEntry {
+/**
+ * `month` (AAAA-MM): mês aberto na tela. "dia 5" cai nele; sem data na frase, `date` fica nula e
+ * quem salva usa `defaultEntryDate`.
+ */
+export function parseQuickEntry(input: string, today: Date = new Date(), month?: string): QuickEntry {
   let text = input.trim();
   let kind: QuickEntry["kind"] = "expense";
   if (text.startsWith("+")) {
@@ -72,7 +76,8 @@ export function parseQuickEntry(input: string, today: Date = new Date()): QuickE
       continue;
     }
     if (word === "dia" && /^\d{1,2}$/.test(next)) {
-      const d = new Date(today.getFullYear(), today.getMonth(), Number(next));
+      const [y, m] = month ? month.split("-").map(Number) : [today.getFullYear(), today.getMonth() + 1];
+      const d = new Date(y, m - 1, Number(next));
       date = iso(d);
       i++;
       continue;
@@ -112,6 +117,12 @@ export function parseQuickEntry(input: string, today: Date = new Date()): QuickE
     payment,
     installments: kind === "expense" ? installments : null,
   };
+}
+
+/** Data de um lançamento sem data na frase: hoje no mês atual; dia 1 do mês aberto, se for outro. */
+export function defaultEntryDate(month: string | undefined, today: Date = new Date()): string {
+  const now = iso(today);
+  return month && month !== now.slice(0, 7) ? `${month}-01` : now;
 }
 
 /** Parece uma frase de lançamento? (tem valor e alguma descrição) */

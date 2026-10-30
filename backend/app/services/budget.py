@@ -363,16 +363,21 @@ def _check_account(db: Session, user: User, account_id: uuid.UUID | None) -> Non
         _owned(db, MoneyAccount, account_id, user)
 
 
+# Contas-vale e a categoria que cada uma paga quando a pessoa não escolhe outra:
+# vale-refeição/alimentação (v1.4) e vale-transporte (v1.5).
+VOUCHER_KINDS = {"benefit": "Alimentação", "transport": "Transporte"}
+
+
 def _check_benefit(
     db: Session, user: User, account_id: uuid.UUID | None, category_id: uuid.UUID | None
 ) -> None:
-    """Vale-refeição/alimentação (v1.4) só paga a categoria escolhida na conta."""
+    """Vale (refeição, alimentação ou transporte) só paga a categoria escolhida na conta."""
     if account_id is None:
         return
     from app.models import MoneyAccount
 
     account = db.get(MoneyAccount, account_id)
-    if account is None or account.kind != "benefit" or account.benefit_category_id is None:
+    if account is None or account.kind not in VOUCHER_KINDS or account.benefit_category_id is None:
         return
     if category_id != account.benefit_category_id:
         category = db.get(Category, account.benefit_category_id)
