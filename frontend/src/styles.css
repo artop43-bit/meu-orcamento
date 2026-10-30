@@ -7100,6 +7100,32 @@ textarea {
 }
 
 /* ---------------------------------------------------------------- dividir em categorias */
+/* v1.5: líquido do salário pelo bruto (INSS), dentro do formulário de receita. */
+.inline-form > .link-btn {
+  justify-self: start;
+  width: fit-content;
+  margin-top: -6px;
+}
+
+.salary-net {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+
+.salary-net__result {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.salary-net__actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
 .split-parts {
   display: grid;
   gap: 8px;

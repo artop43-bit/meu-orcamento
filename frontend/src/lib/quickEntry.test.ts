@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { looksLikeEntry, parseQuickEntry } from "./quickEntry";
+import { defaultEntryDate, looksLikeEntry, parseQuickEntry } from "./quickEntry";
 
 const TODAY = new Date(2030, 0, 22); // 22/01/2030
 
@@ -51,5 +51,19 @@ describe("parseQuickEntry", () => {
   it("sem valor não é lançamento", () => {
     expect(looksLikeEntry(parseQuickEntry("calendário", TODAY))).toBe(false);
     expect(looksLikeEntry(parseQuickEntry("pão 8", TODAY))).toBe(true);
+  });
+
+  it("mês aberto na tela: “dia 5” cai nele", () => {
+    expect(parseQuickEntry("luz 180 dia 5", TODAY, "2030-03").date).toBe("2030-03-05");
+    expect(parseQuickEntry("luz 180", TODAY, "2030-03").date).toBeNull();
+  });
+});
+
+describe("defaultEntryDate", () => {
+  it("hoje no mês atual; dia 1 do mês aberto se for outro", () => {
+    expect(defaultEntryDate(undefined, TODAY)).toBe("2030-01-22");
+    expect(defaultEntryDate("2030-01", TODAY)).toBe("2030-01-22");
+    expect(defaultEntryDate("2030-03", TODAY)).toBe("2030-03-01");
+    expect(defaultEntryDate("2029-12", TODAY)).toBe("2029-12-01");
   });
 });

@@ -11,6 +11,27 @@ export type Release = {
 
 export const RELEASES: Release[] = [
   {
+    version: "1.5.0",
+    date: "30/10/2026 às 00:00",
+    title: "Cupom item a item, vale-transporte e INSS",
+    sections: [
+      {
+        title: "Lançamentos",
+        items: [
+          "Comprovante: o cupom com vários produtos é lido item a item e a compra já vem dividida pelas categorias sugeridas. A lista de itens fica na observação.",
+          "Lançamento rápido: com outro mês aberto no Orçamento, a frase sem data é lançada nele (dia 1). \"Dia 5\" também vale para o mês aberto.",
+        ],
+      },
+      {
+        title: "Contas e salário",
+        items: [
+          "Nova conta Vale-transporte: recarga mensal como receita e pagamento só de Transporte, como o vale-refeição.",
+          "Receita fixa: \"Calcular o líquido pelo salário bruto\" desconta o INSS pela tabela de 2026 e anota o cálculo na observação.",
+        ],
+      },
+    ],
+  },
+  {
     version: "1.4.4",
     date: "22/10/2026 às 16:04",
     title: "Manutenção e otimização",

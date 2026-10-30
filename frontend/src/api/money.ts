@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import type { Expense } from "./budget";
 import { api } from "./client";
 
-export type AccountKind = "checking" | "savings" | "wallet" | "other" | "benefit";
+export type AccountKind = "checking" | "savings" | "wallet" | "other" | "benefit" | "transport";
 
 export const ACCOUNT_KINDS: Record<AccountKind, string> = {
   checking: "Conta corrente",
@@ -11,7 +11,11 @@ export const ACCOUNT_KINDS: Record<AccountKind, string> = {
   wallet: "Carteira (dinheiro)",
   other: "Outra",
   benefit: "Vale-refeição ou alimentação",
+  transport: "Vale-transporte",
 };
+
+/** Contas-vale (recarga mensal, pagam uma categoria só) e a categoria usada sem escolha. */
+export const VOUCHER_DEFAULT: Partial<Record<AccountKind, string>> = { benefit: "Alimentação", transport: "Transporte" };
 
 export type Account = {
   id: string;
@@ -20,7 +24,7 @@ export type Account = {
   initial_balance: string;
   color: string | null;
   archived: boolean;
-  /** v1.4: vale (kind "benefit"): recarga mensal e a categoria que ele paga. */
+  /** Vale (kind "benefit" ou "transport"): recarga mensal e a categoria que ele paga. */
   benefit_amount?: string | null;
   benefit_day?: number | null;
   benefit_category_id?: string | null;

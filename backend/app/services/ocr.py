@@ -2,7 +2,8 @@
 
 A leitura roda no próprio servidor (Tesseract, sem serviço externo): a foto não sai do app.
 - Boleto: a linha digitável traz o valor e o vencimento exatos (fator de vencimento).
-- Cupom, nota ou recibo: procura o total, a data e o nome do estabelecimento no texto.
+- Cupom, nota ou recibo: procura o total, a data e o nome do estabelecimento no texto, e
+  (v1.5) os produtos com o valor de cada um.
 Nada é salvo sozinho: o resultado só preenche o formulário, e a pessoa confirma.
 """
 
@@ -11,7 +12,7 @@ import re
 import shutil
 import subprocess
 import threading
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, timedelta
 from decimal import Decimal, InvalidOperation
 
@@ -38,12 +39,31 @@ SKIP_LINE = re.compile(
 )
 
 
+# Linhas com valor que não são produto (pagamento, troco, descontos, tributos, contagem).
+NOT_ITEM = re.compile(
+    r"troco|desconto|acr[eé]scimo|sub\s*-?total|qtd|itens|dinheiro|cart[aã]o|cr[eé]dito|"
+    r"d[eé]bito|\bpix\b|pagamento|pago|tribut|imposto|lei\s*12|aprox|saldo",
+    re.I,
+)
+# Quantidade e unidade no meio da linha ("2 UN X 8,49", "0,512 KG"): o nome vem antes.
+QUANTITY = re.compile(r"\s\d+(?:[.,]\d+)?\s*(?:un|und|kg|g|lt?|ml|pc|pct|cx|fd)\b", re.I)
+MAX_ITEMS = 30
+
+
+@dataclass
+class Item:
+    description: str
+    amount: Decimal
+
+
 @dataclass
 class Reading:
     kind: str  # "boleto" | "cupom" | "desconhecido"
     amount: Decimal | None
     date: date | None
     description: str | None
+    # v1.5: produtos do cupom (nome e valor da linha), para dividir a compra por categoria.
+    items: list[Item] = field(default_factory=list)
 
 
 def _money(text: str) -> Decimal | None:
@@ -129,6 +149,45 @@ def _description(text: str) -> str | None:
     return None
 
 
+def _item_name(line: str) -> str:
+    """Nome do produto: sem código/número do item no começo, sem quantidade e valores no fim."""
+    money = MONEY.search(line)
+    end = money.start() if money else len(line)
+    # A quantidade é a última antes do preço: "ARROZ 5KG 1 UN X 27,90" corta em "1 UN".
+    quantities = [m for m in QUANTITY.finditer(line) if m.start() < end]
+    if quantities:
+        end = quantities[-1].start()
+    words = line[:end].split()
+    # Número do item e código de barras ("001 7891234567890 ARROZ").
+    while words and re.fullmatch(r"[\d.\-]+", words[0]):
+        words.pop(0)
+    clean = re.sub(r"[^\wÀ-ú&.\- ]", " ", " ".join(words))
+    return re.sub(r"\s+", " ", clean).strip(" .-")[:60].title()
+
+
+def _items(text: str) -> list[Item]:
+    """Produtos do cupom: linhas com nome e valor antes do total. Só vale com dois ou mais."""
+    found: list[Item] = []
+    for line in text.splitlines():
+        values = MONEY.findall(line)
+        if TOTAL_WORDS.search(line):
+            # O total com valor encerra a lista; sem valor é o cabeçalho ("VL UNIT VL TOTAL").
+            if values:
+                break
+            continue
+        # SKIP_LINE não serve aqui: "tel" cortaria pastel; "cupom", o desconto do cupom.
+        if (
+            not values
+            or NOT_ITEM.search(line)
+            or re.search(r"cnpj|cpf|chave|protocolo", line, re.I)
+        ):
+            continue
+        name, amount = _item_name(line), _money(values[-1])
+        if amount and amount > 0 and sum(c.isalpha() for c in name) >= 3:
+            found.append(Item(name, amount))
+    return found[:MAX_ITEMS] if len(found) >= 2 else []
+
+
 def parse(text: str, today: date | None = None) -> Reading:
     """Interpreta o texto lido da foto (separado da leitura para poder testar)."""
     today = today or date.today()
@@ -137,7 +196,7 @@ def parse(text: str, today: date | None = None) -> Reading:
         return boleto
     amount, when, description = _amount(text), _date(text, today), _description(text)
     kind = "cupom" if amount or when else "desconhecido"
-    return Reading(kind, amount, when, description)
+    return Reading(kind, amount, when, description, _items(text))
 
 
 # ---------------------------------------------------------------- leitura da imagem

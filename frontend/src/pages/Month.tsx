@@ -531,7 +531,7 @@ function ExpensesCard({
 type StatusFilter = "all" | "pending" | "late" | "paid";
 
 /** Campo "lançar numa frase": "mercado 120 pix ontem". */
-function QuickBar({ categories, autoListen = false }: { categories: Category[]; autoListen?: boolean }) {
+function QuickBar({ month, categories, autoListen = false }: { month: string; categories: Category[]; autoListen?: boolean }) {
   const [text, setText] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -549,7 +549,7 @@ function QuickBar({ categories, autoListen = false }: { categories: Category[]; 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoListen]);
   const undo = useUndo();
-  const save = useBudgetMutation((value: string) => saveQuickEntry(value, categories, cards.data ?? []));
+  const save = useBudgetMutation((value: string) => saveQuickEntry(value, categories, cards.data ?? [], month));
 
   // Microfone: a fala vira a frase no campo; a pessoa confere e toca em "Lançar".
   function toggleVoice() {
@@ -1075,7 +1075,7 @@ export default function MonthPage() {
         >
           {shown("top").map((key) => {
             const empty = data.data!.incomes.length === 0 && data.data!.expenses.length === 0;
-            if (key === "quick") return <QuickBar key={key} categories={cats} autoListen={voice} />;
+            if (key === "quick") return <QuickBar key={key} month={month} categories={cats} autoListen={voice} />;
             if (empty) return null;
             if (key === "kpis") return <Kpis key={key} data={data.data!} />;
             return <ConsultantTeaser key={key} month={month} />;

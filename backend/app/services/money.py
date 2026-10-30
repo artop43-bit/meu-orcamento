@@ -59,7 +59,7 @@ def _sync_benefit(
     """Recarga do vale = renda fixa ligada à conta (entra no orçamento e no saldo do vale)."""
     item = db.get(RecurringItem, account.recurring_id) if account.recurring_id else None
     this_month = budget.current_month(user.month_start_day)
-    if account.kind != "benefit" or not amount:
+    if account.kind not in budget.VOUCHER_KINDS or not amount:
         if item is not None:
             _end_benefit(db, user, item, this_month)
             account.recurring_id = None
@@ -111,11 +111,12 @@ def _benefit_fields(db: Session, user: User, data: dict[str, Any]) -> tuple[Any,
 
 def create_account(db: Session, user: User, data: dict[str, Any]) -> MoneyAccount:
     amount, day = _benefit_fields(db, user, data)
-    if data.get("kind") == "benefit" and data.get("benefit_category_id") is None:
-        food = db.scalar(
-            select(Category).where(Category.user_id == user.id, Category.name == "Alimentação")
+    default = budget.VOUCHER_KINDS.get(data.get("kind", ""))
+    if default and data.get("benefit_category_id") is None:
+        category = db.scalar(
+            select(Category).where(Category.user_id == user.id, Category.name == default)
         )
-        data["benefit_category_id"] = food.id if food else None
+        data["benefit_category_id"] = category.id if category else None
     account = MoneyAccount(user_id=user.id, **data)
     db.add(account)
     db.flush()

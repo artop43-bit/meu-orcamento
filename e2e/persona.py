@@ -2163,6 +2163,76 @@ def v14_money(page: Page):
     page.keyboard.press("Escape")
 
 
+@step("v1.5: frase no mês aberto, vale-transporte, líquido pelo INSS e cupom item a item")
+def v15_entries(page: Page):
+    # Lançamento rápido com o próximo mês aberto: sem data na frase, cai no dia 1 dele.
+    year, mon = map(int, CURRENT.split("-"))
+    nxt = f"{year + mon // 12}-{mon % 12 + 1:02d}"
+    open_month(page, nxt)
+    page.get_by_placeholder(re.compile("mercado 120")).fill("conserto da bike 77 pix")
+    page.get_by_role("button", name="Lançar", exact=True).click()
+    expect(page.locator(".toast")).to_contain_text("Conserto da bike", timeout=8000)
+    idle(page)
+    [bike] = [e for e in api(page, f"/months/{nxt}")["expenses"] if e["description"] == "Conserto da bike"]
+    assert (bike["amount"], bike["due_date"]) == ("77.00", f"{nxt}-01"), bike
+
+    # Vale-transporte: conta com recarga que só paga Transporte.
+    page.goto(f"{BASE}/contas")
+    idle(page)
+    page.get_by_role("button", name=re.compile("Nova conta")).first.click()
+    d = dialog(page)
+    d.get_by_label("Nome").fill("VT Metrô")
+    d.get_by_label("Tipo").select_option(label="Vale-transporte")
+    expect(d.get_by_text("Sem escolha, o vale usa a categoria Transporte.")).to_be_visible()
+    d.get_by_label(re.compile("^Recarga por mês")).fill(money(220))
+    d.get_by_label("Dia da recarga").fill("1")
+    d.get_by_role("button", name="Adicionar conta").click()
+    expect(d).to_have_count(0, timeout=8000)
+    idle(page)
+    expect(page.get_by_text(re.compile(r"Vale-transporte · recarga de R\$\s220,00 no dia 1"))).to_be_visible()
+
+    # Salário: o bruto vira líquido pelo INSS (tabela do ano) e fica anotado.
+    open_month(page, CURRENT)
+    page.get_by_role("button", name="Nova receita", exact=True).click()
+    d = dialog(page)
+    d.get_by_label("Descrição").fill("Salário novo emprego")
+    d.get_by_role("button", name="Calcular o líquido pelo salário bruto (INSS)").click()
+    d.get_by_label(re.compile("^Salário bruto")).fill(money(3000))
+    expect(d.locator(".salary-net__result")).to_contain_text(re.compile(r"INSS R\$\s248,60"))
+    page.screenshot(path=OUT / "v15-inss.png")
+    d.get_by_role("button", name="Usar o líquido").click()
+    expect(d.get_by_label("Valor", exact=True)).to_have_value(re.compile(r"^2\.?751,40$"))
+    expect(d.get_by_label("Observação")).to_have_value(re.compile(r"Bruto R\$\s3\.000,00 − INSS R\$\s248,60"))
+    page.keyboard.press("Escape")
+    expect(d).to_have_count(0, timeout=8000)
+
+    # Cupom com vários produtos: a compra já vem dividida pelas categorias sugeridas.
+    cats = {c["name"]: c["id"] for c in api(page, "/categories")}
+    items = [
+        {"description": "Arroz Tipo 1", "amount": "27.90", "category_id": cats["Alimentação"]},
+        {"description": "Pastel De Queijo", "amount": "13.00", "category_id": cats["Alimentação"]},
+        {"description": "Detergente Limpol", "amount": "3.49", "category_id": cats["Compras"]},
+    ]
+    reading = {"kind": "cupom", "amount": "44.39", "date": f"{CURRENT}-02", "description": "Mercado Central", "items": items}
+    page.route("**/api/receipts/read", lambda route: route.fulfill(json=reading))
+    page.get_by_role("button", name="Nova despesa", exact=True).click()
+    d = dialog(page)
+    d.get_by_test_id("receipt-reader-input").set_input_files(
+        files=[{"name": "cupom.png", "mimeType": "image/png", "buffer": png_bytes()}]
+    )
+    expect(d.get_by_text(re.compile("Lido do comprovante: 3 itens, divididos em 2 categorias"))).to_be_visible()
+    expect(d.locator(".split-parts__row")).to_have_count(2)
+    expect(d.locator(".split-parts .summary-box")).to_contain_text("As partes somam o total")
+    page.screenshot(path=OUT / "v15-cupom-itens.png")
+    d.get_by_role("button", name="Adicionar despesa").click()
+    expect(d).to_have_count(0, timeout=8000)
+    page.unroute("**/api/receipts/read")
+    idle(page, 300)
+    parts = [e for e in api(page, f"/months/{CURRENT}")["expenses"] if e["description"] == "Mercado Central"]
+    assert sorted(e["amount"] for e in parts) == ["3.49", "40.90"], parts
+    assert all((e["notes"] or "").startswith("Itens: Arroz Tipo 1") for e in parts), parts
+
+
 @step("v1.4: conciliação, IR, tarifas, inflação pessoal, 13º e meta de alocação")
 def v14_insights(page: Page):
     # Conciliação: o Uber lançado à mão casa com a linha do extrato e não entra de novo.
@@ -2362,6 +2432,7 @@ def main():
         v13_planning(page)
         v14_money(page)
         v14_insights(page)
+        v15_entries(page)
         two_factor(page)
         banner_never(page)
         STATE["state"] = ctx.storage_state()

@@ -21,6 +21,7 @@ import {
   type Interval,
   type MonthData,
   type PaymentMethod,
+  type ReceiptItem,
   type ReceiptReading,
 } from "../api/budget";
 import { extrasApi, hasCredit, hasDebit, useCards, type Card } from "../api/extras";
@@ -32,6 +33,8 @@ import { SplitForm } from "./SplitForm";
 import { moneyApi, PROJECTS_KEY, useAccounts } from "../api/money";
 import { DateField, DayField } from "./DateField";
 import { normalizeText } from "../lib/text";
+import { INSS_YEAR, inssDiscount } from "../lib/inss";
+import { itemsNote, partsFromItems } from "../lib/receiptItems";
 import { errorMessage } from "../api/client";
 import { useMe } from "../api/auth";
 import { announce } from "../lib/announce";
@@ -372,11 +375,37 @@ export function ExpenseForm({
     }
     if (reading.kind === "boleto" && !payment) setPayment("boleto");
     setPendingReceipts((list) => [...list, file].slice(0, 3));
+    const items = reading.items ?? [];
+    if (items.length >= 2) {
+      setReadInfo(applyItems(items, reading.amount));
+      return;
+    }
     setReadInfo(
       reading.amount || reading.date
         ? "Lido do comprovante: confira o valor, a data e a descrição antes de salvar. A foto fica anexada."
         : "Não encontramos o valor nem a data na foto. Preencha à mão; a foto fica anexada.",
     );
+  }
+
+  /**
+   * v1.5: produtos do cupom. A compra é dividida pelas categorias sugeridas (uma categoria só
+   * preenche o campo) e a lista vai para a observação. Retorna o aviso para a pessoa conferir.
+   */
+  function applyItems(items: ReceiptItem[], total: string | null): string {
+    const groups = canSplitCategories ? partsFromItems(items) : [];
+    if (groups.length >= 2) setParts(groups.map((g) => ({ categoryId: g.categoryId, amount: moneyInput(g.amount) })));
+    else if (groups[0]?.categoryId) {
+      setCategoryId(groups[0].categoryId);
+      setCategoryTouched(true);
+    }
+    setNotes((current) => current.trim() || itemsNote(items));
+    const sum = items.reduce((acc, item) => acc + Number(item.amount), 0);
+    const split = groups.length >= 2 ? `, divididos em ${groups.length} categorias` : "";
+    const gap =
+      total && Math.abs(sum - Number(total)) >= 0.01
+        ? ` Os itens somam ${money(sum)} e o total é ${money(total)} (desconto ou item não lido): ajuste antes de salvar.`
+        : "";
+    return `Lido do comprovante: ${items.length} itens${split}. Confira os valores e as categorias; a lista fica na observação e a foto, anexada.${gap}`;
   }
   const startMonth = (card ? invoiceDue(card, purchase) : dueDate || `${month}-01`).slice(0, 7);
   const installmentSummary =
@@ -970,6 +999,60 @@ export function ExpenseForm({
 
 // ---------------------------------------------------------------- renda
 
+/**
+ * v1.5: salário com carteira assinada. A pessoa digita o bruto, vê o INSS da tabela do ano e
+ * usa o líquido como valor da receita (o desconto fica anotado nas observações).
+ */
+function SalaryNet({ onUse }: { onUse: (net: string, note: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const [gross, setGross] = useState("");
+  const value = Number(parseMoney(gross) ?? 0);
+  const result = value > 0 ? inssDiscount(value) : null;
+  if (!open) {
+    return (
+      <button type="button" className="link-btn small" onClick={() => setOpen(true)}>
+        Calcular o líquido pelo salário bruto (INSS)
+      </button>
+    );
+  }
+  return (
+    <div className="salary-net">
+      <label>
+        <span className="field-label">
+          Salário bruto{" "}
+          <Tip>
+            Desconto do INSS pela tabela de {INSS_YEAR} para carteira assinada. É uma estimativa: o holerite pode ter outros
+            descontos, como IR, vale-transporte e plano de saúde.
+          </Tip>
+        </span>
+        <MoneyInput value={gross} onChange={setGross} required={false} placeholder="0,00" />
+      </label>
+      {result && (
+        <p className="salary-net__result">
+          INSS {money(result.inss)} ({(result.rate * 100).toFixed(2).replace(".", ",")}%) · líquido <strong>{money(result.net)}</strong>
+        </p>
+      )}
+      <div className="salary-net__actions">
+        <Button
+          type="button"
+          variant="secondary"
+          disabled={!result}
+          onClick={() => {
+            if (!result) return;
+            onUse(result.net.toFixed(2), `Bruto ${money(result.gross)} − INSS ${money(result.inss)} (tabela ${INSS_YEAR})`);
+            setOpen(false);
+          }}
+        >
+          Usar o líquido
+        </Button>
+        <button type="button" className="link-btn small" onClick={() => setOpen(false)}>
+          Fechar
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function IncomeForm({ month, income, onDone }: { month: string; income?: Income; onDone: () => void }) {
   const [description, setDescription] = useState(income?.description ?? "");
   const [amount, setAmount] = useState(income ? moneyInput(income.amount) : "");
@@ -1080,6 +1163,15 @@ export function IncomeForm({ month, income, onDone }: { month: string; income?: 
           />
         </label>
       </div>
+      {type === "fixed" && (
+        <SalaryNet
+          onUse={(net, note) => {
+            setAmount(moneyInput(net));
+            // Troca a anotação de um cálculo anterior em vez de acumular.
+            setNotes((current) => [current.replace(/^Bruto .*\(tabela \d{4}\)$/m, "").trim(), note].filter(Boolean).join("\n"));
+          }}
+        />
+      )}
       {!income && (
         <fieldset className="radios">
           <legend className="field-label">Recorrência</legend>
