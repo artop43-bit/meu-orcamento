@@ -12,7 +12,7 @@ export type Release = {
 export const RELEASES: Release[] = [
   {
     version: "1.5.0",
-    date: "30/10/2026 às 00:00",
+    date: "30/10/2026 às 08:47",
     title: "Cupom item a item, vale-transporte e INSS",
     sections: [
       {
