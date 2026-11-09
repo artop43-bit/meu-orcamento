@@ -241,6 +241,19 @@ def test_delivery_challenge_is_lost_by_an_ifood_order(user: TestClient, jan10: d
     assert row["status"] == "lost" and row["slips"][0]["description"] == "IFOOD *Pizzaria"
 
 
+def test_challenge_ignores_what_was_entered_before_it_started(
+    user: TestClient, jan10: date
+) -> None:
+    # v1.6: o pedido de delivery já lançado (vence no dia do início) não derruba o desafio
+    # começado depois; um pedido novo no mesmo dia, sim.
+    add_expense(user, description="Delivery (iFood)", amount="60.00", due_date="2030-01-10")
+    assert user.post("/api/challenges", json={"template": "delivery"}).status_code == 201
+    [row] = user.get("/api/challenges").json()
+    assert row["status"] == "active" and row["slips"] == []
+    add_expense(user, description="IFOOD *Lanche", amount="30.00", due_date="2030-01-10")
+    assert user.get("/api/challenges").json()[0]["status"] == "lost"
+
+
 def test_category_ceiling_challenge(user: TestClient, jan10: date) -> None:
     lazer = category_id(user, "Lazer")
     out = user.post(
