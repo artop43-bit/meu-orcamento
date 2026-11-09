@@ -219,7 +219,7 @@ jobs:
       - name: Logs dos servidores
         if: failure()
         run: tail -n 80 /tmp/api.log /tmp/web.log
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: e2e-prints
