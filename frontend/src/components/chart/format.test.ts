@@ -31,7 +31,9 @@ describe("chartsFor", () => {
 describe("colorFor", () => {
   it("usa a cor própria ou a paleta", () => {
     expect(colorFor("#123456", 3)).toBe("#123456");
-    expect(colorFor(null, 0)).toMatch(/^#/);
+    // v1.6: a 1ª série segue a cor de destaque; as demais são tokens do tema.
+    expect(colorFor(null, 0)).toBe("var(--accent)");
+    expect(colorFor(null, 1)).toBe("var(--chart-1)");
   });
 });
 

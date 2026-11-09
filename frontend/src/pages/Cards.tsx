@@ -12,7 +12,7 @@ import { CardForm } from "../components/CardForm";
 import { EmptyGuide, Tip } from "../components/help";
 import { Alert, Button, LoadingRegion, PageHeader, Sheet, Skeleton } from "../components/ui";
 import { announce } from "../lib/announce";
-import { money, monthLabel, shortDate } from "../lib/format";
+import { money, monthLabel, shortDate, textOn } from "../lib/format";
 
 const STATUS: Record<Invoice["status"], { label: string; tone: string }> = {
   open: { label: "Aberta", tone: "badge--neutral" },
@@ -94,7 +94,10 @@ function CardTile({ summary, onEdit }: { summary: CardSummary; onEdit: () => voi
     <section className="card stack card-tile" style={{ borderTopColor: card.color ?? undefined }}>
       <div className="section-header">
         <h2 className="row" style={{ gap: 8 }}>
-          <CreditCard size={18} style={{ color: card.color ?? undefined }} aria-hidden /> {card.name}
+          <span className="card-tile__icon" style={{ background: card.color ?? "var(--accent)", color: card.color ? textOn(card.color) : "var(--accent-fg)" }} aria-hidden>
+            <CreditCard size={16} />
+          </span>{" "}
+          {card.name}
           <span className="badge">{CARD_KIND_LABEL[card.kind]}</span>
         </h2>
         <span className="row" style={{ gap: 4 }}>

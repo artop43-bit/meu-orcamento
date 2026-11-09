@@ -11,6 +11,28 @@ export type Release = {
 
 export const RELEASES: Release[] = [
   {
+    version: "1.6.0",
+    date: "09/11/2026 às 16:00",
+    title: "Estilos visuais e parcelamento que conhece as suas contas",
+    sections: [
+      {
+        title: "Aparência",
+        items: [
+          "Visual novo em todas as telas e um segundo estilo, Liquid glass: escolha em Preferências › Aparência. Combina com o tema claro ou escuro e com a sua cor de destaque, e fica salvo na conta.",
+          "Gráficos, investimentos, Retrospectiva e ícones dos cartões agora acompanham a cor escolhida, com leitura conferida em todas as combinações.",
+        ],
+      },
+      {
+        title: "Calculadoras",
+        items: [
+          "Parcelar ou à vista mostra o efeito da parcela nos seus próximos meses: quanto da renda fica comprometida, a sobra mês a mês, o limite do cartão e se o saldo cobre o à vista sem tocar na reserva.",
+          "Sugestão do menor número de parcelas sem mês negativo e \"Lançar como planejado\".",
+          "Resultados em destaque com mini gráficos, rendimento pelo CDI atual e vírgula ou ponto nos números.",
+        ],
+      },
+    ],
+  },
+  {
     version: "1.5.0",
     date: "30/10/2026 às 08:47",
     title: "Cupom item a item, vale-transporte e INSS",

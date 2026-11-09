@@ -217,14 +217,20 @@ Accent = Literal[
 ]
 
 
+# Estilos visuais (os mesmos de frontend/src/theme/styles.ts).
+Style = Literal["padrao", "glass"]
+
+
 class AppearanceIn(BaseModel):
     theme: Literal["system", "light", "dark"] | None = None
     accent: Accent | None = None
+    style: Style | None = None
 
 
 class AppearanceOut(BaseModel):
     theme: str | None
     accent: str | None
+    style: str | None = None
 
 
 @router.patch("/me/appearance")
@@ -233,8 +239,10 @@ def appearance(body: AppearanceIn, user: CurrentUser, db: DbSession) -> Appearan
         user.theme = body.theme
     if body.accent is not None:
         user.accent = body.accent
+    if body.style is not None:
+        user.style = body.style
     db.commit()
-    return AppearanceOut(theme=user.theme, accent=user.accent)
+    return AppearanceOut(theme=user.theme, accent=user.accent, style=user.style)
 
 
 # ---------------------------------------------------------------- painel do Orçamento (v1.3)

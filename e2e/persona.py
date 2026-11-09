@@ -1596,6 +1596,40 @@ def accent_colors(page: Page):
     assert api(page, "/auth/me")["accent"] == "verde"
 
 
+@step("v1.6: estilo Liquid glass em Preferências, salvo na conta, com a cor escolhida")
+def visual_style(page: Page):
+    page.goto(f"{BASE}/ajustes/preferencias")
+    idle(page)
+    picker = page.get_by_role("group", name="Estilo")
+    expect(picker.locator(".style-option")).to_have_count(2)
+    expect(picker.get_by_label(re.compile("^Padrão"))).to_be_checked()
+    picker.locator(".style-option", has_text="Liquid glass").click()
+    expect(page.locator("html")).to_have_attribute("data-style", "glass")
+    page.wait_for_timeout(400)
+    assert api(page, "/auth/me")["style"] == "glass"
+    # Combina com a cor de destaque: o brilho do fundo é a cor escolhida.
+    page.get_by_role("group", name="Cor de destaque").locator(".accent-swatch", has_text="Roxo").click()
+    expect(page.locator("html")).to_have_attribute("data-accent", "roxo")
+    page.goto(f"{BASE}/orcamento")
+    idle(page)
+    blur = page.locator(".card").first.evaluate("(e) => getComputedStyle(e).backdropFilter")
+    assert "blur" in blur, blur
+    page.screenshot(path=OUT / "v16-liquid-glass.png", full_page=True)
+    # Outro "aparelho" (sem nada salvo no navegador): o estilo vem da conta.
+    page.evaluate("localStorage.removeItem('preferencias-v1')")
+    page.reload()
+    idle(page)
+    expect(page.locator("html")).to_have_attribute("data-style", "glass")
+    page.goto(f"{BASE}/ajustes/preferencias")
+    idle(page)
+    page.get_by_role("group", name="Estilo").locator(".style-option", has_text="Padrão").click()
+    page.get_by_role("group", name="Cor de destaque").locator(".accent-swatch", has_text="Verde").click()
+    expect(page.locator("html")).to_have_attribute("data-style", "padrao")
+    page.wait_for_timeout(400)
+    me = api(page, "/auth/me")
+    assert me["style"] == "padrao" and me["accent"] == "verde", me
+
+
 @step("v1.2: menu com vários grupos abertos e troca de tela sem a tela de carregamento")
 def fluid_navigation(page: Page):
     page.goto(f"{BASE}/orcamento")
@@ -1736,15 +1770,25 @@ def debts(page: Page):
     page.screenshot(path=OUT / "v10-tabela.png", full_page=True)
 
 
-@step("v1.0: calculadoras em Insights (juros compostos, à vista ou parcelado, reserva)")
+@step("v1.0/v1.6: calculadoras em Insights (parcelar ou à vista no orçamento, juros compostos, reserva)")
 def calculators(page: Page):
     page.goto(f"{BASE}/analises?secao=calculadoras")
     idle(page)
-    result = page.locator(".calc-result")
-    expect(result).to_contain_text("Em 5 ano(s)")
-    page.get_by_role("button", name="À vista ou parcelado").click()
+    result = page.locator(".calc-hero").first
+    # v1.6: abre em "Parcelar ou à vista", com o efeito da parcela nos próximos meses.
     expect(result).to_contain_text(re.compile("sai mais barato"))
-    page.get_by_role("button", name="Reserva de emergência").click()
+    impact = page.locator(".calc-impact")
+    expect(impact).to_contain_text("da renda em parcelas")
+    expect(impact).to_contain_text("Mês com menor sobra")
+    expect(impact.locator(".calc-bars__col").first).to_be_visible()
+    # Vírgula e ponto valem o mesmo.
+    page.get_by_label("Desconto à vista").fill("10.6")
+    with_dot = result.locator(".calc-stat").first.inner_text()
+    page.get_by_label("Desconto à vista").fill("10,6")
+    expect(result.locator(".calc-stat").first).to_have_text(with_dot)
+    page.get_by_role("button", name=re.compile("^Juros compostos")).click()
+    expect(result).to_contain_text("Em 5 ano(s)")
+    page.get_by_role("button", name=re.compile("^Reserva")).click()
     page.get_by_label(re.compile("^Gastos essenciais")).fill(money(2500))
     expect(result).to_contain_text("R$ 15.000,00")
     page.screenshot(path=OUT / "v10-calculadoras.png", full_page=True)
@@ -2003,8 +2047,8 @@ def v13_planning(page: Page):
     # Correção pela inflação (IPCA do Banco Central; sem internet no servidor, explica).
     page.goto(f"{BASE}/analises?secao=calculadoras")
     idle(page)
-    page.get_by_role("button", name="Correção pela inflação").click()
-    expect(page.locator(".calc-result, .calc-form [role=alert]").first).to_be_visible(timeout=15000)
+    page.get_by_role("button", name=re.compile("^Inflação")).click()
+    expect(page.locator(".calc-hero, .calc-form [role=alert]").first).to_be_visible(timeout=15000)
 
     # Desafio: 30 dias sem delivery.
     page.goto(f"{BASE}/metas")
@@ -2264,8 +2308,8 @@ def v14_insights(page: Page):
     expect(page.get_by_role("heading", name=re.compile("^Tarifas e juros"))).to_be_visible()
     page.goto(f"{BASE}/analises?secao=calculadoras")
     idle(page)
-    page.get_by_role("button", name="13º e restituição").click()
-    expect(page.locator(".calc-result")).to_contain_text("13º bruto estimado")
+    page.get_by_role("button", name=re.compile("^13º e restituição")).click()
+    expect(page.locator(".calc-hero")).to_contain_text("13º bruto estimado")
 
     # Meta de alocação na carteira.
     page.goto(f"{BASE}/investimentos")
@@ -2419,6 +2463,7 @@ def main():
         inbox_and_announcement(page)
         theme_on_account(page)
         accent_colors(page)
+        visual_style(page)
         fluid_navigation(page)
         start_over(page)
         debts(page)

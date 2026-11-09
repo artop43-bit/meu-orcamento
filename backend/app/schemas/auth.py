@@ -27,6 +27,8 @@ class UserOut(BaseModel):
     # v0.9: aparência salva na conta (None = ainda não escolheu; vale a do aparelho).
     theme: str | None = None
     accent: str | None = None
+    # v1.6: estilo visual ("padrao" ou "glass").
+    style: str | None = None
     # v1.0: dia em que começa o mês financeiro.
     month_start_day: int = 1
     # v1.3: cartões do Orçamento (ordem e visibilidade), em JSON; None = padrão.

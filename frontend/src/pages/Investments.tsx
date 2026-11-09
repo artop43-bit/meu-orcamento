@@ -24,15 +24,16 @@ const KEY = ["budget", "investments"] as const;
 // Tipos que costumam ter código na bolsa (ou cripto): o valor atual vem da cotação.
 const QUOTED: InvestmentKind[] = ["acoes", "fiis", "cripto", "fundos"];
 const KIND_COLORS: Record<InvestmentKind, string> = {
-  poupanca: "#bab0ac",
-  renda_fixa: "#4e79a7",
-  tesouro: "#59a14f",
-  fundos: "#76b7b2",
-  acoes: "#f28e2b",
-  fiis: "#9c755f",
-  cripto: "#b07aa1",
-  previdencia: "#e15759",
-  outro: "#79706e",
+  // v1.6: cores do tema (versão própria no claro e no escuro, contraste testado).
+  poupanca: "var(--chart-8)",
+  renda_fixa: "var(--chart-2)",
+  tesouro: "var(--accent)",
+  fundos: "var(--chart-5)",
+  acoes: "var(--chart-1)",
+  fiis: "var(--chart-7)",
+  cripto: "var(--chart-3)",
+  previdencia: "var(--chart-4)",
+  outro: "var(--subtle)",
 };
 
 function Indicators() {

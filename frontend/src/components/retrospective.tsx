@@ -97,6 +97,16 @@ function wrap(ctx: CanvasRenderingContext2D, text: string, x: number, y: number,
 }
 
 /** Monta a imagem da retrospectiva (story 9:16 ou feed 1:1) só com o que a pessoa escolheu mostrar. */
+
+/** Mistura a cor (#rrggbb) com preto: `keep` é a fração da cor que fica (como color-mix). */
+export function darken(hex: string, keep: number): string {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
+  if (!m) return hex;
+  const n = parseInt(m[1]!, 16);
+  const part = (shift: number) => Math.round(((n >> shift) & 255) * keep).toString(16).padStart(2, "0");
+  return `#${part(16)}${part(8)}${part(0)}`;
+}
+
 export async function renderShareImage(
   data: Retrospective,
   person: { name: string; avatarId: string | null },
@@ -109,9 +119,10 @@ export async function renderShareImage(
   canvas.height = H;
   const ctx = canvas.getContext("2d")!;
   const accent = getComputedStyle(document.documentElement).getPropertyValue("--accent").trim() || "#1f7a62";
+  // v1.6: degradê inteiro na cor escolhida, escurecida para o texto branco ser legível com qualquer cor.
   const gradient = ctx.createLinearGradient(0, 0, W, H);
-  gradient.addColorStop(0, accent);
-  gradient.addColorStop(1, "#0d2a22");
+  gradient.addColorStop(0, darken(accent, 0.55));
+  gradient.addColorStop(1, darken(accent, 0.25));
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, W, H);
 

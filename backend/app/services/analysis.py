@@ -249,6 +249,20 @@ def projection(db: Session, user: User, start: date, months: int) -> list[dict[s
 
     incomes = sums(Income)
     expenses = sums(Expense)
+    # v1.6: parte dos gastos que é parcela (compras parceladas, financiamentos): base do
+    # "quanto da renda já está comprometida com parcelas" na calculadora de parcelamento.
+    installments = {
+        month: Decimal(total)
+        for month, total in db.execute(
+            select(Expense.month, func.sum(Expense.amount))
+            .where(
+                Expense.user_id == user.id,
+                Expense.month.between(start, end),
+                Expense.installment_total > 1,
+            )
+            .group_by(Expense.month)
+        )
+    }
     # Gastos não essenciais (categoria não essencial ou sem categoria), usados pelo simulador.
     essential_ids = {c.id for c in budget.list_categories(db, user) if c.is_essential}
     wants: dict[date, Decimal] = defaultdict(lambda: ZERO)
@@ -303,6 +317,7 @@ def projection(db: Session, user: User, start: date, months: int) -> list[dict[s
                 "income": income,
                 "expenses": expense,
                 "planned": planned_by_month[month],
+                "installments": installments.get(month, ZERO),
                 "non_essential": non_essential,
                 "balance": balance,
                 "cumulative": cumulative,

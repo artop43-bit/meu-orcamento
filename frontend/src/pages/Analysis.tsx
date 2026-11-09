@@ -424,7 +424,7 @@ function CategoriesSection({ month, setMonth }: { month: string; setMonth: (m: s
           ) : (
             <Chart
               type={view}
-              labels={byCategory.map((c) => ({ key: c.category_id ?? "none", label: c.name, color: c.category_id ? colors.get(c.category_id) : "#9aa3a0" }))}
+              labels={byCategory.map((c) => ({ key: c.category_id ?? "none", label: c.name, color: c.category_id ? colors.get(c.category_id) : "var(--subtle)" }))}
               series={[{ key: "total", name: "Gastos", values: byCategory.map((c) => Number(c.total)) }]}
               description={`Gastos por categoria em ${monthLabel(month)}`}
             />

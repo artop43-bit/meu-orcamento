@@ -4,8 +4,11 @@ import { money } from "../../lib/format";
 export type ChartType = "bar" | "stacked" | "line" | "area" | "donut" | "hbar" | "table";
 export type ChartUnit = "money" | "percent";
 
-/** Paleta para séries sem cor própria (boa leitura em claro e escuro). */
-export const PALETTE = ["#1f9d7a", "#e8833a", "#4e79a7", "#b07aa1", "#e15759", "#76b7b2", "#edc948", "#9c755f", "#bab0ac"];
+/**
+ * Paleta para séries sem cor própria (v1.6): a 1ª segue a cor de destaque escolhida; as demais
+ * são tokens do tema (--chart-1 a --chart-8), com versão própria no claro e no escuro.
+ */
+export const PALETTE = ["var(--accent)", ...Array.from({ length: 8 }, (_, i) => `var(--chart-${i + 1})`)];
 
 export function colorFor(color: string | null | undefined, index: number): string {
   return color || PALETTE[index % PALETTE.length];

@@ -168,7 +168,7 @@ function AssetSheet({ symbol, onClose, watching }: { symbol: string | null; onCl
             <Chart
               type="area"
               labels={history.map((p) => ({ key: p.date, label: `${p.date.slice(8)}/${p.date.slice(5, 7)}` }))}
-              series={[{ key: "close", name: "Fechamento", color: "#4e79a7", values: history.map((p) => p.close) }]}
+              series={[{ key: "close", name: "Fechamento", color: "var(--accent)", values: history.map((p) => p.close) }]}
               description={`Preço de ${q.name} em ${RANGES.find((r) => r.value === range)?.label}`}
               height={220}
             />

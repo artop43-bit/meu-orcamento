@@ -33,14 +33,14 @@
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #0f1311;
-    --surface: #171c19;
-    --surface-2: #1d231f;
+    --bg: #080c0a;
+    --surface: #0f1613;
+    --surface-2: #151e1a;
     --fg: #e8ece9;
     --muted: #9ba5a0;
     --subtle: #8b958f;
-    --border: #262d29;
-    --border-strong: #343c37;
+    --border: #1f2a25;
+    --border-strong: #2e3a35;
     --accent: #3fb994;
     --accent-hover: #55c9a5;
     --accent-soft: #173229;
@@ -61,14 +61,14 @@
 }
 
 :root[data-theme="dark"] {
-  --bg: #0f1311;
-  --surface: #171c19;
-  --surface-2: #1d231f;
+  --bg: #080c0a;
+  --surface: #0f1613;
+  --surface-2: #151e1a;
   --fg: #e8ece9;
   --muted: #9ba5a0;
   --subtle: #8b958f;
-  --border: #262d29;
-  --border-strong: #343c37;
+  --border: #1f2a25;
+  --border-strong: #2e3a35;
   --accent: #3fb994;
   --accent-hover: #55c9a5;
   --accent-soft: #173229;
@@ -95,6 +95,7 @@
 :root {
   --positive: var(--accent);
   --positive-bg: var(--accent-soft);
+  --positive-fg: var(--accent-fg);
 }
 
 :root[data-accent="rosa"],
@@ -103,6 +104,42 @@
 :root[data-accent="ambar"] {
   --positive: var(--fg);
   --positive-bg: var(--surface-2);
+  --positive-fg: var(--surface-solid);
+}
+
+:root {
+  --chart-1: #c2621a;
+  --chart-2: #3b6ea8;
+  --chart-3: #8e5b9a;
+  --chart-4: #c4433f;
+  --chart-5: #2f8580;
+  --chart-6: #9a7410;
+  --chart-7: #8a6448;
+  --chart-8: #76706c;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --chart-1: #e8833a;
+    --chart-2: #6f9fd8;
+    --chart-3: #c08fd0;
+    --chart-4: #ee6b66;
+    --chart-5: #6cc3bd;
+    --chart-6: #e2c050;
+    --chart-7: #c49a7a;
+    --chart-8: #aaa39e;
+  }
+}
+
+:root[data-theme="dark"] {
+  --chart-1: #e8833a;
+  --chart-2: #6f9fd8;
+  --chart-3: #c08fd0;
+  --chart-4: #ee6b66;
+  --chart-5: #6cc3bd;
+  --chart-6: #e2c050;
+  --chart-7: #c49a7a;
+  --chart-8: #aaa39e;
 }
 
 /* Azul */
@@ -328,4 +365,71 @@
   --accent-hover: #d5dbd8;
   --accent-soft: #2a302d;
   --accent-fg: #121614;
+}
+
+/* Estilos visuais (src/theme/styles.ts) */
+
+:root {
+  --surface-solid: #ffffff;
+  --glow: color-mix(in srgb, var(--accent) 0%, transparent);
+  --glow-2: color-mix(in srgb, var(--accent-hover) 0%, transparent);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --surface-solid: #111915;
+    --glow: color-mix(in srgb, var(--accent) 0%, transparent);
+    --glow-2: color-mix(in srgb, var(--accent-hover) 0%, transparent);
+  }
+}
+
+:root[data-theme="dark"] {
+  --surface-solid: #111915;
+  --glow: color-mix(in srgb, var(--accent) 0%, transparent);
+  --glow-2: color-mix(in srgb, var(--accent-hover) 0%, transparent);
+}
+
+/* Liquid glass */
+
+:root[data-style="glass"] {
+  --bg: #f9fbfa;
+  --surface: rgba(255, 255, 255, 0.66);
+  --surface-2: rgba(255, 255, 255, 0.5);
+  --border: rgba(23, 32, 28, 0.1);
+  --border-strong: rgba(23, 32, 28, 0.2);
+  --muted: #4f5a55;
+  --subtle: #55605b;
+  --surface-solid: #fbfcfc;
+  --glow: color-mix(in srgb, var(--accent) 7%, transparent);
+  --glow-2: color-mix(in srgb, var(--accent-hover) 7%, transparent);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"])[data-style="glass"] {
+    --bg: #05080a;
+    --surface: rgba(16, 22, 20, 0.62);
+    --surface-2: rgba(255, 255, 255, 0.07);
+    --border: rgba(255, 255, 255, 0.13);
+    --border-strong: rgba(255, 255, 255, 0.22);
+    --fg: #f2f6f4;
+    --muted: #b2bcb7;
+    --subtle: #a3aea9;
+    --surface-solid: #121a17;
+    --glow: color-mix(in srgb, var(--accent) 25%, transparent);
+    --glow-2: color-mix(in srgb, var(--accent-hover) 25%, transparent);
+  }
+}
+
+:root[data-theme="dark"][data-style="glass"] {
+  --bg: #05080a;
+  --surface: rgba(16, 22, 20, 0.62);
+  --surface-2: rgba(255, 255, 255, 0.07);
+  --border: rgba(255, 255, 255, 0.13);
+  --border-strong: rgba(255, 255, 255, 0.22);
+  --fg: #f2f6f4;
+  --muted: #b2bcb7;
+  --subtle: #a3aea9;
+  --surface-solid: #121a17;
+  --glow: color-mix(in srgb, var(--accent) 25%, transparent);
+  --glow-2: color-mix(in srgb, var(--accent-hover) 25%, transparent);
 }

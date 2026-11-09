@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { addMonths, money, moneyInput, monthLabel, parseMoney, percent, shortDate } from "./format";
+import { addMonths, money, moneyInput, monthLabel, parseMoney, percent, shortDate, textOn } from "./format";
 
 // O Intl usa espaço não separável entre "R$" e o número.
 const brl = (text: string) => text.replace(/ /g, " ");
@@ -76,5 +76,19 @@ describe("mês financeiro", () => {
     setCycleStart(1);
     expect(cycleLabel("2030-10")).toBe("");
     expect(thisMonth()).toMatch(/^\d{4}-\d{2}$/);
+  });
+});
+
+describe("textOn (v1.6)", () => {
+  it("escolhe branco em cores escuras e quase preto em cores claras", () => {
+    expect(textOn("#8a05be")).toBe("#ffffff");
+    expect(textOn("#17201c")).toBe("#ffffff");
+    expect(textOn("#f0b44c")).toBe("#0b0f0d");
+    expect(textOn("#ffffff")).toBe("#0b0f0d");
+  });
+
+  it("sem cor válida, segue a cor do texto do tema", () => {
+    expect(textOn(null)).toBe("var(--fg)");
+    expect(textOn("azul")).toBe("var(--fg)");
   });
 });
