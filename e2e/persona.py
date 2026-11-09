@@ -1612,8 +1612,11 @@ def visual_style(page: Page):
     expect(page.locator("html")).to_have_attribute("data-accent", "roxo")
     page.goto(f"{BASE}/orcamento")
     idle(page)
-    blur = page.locator(".card").first.evaluate("(e) => getComputedStyle(e).backdropFilter")
-    assert "blur" in blur, blur
+    # Vidro: cantos bem arredondados; o desfoque só fora do modo leve (aparelhos simples).
+    card = page.locator(".card").first
+    assert card.evaluate("(e) => getComputedStyle(e).borderTopLeftRadius") == "26px"
+    if page.locator("html").get_attribute("data-lite") is None:
+        assert "blur" in card.evaluate("(e) => getComputedStyle(e).backdropFilter")
     page.screenshot(path=OUT / "v16-liquid-glass.png", full_page=True)
     # Outro "aparelho" (sem nada salvo no navegador): o estilo vem da conta.
     page.evaluate("localStorage.removeItem('preferencias-v1')")
@@ -1783,9 +1786,9 @@ def calculators(page: Page):
     expect(impact.locator(".calc-bars__col").first).to_be_visible()
     # Vírgula e ponto valem o mesmo.
     page.get_by_label("Desconto à vista").fill("10.6")
-    with_dot = result.locator(".calc-stat").first.inner_text()
+    with_dot = result.locator(".calc-stat").first.text_content()
     page.get_by_label("Desconto à vista").fill("10,6")
-    expect(result.locator(".calc-stat").first).to_have_text(with_dot)
+    expect(result.locator(".calc-stat").first).to_have_text(with_dot or "")
     page.get_by_role("button", name=re.compile("^Juros compostos")).click()
     expect(result).to_contain_text("Em 5 ano(s)")
     page.get_by_role("button", name=re.compile("^Reserva")).click()

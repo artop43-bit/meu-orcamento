@@ -496,7 +496,7 @@ function CashCalc({ cdi }: { cdi: number | null }) {
               <Stat label="Sobra média no período" value={`${money(impact.averageBefore)} → ${money(impact.averageAfter)}`} hint="por mês, antes → depois da compra" />
             </div>
 
-            <div className="calc-bars" role="img" aria-label={impact.months.map((x) => `${monthLabel(x.month)}: sobra ${money(x.before)}, com a compra ${money(x.after)}`).join("; ")}>
+            <div className="calc-bars" tabIndex={0} role="img" aria-label={impact.months.map((x) => `${monthLabel(x.month)}: sobra ${money(x.before)}, com a compra ${money(x.after)}`).join("; ")}>
               {impact.months.map((x) => (
                 <div key={x.month} className={`calc-bars__col ${x.after < 0 ? "is-negative" : ""}`}>
                   <div className="calc-bars__pos">

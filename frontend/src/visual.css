@@ -966,3 +966,9 @@ textarea:focus {
 .calc-launch label {
   flex: 1 1 220px;
 }
+
+.calc-bars:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}

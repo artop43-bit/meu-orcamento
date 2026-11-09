@@ -20,7 +20,7 @@ Estilo "Liquid glass"
 - [x] Fundo com a cor de destaque desfocada, painéis de vidro com reflexo e cantos arredondados
 - [x] Menu lateral flutuante; no celular, barra de navegação flutuante em cápsula
 - [x] Botões e seletores em pílula com relevo; gráficos em cápsula
-- [x] Vidro mais leve (sem desfoque, superfícies opacas) em aparelhos simples e quando o sistema pede "reduzir transparência"
+- [x] Vidro mais leve (sem desfoque, superfícies opacas) em aparelhos simples (até 2 núcleos ou 2 GB) e quando o sistema pede "reduzir transparência"
 
 Cores · personalização preservada
 - [x] Os dois estilos usam só as variáveis de tema; nenhuma cor fixa nos componentes (teste automático cobre styles.css e visual.css)
