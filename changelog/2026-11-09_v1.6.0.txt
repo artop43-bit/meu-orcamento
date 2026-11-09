@@ -1,6 +1,6 @@
 MEU ORÇAMENTO · UPDATE LOG
 Versão 1.6.0 · Estilos visuais e parcelamento que conhece as suas contas
-Data: 09/11/2026 às 16:00 (horário de Brasília)
+Data: 09/11/2026 às 17:45 (horário de Brasília)
 
 Aparência · novo "Estilo"
 - [x] Nova escolha em Preferências › Aparência: Estilo "Padrão" ou "Liquid glass", com miniatura de cada um
