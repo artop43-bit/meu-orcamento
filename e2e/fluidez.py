@@ -55,6 +55,8 @@ FRAMING = """() => {
     const el = n.parentElement;
     if (!el || el.closest('[aria-hidden="true"], .sr-only, svg, input, textarea, code, .admin-user__email, .bubble__text, .error-card__message, details:not([open]) > :not(summary)')) continue;
     if (!el.getBoundingClientRect().width) continue;
+    // Quebra com hífen (hifenização do idioma) é a forma correta de partir uma palavra longa.
+    if (getComputedStyle(el).hyphens === 'auto') continue;
     const re = /[\\p{L}\\p{N}]{4,}/gu;
     let m;
     while ((m = re.exec(text))) {

@@ -509,7 +509,7 @@ svg {
   flex-wrap: wrap;
   gap: 8px;
   min-width: 0;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
   color: var(--muted);
   font-size: 0.85rem;
   font-weight: 550;
@@ -3612,7 +3612,8 @@ ul.legend {
   line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
+  hyphens: auto;
   line-height: 1.25;
 }
 

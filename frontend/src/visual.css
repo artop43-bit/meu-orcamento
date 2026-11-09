@@ -1209,3 +1209,29 @@ textarea:focus {
   animation: none;
   mix-blend-mode: normal;
 }
+
+/* ---------------------------------------------------------- palavras longas (v1.6.5) */
+
+/* Palavra que não cabe sozinha na linha (fonte larga do aparelho, nome de empresa, célula do
+   calendário) quebra com hífen, como num livro ("Financia-mento"), em vez de partir sem aviso.
+   O idioma vem de <html lang="pt-BR">. */
+.ledger__title > span:first-child,
+.item__title,
+.rank__name,
+.ev__text,
+.task-card__title,
+.goal-card__title h2,
+.release__title {
+  hyphens: auto;
+  -webkit-hyphens: auto;
+}
+
+/* Indicadores lado a lado em celular estreito: o rótulo diminui um pouco para caber inteiro
+   (ex.: "Comprometimento" com a fonte mais larga de alguns aparelhos). */
+@container (max-width: 175px) {
+  .kpi__head {
+    font-size: 0.72rem;
+    letter-spacing: -0.01em;
+    gap: 6px;
+  }
+}
