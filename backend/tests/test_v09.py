@@ -250,7 +250,7 @@ def test_unsubscribe_messages_link(
 def test_appearance_is_saved_on_the_account(user: TestClient) -> None:
     assert user.get("/api/auth/me").json()["theme"] is None
     out = user.patch("/api/me/appearance", json={"theme": "dark", "accent": "roxo"})
-    assert out.json() == {"theme": "dark", "accent": "roxo"}
+    assert out.json() == {"theme": "dark", "accent": "roxo", "style": None}
     me = user.get("/api/auth/me").json()
     assert me["theme"] == "dark" and me["accent"] == "roxo"
     assert user.patch("/api/me/appearance", json={"theme": "neon"}).status_code == 422

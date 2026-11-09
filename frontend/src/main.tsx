@@ -8,8 +8,10 @@ import { captureInstallPrompt } from "./lib/install";
 import { startOfflineSync } from "./lib/offline";
 import { installErrorReporting } from "./lib/errorReport";
 import { applyPrefs } from "./lib/prefs";
+import "@fontsource-variable/space-grotesk";
 import "./theme.css";
 import "./styles.css";
+import "./visual.css";
 
 // Tema, cor, tamanho do texto e privacidade escolhidos neste aparelho.
 applyPrefs();

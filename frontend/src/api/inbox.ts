@@ -59,7 +59,8 @@ export const inboxApi = {
     api.get<{ recipients: number }>(`/admin/announcements/audience?include_pending=${includePending}`),
   announce: (data: AnnouncementInput) => api.post<Announcement>("/admin/announcements", data),
 
-  appearance: (data: { theme?: string; accent?: string }) => api.patch<{ theme: string | null; accent: string | null }>("/me/appearance", data),
+  appearance: (data: { theme?: string; accent?: string; style?: string }) =>
+    api.patch<{ theme: string | null; accent: string | null; style: string | null }>("/me/appearance", data),
   financeSettings: (data: { pix_key?: string | null; pix_name?: string | null; pix_city?: string | null; mei?: boolean }) =>
     api.patch<{ pix_key: string | null; pix_name: string | null; pix_city: string | null; mei: boolean }>("/me/finance-settings", data),
   mei: () => api.get<{ year: number; total: string; limit: string; pct: number; count: number }>("/mei"),

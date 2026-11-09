@@ -254,8 +254,8 @@ svg {
   width: 32px;
   height: 32px;
   border-radius: 9px;
-  background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 70%, #fff));
-  color: #fff;
+  background: linear-gradient(135deg, var(--accent), var(--accent-hover));
+  color: var(--accent-fg);
 }
 
 @media (min-width: 1024px) {
@@ -1586,9 +1586,9 @@ input.color {
       radial-gradient(circle at 20% 20%, rgb(255 255 255 / 12%), transparent 45%),
       linear-gradient(
         150deg,
-        color-mix(in srgb, var(--accent) 85%, #000) 0%,
-        color-mix(in srgb, var(--accent) 55%, #000) 55%,
-        color-mix(in srgb, var(--accent) 35%, #000) 100%
+        color-mix(in srgb, var(--accent) 55%, #000) 0%,
+        color-mix(in srgb, var(--accent) 40%, #000) 55%,
+        color-mix(in srgb, var(--accent) 25%, #000) 100%
       );
     color: color-mix(in srgb, #fff 92%, var(--accent));
   }
@@ -3329,7 +3329,7 @@ legend.field-label {
   padding: 10px 12px;
   border-radius: var(--radius-sm);
   background: var(--fg);
-  color: var(--surface);
+  color: var(--surface-solid);
   font-size: 0.85rem;
   font-weight: 450;
   line-height: 1.45;
@@ -3814,7 +3814,7 @@ ul.legend {
 
   .cal-day--today .cal-day__num {
     background: var(--accent);
-    color: var(--surface);
+    color: var(--accent-fg);
   }
 
   .cal-day__events {
@@ -4388,7 +4388,7 @@ kbd {
   height: 20px;
   border-radius: 50%;
   background: var(--positive);
-  color: #fff;
+  color: var(--positive-fg);
   font-size: 0.75rem;
   animation: check-pop 0.3s ease-out;
 }
@@ -5417,7 +5417,8 @@ kbd {
   margin: 0;
   padding: 0;
   border: none;
-  background: linear-gradient(160deg, var(--accent), color-mix(in srgb, var(--accent) 25%, #000));
+  /* v1.6: começa no destaque escurecido, para o texto branco ser legível com qualquer cor. */
+  background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 55%, #000), color-mix(in srgb, var(--accent) 25%, #000));
   color: #fff;
 }
 
@@ -6585,13 +6586,6 @@ textarea {
 }
 
 /* ---------------------------------------------------------------- calculadoras */
-.calc-result {
-  padding: 14px 16px;
-  border-radius: var(--radius);
-  background: var(--accent-soft);
-  line-height: 1.55;
-  overflow-wrap: anywhere;
-}
 
 /* ---------------------------------------------------------------- divisões */
 .split-rows {

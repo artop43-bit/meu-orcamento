@@ -72,14 +72,15 @@ export const BASE: Theme = {
     "shadow-lg": "0 12px 40px rgb(16 24 20 / 18%)",
   },
   dark: {
-    bg: "#0f1311",
-    surface: "#171c19",
-    "surface-2": "#1d231f",
+    // v1.6: escuro mais profundo, para o brilho da cor de destaque aparecer (estilo Padrão).
+    bg: "#080c0a",
+    surface: "#0f1613",
+    "surface-2": "#151e1a",
     fg: "#e8ece9",
     muted: "#9ba5a0",
     subtle: "#8b958f",
-    border: "#262d29",
-    "border-strong": "#343c37",
+    border: "#1f2a25",
+    "border-strong": "#2e3a35",
     accent: "#3fb994",
     "accent-hover": "#55c9a5",
     "accent-soft": "#173229",
@@ -106,6 +107,16 @@ export const BASE: Theme = {
  * só para o negativo. Cotações de mercado mantêm verde/vermelho (convenção da bolsa: --ok/--error).
  */
 export const NEUTRAL_POSITIVE = ["rosa", "vermelho", "laranja", "ambar"] as const;
+
+/**
+ * Cores das séries de gráfico (v1.6). A 1ª série é sempre a cor de destaque; estas vêm depois.
+ * Uma versão para o claro (mais escura) e outra para o escuro (mais clara): todas passam no
+ * contraste de 3:1 para elementos gráficos sobre o fundo e os cartões, em todos os estilos.
+ */
+export const CHART = {
+  light: ["#c2621a", "#3b6ea8", "#8e5b9a", "#c4433f", "#2f8580", "#9a7410", "#8a6448", "#76706c"],
+  dark: ["#e8833a", "#6f9fd8", "#c08fd0", "#ee6b66", "#6cc3bd", "#e2c050", "#c49a7a", "#aaa39e"],
+} as const;
 
 /** Cores de destaque (a primeira é a padrão). A ordem é a do seletor em Preferências. */
 export const ACCENTS = {

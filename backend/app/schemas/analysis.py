@@ -87,6 +87,8 @@ class ProjectionPoint(BaseModel):
     expenses: Decimal
     # Parte dos gastos que vem de gastos planejados ainda não lançados.
     planned: Decimal = Decimal("0")
+    # v1.6: parte dos gastos que é parcela (compras parceladas e financiamentos).
+    installments: Decimal = Decimal("0")
     non_essential: Decimal
     balance: Decimal
     cumulative: Decimal

@@ -1,0 +1,64 @@
+MEU ORÇAMENTO · UPDATE LOG
+Versão 1.6.0 · Estilos visuais e parcelamento que conhece as suas contas
+Data: 09/11/2026 às 17:45 (horário de Brasília)
+
+Aparência · novo "Estilo"
+- [x] Nova escolha em Preferências › Aparência: Estilo "Padrão" ou "Liquid glass", com miniatura de cada um
+- [x] O visual anterior foi substituído; contas existentes começam no Padrão
+- [x] Combina com qualquer tema (Automático, Claro, Escuro) e qualquer uma das 10 cores de destaque
+- [x] Salvo na conta e aplicado em todos os aparelhos, como o tema e a cor
+- [x] Troca na hora, sem recarregar a página
+- [x] Estrutura pronta para estilos futuros: cada estilo é uma camada própria de forma (src/theme/styles.ts + src/visual.css)
+- [x] Todas as telas no visual novo, inclusive entrar, cadastro, primeiros passos, administração, ajuda e termos
+- [x] App Android acompanha automaticamente (ele exibe o site), sem nova versão na loja
+
+Estilo "Padrão"
+- [x] Fundo com grade sutil na cor de destaque, cartões foscos, brilho na cor de destaque no item ativo e números em fonte própria (Space Grotesk, servida pelo próprio site)
+- [x] Escuro mais profundo; menu, cabeçalhos, cartões, barras, listas, tabelas, janelas e formulários no padrão novo
+
+Estilo "Liquid glass"
+- [x] Fundo com a cor de destaque desfocada, painéis de vidro com reflexo e cantos arredondados
+- [x] Menu lateral flutuante; no celular, barra de navegação flutuante em cápsula
+- [x] Botões e seletores em pílula com relevo; gráficos em cápsula
+- [x] Vidro mais leve (sem desfoque, superfícies opacas) em aparelhos simples (até 2 núcleos ou 2 GB) e quando o sistema pede "reduzir transparência"
+
+Cores · personalização preservada
+- [x] Os dois estilos usam só as variáveis de tema; nenhuma cor fixa nos componentes (teste automático cobre styles.css e visual.css)
+- [x] Texto sobre a cor de destaque usa a cor de contraste do tema (ícone da marca, aviso de "salvo")
+- [x] Retrospectiva, imagem para compartilhar e lateral do login: degradê inteiro na cor escolhida, escurecido para o texto branco ser legível com qualquer cor
+- [x] Gráficos: a 1ª série acompanha a cor de destaque; as demais são cores do tema, com versão para o claro e para o escuro
+- [x] Gráfico de cotações acompanha a cor de destaque
+- [x] Cores de investimentos e "sem categoria" com versão própria para o claro e o escuro
+- [x] Ícone do cartão na cor do cartão, com o ícone em branco ou escuro conforme o contraste
+- [x] Avisos sempre com texto, sem confusão com os destaques Vermelho, Laranja e Âmbar
+- [x] Animações desligadas quando o aparelho pede "reduzir movimento"
+
+Calculadoras
+- [x] Seletor em cartões com ícone e frase curta (pílulas no Liquid glass); no celular, faixa que desliza
+- [x] Resultado em destaque com número principal grande e mini gráfico em cada calculadora
+- [x] Rendimento preenchido pelo CDI atual (quando o Banco Central responde), editável, com atalho "CDI"
+- [x] Vírgula e ponto aceitos do mesmo jeito em todos os campos
+- [x] Campos com a unidade dentro da caixa (%, meses, anos) e botões rápidos de parcelas (3×, 6×, 10×, 12×)
+
+Parcelar ou à vista · "E no meu orçamento?"
+- [x] Soma a parcela simulada à previsão real dos próximos meses (parcelas atuais, fixas e planejados)
+- [x] Renda comprometida com parcelas, hoje → com a compra (sem veredito: a pessoa conclui)
+- [x] Gráfico da sobra mês a mês, antes e depois, com mês negativo destacado; mês de menor sobra e sobra média
+- [x] Limite do cartão: escolha do cartão, quanto do limite fica usado e quanto sobra livre (avisa quando não cabe)
+- [x] À vista: mostra se o saldo das contas cobre a compra sem tocar na reserva de emergência
+- [x] Sugestão do menor número de parcelas sem mês negativo, com botão "Simular"
+- [x] Escolha do mês da 1ª parcela; "Lançar como planejado" cria uma despesa planejada por parcela
+- [x] Aviso de previsão parcial quando faltam receitas ou meses previstos
+
+Correções
+- [x] Desafio começado hoje não é perdido por uma despesa que já estava lançada antes de começar (ex.: conta com vencimento no dia); um gasto novo no mesmo dia continua contando
+
+Técnico
+- [x] Nova preferência "estilo" na conta (coluna users.style, migração 0028; quem já usa fica no Padrão)
+- [x] Previsão (/analysis/projection) informa quanto de cada mês já é parcela
+- [x] Cálculos do impacto, do limite e do saldo em funções testadas (src/lib/installmentImpact.ts)
+- [x] Testes de contraste: 2 estilos × claro/escuro × 10 destaques, sobre o pior fundo (ponto mais forte do brilho), mais as séries de gráfico (3:1)
+- [x] Auditoria e2e de cores: todas as telas × 2 estilos × claro/escuro × 10 cores (1.800 combinações), com contraste de cada texto e verde fixo
+- [x] Testes novos no servidor e no site; passos novos no teste ponta a ponta (estilo e calculadora)
+- [x] Dependências atualizadas: servidor (FastAPI 0.162, SQLAlchemy 2.1.8, pytest 9.2, httpx2 2.16, entre outras) e site (react-query, lucide, react-router, vite, vitest, TypeScript 5.9); teste de sessões ajustado ao httpx2 2.16
+- [x] CI mais econômico: envio novo no mesmo pull request cancela a execução anterior; cada tarefa só roda se a parte dela mudou; imagens ARM, produção, e2e e Codespaces não rodam em rascunho; na main tudo roda sempre

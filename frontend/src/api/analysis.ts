@@ -50,6 +50,8 @@ export type ProjectionPoint = {
   income: string;
   expenses: string;
   planned?: string;
+  /** v1.6: parte dos gastos que é parcela (compras parceladas e financiamentos). */
+  installments?: string;
   non_essential: string;
   balance: string;
   cumulative: string;

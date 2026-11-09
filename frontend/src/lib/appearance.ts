@@ -2,6 +2,7 @@ import type { QueryClient } from "@tanstack/react-query";
 
 import { ME_KEY, type User } from "../api/auth";
 import { inboxApi } from "../api/inbox";
+import { isStyleName } from "../theme/styles";
 import { getPrefs, setPrefs, type Prefs } from "./prefs";
 
 export const THEMES: [Prefs["theme"], string][] = [
@@ -14,18 +15,21 @@ export const THEMES: [Prefs["theme"], string][] = [
  * Tema e cor de destaque: aplicados na hora neste aparelho e salvos na conta, para valerem
  * em qualquer aparelho em que a pessoa entrar. Falha ao salvar não desfaz a escolha local.
  */
-export function setAppearance(changes: Partial<Pick<Prefs, "theme" | "accent">>, queryClient?: QueryClient) {
+export type Appearance = Partial<Pick<Prefs, "theme" | "accent" | "style">>;
+
+export function setAppearance(changes: Appearance, queryClient?: QueryClient) {
   setPrefs(changes);
   queryClient?.setQueryData<User | null>(ME_KEY, (user) => (user ? { ...user, ...changes } : user));
   void inboxApi.appearance(changes).catch(() => undefined);
 }
 
 /** Ao entrar: a aparência salva na conta vale também neste aparelho. */
-export function syncAppearance(user: Pick<User, "theme" | "accent">) {
+export function syncAppearance(user: Pick<User, "theme" | "accent" | "style">) {
   const current = getPrefs();
   const changes: Partial<Prefs> = {};
   if (user.theme && user.theme !== current.theme) changes.theme = user.theme;
   if (user.accent && user.accent !== current.accent) changes.accent = user.accent;
+  if (user.style && isStyleName(user.style) && user.style !== current.style) changes.style = user.style;
   if (Object.keys(changes).length) setPrefs(changes);
 }
 

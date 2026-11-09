@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 
+import type { StyleName } from "../theme/styles";
 import type { AccentName } from "../theme/tokens";
 import { api, ApiError } from "./client";
 
@@ -15,6 +16,8 @@ export type User = {
   onboarded_at?: string | null;
   theme?: "system" | "light" | "dark" | null;
   accent?: AccentName | null;
+  /** v1.6: estilo visual. */
+  style?: StyleName | null;
   /** v1.3: cartões do Orçamento (JSON); null = padrão. */
   dashboard?: string | null;
   /** v1.4: chave Pix e MEI. */

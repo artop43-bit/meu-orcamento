@@ -151,6 +151,10 @@ def progress(
         when = _spent_on(expense)
         if not challenge.start_date <= when <= window_end:
             continue
+        # No dia do início, o que já estava lançado antes de começar o desafio não conta
+        # (ex.: uma conta com vencimento hoje cadastrada há semanas). v1.6.
+        if when == challenge.start_date and expense.created_at < challenge.created_at:
+            continue
         if challenge.kind == "no_keyword":
             text = normalize(expense.description)
             if any(w and w in text for w in words):

@@ -12,6 +12,7 @@ import { setAppearance } from "../lib/appearance";
 import { cycleLabel, setCycleStart, thisMonth } from "../lib/format";
 import { setPrefs, usePrefs, type Prefs } from "../lib/prefs";
 import { PixMeiSettings } from "../components/PixMeiSettings";
+import { STYLES, type StyleName } from "../theme/styles";
 import { ACCENTS, type AccentName } from "../theme/tokens";
 
 function Choice<K extends keyof Prefs>({
@@ -44,6 +45,41 @@ function Choice<K extends keyof Prefs>({
               }
             />
             {text}
+          </label>
+        ))}
+      </div>
+    </fieldset>
+  );
+}
+
+/**
+ * Estilo visual (v1.6): miniatura de cada um, pintada com o tema e a cor de destaque atuais
+ * (o atributo data-style da miniatura troca só a forma, igual ao app inteiro).
+ */
+function StylePicker({ value }: { value: StyleName }) {
+  const queryClient = useQueryClient();
+  const styles = Object.entries(STYLES) as [StyleName, (typeof STYLES)[StyleName]][];
+  return (
+    <fieldset className="radios">
+      <legend className="field-label">Estilo</legend>
+      <div className="style-picker">
+        {styles.map(([name, style]) => (
+          <label key={name} className="style-option">
+            <input type="radio" name="style" checked={value === name} onChange={() => setAppearance({ style: name }, queryClient)} />
+            <span className="style-thumb" data-thumb={name} aria-hidden>
+              <span className="style-thumb__side" />
+              <span className="style-thumb__body">
+                <span className="style-thumb__card style-thumb__card--hero" />
+                <span className="style-thumb__row">
+                  <span className="style-thumb__card" />
+                  <span className="style-thumb__card" />
+                </span>
+              </span>
+            </span>
+            <span className="style-option__text">
+              <strong>{style.label}</strong>
+              <span className="muted small">{style.text}</span>
+            </span>
           </label>
         ))}
       </div>
@@ -211,9 +247,10 @@ export default function Preferences() {
           <section className="card stack">
             <h2>Aparência</h2>
             <p className="muted small" style={{ margin: 0 }}>
-              Tema e cor de destaque ficam salvos na sua conta e valem em todos os aparelhos. Tamanho do texto e espaçamento valem só neste
+              Estilo, tema e cor de destaque ficam salvos na sua conta e valem em todos os aparelhos. Tamanho do texto e espaçamento valem só neste
               aparelho.
             </p>
+            <StylePicker value={prefs.style} />
             <Choice
               name="theme"
               label="Tema"
