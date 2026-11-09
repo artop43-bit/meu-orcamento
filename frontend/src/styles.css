@@ -3329,7 +3329,7 @@ legend.field-label {
   padding: 10px 12px;
   border-radius: var(--radius-sm);
   background: var(--fg);
-  color: var(--surface);
+  color: var(--surface-solid);
   font-size: 0.85rem;
   font-weight: 450;
   line-height: 1.45;
@@ -3814,7 +3814,7 @@ ul.legend {
 
   .cal-day--today .cal-day__num {
     background: var(--accent);
-    color: var(--surface);
+    color: var(--accent-fg);
   }
 
   .cal-day__events {

@@ -139,4 +139,11 @@ describe("tema", () => {
       expect(contrast("#ffffff", mix(a, 55, "#000000"))).toBeGreaterThanOrEqual(AA);
     }
   });
+
+  // No Liquid glass as superfícies são translúcidas: como cor de TEXTO, use --surface-solid ou
+  // --accent-fg (opacos e testados), nunca --surface/--surface-2.
+  it("nenhum texto pintado com a cor translúcida das superfícies", () => {
+    const css = read("../styles.css") + read("../visual.css");
+    expect(css.match(/(?<![-\w])color:\s*var\(--surface(-2)?\)/g)).toBeNull();
+  });
 });
