@@ -1,6 +1,6 @@
 MEU ORÇAMENTO · UPDATE LOG
 Versão 1.6.5 · Fluidez e enquadramento
-Data: 09/11/2026 às 22:00 (horário de Brasília)
+Data: 09/11/2026 às 20:40 (horário de Brasília)
 
 Enquadramento
 - [x] Abas (Administração, Contas, Mensagens e demais) nunca partem palavras: no celular ocupam a largura quando cabem e viram uma faixa que desliza quando não cabem
