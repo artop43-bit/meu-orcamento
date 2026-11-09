@@ -113,9 +113,16 @@ def test_list_and_revoke_sessions(client: TestClient, outbox: Outbox, db: Sessio
     assert client.delete(f"/api/auth/sessions/{other['id']}").status_code == 204
     assert len(client.get("/api/auth/sessions").json()) == 1
 
-    # O cookie da sessão encerrada não vale mais.
+    # O cookie da sessão encerrada não vale mais. Limpa antes: sem domínio, cookies.set()
+    # acrescenta um segundo cookie em vez de trocar o da sessão atual (httpx2 2.16).
+    current_cookie = client.cookies.get("session")
+    client.cookies.clear()
     client.cookies.set("session", old_cookie)
     assert client.get("/api/auth/me").status_code == 401
+    # E o da sessão atual continua valendo.
+    client.cookies.clear()
+    client.cookies.set("session", current_cookie)
+    assert client.get("/api/auth/me").status_code == 200
 
 
 def test_revoke_other_sessions(client: TestClient, outbox: Outbox) -> None:
