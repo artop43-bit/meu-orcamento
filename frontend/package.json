@@ -12,21 +12,21 @@
     "theme": "node scripts/gen-theme.ts"
   },
   "dependencies": {
-    "@tanstack/react-query": "^5.75.0",
-    "lucide-react": "^1.58.0",
+    "@tanstack/react-query": "^5.106.1",
+    "lucide-react": "^1.70.0",
     "qrcode.react": "^4.2.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
-    "react-router": "^8.4.0"
+    "react-router": "^8.5.1"
   },
   "devDependencies": {
     "@types/node": "^22.15.0",
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.0",
-    "@vitejs/plugin-react": "^6.1.2",
+    "@vitejs/plugin-react": "^6.2.1",
     "axe-core": "^4.14.0",
-    "typescript": "~5.8.3",
-    "vite": "^8.3.4",
-    "vitest": "^5.0.5"
+    "typescript": "~5.9.3",
+    "vite": "^8.3.6",
+    "vitest": "^5.1.0"
   }
 }
