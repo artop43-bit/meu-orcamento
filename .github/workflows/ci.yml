@@ -4,9 +4,58 @@ on:
   push:
     branches: [main]
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+# Economia de minutos (v1.6): um envio novo no mesmo pull request cancela a execução anterior.
+# Na main nada é cancelado (o deploy depende do CI completo de cada versão).
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  # Quais partes mudaram no pull request: cada tarefa abaixo só roda se a parte dela mudou.
+  # Na main tudo roda sempre. Mudança no próprio CI também roda tudo.
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.diff.outputs.backend }}
+      frontend: ${{ steps.diff.outputs.frontend }}
+      stack: ${{ steps.diff.outputs.stack }}
+      e2e: ${{ steps.diff.outputs.e2e }}
+      devcontainer: ${{ steps.diff.outputs.devcontainer }}
+      heavy: ${{ steps.diff.outputs.heavy }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - id: diff
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          DRAFT: ${{ github.event.pull_request.draft }}
+        run: |
+          if [ "$EVENT" != "pull_request" ]; then
+            files="(tudo)"
+            all=1
+          else
+            files=$(git diff --name-only "$BASE" HEAD)
+            all=0
+            echo "$files" | grep -q '^\.github/workflows/ci\.yml$' && all=1
+          fi
+          has() { [ "$all" = 1 ] || echo "$files" | grep -Eq "$1"; }
+          out() { if has "$2"; then echo "$1=true"; else echo "$1=false"; fi >> "$GITHUB_OUTPUT"; }
+          out backend '^backend/'
+          out frontend '^frontend/'
+          out stack '^(backend|frontend|deploy)/|^docker-compose'
+          out e2e '^(backend|frontend|e2e)/'
+          out devcontainer '^\.devcontainer/|^backend/(pyproject\.toml|uv\.lock)$|^frontend/package(-lock)?\.json$'
+          # Tarefas pesadas (imagens ARM, produção, e2e, Codespaces): não rodam em rascunho.
+          if [ "$DRAFT" = "true" ]; then echo "heavy=false" >> "$GITHUB_OUTPUT"; else echo "heavy=true" >> "$GITHUB_OUTPUT"; fi
+          echo "Arquivos alterados:"; echo "$files"; cat "$GITHUB_OUTPUT"
+
   backend:
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -23,6 +72,8 @@ jobs:
 
   # Os mesmos testes no banco de produção, mais as migrações do zero.
   backend-postgres:
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -67,6 +118,8 @@ jobs:
           uv run alembic upgrade head
 
   frontend:
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -83,6 +136,8 @@ jobs:
   # Sobe a stack de produção inteira (docker-compose.prod.yml) em https://localhost e testa
   # site, segurança, cadastro/login e backup + restauração. Ver deploy/scripts/smoke-test.sh.
   production:
+    needs: changes
+    if: needs.changes.outputs.stack == 'true' && needs.changes.outputs.heavy == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -92,6 +147,8 @@ jobs:
 
   # A VM da Oracle é ARM (Ampere): garante que as imagens constroem e importam nessa arquitetura.
   arm64:
+    needs: changes
+    if: needs.changes.outputs.stack == 'true' && needs.changes.outputs.heavy == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -111,6 +168,8 @@ jobs:
   # Usa o app pela interface como uma pessoa de verdade (persona com 9 meses de dados) e
   # confere o layout e audita a acessibilidade de todas as telas. Ver e2e/persona.py, e2e/layout.py e e2e/acessibilidade.py.
   e2e:
+    needs: changes
+    if: needs.changes.outputs.e2e == 'true' && needs.changes.outputs.heavy == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
@@ -170,6 +229,8 @@ jobs:
   # Sobe o ambiente do Codespaces de verdade (devcontainer) e confere que API e site
   # continuam no ar depois da inicialização automática.
   codespaces:
+    needs: changes
+    if: needs.changes.outputs.devcontainer == 'true' && needs.changes.outputs.heavy == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:

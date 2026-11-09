@@ -50,6 +50,9 @@ Parcelar ou à vista · "E no meu orçamento?"
 - [x] Escolha do mês da 1ª parcela; "Lançar como planejado" cria uma despesa planejada por parcela
 - [x] Aviso de previsão parcial quando faltam receitas ou meses previstos
 
+Correções
+- [x] Desafio começado hoje não é perdido por uma despesa que já estava lançada antes de começar (ex.: conta com vencimento no dia); um gasto novo no mesmo dia continua contando
+
 Técnico
 - [x] Nova preferência "estilo" na conta (coluna users.style, migração 0028; quem já usa fica no Padrão)
 - [x] Previsão (/analysis/projection) informa quanto de cada mês já é parcela
@@ -57,3 +60,5 @@ Técnico
 - [x] Testes de contraste: 2 estilos × claro/escuro × 10 destaques, sobre o pior fundo (ponto mais forte do brilho), mais as séries de gráfico (3:1)
 - [x] Auditoria e2e de cores: todas as telas × 2 estilos × claro/escuro × 10 cores (1.800 combinações), com contraste de cada texto e verde fixo
 - [x] Testes novos no servidor e no site; passos novos no teste ponta a ponta (estilo e calculadora)
+- [x] Dependências atualizadas: servidor (FastAPI 0.162, SQLAlchemy 2.1.8, pytest 9.2, httpx2 2.16, entre outras) e site (react-query, lucide, react-router, vite, vitest, TypeScript 5.9); teste de sessões ajustado ao httpx2 2.16
+- [x] CI mais econômico: envio novo no mesmo pull request cancela a execução anterior; cada tarefa só roda se a parte dela mudou; imagens ARM, produção, e2e e Codespaces não rodam em rascunho; na main tudo roda sempre

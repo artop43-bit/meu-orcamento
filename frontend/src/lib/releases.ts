@@ -30,6 +30,10 @@ export const RELEASES: Release[] = [
           "Resultados em destaque com mini gráficos, rendimento pelo CDI atual e vírgula ou ponto nos números.",
         ],
       },
+      {
+        title: "Correções",
+        items: ["Um desafio começado hoje não é mais perdido por uma despesa que já estava lançada antes de começar."],
+      },
     ],
   },
   {
