@@ -35,12 +35,14 @@ type ViewTransitionDoc = Document & { startViewTransition?: (cb: () => void) => 
 
 /**
  * v1.6.5: aplica a troca com uma revelação circular a partir de `origin` (View Transitions do
- * navegador). Sem suporte, com "reduzir movimento" ou sem origem, troca direto.
+ * navegador). Sem suporte, com "reduzir movimento", sem origem ou em navegador controlado por
+ * teste automático, troca direto. (Com a revelação, a troca só acontece um quadro depois do
+ * toque, quando o navegador termina de fotografar a tela antiga.)
  */
 function withReveal(apply: () => void, origin?: Origin) {
   const doc = document as ViewTransitionDoc;
   const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-  if (!origin || !doc.startViewTransition || reduce) {
+  if (!origin || !doc.startViewTransition || reduce || navigator.webdriver) {
     apply();
     return;
   }
