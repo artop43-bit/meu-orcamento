@@ -3,15 +3,15 @@
  * do changelog (pasta changelog/), que tem a mesma versão, data e hora.
  */
 export const RELEASE = {
-  version: "1.6.0",
+  version: "1.6.5",
   // Data e hora (Brasília) em que o update foi publicado.
-  releasedAt: "2026-11-09T17:45:00-03:00",
+  releasedAt: "2026-11-09T22:00:00-03:00",
 };
 
 /** Mostrado uma vez em "Novidades" depois do update (curto: o detalhe fica no changelog). */
 export const RELEASE_NOTES: { title: string; text: string }[] = [
-  { title: "Visual novo e Liquid glass.", text: "Escolha o estilo em Preferências › Aparência; combina com o tema e a sua cor." },
-  { title: "Parcelar ou à vista.", text: "A calculadora mostra quanto da sua renda a parcela compromete nos próximos meses." },
+  { title: "Mais fluido.", text: "Troca de telas mais leve, marcador que desliza até a aba ativa e números que sobem até o valor." },
+  { title: "Tudo no lugar.", text: "Abas e títulos não partem mais palavras no celular, nos dois estilos." },
 ];
 
 export function releaseLabel(): string {

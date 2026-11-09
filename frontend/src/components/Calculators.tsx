@@ -17,6 +17,7 @@ import { MoneyInput } from "./budget";
 import { Tip } from "./help";
 import { Button } from "./ui";
 import { compactValue } from "./chart/format";
+import { CountUp } from "./CountUp";
 
 type Kind = "compound" | "plan" | "cash" | "prepay" | "reserve" | "inflation" | "bonus";
 
@@ -166,7 +167,9 @@ function Hero({ tag, label, figure, children, chart, tone = "accent" }: { tag?: 
     <div className={`calc-hero calc-hero--${tone}`} aria-live="polite">
       {tag && <span className="calc-hero__tag">{tag}</span>}
       <span className="calc-hero__label">{label}</span>
-      <span className="calc-figure">{figure}</span>
+      <span className="calc-figure">
+        <CountUp text={figure} duration={450} />
+      </span>
       {children}
       {chart && <div className="calc-hero__chart">{chart}</div>}
     </div>

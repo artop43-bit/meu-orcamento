@@ -18,7 +18,6 @@
   --control-radius: 12px;
   --glow-ring: 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent), 0 0 22px color-mix(in srgb, var(--accent) 20%, transparent);
   --card-bg: color-mix(in srgb, var(--surface) 90%, transparent);
-  --card-blur: 10px;
 }
 
 /* ---------------------------------------------------------- tipografia */
@@ -58,6 +57,9 @@ body {
 
 /* ---------------------------------------------------------- superfícies */
 
+/* v1.6.5: cartões sem desfoque (o desfoque em dezenas de cartões pesava no celular). O vidro
+   dos cartões vem da cor translúcida e do reflexo; o desfoque fica no menu, nas abas e nas
+   janelas, que são poucos e ficam por cima do conteúdo. */
 .card,
 .kpi,
 .teaser,
@@ -66,8 +68,6 @@ body {
 .settings-list__item,
 .agenda__list > li {
   background: var(--card-bg);
-  backdrop-filter: blur(var(--card-blur));
-  -webkit-backdrop-filter: blur(var(--card-blur));
   border-radius: var(--radius-lg);
 }
 
@@ -136,7 +136,6 @@ textarea:focus {
 :root[data-style="glass"] {
   --glass-blur: 28px;
   --card-bg: var(--surface);
-  --card-blur: var(--glass-blur);
   --radius-sm: 12px;
   --radius: 20px;
   --radius-lg: 26px;
@@ -160,8 +159,6 @@ textarea:focus {
 :root[data-style="glass"] .task-card,
 :root[data-style="glass"] .inbox-item,
 :root[data-style="glass"] .settings-list__item {
-  backdrop-filter: blur(var(--glass-blur)) saturate(170%);
-  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(170%);
   box-shadow: var(--glass-highlight), var(--shadow);
 }
 
@@ -177,8 +174,6 @@ textarea:focus {
 :root[data-style="glass"] .btn--secondary {
   background: var(--surface-2);
   box-shadow: var(--glass-highlight);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
 }
 
 :root[data-style="glass"] input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]),
@@ -971,4 +966,246 @@ textarea:focus {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
   border-radius: var(--radius-sm);
+}
+
+/* ---------------------------------------------------------- faixas que deslizam (v1.6.5) */
+
+/* Esmaecido na borda onde ainda há conteúdo (data-fade vem de src/lib/scrollEdges.ts). */
+[data-fade="end"] {
+  -webkit-mask-image: linear-gradient(to right, black calc(100% - 28px), transparent);
+  mask-image: linear-gradient(to right, black calc(100% - 28px), transparent);
+}
+
+[data-fade="start"] {
+  -webkit-mask-image: linear-gradient(to right, transparent, black 28px);
+  mask-image: linear-gradient(to right, transparent, black 28px);
+}
+
+[data-fade="both"] {
+  -webkit-mask-image: linear-gradient(to right, transparent, black 28px, black calc(100% - 28px), transparent);
+  mask-image: linear-gradient(to right, transparent, black 28px, black calc(100% - 28px), transparent);
+}
+
+.page-tabs a,
+.tabs > *,
+.analysis__nav a {
+  white-space: nowrap;
+}
+
+/* ---------------------------------------------------------- linhas de item (v1.6.5) */
+
+/* Título com pelo menos ~9 caracteres de largura: quando não cabe tudo numa linha (celular
+   estreito, etiquetas e botões), valor e ações descem para a linha de baixo, à direita, em vez
+   de espremer o título até partir as palavras. */
+.item {
+  flex-wrap: wrap;
+  row-gap: 6px;
+}
+
+.item__main {
+  flex: 1 1 9.5rem;
+}
+
+.item__main ~ :not(.item__check) {
+  flex-shrink: 0;
+}
+
+.item__main + *,
+.item__main ~ .item__value,
+.item__main ~ .item__amount {
+  margin-left: auto;
+}
+
+/* ---------------------------------------------------------- telas longas (v1.6.5) */
+
+/* Linhas do extrato do mês fora da tela não são desenhadas até chegarem perto (a rolagem e a
+   troca de telas ficam mais leves no celular). A altura reservada é a de uma linha comum; as
+   linhas têm folga nas bordas, então o contorno de foco não é cortado. */
+.ledger__row:not(.ledger__head) {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 64px;
+}
+
+/* ---------------------------------------------------------- marcador deslizante (v1.6.5) */
+
+/* O marcador (src/lib/navIndicator.ts) fica atrás dos itens e desliza com efeito de mola até o
+   item ativo. Com ele, o item ativo perde o fundo próprio (o marcador é o fundo). */
+[data-pill] {
+  position: relative;
+  isolation: isolate;
+}
+
+.tabbar[data-pill] {
+  position: fixed;
+}
+
+.nav-pill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: -1;
+  pointer-events: none;
+  border-radius: 10px;
+  background: var(--accent-soft);
+  box-shadow: var(--glow-ring);
+  transition:
+    transform 0.42s cubic-bezier(0.34, 1.4, 0.64, 1),
+    width 0.32s cubic-bezier(0.2, 0.8, 0.2, 1),
+    height 0.32s cubic-bezier(0.2, 0.8, 0.2, 1),
+    opacity 0.2s;
+  will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nav-pill {
+    transition: none;
+  }
+}
+
+/* Menu lateral */
+.sidebar nav[data-pill] .sidebar__link.active {
+  background: transparent;
+  box-shadow: none;
+}
+
+/* Barra de abas do celular: o marcador envolve o ícone e o nome. */
+.tabbar {
+  --pill-inset: 6px;
+}
+
+.tabbar .nav-pill {
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  box-shadow: 0 0 18px color-mix(in srgb, var(--accent) 22%, transparent);
+  transform-origin: center;
+}
+
+:root[data-style="glass"] .tabbar .nav-pill {
+  border-radius: 999px;
+  box-shadow: var(--glass-highlight), 0 0 18px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+/* Abas das telas */
+.page-tabs .nav-pill {
+  border-radius: 9px;
+  background: var(--surface-solid);
+  box-shadow: 0 1px 3px color-mix(in srgb, black 12%, transparent), var(--glow-ring);
+}
+
+.page-tabs[data-pill] a[aria-current="page"] {
+  background: transparent;
+  box-shadow: none;
+}
+
+:root[data-style="glass"] .page-tabs .nav-pill {
+  border-radius: 999px;
+}
+
+/* Submenus em pílula no celular */
+.group-tabs .nav-pill {
+  border-radius: 999px;
+  background: var(--accent-soft);
+  box-shadow: 0 0 0 1px var(--accent), 0 0 16px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+.group-tabs[data-pill] a,
+.group-tabs[data-pill] a.active {
+  background: transparent;
+}
+
+.group-tabs[data-pill] a.active {
+  border-color: transparent;
+}
+
+/* ---------------------------------------------------------- fluidez (v1.6.5) */
+
+/* Entrada das telas: cartões surgem em sequência rápida (no máximo ~0,3 s no total). Nunca
+   partem do transparente: o conteúdo aparece na hora e só se acomoda. */
+.page[data-enter] :is(.card, .kpi, .teaser, .calc-hero, .calc-impact) {
+  animation: card-in 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.page[data-enter] :is(.card, .kpi, .teaser):nth-child(2) {
+  animation-delay: 30ms;
+}
+
+.page[data-enter] :is(.card, .kpi, .teaser):nth-child(3) {
+  animation-delay: 60ms;
+}
+
+.page[data-enter] :is(.card, .kpi, .teaser):nth-child(4) {
+  animation-delay: 90ms;
+}
+
+.page[data-enter] :is(.card, .kpi, .teaser):nth-child(n + 5) {
+  animation-delay: 120ms;
+}
+
+@keyframes card-in {
+  from {
+    opacity: 0.35;
+    transform: translate3d(0, 10px, 0) scale(0.985);
+  }
+}
+
+/* Gráficos das calculadoras crescem ao aparecer. */
+.calc-bars__bar {
+  transform-origin: bottom;
+  animation: calc-grow-y 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.calc-bars__neg .calc-bars__bar {
+  transform-origin: top;
+}
+
+.calc-compare__fill {
+  transform-origin: left;
+  animation: calc-grow-x 0.55s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.calc-ring {
+  animation: calc-ring-in 0.6s cubic-bezier(0.34, 1.4, 0.64, 1) both;
+}
+
+@keyframes calc-grow-y {
+  from {
+    transform: scaleY(0);
+  }
+}
+
+@keyframes calc-grow-x {
+  from {
+    transform: scaleX(0);
+  }
+}
+
+@keyframes calc-ring-in {
+  from {
+    transform: rotate(-90deg) scale(0.85);
+    opacity: 0.4;
+  }
+}
+
+/* Toque com resposta: botões, cartões clicáveis e abas afundam levemente ao pressionar. */
+.btn,
+.calc-picker__item,
+.calc-quick__btn,
+.chip-btn,
+.page-tabs a,
+.group-tabs a,
+.style-option,
+.accent-swatch {
+  transition-property: background, border-color, color, box-shadow, transform;
+  transition-duration: 0.15s;
+}
+
+:is(.btn, .calc-picker__item, .calc-quick__btn, .chip-btn, .page-tabs a, .group-tabs a, .style-option, .accent-swatch, a.card, button.card):active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+/* Troca de tema ou estilo: revelação circular a partir do toque (src/lib/appearance.ts). */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
 }

@@ -8,6 +8,8 @@ import { captureInstallPrompt } from "./lib/install";
 import { startOfflineSync } from "./lib/offline";
 import { installErrorReporting } from "./lib/errorReport";
 import { applyPrefs } from "./lib/prefs";
+import { installNavIndicator } from "./lib/navIndicator";
+import { installScrollEdges } from "./lib/scrollEdges";
 import "@fontsource-variable/space-grotesk";
 import "./theme.css";
 import "./styles.css";
@@ -15,6 +17,12 @@ import "./visual.css";
 
 // Tema, cor, tamanho do texto e privacidade escolhidos neste aparelho.
 applyPrefs();
+
+// Faixas que deslizam para o lado mostram um esmaecido onde há mais conteúdo (v1.6.5).
+installScrollEdges();
+
+// Marcador que desliza até o item ativo dos menus e abas (v1.6.5).
+installNavIndicator();
 
 // Erros de formulário em mensagens do app, junto do campo (sem balões do navegador).
 installFormErrors();

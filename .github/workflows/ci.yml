@@ -216,6 +216,10 @@ jobs:
         if: always()
         timeout-minutes: 10
         run: uv run --no-project --with playwright python e2e/cores.py
+      - name: Enquadramento e fluidez (palavra partida, fora da tela, quadros travados)
+        if: always()
+        timeout-minutes: 10
+        run: uv run --no-project --with playwright python e2e/fluidez.py
       - name: Logs dos servidores
         if: failure()
         run: tail -n 80 /tmp/api.log /tmp/web.log

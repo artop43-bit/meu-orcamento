@@ -24,6 +24,8 @@ type Options = {
 export function resetSwipe(el: HTMLElement | null, peek?: HTMLElement | null) {
   for (const node of [el, peek]) {
     if (!node) continue;
+    // Encerra a saída animada do deslize (v1.6.5), que fica parada no fim até a troca de tela.
+    node.getAnimations().forEach((a) => a.cancel());
     node.style.transition = "";
     node.style.transform = "";
     node.style.opacity = "";
