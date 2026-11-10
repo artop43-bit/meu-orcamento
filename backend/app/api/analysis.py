@@ -25,7 +25,7 @@ from app.schemas.analysis import (
     SeriesOut,
     TrendsOut,
 )
-from app.services import analysis, indicators, insights, investments, series
+from app.services import analysis, ask, indicators, insights, investments, series
 
 router = APIRouter(tags=["análises"])
 
@@ -217,3 +217,36 @@ def set_targets(body: TargetsIn, user: CurrentUser, db: DbSession) -> dict[str, 
     user.investment_targets = json.dumps(targets) if targets else None
     db.commit()
     return targets
+
+
+# ---------------------------------------------------------------- tire sua dúvida (v1.7)
+
+
+class AskIn(BaseModel):
+    question: str = Field(min_length=1, max_length=200)
+
+
+class AskItem(BaseModel):
+    label: str
+    detail: str | None = None
+    value: str | None = None
+    link: str | None = None
+
+
+class AskLink(BaseModel):
+    label: str
+    to: str
+
+
+class AskOut(BaseModel):
+    intent: str
+    answer: str
+    items: list[AskItem]
+    links: list[AskLink]
+    suggestions: list[str]
+
+
+@router.post("/ask")
+def ask_question(body: AskIn, user: CurrentUser, db: DbSession) -> AskOut:
+    """Responde perguntas sobre os próprios dados por regras locais (a pergunta não é guardada)."""
+    return AskOut.model_validate(ask.answer(db, user, body.question))

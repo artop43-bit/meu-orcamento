@@ -11,6 +11,35 @@ export type Release = {
 
 export const RELEASES: Release[] = [
   {
+    version: "1.7.0",
+    date: "10/11/2026 às 12:00",
+    title: "Painel mais leve, cores consistentes e Tire sua dúvida",
+    sections: [
+      {
+        title: "Painel do Orçamento",
+        items: [
+          "Resumo do mês num bloco só, com o saldo em destaque.",
+          "Avisos reunidos numa faixa que abre ao tocar; filtros em pílulas e o menu ⋯ na lista de despesas.",
+          "Coluna lateral mais enxuta: detalhes aparecem quando você toca.",
+        ],
+      },
+      {
+        title: "Tire sua dúvida",
+        items: [
+          "Em Insights, pergunte sobre os seus lançamentos: o que mais gastou, em que mês, quando gastou mais numa categoria, o que vence e onde fica cada coisa no site.",
+          "Respondido pelo próprio site, sem serviço externo; a pergunta não fica salva.",
+        ],
+      },
+      {
+        title: "Cores e mouse",
+        items: [
+          "Listas suspensas legíveis em todos os temas e cores.",
+          "Ícones e botões ganham destaque na cor escolhida ao passar o mouse.",
+        ],
+      },
+    ],
+  },
+  {
     version: "1.6.5",
     date: "09/11/2026 às 21:35",
     title: "Fluidez e enquadramento",

@@ -82,3 +82,18 @@ export const builderApi = {
     api.patch<SavedAnalysis>(`/analysis/saved/${id}`, data),
   remove: (id: string) => api.delete(`/analysis/saved/${id}`),
 };
+
+// ---------------------------------------------------------------- tire sua dúvida (v1.7)
+
+export type AskItem = { label: string; detail: string | null; value: string | null; link: string | null };
+export type AskAnswer = {
+  intent: string;
+  answer: string;
+  items: AskItem[];
+  links: { label: string; to: string }[];
+  suggestions: string[];
+};
+
+export const askApi = {
+  ask: (question: string) => api.post<AskAnswer>("/ask", { question }),
+};
