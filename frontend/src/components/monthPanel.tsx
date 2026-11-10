@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { ArrowDownLeft, CalendarClock, Wallet } from "lucide-react";
+import { ArrowDownLeft, CalendarClock } from "lucide-react";
 import { Link } from "react-router";
 
 import { periodsApi, type Periods } from "../api/analysis";
@@ -169,7 +169,7 @@ function PeriodDelta({ periods, month }: { periods: Periods; month: string }) {
 export type Stop = { date: string; pos: number; label: string; amount: number; count: number; kind: "income" | "paid" | "late" | "next" };
 
 /** Paradas da linha do mês: receitas com dia e vencimentos, agrupando o que cai perto (pura). */
-export function monthStops(data: MonthData, today: string, [start, end]: [Date, Date], gap = 8, max = 8): Stop[] {
+export function monthStops(data: MonthData, today: string, [start, end]: [Date, Date], gap = 12, max = 8): Stop[] {
   const span = Math.max(1, (end.getTime() - start.getTime()) / DAY);
   const pos = (date: Date) => Math.min(100, Math.max(0, ((date.getTime() - start.getTime()) / DAY / span) * 100));
   const raw: Stop[] = [];
@@ -196,16 +196,22 @@ export function monthStops(data: MonthData, today: string, [start, end]: [Date, 
   // Cabem poucas paradas: ficam as que pedem atenção e as maiores.
   const weight = (s: Stop) => (s.kind === "late" ? 4 : s.kind === "next" ? 3 : s.kind === "income" ? 2 : 1) * 1e9 + s.amount;
   const kept = [...raw].sort((a, b) => weight(b) - weight(a)).slice(0, max * 2).sort((a, b) => a.pos - b.pos || a.kind.localeCompare(b.kind));
+  // Receitas ficam acima da linha e contas abaixo: cada lado agrupa o que cai perto.
+  const rank = { late: 3, next: 2, paid: 1, income: 0 } as const;
   const merged: Stop[] = [];
-  for (const stop of kept) {
-    const last = merged.at(-1);
-    if (last && stop.pos - last.pos < gap && (last.kind === "income") === (stop.kind === "income")) {
-      last.amount += stop.amount;
-      last.count += stop.count;
-      last.label = last.kind === "income" ? `${last.count} receitas` : `${last.count} contas`;
-      const rank = { late: 3, next: 2, paid: 1, income: 0 } as const;
-      if (rank[stop.kind] > rank[last.kind]) last.kind = stop.kind;
-    } else merged.push({ ...stop });
+  for (const side of [kept.filter((s) => s.kind === "income"), kept.filter((s) => s.kind !== "income")]) {
+    let last: Stop | undefined;
+    for (const stop of side) {
+      if (last && stop.pos - last.pos < gap) {
+        last.amount += stop.amount;
+        last.count += stop.count;
+        last.label = last.kind === "income" ? `${last.count} receitas` : `${last.count} contas`;
+        if (rank[stop.kind] > rank[last.kind]) last.kind = stop.kind;
+      } else {
+        last = { ...stop };
+        merged.push(last);
+      }
+    }
   }
   return merged.sort((a, b) => weight(b) - weight(a)).slice(0, max).sort((a, b) => a.pos - b.pos);
 }
@@ -237,9 +243,6 @@ export function MonthLine({ data, month }: { data: MonthData; month: string }) {
           {inMonth && (
             <li className="month-line__today" aria-label={`Hoje, ${shortDate(today)}`}>
               <span className="month-line__marker" aria-hidden>
-                <Wallet size={14} />
-              </span>
-              <span className="month-line__today-label" aria-hidden>
                 hoje
               </span>
             </li>
