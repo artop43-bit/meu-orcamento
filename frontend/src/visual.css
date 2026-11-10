@@ -1608,11 +1608,27 @@ select option:checked {
 @media (min-width: 1024px) {
   .page-header:has(.month-actions .quick-bar) {
     align-items: center;
+    flex-wrap: nowrap;
+  }
+
+  .page-header:has(.month-actions .quick-bar) > :first-child {
+    flex: none;
   }
 
   .page-header:has(.month-actions .quick-bar) .page-header__actions {
-    flex: 1 1 520px;
+    flex: 1 1 auto;
+    min-width: 0;
+    flex-wrap: nowrap;
     justify-content: flex-end;
+  }
+
+  .month-actions .quick-bar {
+    flex: 1 1 200px;
+  }
+
+  .month-actions > .btn {
+    flex: none;
+    white-space: nowrap;
   }
 }
 
@@ -1707,7 +1723,8 @@ select option:checked {
   font-size: 1.05rem;
   font-weight: 650;
   font-variant-numeric: tabular-nums;
-  overflow-wrap: anywhere;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
 }
 
 .month-summary__foot {
@@ -1716,10 +1733,28 @@ select option:checked {
   line-height: 1.35;
 }
 
-@container (max-width: 330px) {
+@container (max-width: 400px) {
+  .month-summary__grid {
+    gap: 8px;
+  }
+
+  .month-summary__num {
+    font-size: 0.9rem;
+  }
+
   .month-summary__grid dt svg,
   .month-summary__foot {
     display: none;
+  }
+}
+
+@container (max-width: 290px) {
+  .month-summary__num {
+    font-size: 0.8rem;
+  }
+
+  .month-summary__grid dt {
+    font-size: 0.7rem;
   }
 }
 
@@ -1956,16 +1991,41 @@ select option:checked {
   outline: none;
 }
 
-/* Ações da linha (editar, duplicar, excluir) aparecem ao passar o mouse ou com o foco do teclado. */
+/* Ações da linha (editar, duplicar, excluir) aparecem ao passar o mouse ou com o foco do teclado,
+   por cima da situação e do valor: a coluna delas não ocupa espaço e a descrição fica mais larga. */
 @media (hover: hover) and (min-width: 1024px) {
+  .ledger__head,
+  .ledger__row {
+    grid-template-columns: 24px minmax(0, 1fr) 88px 112px;
+  }
+
+  .ledger__head > span:last-child {
+    display: none;
+  }
+
+  .ledger__row {
+    position: relative;
+  }
+
   .ledger__row > .ledger__actions {
+    position: absolute;
+    right: 6px;
+    top: 50%;
+    translate: 0 -50%;
+    padding: 3px;
+    border-radius: 12px;
+    background: var(--surface-solid);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-lg);
     opacity: 0;
+    pointer-events: none;
     transition: opacity 0.15s;
   }
 
   .ledger__row:hover > .ledger__actions,
   .ledger__row:focus-within > .ledger__actions {
     opacity: 1;
+    pointer-events: auto;
   }
 }
 
