@@ -2,14 +2,14 @@
 
 import uuid
 from collections import defaultdict
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 from typing import Any
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.core.months import add_months
+from app.core.months import add_months, cycle_range
 from app.models import BudgetMonth, Expense, Income, User
 from app.services import budget, investments, planned
 
@@ -348,3 +348,62 @@ def _variable_income_average(
         if amounts:
             result[item.id] = (sum(amounts, ZERO) / len(amounts)).quantize(Decimal("0.01"))
     return result
+
+
+# ---------------------------------------------------------------- resumo por período (v1.7.5)
+
+
+def periods(db: Session, user: User, month: date, today: date) -> dict[str, Any]:
+    """Gastos de hoje, da semana, do mês e do ano, e o mesmo trecho do mês anterior (para a
+    variação do resumo e as barras "fantasma" por categoria no painel do Orçamento)."""
+    previous = add_months(month, -1)
+    year_start = date(month.year, 1, 1)
+    rows = list(
+        db.execute(
+            select(
+                Expense.amount,
+                Expense.month,
+                Expense.category_id,
+                Expense.purchase_date,
+                Expense.due_date,
+            ).where(
+                Expense.user_id == user.id, Expense.month.between(min(year_start, previous), month)
+            )
+        )
+    )
+    start, end = cycle_range(month, user.month_start_day)
+    prev_start, _ = cycle_range(previous, user.month_start_day)
+    # Quantos dias do mês já passaram (mês encerrado = mês inteiro).
+    elapsed = (min(today, end) - start).days if today >= start else -1
+    monday = today - timedelta(days=today.weekday())
+    out = {
+        "today": ZERO,
+        "week": ZERO,
+        "month": ZERO,
+        "year": ZERO,
+        "previous": ZERO,
+        "previous_same_days": ZERO,
+    }
+    by_category: dict[uuid.UUID | None, Decimal] = defaultdict(lambda: ZERO)
+    for amount, row_month, category_id, purchase, due in rows:
+        when = purchase or due or row_month
+        if row_month.year == month.year and row_month <= month:
+            out["year"] += amount
+        if row_month == month:
+            out["month"] += amount
+            if when == today:
+                out["today"] += amount
+            if monday <= when <= today:
+                out["week"] += amount
+        elif row_month == previous:
+            out["previous"] += amount
+            if elapsed < 0 or (when - prev_start).days <= elapsed:
+                out["previous_same_days"] += amount
+                by_category[category_id] += amount
+    return {
+        **out,
+        "previous_by_category": [
+            {"category_id": category_id, "total": total}
+            for category_id, total in by_category.items()
+        ],
+    }

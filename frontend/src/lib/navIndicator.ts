@@ -26,6 +26,28 @@ function activeItem(group: HTMLElement): HTMLElement | null {
   return all.length ? all[all.length - 1]! : null;
 }
 
+/**
+ * Efeito elástico (v1.7.5): a borda da frente chega primeiro e a de trás alcança depois, como
+ * uma gota. No meio do caminho o marcador cobre do item antigo ao novo. Sem "reduzir movimento".
+ */
+export function stretchFrames(from: Box, to: Box): { transform: string; width: string; height: string; offset?: number }[] {
+  const x = Math.min(from.x, to.x);
+  const y = Math.min(from.y, to.y);
+  const w = Math.max(from.x + from.w, to.x + to.w) - x;
+  const h = Math.max(from.y + from.h, to.y + to.h) - y;
+  const frame = (b: Box) => ({ transform: `translate3d(${b.x}px, ${b.y}px, 0)`, width: `${b.w}px`, height: `${b.h}px` });
+  return [frame(from), { ...frame({ x, y, w, h }), offset: 0.42 }, frame(to)];
+}
+
+function stretch(pill: HTMLElement, from: Box, to: Box) {
+  const moved = Math.abs(from.x - to.x) + Math.abs(from.y - to.y);
+  if (moved < 4 || typeof pill.animate !== "function") return;
+  if (typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  // Salto muito longo (ex.: do topo ao fim do menu) só desliza: esticar tudo ficaria exagerado.
+  if (moved > 420) return;
+  pill.animate(stretchFrames(from, to), { duration: 420, easing: "cubic-bezier(0.3, 0.9, 0.3, 1)" });
+}
+
 function place(group: HTMLElement) {
   let pill = group.querySelector<HTMLElement>(":scope > .nav-pill");
   const item = activeItem(group);
@@ -46,11 +68,14 @@ function place(group: HTMLElement) {
   const inset = parseFloat(cs.getPropertyValue("--pill-inset")) || 0;
   if (inset) Object.assign(box, { x: box.x + inset, y: box.y + inset, w: box.w - inset * 2, h: box.h - inset * 2 });
   const first = pill.dataset.ready !== "1";
+  const before = pill.dataset.box ? (JSON.parse(pill.dataset.box) as Box) : null;
   if (first) pill.style.transition = "none";
   pill.style.opacity = "1";
   pill.style.width = `${box.w}px`;
   pill.style.height = `${box.h}px`;
   pill.style.transform = `translate3d(${box.x}px, ${box.y}px, 0)`;
+  pill.dataset.box = JSON.stringify(box);
+  if (!first && before) stretch(pill, before, box);
   if (first) {
     void pill.offsetWidth;
     pill.style.transition = "";

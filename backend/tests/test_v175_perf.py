@@ -135,3 +135,25 @@ def test_screen_speed_is_stored_as_anonymous_totals(
         "slow_pct": 50.0,
         "frame_ms": 40,
     }
+
+
+def test_periods_summary_for_the_dashboard(user: TestClient) -> None:
+    from datetime import date as day
+
+    from app.core.months import format_month, today_local
+
+    today = today_local()
+    month = format_month(today.replace(day=1))
+    previous = format_month((today.replace(day=1) - day.resolution).replace(day=1))
+    user.get(f"/api/months/{month}")
+    user.get(f"/api/months/{previous}")
+    expense(user, "40", "Alimentação", month=month, due_date=today.isoformat())
+    expense(user, "60", "Transporte", month=month, due_date=today.replace(day=1).isoformat())
+    expense(user, "500", "Alimentação", month=previous, due_date=f"{previous}-01")
+    out = user.get(f"/api/analysis/periods?month={month}").json()
+    assert out["today"] == "40.00" and out["month"] == "100.00"
+    assert float(out["week"]) in (40.0, 100.0)  # o dia 1 pode cair na mesma semana
+    assert float(out["year"]) >= 100.0 and out["previous"] == "500.00"
+    # O gasto do dia 1 do mês anterior entra no "mesmo trecho" em qualquer dia de hoje.
+    assert out["previous_same_days"] == "500.00"
+    assert [c["total"] for c in out["previous_by_category"]] == ["500.00"]

@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime
+from decimal import Decimal
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Query, status
@@ -7,7 +8,7 @@ from pydantic import BaseModel, Field
 
 from app.api.budget import _changes
 from app.api.deps import CurrentUser, DbSession
-from app.core.months import current_month, format_month, parse_month
+from app.core.months import current_month, format_month, parse_month, today_local
 from app.schemas.analysis import (
     AnalysisConfig,
     CompareOut,
@@ -43,6 +44,28 @@ def overview(user: CurrentUser, db: DbSession, month: str | None = None) -> Over
         score=ScoreOut.model_validate(analysis.score(db, user, target)),
         rule=RuleOut.model_validate(analysis.rule_50_30_20(db, user, target)),
     )
+
+
+class PeriodCategory(BaseModel):
+    category_id: uuid.UUID | None
+    total: Decimal
+
+
+class PeriodsOut(BaseModel):
+    today: Decimal
+    week: Decimal
+    month: Decimal
+    year: Decimal
+    previous: Decimal
+    previous_same_days: Decimal
+    previous_by_category: list[PeriodCategory]
+
+
+@router.get("/analysis/periods")
+def periods(user: CurrentUser, db: DbSession, month: str | None = None) -> PeriodsOut:
+    """Gastos de hoje, da semana, do mês e do ano, e o mesmo trecho do mês anterior (v1.7.5)."""
+    target = parse_month(month) if month else current_month(user.month_start_day)
+    return PeriodsOut.model_validate(analysis.periods(db, user, target, today_local()))
 
 
 @router.get("/analysis/compare")

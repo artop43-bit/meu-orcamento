@@ -57,6 +57,7 @@ import { moneyApi, useReviewCount } from "../api/money";
 import { Alert, Button, LoadingRegion, PageHeader, Sheet, Skeleton } from "../components/ui";
 import { maybeCountUp } from "../components/CountUp";
 import { MonthNotices } from "../components/MonthNotices";
+import { EssentialRing, MonthGreeting, MonthLine, PeriodPills, Spark, usePeriods, useSixMonths } from "../components/monthPanel";
 import { useUndo } from "../components/undo";
 import { addMonths, cycleLabel, money, monthLabel, parseMoney, percent, shortDate, thisMonth, todayISO } from "../lib/format";
 import { normalizeText } from "../lib/text";
@@ -76,8 +77,13 @@ type Editing =
 
 /** Resumo do mês num bloco só (v1.7): o saldo em destaque e receitas, despesas e
  * comprometimento ao lado, com uma barra de quanto da receita já está comprometido. */
-function MonthSummary({ data }: { data: MonthData }) {
+function MonthSummary({ data, current }: { data: MonthData; current: boolean }) {
   const s = data.summary;
+  const periods = usePeriods(data.month);
+  const six = useSixMonths(data.month).data?.months ?? [];
+  const incomes = six.map((p) => Number(p.income));
+  const expenses = six.map((p) => Number(p.expenses));
+  const committedSeries = six.map((p) => (Number(p.income) > 0 ? (Number(p.expenses) / Number(p.income)) * 100 : NaN));
   const balance = Number(s.balance);
   const committed = s.committed_pct;
   const level = committed === null ? "sem receitas" : committed <= 50 ? "saudável" : committed <= 80 ? "moderado" : "elevado";
@@ -96,14 +102,18 @@ function MonthSummary({ data }: { data: MonthData }) {
             <dt>
               <ArrowDownLeft size={14} aria-hidden /> Receitas
             </dt>
-            <dd className="month-summary__num">{maybeCountUp(money(s.income_total))}</dd>
+            <dd className="month-summary__num">
+              {maybeCountUp(money(s.income_total))} <Spark values={incomes} />
+            </dd>
             <dd className="month-summary__foot">{data.incomes.length} lançamento(s)</dd>
           </div>
           <div>
             <dt>
               <Receipt size={14} aria-hidden /> Despesas
             </dt>
-            <dd className="month-summary__num">{maybeCountUp(money(s.expense_total))}</dd>
+            <dd className="month-summary__num">
+              {maybeCountUp(money(s.expense_total))} <Spark values={expenses} tone="expense" />
+            </dd>
             <dd className="month-summary__foot">
               Pago {money(s.paid_total)} · pendente {money(s.pending_total)}
             </dd>
@@ -112,7 +122,9 @@ function MonthSummary({ data }: { data: MonthData }) {
             <dt>
               <Gauge size={14} aria-hidden /> Comprometimento
             </dt>
-            <dd className={`month-summary__num ${committed !== null && committed > 100 ? "tone--error" : ""}`}>{percent(committed)}</dd>
+            <dd className={`month-summary__num ${committed !== null && committed > 100 ? "tone--error" : ""}`}>
+              {percent(committed)} <Spark values={committedSeries} tone="warn" />
+            </dd>
             <dd className="month-summary__foot">{level}</dd>
           </div>
         </dl>
@@ -125,6 +137,7 @@ function MonthSummary({ data }: { data: MonthData }) {
             <span style={{ width: `${Math.min(committed, 100)}%` }} />
           </div>
         )}
+        <PeriodPills periods={periods.data} month={data.month} current={current} />
       </div>
     </section>
   );
@@ -780,6 +793,7 @@ function DailyCard({ month }: { month: string }) {
   const extra = Number(parseMoney(simulate) ?? 0);
   const rest = can ? Number(can.rest_of_month) - extra : Number(data.end_balance) - extra;
   const perDay = can ? Math.max(rest, 0) / can.days_left : 0;
+  const sliderMax = Math.max(500, Math.ceil(Math.max(Number(can?.rest_of_month ?? data.end_balance), 0) / 500) * 500);
   return (
     <section className="card stack daily-card" aria-label="Saldo previsto do mês">
       {can ? (
@@ -814,7 +828,24 @@ function DailyCard({ month }: { month: string }) {
         <span className="field-label">
           Simular despesa <Tip>Veja o efeito de um gasto antes de fazê-lo. Nada é lançado.</Tip>
         </span>
-        <input inputMode="decimal" value={simulate} onChange={(e) => setSimulate(e.target.value)} placeholder="0,00" />
+        <span className="simulate__row">
+          <input
+            type="range"
+            min={0}
+            max={sliderMax}
+            step={10}
+            value={Math.min(extra, sliderMax)}
+            onChange={(e) => setSimulate(Number(e.target.value) ? String(e.target.value) : "")}
+            aria-label="Valor da despesa simulada"
+            style={{ "--fill": `${(Math.min(extra, sliderMax) / sliderMax) * 100}%` } as React.CSSProperties}
+          />
+          <input inputMode="decimal" value={simulate} onChange={(e) => setSimulate(e.target.value)} placeholder="0,00" aria-label="Valor exato" />
+        </span>
+        {extra > 0 && (
+          <span className={`small ${rest < 0 ? "tone--error" : "muted"}`} role="status">
+            Com {money(extra)} a mais, {rest < 0 ? `faltam ${money(Math.abs(rest))}` : `sobram ${money(rest)}`} até o fim do mês.
+          </span>
+        )}
       </label>
       <LazyChart
         type="line"
@@ -930,8 +961,11 @@ function BreakdownCard({ data, categories }: { data: MonthData; categories: Cate
   const paceQuery = useQuery({ queryKey: ["budget", "pace", data.month], queryFn: () => moneyApi.pace(data.month) });
   const pace = new Map((paceQuery.data ?? []).map((r) => [r.category_id ?? "none", r]));
   const total = Number(s.expense_total);
+  const periods = usePeriods(data.month);
   const [all, setAll] = useState(false);
   if (total === 0) return null;
+  const before = new Map((periods.data?.previous_by_category ?? []).map((c) => [c.category_id ?? "none", Number(c.total)]));
+  const scale = Math.max(total, ...before.values(), 1);
   const SHOWN = 4;
   const list = all ? s.by_category : s.by_category.slice(0, SHOWN);
   const hidden = s.by_category.length - SHOWN;
@@ -939,12 +973,20 @@ function BreakdownCard({ data, categories }: { data: MonthData; categories: Cate
   const essentialPct = (Number(s.essential_total) / total) * 100;
   return (
     <section className="card stack">
+      <div className="breakdown-head">
       <h2>
         Para onde foi{" "}
         <Tip label="Ritmo por categoria">
           Compara o gasto de cada categoria com o esperado até hoje: o limite definido ou, sem limite, a média dos últimos 3 meses.
         </Tip>
       </h2>
+        <EssentialRing essential={Number(s.essential_total)} total={total} />
+      </div>
+      {before.size > 0 && (
+        <p className="muted small" style={{ margin: 0 }}>
+          A barra clara mostra o mesmo trecho do mês anterior.
+        </p>
+      )}
       {all && (
       <div className="stack stack--tight">
         <div className="stacked-bar" aria-hidden>
@@ -993,7 +1035,16 @@ function BreakdownCard({ data, categories }: { data: MonthData; categories: Cate
                 </span>
               </>
             ) : (
-              <Bar pct={(Number(c.total) / total) * 100} color={c.category_id ? colors.get(c.category_id) : undefined} />
+              <span className="ghost-bar">
+                {before.has(c.category_id ?? "none") && (
+                  <span
+                    className="ghost-bar__before"
+                    style={{ width: `${(before.get(c.category_id ?? "none")! / scale) * 100}%` }}
+                    title={`Mesmo trecho do mês anterior: ${money(before.get(c.category_id ?? "none")!)}`}
+                  />
+                )}
+                <Bar pct={(Number(c.total) / scale) * 100} color={c.category_id ? colors.get(c.category_id) : undefined} />
+              </span>
             )}
           </li>
         ))}
@@ -1236,8 +1287,12 @@ export default function MonthPage() {
           style={{ gap: 20 }}
           aria-busy={data.isPlaceholderData || undefined}
         >
+          {isCurrent && <MonthGreeting data={data.data} month={month} />}
           {shown("top").includes("kpis") && (data.data.incomes.length > 0 || data.data.expenses.length > 0) && (
-            <MonthSummary data={data.data} />
+            <MonthSummary data={data.data} current={isCurrent} />
+          )}
+          {shown("top").includes("kpis") && data.data.expenses.length + data.data.incomes.length > 0 && (
+            <MonthLine data={data.data} month={month} />
           )}
           <MonthNotices
             month={month}
