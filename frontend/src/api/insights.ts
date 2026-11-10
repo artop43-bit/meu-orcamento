@@ -83,7 +83,7 @@ export const builderApi = {
   remove: (id: string) => api.delete(`/analysis/saved/${id}`),
 };
 
-// ---------------------------------------------------------------- tire sua dúvida (v1.7)
+// ---------------------------------------------------------------- tire sua dúvida (v1.7 / v1.7.5)
 
 export type AskItem = { label: string; detail: string | null; value: string | null; link: string | null };
 export type AskAnswer = {
@@ -92,8 +92,22 @@ export type AskAnswer = {
   items: AskItem[];
   links: { label: string; to: string }[];
   suggestions: string[];
+  /** Devolvido na pergunta seguinte para "e em setembro?" continuar o assunto. */
+  context?: Record<string, unknown> | null;
+  /** Conversa guardada (null com o histórico desligado). */
+  conversation_id?: string | null;
 };
+export type AskConversation = { id: string; title: string; updated_at: string };
+export type AskMessage = { id: string; question: string; answer: AskAnswer; created_at: string };
+
+export const ASK_CONVERSATIONS_KEY = ["ask", "conversations"] as const;
 
 export const askApi = {
-  ask: (question: string) => api.post<AskAnswer>("/ask", { question }),
+  ask: (question: string, conversationId?: string | null, context?: AskAnswer["context"]) =>
+    api.post<AskAnswer>("/ask", { question, conversation_id: conversationId ?? null, context: context ?? null }),
+  conversations: () => api.get<AskConversation[]>("/ask/conversations"),
+  messages: (id: string) => api.get<AskMessage[]>(`/ask/conversations/${id}`),
+  remove: (id: string) => api.delete(`/ask/conversations/${id}`),
+  removeAll: () => api.delete("/ask/conversations"),
+  setHistory: (history: boolean) => api.patch<{ history: boolean }>("/ask/settings", { history }),
 };

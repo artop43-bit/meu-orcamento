@@ -4,6 +4,7 @@ import { CalendarRange, Keyboard, Mail, MessageSquarePlus } from "lucide-react";
 
 import { ME_KEY, useMe, type User } from "../api/auth";
 import { api, errorMessage } from "../api/client";
+import { ASK_CONVERSATIONS_KEY, askApi } from "../api/insights";
 import { sharingApi } from "../api/sharing";
 import { openFeedback, openShortcuts, SHORTCUTS } from "../components/power";
 import { Alert, Button, PageHeader } from "../components/ui";
@@ -14,6 +15,30 @@ import { setPrefs, usePrefs, type Prefs } from "../lib/prefs";
 import { PixMeiSettings } from "../components/PixMeiSettings";
 import { STYLES, type StyleName } from "../theme/styles";
 import { ACCENTS, type AccentName } from "../theme/tokens";
+
+/** v1.7.5: guardar (ou não) as conversas do Tire sua dúvida. Desligar apaga as guardadas. */
+function AskHistoryToggle() {
+  const me = useMe();
+  const client = useQueryClient();
+  const on = me.data?.ask_history !== false;
+  async function change(value: boolean) {
+    await askApi.setHistory(value);
+    await client.invalidateQueries({ queryKey: ME_KEY });
+    void client.invalidateQueries({ queryKey: ASK_CONVERSATIONS_KEY });
+  }
+  return (
+    <>
+      <label className="check">
+        <input type="checkbox" checked={on} onChange={(e) => void change(e.target.checked)} />
+        Guardar histórico do Tire sua dúvida
+      </label>
+      <p className="muted small" style={{ margin: 0 }}>
+        As conversas ficam na sua conta e são apagadas sozinhas 30 dias depois da última mensagem. Ao desligar, as conversas guardadas são
+        apagadas na hora.
+      </p>
+    </>
+  );
+}
 
 function Choice<K extends keyof Prefs>({
   name,
@@ -285,8 +310,9 @@ export default function Preferences() {
           <FinancialMonth />
           <PixMeiSettings />
           <EmailNotices />
-          <section className="card stack">
+          <section className="card stack" id="privacidade">
             <h2>Privacidade</h2>
+            <AskHistoryToggle />
             <label className="check">
               <input type="checkbox" checked={prefs.privacy} onChange={(e) => setPrefs({ privacy: e.target.checked })} />
               Ocultar valores agora (atalho: P)
