@@ -1,7 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { maskMoney } from "../lib/format";
 import {
-  ChevronRight,
   CircleAlert,
   Info,
   Sparkles,
@@ -11,7 +10,6 @@ import {
   Trophy,
   type LucideIcon,
 } from "lucide-react";
-import { Link } from "react-router";
 
 import { insightsApi, type InsightMessage, type InsightTone, type Insights } from "../api/insights";
 
@@ -100,24 +98,3 @@ export function AlertsCard({ alerts }: { alerts: InsightMessage[] }) {
 }
 
 /** Resumo do consultor na tela do Orçamento, com atalho para a análise completa. */
-export function ConsultantTeaser({ month }: { month: string }) {
-  const insights = useInsights(month);
-  const data = insights.data;
-  if (!data || data.mood === "empty") return null;
-  const { icon: Icon, className } = MOOD[data.mood];
-  const urgent = data.alerts.filter((a) => a.tone === "danger" || a.tone === "warning");
-  return (
-    <Link to={`/analises?mes=${month}`} className={`teaser ${className}`}>
-      <span className="consultant__icon" aria-hidden>
-        <Icon size={20} />
-      </span>
-      <span className="grow">
-        <strong>{data.headline}</strong>
-        <span className="teaser__text">
-          {urgent.length > 0 ? `${maskMoney(urgent[0].title)}${urgent.length > 1 ? ` e mais ${urgent.length - 1} alerta(s)` : ""}` : "Ver análise completa"}
-        </span>
-      </span>
-      <ChevronRight size={18} aria-hidden />
-    </Link>
-  );
-}

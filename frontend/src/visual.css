@@ -2226,3 +2226,124 @@ select option:checked {
     background: color-mix(in srgb, var(--accent) 7%, transparent);
   }
 }
+
+/* ---------------------------------------------------------- avisos num formato só (v1.7.5) */
+
+/* Todo aviso é uma linha igual: traço lateral na cor do tom, ícone, título e texto. Com ação
+   (link ou botão) a linha inteira é clicável e tem seta; sem ação, não reage ao mouse. */
+.notice-row {
+  --tone: var(--accent);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--tone);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--fg);
+  font: inherit;
+  text-align: left;
+  text-decoration: none;
+}
+
+.notice-row--danger {
+  --tone: var(--error);
+}
+
+.notice-row--warn {
+  --tone: var(--warn);
+}
+
+:is(a, button).notice-row {
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.notice-row__icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--tone) 15%, transparent);
+  color: var(--tone);
+}
+
+.notice-row__body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  overflow-wrap: break-word;
+}
+
+.notice-row__text {
+  color: var(--muted);
+  font-size: 0.86rem;
+  line-height: 1.4;
+}
+
+.notice-row__arrow {
+  flex: none;
+  color: var(--muted);
+}
+
+.notices__group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+@media (min-width: 900px) {
+  .notices__body:has(> :nth-child(2)) {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .notices__body[hidden] {
+    display: none;
+  }
+
+  .notices__group {
+    display: contents;
+  }
+}
+
+/* ---------------------------------------------------------- hover padrão dos cartões (v1.7.5) */
+
+/* Um cartão clicável reage sempre do mesmo jeito: borda e brilho leves na cor de destaque. O
+   traço lateral (a cor do tom) nunca muda no hover: só as outras três bordas. */
+@media (hover: hover) {
+  :is(a, button).notice-row:hover,
+  :root :is(a, button):is(.teaser, .task-card, .review-banner, .preset, .quote, .stat--button, .invoice-chip, .settings-list__item, .doc-chip):hover {
+    border-top-color: color-mix(in srgb, var(--accent) 45%, transparent);
+    border-right-color: color-mix(in srgb, var(--accent) 45%, transparent);
+    border-bottom-color: color-mix(in srgb, var(--accent) 45%, transparent);
+    box-shadow: var(--glow-ring);
+  }
+
+  :is(a, button).notice-row:hover .notice-row__arrow {
+    color: var(--accent);
+  }
+}
+
+:root :is(.consultant, .teaser):hover {
+  border-left-color: var(--mood, var(--accent));
+}
+
+:root :is(.reminder, .notice.is-important):hover {
+  border-left-color: var(--warn);
+}
+
+:root .task-card.is-unread:hover {
+  border-left-color: var(--accent);
+}
+
+:root :is(a, button).notice-row:hover {
+  border-left-color: var(--tone);
+}

@@ -10,6 +10,8 @@ cada combinação confere:
 - verde fixo: com outra cor escolhida, nada fora das cotações de mercado (alta/queda) pode
   continuar verde;
 - itens do menu apagados;
+- cartões com traço lateral (v1.7.5): ao passar o mouse num cartão clicável, o traço lateral
+  mantém a cor; e todo aviso segue a regra "tem seta se e somente se é clicável";
 - listas suspensas (v1.7): cada opção de cada <select> legível sobre o fundo sólido da lista, e a
   primeira lista da tela aberta de verdade (o texto das opções abertas passa no contraste).
 
@@ -186,6 +188,42 @@ OPEN_FIRST_SELECT = """() => {
   return '#' + CSS.escape(select.id);
 }"""
 
+# Cartões clicáveis com traço lateral colorido: marca cada um para o teste passar o mouse.
+MARK_STRIPES = """() => {
+  let n = 0;
+  for (const el of document.querySelectorAll('a, button, [role="button"]')) {
+    const cs = getComputedStyle(el);
+    const r = el.getBoundingClientRect();
+    if (!r.width || !r.height || parseFloat(cs.borderLeftWidth) < 3) continue;
+    if (cs.borderLeftColor === cs.borderTopColor && parseFloat(cs.borderTopWidth) >= 3) continue;
+    if (el.closest('[hidden], [aria-hidden="true"]')) continue;
+    el.dataset.traco = String(n++);
+    el.dataset.tracoCor = cs.borderLeftColor;
+    if (n >= 10) break;
+  }
+  return n;
+}"""
+
+STRIPE_AFTER_HOVER = """(i) => {
+  const el = document.querySelector(`[data-traco="${i}"]`);
+  if (!el) return null;
+  const now = getComputedStyle(el).borderLeftColor;
+  return now === el.dataset.tracoCor ? null : `${el.tagName.toLowerCase()}.${[...el.classList].join('.')}: ${el.dataset.tracoCor} virou ${now}`;
+}"""
+
+# Avisos: seta só em linha clicável, e linha clicável sempre com seta. No resto do site, nada
+# que não seja link, botão ou campo pode ter o cursor de "clicável".
+NOTICE_RULE = """() => {
+  const out = [];
+  for (const el of document.querySelectorAll('.notice-row')) {
+    const clickable = el.tagName === 'A' || el.tagName === 'BUTTON';
+    const arrow = Boolean(el.querySelector('.notice-row__arrow'));
+    if (clickable !== arrow) out.push(`aviso "${el.textContent.trim().slice(0, 30)}": ${clickable ? 'clicável sem seta' : 'seta sem ser clicável'}`);
+    if (!clickable && getComputedStyle(el).cursor === 'pointer') out.push(`aviso "${el.textContent.trim().slice(0, 30)}": parece clicável e não é`);
+  }
+  return out;
+}"""
+
 FADED_MENU = "[...document.querySelectorAll('.sidebar__sublink')].filter((e) => getComputedStyle(e).opacity !== '1').length"
 
 
@@ -214,6 +252,8 @@ def check(page: Page, path: str, problems: list[str]) -> int:
                     problems.append(f"LISTA {where}: {item}")
             if path == "/orcamento":
                 page.screenshot(path=OUT / f"orcamento-{style}-{theme}.png", full_page=True)
+            if theme == "dark":
+                check_cards(page, f"{style} {path}", problems)
             # A primeira lista da tela aberta de verdade (o navegador desenha as opções).
             target = page.evaluate(OPEN_FIRST_SELECT)
             if target and page.evaluate("CSS.supports('appearance', 'base-select')"):
@@ -226,6 +266,28 @@ def check(page: Page, path: str, problems: list[str]) -> int:
                     page.screenshot(path=OUT / f"lista-{name}.png")
                 page.keyboard.press("Escape")
     return combos
+
+
+def check_cards(page: Page, where: str, problems: list[str]) -> None:
+    """Passa o mouse em cada cartão clicável com traço lateral e confere que o traço não muda."""
+    bar = page.locator(".notices__bar")
+    if bar.count() and bar.get_attribute("aria-expanded") != "true":
+        bar.click()
+        page.wait_for_timeout(120)
+    for item in page.evaluate(NOTICE_RULE):
+        problems.append(f"PADRÃO {where}: {item}")
+    for index in range(page.evaluate(MARK_STRIPES)):
+        target = page.locator(f'[data-traco="{index}"]')
+        try:
+            target.scroll_into_view_if_needed(timeout=2000)
+            target.hover(timeout=2000, force=True)
+        except Exception:  # noqa: BLE001 (elemento saiu da tela: não dá para passar o mouse)
+            continue
+        changed = page.evaluate(STRIPE_AFTER_HOVER, index)
+        if changed:
+            problems.append(f"TRAÇO {where}: {changed}")
+    page.mouse.move(0, 0)
+    page.evaluate("document.querySelectorAll('[data-traco]').forEach((e) => { delete e.dataset.traco; delete e.dataset.tracoCor; })")
 
 
 def main() -> int:

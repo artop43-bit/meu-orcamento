@@ -2094,7 +2094,8 @@ def v13_planning(page: Page):
     open_month(page, month)
     assert float(api(page, f"/months/{month}")["summary"]["balance"]) < 0
     open_notices(page)
-    page.get_by_role("region", name="Plano para equilibrar o mês").get_by_role("button", name="Ver o plano").click()
+    # v1.7.5: o aviso inteiro é clicável (sem botão "Ver o plano" à parte).
+    page.locator('[data-notice="recovery"]').click()
     d = dialog(page)
     expect(d).to_contain_text("O tamanho da diferença")
     expect(d).to_contain_text("Em quanto tempo cobrir")
@@ -2415,8 +2416,8 @@ def mobile(browser):
     idle(page, 600)
     page.screenshot(path=OUT / "celular-orcamento.png", full_page=True)
     open_notices(page)
-    expect(page.locator(".teaser")).to_be_visible()
-    page.locator(".teaser").click()
+    expect(page.locator('[data-notice="consultant"]')).to_be_visible()
+    page.locator('[data-notice="consultant"]').click()
     page.wait_for_url("**/analises**")
     idle(page, 800)
     page.screenshot(path=OUT / "celular-painel.png", full_page=True)
