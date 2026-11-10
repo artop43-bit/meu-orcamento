@@ -1,6 +1,6 @@
 MEU ORÇAMENTO · UPDATE LOG
 Versão 1.7.0 · Painel mais leve, cores consistentes e "Tire sua dúvida"
-Data: 10/11/2026 às 09:40 (horário de Brasília)
+Data: 10/11/2026 às 11:00 (horário de Brasília)
 
 Painel do Orçamento (mesmas informações, de forma sutil)
 - [x] Resumo do mês num bloco só: saldo em destaque; receitas, despesas (pago e pendente) e comprometimento ao lado, com barra de quanto da receita está comprometido
