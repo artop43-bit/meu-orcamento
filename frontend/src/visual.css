@@ -1518,6 +1518,14 @@ select option:checked {
     display: flex;
     align-items: center;
     gap: 8px;
+    /* Mesma altura dos outros campos (o seletor próprio soma o espaço da seta). */
+    block-size: var(--control-h);
+    padding-block: 0;
+    line-height: 1.2;
+  }
+
+  .list-tools select.pill-select {
+    block-size: 34px;
   }
 
   select::picker-icon {
@@ -1797,7 +1805,7 @@ select option:checked {
   min-height: 46px;
   padding: 8px 14px;
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: 23px;
   background: var(--surface);
   color: var(--fg);
   font: inherit;
@@ -1835,9 +1843,7 @@ select option:checked {
   min-width: 0;
   color: var(--muted);
   font-size: 0.88rem;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  line-height: 1.35;
 }
 
 .notices__bell {
