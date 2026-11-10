@@ -170,3 +170,30 @@ class ErrorEvent(Base):
     first_seen: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
     last_seen: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, index=True)
     resolved_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+
+
+class AskConversation(Base):
+    """Conversa do Tire sua dúvida (v1.7.5). Apagada 30 dias depois da última mensagem."""
+
+    __tablename__ = "ask_conversations"
+    __table_args__ = (Index("ix_ask_conversations_user_id_updated_at", "user_id", "updated_at"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    title: Mapped[str] = mapped_column(String(200))
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+
+
+class AskMessage(Base):
+    """Pergunta e resposta (a resposta em JSON, do jeito que foi mostrada)."""
+
+    __tablename__ = "ask_messages"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    conversation_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("ask_conversations.id", ondelete="CASCADE"), index=True
+    )
+    question: Mapped[str] = mapped_column(String(200))
+    answer: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)

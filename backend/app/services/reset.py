@@ -185,6 +185,9 @@ def reset(
             _reset_categories(db, user)
         if "analyses" in chosen:
             db.execute(delete(SavedAnalysis).where(SavedAnalysis.user_id == uid))
+            from app.services import ask_history
+
+            ask_history.remove(db, user)  # conversas do Tire sua dúvida
         if "debts" in chosen:
             # Parcelas já pagas ficam no histórico (sem o vínculo); as a pagar somem com o contrato.
             db.execute(

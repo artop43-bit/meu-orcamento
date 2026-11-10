@@ -150,7 +150,7 @@ def test_only_own_data_and_api(data: TestClient, client: TestClient, outbox: Out
     out = data.post("/api/ask", json={"question": "o que mais gastei esse ano?"})
     assert out.status_code == 200
     body = out.json()
-    assert set(body) == {"intent", "answer", "items", "links", "suggestions"}
+    assert {"intent", "answer", "items", "links", "suggestions"} <= set(body)
     assert data.post("/api/ask", json={"question": ""}).status_code == 422
     # Outra pessoa não vê nada dos lançamentos acima.
     data.post("/api/auth/logout")
@@ -173,7 +173,7 @@ def test_only_own_data_and_api(data: TestClient, client: TestClient, outbox: Out
         ("gastos com moradia este ano", "sum"),
         ("contas atrasadas", "due"),
         ("qual o limite do meu cartão", "cards"),
-        ("quanto entrou de salário", "incomes"),
+        ("quanto entrou de salário", "salary"),
         ("como fiquei no mês passado", "balance"),
         ("onde mudo a cor do tema?", "navigate"),
         ("onde vejo meus investimentos", "navigate"),

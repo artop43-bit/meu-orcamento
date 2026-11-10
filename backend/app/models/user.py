@@ -58,6 +58,8 @@ class User(Base):
     accent: Mapped[str | None] = mapped_column(String(8))
     # v1.6: estilo visual ("padrao" ou "glass"). None = ainda não escolheu (vale o Padrão).
     style: Mapped[str | None] = mapped_column(String(12))
+    # v1.7.5: guardar as conversas do Tire sua dúvida (apagadas sozinhas depois de 30 dias).
+    ask_history: Mapped[bool] = mapped_column(default=True, server_default="1")
     # v1.0: mês financeiro começa neste dia (1 = mês do calendário; ex.: 5 = dia do salário).
     month_start_day: Mapped[int] = mapped_column(SmallInteger, default=1, server_default="1")
     # v1.0: alertas de gasto fora do padrão e de assinaturas (na caixa e por e-mail).

@@ -39,7 +39,9 @@ def cleanup(db: Session) -> dict[str, int]:
     emails = db.execute(
         delete(EmailLog).where(EmailLog.created_at <= now - timedelta(days=30))
     ).rowcount
-    from app.services import errors
+    from app.services import ask_history, errors
+
+    ask_history.purge(db)  # conversas do Tire sua dúvida paradas há mais de 30 dias
 
     error_groups = errors.cleanup(db)
     db.commit()
