@@ -20,11 +20,19 @@ import { ACCENTS, type AccentName } from "../theme/tokens";
 function AskHistoryToggle() {
   const me = useMe();
   const client = useQueryClient();
-  const on = me.data?.ask_history !== false;
+  // Resposta imediata: a caixa muda na hora e volta se o servidor recusar.
+  const [local, setLocal] = useState<boolean | null>(null);
+  const on = local ?? me.data?.ask_history !== false;
   async function change(value: boolean) {
-    await askApi.setHistory(value);
-    await client.invalidateQueries({ queryKey: ME_KEY });
-    void client.invalidateQueries({ queryKey: ASK_CONVERSATIONS_KEY });
+    setLocal(value);
+    try {
+      await askApi.setHistory(value);
+      await client.invalidateQueries({ queryKey: ME_KEY });
+      void client.invalidateQueries({ queryKey: ASK_CONVERSATIONS_KEY });
+      announce(value ? "Histórico ligado" : "Histórico desligado e conversas apagadas");
+    } finally {
+      setLocal(null);
+    }
   }
   return (
     <>

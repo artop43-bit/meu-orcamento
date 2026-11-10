@@ -2464,6 +2464,7 @@ def v175_panel(page: Page):
     shell = page.locator(".shell")
     page.get_by_role("button", name="Recolher o menu").click()
     expect(shell).to_have_attribute("data-menu", "collapsed")
+    page.wait_for_timeout(500)  # a largura muda com uma transição
     assert page.locator(".sidebar").evaluate("(e) => e.getBoundingClientRect().width") < 110
     page.locator(".sidebar .nav-group__toggle", has_text="Carteira").click()
     flyout = page.locator("#grupo-carteira")
