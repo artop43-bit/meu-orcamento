@@ -9,7 +9,9 @@ cada combinação confere:
   texto grande (WCAG AA);
 - verde fixo: com outra cor escolhida, nada fora das cotações de mercado (alta/queda) pode
   continuar verde;
-- itens do menu apagados.
+- itens do menu apagados;
+- listas suspensas (v1.7): cada opção de cada <select> legível sobre o fundo sólido da lista, e a
+  primeira lista da tela aberta de verdade (o texto das opções abertas passa no contraste).
 
 Também tira uma foto do Orçamento em cada estilo e tema, para conferência visual.
 
@@ -146,6 +148,44 @@ FIND_FIXED_GREEN = """() => {
   return [...new Set(found)].slice(0, 10);
 }"""
 
+# Opções dos <select>: texto sobre o fundo da lista (que precisa ser sólido; translúcido, o
+# navegador pinta a lista aberta de branco por baixo).
+FIND_BAD_OPTIONS = """() => {
+  const parse = (c) => {
+    const m = c.match(/[\\d.]+/g);
+    if (!m) return [0, 0, 0, 0];
+    const v = m.map(Number);
+    const unit = c.startsWith('color(') ? 255 : 1;
+    return [v[0] * unit, v[1] * unit, v[2] * unit, v[3] ?? 1];
+  };
+  const lum = ([r, g, b]) => { const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }; return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b); };
+  const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
+  const over = (top, bottom) => { const a = top[3]; return [0, 1, 2].map((i) => top[i] * a + bottom[i] * (1 - a)).concat(1); };
+  const custom = CSS.supports('appearance', 'base-select');
+  const found = new Set();
+  for (const select of document.querySelectorAll('select')) {
+    if (select.disabled) continue;
+    const list = parse(getComputedStyle(select, custom ? '::picker(select)' : null).backgroundColor);
+    if (list[3] < 0.999) { found.add(`select#${select.id || select.name || '?'}: lista com fundo translúcido`); continue; }
+    for (const option of select.options) {
+      if (option.disabled) continue;
+      const cs = getComputedStyle(option);
+      const bg = over(parse(cs.backgroundColor), list);
+      const value = ratio(over(parse(cs.color), bg), bg);
+      if (value < 4.5) found.add(`option "${option.textContent.trim().slice(0, 24)}" ${value.toFixed(2)}:1`);
+    }
+  }
+  return [...found].slice(0, 6);
+}"""
+
+OPEN_FIRST_SELECT = """() => {
+  const select = [...document.querySelectorAll('select')].find((s) => !s.disabled && s.getBoundingClientRect().width && s.closest('.page, main'));
+  if (!select) return false;
+  select.scrollIntoView({ block: 'center' });
+  select.id ||= 'lista-em-teste';
+  return '#' + CSS.escape(select.id);
+}"""
+
 FADED_MENU = "[...document.querySelectorAll('.sidebar__sublink')].filter((e) => getComputedStyle(e).opacity !== '1').length"
 
 
@@ -170,8 +210,21 @@ def check(page: Page, path: str, problems: list[str]) -> int:
                     faded = page.evaluate(FADED_MENU)
                     if faded:
                         problems.append(f"MENU {where}: {faded} item(ns) do menu apagado(s)")
+                for item in page.evaluate(FIND_BAD_OPTIONS):
+                    problems.append(f"LISTA {where}: {item}")
             if path == "/orcamento":
                 page.screenshot(path=OUT / f"orcamento-{style}-{theme}.png", full_page=True)
+            # A primeira lista da tela aberta de verdade (o navegador desenha as opções).
+            target = page.evaluate(OPEN_FIRST_SELECT)
+            if target and page.evaluate("CSS.supports('appearance', 'base-select')"):
+                page.click(target)
+                page.wait_for_timeout(150)
+                for item in page.evaluate(FIND_LOW_CONTRAST):
+                    problems.append(f"LISTA ABERTA {style}/{theme} {path}: {item}")
+                name = re.sub(r"[^a-z0-9]+", "-", path.lower()).strip("-") or "inicio"
+                if style == "glass" and theme == "dark":
+                    page.screenshot(path=OUT / f"lista-{name}.png")
+                page.keyboard.press("Escape")
     return combos
 
 

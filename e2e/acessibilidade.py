@@ -62,6 +62,7 @@ PAGES = [
     "/divisoes",
     "/ajustes/app",
     "/analises?secao=calculadoras",
+    "/analises?secao=duvida",
     "/admin?aba=recados",
     "/ajustes/seguranca",
     "/ajustes/preferencias",

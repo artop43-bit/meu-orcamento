@@ -1,0 +1,37 @@
+MEU ORÇAMENTO · UPDATE LOG
+Versão 1.7.0 · Painel mais leve, cores consistentes e "Tire sua dúvida"
+Data: 10/11/2026 às 11:00 (horário de Brasília)
+
+Painel do Orçamento (mesmas informações, de forma sutil)
+- [x] Resumo do mês num bloco só: saldo em destaque; receitas, despesas (pago e pendente) e comprometimento ao lado, com barra de quanto da receita está comprometido
+- [x] Faixa "N avisos do mês" que abre ao tocar: desempenho do mês, plano para equilibrar, alertas (gastos fora do padrão, lugares novos, assinaturas mais caras, renovações) e importados para revisar; fechada, mostra o título de cada aviso; lembra se ficou aberta
+- [x] Lançamento rápido na mesma linha do mês e dos botões (no computador); no celular, logo abaixo
+- [x] Despesas: filtros em pílulas (Todas, A pagar, Atrasadas, Pagas) e categoria; busca no ícone de lupa; "Selecionar" e "Copiar do mês anterior" no menu "⋯"
+- [x] Editar, duplicar e excluir aparecem ao passar o mouse na linha (ou com o foco do teclado); no celular, continua o deslizar
+- [x] Coluna lateral enxuta: Disponível hoje com a simulação e o gráfico atrás de "Simular uma despesa"; "Para onde foi" com as 4 maiores categorias (o resto e a divisão essencial ao tocar); Receitas numa linha que abre a lista
+- [x] "Personalizar o painel" continua valendo para todos os blocos
+
+Cores e tema
+- [x] Listas suspensas com fundo sólido e o texto do tema: as opções abertas não ficam mais brancas e ilegíveis no escuro e no Liquid glass
+- [x] Seletor próprio nos navegadores que permitem (Chrome e Edge recentes, também no celular): lista com cantos, sombra, brilho e opção marcada na cor de destaque; o campo continua nativo (teclado, leitor de tela e preenchimento automático iguais)
+- [x] Varredura de cores fixas: o que sobrou é intencional (cores das bandeiras de cartão, imagem da Retrospectiva e cor inicial de categoria nova)
+
+Passar o mouse
+- [x] Ícones e botões clicáveis ganham destaque ao passar o mouse (fundo e ícone na cor de destaque e brilho leve) em vez de ficar cinza
+- [x] Excluir e remover avisam em vermelho; linhas de listas e tabelas recebem um véu leve da cor de destaque; menu lateral com o ícone aceso
+- [x] Só em aparelhos com mouse (no toque o destaque não "gruda")
+
+Insights › Tire sua dúvida
+- [x] Perguntas sobre os próprios lançamentos, respondidas pelo próprio site por regras (sem serviço externo nem inteligência artificial de terceiros); a pergunta não é guardada
+- [x] Entende: o que mais gastei, qual mês gastei mais, quando gastei mais em X (maiores valores com data), quanto gastei com X, última compra, receitas, saldo (quanto sobrou), o que vence ou está atrasado, cartões e faturas, metas
+- [x] Períodos: este mês, mês passado, nome do mês (com ou sem ano), este ano, ano passado, um ano (2026) e últimos N meses
+- [x] Assunto pela categoria do usuário, por palavra da descrição (ifood, uber, farmácia) ou pelo mesmo dicionário do lançamento rápido (comida → Alimentação, gasolina → Transporte)
+- [x] "Onde encontro…" / "Como faço…" leva à tela certa (recorrências, exportar dados, calculadoras, tema e outras 25)
+- [x] Respostas com lista dos itens (valor, data, categoria) e atalho para o mês; sugestões de perguntas para continuar
+
+Técnico
+- [x] API POST /api/ask (a pergunta vai no corpo, não no endereço, e não entra nos registros)
+- [x] Testes de backend: 27 casos do bot, inclusive várias formas de perguntar e o isolamento entre contas
+- [x] e2e/cores.py confere as listas suspensas: cada opção legível sobre o fundo da lista (que precisa ser sólido) e a primeira lista de cada tela aberta de verdade
+- [x] Tire sua dúvida incluída nas auditorias de acessibilidade, cores e enquadramento
+- [x] Revisão final com roteiros de acabamento de interface, acessibilidade e privacidade (LGPD)

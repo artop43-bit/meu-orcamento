@@ -3,15 +3,15 @@
  * do changelog (pasta changelog/), que tem a mesma versão, data e hora.
  */
 export const RELEASE = {
-  version: "1.6.5",
+  version: "1.7.0",
   // Data e hora (Brasília) em que o update foi publicado.
-  releasedAt: "2026-11-09T21:35:00-03:00",
+  releasedAt: "2026-11-10T11:00:00-03:00",
 };
 
 /** Mostrado uma vez em "Novidades" depois do update (curto: o detalhe fica no changelog). */
 export const RELEASE_NOTES: { title: string; text: string }[] = [
-  { title: "Mais fluido.", text: "Troca de telas mais leve, marcador que desliza até a aba ativa e números que sobem até o valor." },
-  { title: "Tudo no lugar.", text: "Abas e títulos não partem mais palavras no celular, nos dois estilos." },
+  { title: "Painel mais leve.", text: "As mesmas informações do Orçamento num resumo só, com os avisos reunidos numa faixa." },
+  { title: "Tire sua dúvida.", text: "Em Insights, pergunte “o que mais gastei este mês?” e outras sobre os seus lançamentos." },
 ];
 
 export function releaseLabel(): string {

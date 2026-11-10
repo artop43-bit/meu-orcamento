@@ -1,13 +1,15 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent, type PointerEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent, type PointerEvent, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowDownLeft,
   CalendarClock,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   CheckCheck,
   Copy,
   CopyPlus,
+  Ellipsis,
   ListChecks,
   Mic,
   SlidersHorizontal,
@@ -45,17 +47,16 @@ import { haptic } from "../lib/haptics";
 import { Badge, Bar } from "../components/budget";
 import { ExpenseForm, IncomeForm, type ExpenseDraft } from "../components/entryForms";
 import { EmptyGuide, Tip } from "../components/help";
-import { ConsultantTeaser } from "../components/consultant";
 import { GoalTeaser } from "../components/GoalTeaser";
-import { MonthAlerts } from "../components/MonthAlerts";
-import { RecoveryCard } from "../components/RecoveryPlan";
 import { DashboardEditor } from "../components/DashboardEditor";
 import { useMe } from "../api/auth";
 import { areaOf, readDashboard, type DashboardKey } from "../lib/dashboard";
 import { LazyChart } from "../components/chart/LazyChart";
 import { extrasApi, saveQuickEntry, useCards, useDaily } from "../api/extras";
 import { moneyApi, useReviewCount } from "../api/money";
-import { Alert, Button, Kpi, LoadingRegion, PageHeader, Sheet, Skeleton } from "../components/ui";
+import { Alert, Button, LoadingRegion, PageHeader, Sheet, Skeleton } from "../components/ui";
+import { maybeCountUp } from "../components/CountUp";
+import { MonthNotices } from "../components/MonthNotices";
 import { useUndo } from "../components/undo";
 import { addMonths, cycleLabel, money, monthLabel, parseMoney, percent, shortDate, thisMonth, todayISO } from "../lib/format";
 import { normalizeText } from "../lib/text";
@@ -73,46 +74,59 @@ type Editing =
 
 // ---------------------------------------------------------------- indicadores
 
-function Kpis({ data }: { data: MonthData }) {
+/** Resumo do mês num bloco só (v1.7): o saldo em destaque e receitas, despesas e
+ * comprometimento ao lado, com uma barra de quanto da receita já está comprometido. */
+function MonthSummary({ data }: { data: MonthData }) {
   const s = data.summary;
   const balance = Number(s.balance);
   const committed = s.committed_pct;
-  const expenseTotal = Number(s.expense_total);
-  const paidPct = expenseTotal > 0 ? (Number(s.paid_total) / expenseTotal) * 100 : 0;
+  const level = committed === null ? "sem receitas" : committed <= 50 ? "saudável" : committed <= 80 ? "moderado" : "elevado";
   return (
-    <div className="kpis">
-      <Kpi icon={<ArrowDownLeft size={17} />} label="Receitas" value={money(s.income_total)} foot={`${data.incomes.length} lançamento(s)`} />
-      <Kpi
-        icon={<Receipt size={17} />}
-        tone="expense"
-        label="Despesas"
-        value={money(s.expense_total)}
-        foot={
-          <span className="stack stack--tight" style={{ gap: 6 }}>
-            <Bar pct={paidPct} />
-            <span>
+    <section className="card month-summary" aria-label="Resumo do mês">
+      <div className="month-summary__main">
+        <span className="month-summary__label">
+          <Scale size={15} aria-hidden /> Saldo do mês
+        </span>
+        <strong className={`month-summary__value ${balance < 0 ? "tone--error" : "tone--ok"}`}>{maybeCountUp(money(s.balance))}</strong>
+        <span className="muted small">{balance < 0 ? "Despesas acima das receitas" : "Receitas menos despesas"}</span>
+      </div>
+      <div className="month-summary__side">
+        <dl className="month-summary__grid">
+          <div>
+            <dt>
+              <ArrowDownLeft size={14} aria-hidden /> Receitas
+            </dt>
+            <dd className="month-summary__num">{maybeCountUp(money(s.income_total))}</dd>
+            <dd className="month-summary__foot">{data.incomes.length} lançamento(s)</dd>
+          </div>
+          <div>
+            <dt>
+              <Receipt size={14} aria-hidden /> Despesas
+            </dt>
+            <dd className="month-summary__num">{maybeCountUp(money(s.expense_total))}</dd>
+            <dd className="month-summary__foot">
               Pago {money(s.paid_total)} · pendente {money(s.pending_total)}
-            </span>
-          </span>
-        }
-      />
-      <Kpi
-        icon={<Scale size={17} />}
-        tone={balance < 0 ? "expense" : "accent"}
-        label="Saldo"
-        value={money(s.balance)}
-        valueClass={balance < 0 ? "tone--error" : "tone--ok"}
-        foot={balance < 0 ? "Despesas acima das receitas" : "Receitas menos despesas"}
-      />
-      <Kpi
-        icon={<Gauge size={17} />}
-        tone="neutral"
-        label="Comprometimento"
-        value={percent(committed)}
-        valueClass={committed !== null && committed > 100 ? "tone--error" : undefined}
-        foot={committed === null ? "Sem receitas no mês" : committed <= 50 ? "Saudável (até 50% da receita)" : committed <= 80 ? "Moderado" : "Elevado"}
-      />
-    </div>
+            </dd>
+          </div>
+          <div>
+            <dt>
+              <Gauge size={14} aria-hidden /> Comprometimento
+            </dt>
+            <dd className={`month-summary__num ${committed !== null && committed > 100 ? "tone--error" : ""}`}>{percent(committed)}</dd>
+            <dd className="month-summary__foot">{level}</dd>
+          </div>
+        </dl>
+        {committed !== null && (
+          <div
+            className={`month-summary__bar ${committed > 100 ? "is-over" : committed > 80 ? "is-high" : ""}`}
+            role="img"
+            aria-label={`Despesas são ${percent(committed)} das receitas`}
+          >
+            <span style={{ width: `${Math.min(committed, 100)}%` }} />
+          </div>
+        )}
+      </div>
+    </section>
   );
 }
 
@@ -303,6 +317,8 @@ function ExpensesCard({
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<StatusFilter>("all");
   const [categoryFilter, setCategoryFilter] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
+  const searchRef = useRef<HTMLInputElement>(null);
   const filtering = query.trim() !== "" || status !== "all" || categoryFilter !== "";
   const visible = useMemo(() => {
     const q = normalizeText(query);
@@ -370,22 +386,38 @@ function ExpensesCard({
 
   return (
     <section className="card stack">
-      <div className="section-header">
+      <div className="section-header expenses-head">
         <h2>
           Despesas <span className="muted section-header__total">· {money(data.summary.expense_total)}</span>
         </h2>
-        <span className="row" style={{ gap: 8 }}>
-          {data.expenses.length > 1 && !selecting && (
-            <Button type="button" variant="secondary" onClick={() => setSelecting(true)}>
-              <ListChecks size={16} /> Selecionar
-            </Button>
-          )}
-          {!selecting && (
-            <Button type="button" variant="secondary" onClick={() => setEditing({ type: "copy" })}>
-              <CopyPlus size={16} /> Copiar do mês anterior
-            </Button>
-          )}
-        </span>
+        {!selecting && (
+          <span className="expenses-head__tools">
+            {data.expenses.length > 3 && (
+              <button
+                type="button"
+                className={`icon-btn ${searchOpen || query ? "is-active" : ""}`}
+                aria-label="Buscar no mês"
+                aria-expanded={searchOpen || query !== ""}
+                title="Buscar no mês"
+                onClick={() => {
+                  if (searchOpen && !query) setSearchOpen(false);
+                  else {
+                    setSearchOpen(true);
+                    requestAnimationFrame(() => searchRef.current?.focus());
+                  }
+                }}
+              >
+                <Search size={17} aria-hidden />
+              </button>
+            )}
+            <MoreMenu
+              items={[
+                ...(data.expenses.length > 1 ? [{ label: "Selecionar", icon: <ListChecks size={16} aria-hidden />, onClick: () => setSelecting(true) }] : []),
+                { label: "Copiar do mês anterior", icon: <CopyPlus size={16} aria-hidden />, onClick: () => setEditing({ type: "copy" }) },
+              ]}
+            />
+          </span>
+        )}
       </div>
       {overdue.length > 0 && !selecting && (
         <div className="overdue-bar" role="status">
@@ -439,20 +471,37 @@ function ExpensesCard({
         </div>
       )}
       {data.expenses.length > 3 && (
-        <div className="list-tools" role="search">
-          <label className="list-tools__search">
-            <Search size={16} aria-hidden />
-            <span className="sr-only">Buscar despesa</span>
-            <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar no mês" />
-          </label>
-          <select value={status} onChange={(e) => setStatus(e.target.value as StatusFilter)} aria-label="Filtrar por situação">
-            <option value="all">Todas</option>
-            <option value="pending">A pagar</option>
-            <option value="late">Atrasadas</option>
-            <option value="paid">Pagas</option>
-          </select>
-          <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} aria-label="Filtrar por categoria">
-            <option value="">Todas as categorias</option>
+        <div className="list-tools list-tools--pills" role="search" aria-label="Filtrar despesas">
+          {(searchOpen || query) && (
+            <label className="list-tools__search">
+              <Search size={16} aria-hidden />
+              <span className="sr-only">Buscar despesa</span>
+              <input
+                ref={searchRef}
+                type="search"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape" && !query) setSearchOpen(false);
+                }}
+                placeholder="Buscar no mês"
+              />
+            </label>
+          )}
+          <span className="pill-group" role="group" aria-label="Filtrar por situação">
+            {STATUS_FILTERS.map((f) => (
+              <button key={f.value} type="button" className="chip-btn" aria-pressed={status === f.value} onClick={() => setStatus(f.value)}>
+                {f.label}
+              </button>
+            ))}
+          </span>
+          <select
+            className={`pill-select ${categoryFilter ? "is-active" : ""}`}
+            value={categoryFilter}
+            onChange={(e) => setCategoryFilter(e.target.value)}
+            aria-label="Filtrar por categoria"
+          >
+            <option value="">Categoria</option>
             <option value="none">Sem categoria</option>
             {categories.map((c) => (
               <option key={c.id} value={c.id}>
@@ -529,6 +578,78 @@ function ExpensesCard({
 }
 
 type StatusFilter = "all" | "pending" | "late" | "paid";
+
+const STATUS_FILTERS: { value: StatusFilter; label: string }[] = [
+  { value: "all", label: "Todas" },
+  { value: "pending", label: "A pagar" },
+  { value: "late", label: "Atrasadas" },
+  { value: "paid", label: "Pagas" },
+];
+
+/** Menu "⋯" com ações menos usadas da lista (v1.7). */
+function MoreMenu({ items }: { items: { label: string; icon: ReactNode; onClick: () => void }[] }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    function onDown(e: globalThis.PointerEvent) {
+      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        setOpen(false);
+        ref.current?.querySelector<HTMLButtonElement>(".more-menu__toggle")?.focus();
+      }
+    }
+    document.addEventListener("pointerdown", onDown);
+    document.addEventListener("keydown", onKey);
+    ref.current?.querySelector<HTMLButtonElement>(".more-menu__list button")?.focus();
+    return () => {
+      document.removeEventListener("pointerdown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+  return (
+    <span
+      className="more-menu"
+      ref={ref}
+      onBlur={(e) => {
+        // Tab para fora do menu fecha (teclado). Clique fora já fecha pelo pointerdown; sem
+        // relatedTarget (Safari não foca botões no clique) não fecha, para o clique no item valer.
+        const next = e.relatedTarget as Node | null;
+        if (open && next && !ref.current?.contains(next)) setOpen(false);
+      }}
+    >
+      <button
+        type="button"
+        className="icon-btn more-menu__toggle"
+        aria-label="Mais ações"
+        title="Mais ações"
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+      >
+        <Ellipsis size={18} aria-hidden />
+      </button>
+      {open && (
+        <span className="more-menu__list" role="group" aria-label="Mais ações">
+          {items.map((item) => (
+            <button
+              key={item.label}
+              type="button"
+              onClick={() => {
+                setOpen(false);
+                item.onClick();
+              }}
+            >
+              {item.icon}
+              {item.label}
+            </button>
+          ))}
+        </span>
+      )}
+    </span>
+  );
+}
 
 /** Campo "lançar numa frase": "mercado 120 pix ontem". */
 function QuickBar({ month, categories, autoListen = false }: { month: string; categories: Category[]; autoListen?: boolean }) {
@@ -651,6 +772,7 @@ function QuickBar({ month, categories, autoListen = false }: { month: string; ca
 function DailyCard({ month }: { month: string }) {
   const daily = useDaily(month);
   const [simulate, setSimulate] = useState("");
+  const [details, setDetails] = useState(false);
   const data = daily.data;
   if (!data || data.days.length === 0) return null;
   const can = data.can_spend;
@@ -681,6 +803,13 @@ function DailyCard({ month }: { month: string }) {
           <strong className={`daily-card__value ${rest < 0 ? "tone--error" : "tone--ok"}`}>{money(rest)}</strong>
         </div>
       )}
+      {!details && (
+        <button type="button" className="link-btn daily-card__more" aria-expanded={false} onClick={() => setDetails(true)}>
+          Simular uma despesa e ver o saldo dia a dia ›
+        </button>
+      )}
+      {details && (
+        <>
       <label className="simulate">
         <span className="field-label">
           Simular despesa <Tip>Veja o efeito de um gasto antes de fazê-lo. Nada é lançado.</Tip>
@@ -702,6 +831,8 @@ function DailyCard({ month }: { month: string }) {
         description={`Saldo previsto dia a dia em ${monthLabel(month)}`}
         height={140}
       />
+        </>
+      )}
       {negative && (
         <p className="tone--error small row" style={{ margin: 0, gap: 6 }}>
           <TrendingDown size={15} aria-hidden /> Saldo negativo a partir do dia {negative.slice(8)}
@@ -747,27 +878,47 @@ function IncomesCard({ data, setEditing }: { data: MonthData; setEditing: (e: Ed
   const incomes = data.incomes.filter((income) => !undo.isHidden(income.id));
   const fixed = incomes.filter((i) => i.income_type !== "variable");
   const variable = incomes.filter((i) => i.income_type === "variable");
+  const [open, setOpen] = useState(() => {
+    try {
+      return localStorage.getItem("receitas-do-mes-abertas") === "1";
+    } catch {
+      return false;
+    }
+  });
+  function toggle() {
+    setOpen(!open);
+    try {
+      localStorage.setItem("receitas-do-mes-abertas", open ? "0" : "1");
+    } catch {
+      /* sem armazenamento: só não lembra */
+    }
+  }
   return (
-    <section className="card stack">
+    <section className={`card stack incomes-card ${open ? "is-open" : ""}`}>
       <div className="section-header">
         <h2>
-          Receitas <span className="muted section-header__total">· {money(data.summary.income_total)}</span>
+          <button type="button" className="incomes-card__toggle" aria-expanded={open} aria-controls="receitas-do-mes" onClick={toggle}>
+            Receitas <span className="muted section-header__total">· {money(data.summary.income_total)}</span>
+            <ChevronDown size={18} className="incomes-card__chevron" aria-hidden />
+          </button>
           <Tip label="Receita fixa e variável">
             Fixa: mesmo valor todo mês (salário, aposentadoria). Variável: muda a cada mês (freelance, comissões). A projeção usa a
             média da receita variável.
           </Tip>
         </h2>
       </div>
-      {incomes.length === 0 ? (
-        <p className="muted" style={{ margin: 0 }}>
-          Nenhuma receita no mês. Use “Nova receita” no topo.
-        </p>
-      ) : (
-        <>
-          <IncomeGroup title="Fixas" items={fixed} setEditing={setEditing} />
-          <IncomeGroup title="Variáveis" items={variable} setEditing={setEditing} />
-        </>
-      )}
+      <div id="receitas-do-mes" className="stack" hidden={!open}>
+        {incomes.length === 0 ? (
+          <p className="muted" style={{ margin: 0 }}>
+            Nenhuma receita no mês. Use “Nova receita” no topo.
+          </p>
+        ) : (
+          <>
+            <IncomeGroup title="Fixas" items={fixed} setEditing={setEditing} />
+            <IncomeGroup title="Variáveis" items={variable} setEditing={setEditing} />
+          </>
+        )}
+      </div>
     </section>
   );
 }
@@ -779,17 +930,22 @@ function BreakdownCard({ data, categories }: { data: MonthData; categories: Cate
   const paceQuery = useQuery({ queryKey: ["budget", "pace", data.month], queryFn: () => moneyApi.pace(data.month) });
   const pace = new Map((paceQuery.data ?? []).map((r) => [r.category_id ?? "none", r]));
   const total = Number(s.expense_total);
+  const [all, setAll] = useState(false);
   if (total === 0) return null;
+  const SHOWN = 4;
+  const list = all ? s.by_category : s.by_category.slice(0, SHOWN);
+  const hidden = s.by_category.length - SHOWN;
   const colors = new Map(categories.map((c) => [c.id, c.color ?? undefined]));
   const essentialPct = (Number(s.essential_total) / total) * 100;
   return (
     <section className="card stack">
       <h2>
-        Despesas por categoria{" "}
+        Para onde foi{" "}
         <Tip label="Ritmo por categoria">
           Compara o gasto de cada categoria com o esperado até hoje: o limite definido ou, sem limite, a média dos últimos 3 meses.
         </Tip>
       </h2>
+      {all && (
       <div className="stack stack--tight">
         <div className="stacked-bar" aria-hidden>
           <div className="seg--needs" style={{ width: `${essentialPct}%` }} />
@@ -806,8 +962,9 @@ function BreakdownCard({ data, categories }: { data: MonthData; categories: Cate
           </span>
         </div>
       </div>
+      )}
       <ul className="breakdown">
-        {s.by_category.map((c) => (
+        {list.map((c) => (
           <li key={c.category_id ?? "none"}>
             <div className="split">
               <span>
@@ -841,6 +998,11 @@ function BreakdownCard({ data, categories }: { data: MonthData; categories: Cate
           </li>
         ))}
       </ul>
+      {(hidden > 0 || all) && (
+        <button type="button" className="link-btn" aria-expanded={all} onClick={() => setAll(!all)}>
+          {all ? "Mostrar menos" : `+ ${hidden} categoria(s) e divisão essencial`}
+        </button>
+      )}
     </section>
   );
 }
@@ -1045,6 +1207,7 @@ export default function MonthPage() {
         }
         actions={
           <span className="row month-actions">
+            {shown("top").includes("quick") && <QuickBar month={month} categories={cats} autoListen={voice} />}
             <button
               type="button"
               className="icon-btn icon-btn--bordered"
@@ -1073,21 +1236,16 @@ export default function MonthPage() {
           style={{ gap: 20 }}
           aria-busy={data.isPlaceholderData || undefined}
         >
-          {shown("top").map((key) => {
-            const empty = data.data!.incomes.length === 0 && data.data!.expenses.length === 0;
-            if (key === "quick") return <QuickBar key={key} month={month} categories={cats} autoListen={voice} />;
-            if (empty) return null;
-            if (key === "kpis") return <Kpis key={key} data={data.data!} />;
-            return <ConsultantTeaser key={key} month={month} />;
-          })}
-          {reviewCount > 0 && (
-            <Link to="/revisar" className="review-banner">
-              <ListChecks size={18} aria-hidden />
-              <span>
-                <strong>{reviewCount} despesa(s) importada(s) para revisar.</strong> Confira as categorias antes que entrem nas análises.
-              </span>
-            </Link>
+          {shown("top").includes("kpis") && (data.data.incomes.length > 0 || data.data.expenses.length > 0) && (
+            <MonthSummary data={data.data} />
           )}
+          <MonthNotices
+            month={month}
+            consultant={shown("top").includes("consultant")}
+            alerts={shown("side").includes("alerts")}
+            negative={Number(data.data.summary.balance) < 0}
+            reviewCount={reviewCount}
+          />
           {data.data.incomes.length === 0 && data.data.expenses.length === 0 ? (
             <div className="empty-hint">
               <span className="kpi__icon" aria-hidden>
@@ -1103,12 +1261,11 @@ export default function MonthPage() {
               </div>
             </div>
           ) : null}
-          {Number(data.data.summary.balance) < 0 && <RecoveryCard month={month} />}
           <div className="layout-main-side">
             <ExpensesCard data={data.data} categories={cats} setEditing={setEditing} />
             <div className="stack" style={{ gap: 20 }}>
               {shown("side").map((key) => {
-                if (key === "alerts") return <MonthAlerts key={key} month={month} />;
+                if (key === "alerts") return null; // na faixa de avisos
                 if (key === "daily") return <DailyCard key={key} month={month} />;
                 if (key === "goal") return <GoalTeaser key={key} showSuggestion={isCurrent} />;
                 if (key === "incomes") return <IncomesCard key={key} data={data.data!} setEditing={setEditing} />;

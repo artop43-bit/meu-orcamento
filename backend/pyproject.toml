@@ -43,6 +43,7 @@ select = ["E", "F", "I", "B", "UP"]
 "app/services/category_words.py" = ["E501"]
 # Modelos de e-mail em HTML: linhas longas de estilos embutidos.
 "app/services/notify.py" = ["E501"]
+"app/services/ask.py" = ["E501"]  # frases das respostas e lista de telas
 
 [tool.ruff.lint.isort]
 # A pasta local "alembic/" não é o pacote alembic.

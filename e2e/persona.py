@@ -103,6 +103,21 @@ def open_month(page: Page, month: str):
     expect(page.locator("h1")).to_be_visible()
 
 
+def open_notices(page: Page):
+    """Painel (v1.7): abre a faixa de avisos do mês, se estiver fechada."""
+    bar = page.locator(".notices__bar")
+    expect(bar).to_be_visible()
+    if bar.get_attribute("aria-expanded") != "true":
+        bar.click()
+
+
+def open_incomes(page: Page):
+    """Painel (v1.7): abre a lista de receitas da coluna lateral, se estiver fechada."""
+    toggle = page.locator(".incomes-card__toggle")
+    if toggle.get_attribute("aria-expanded") != "true":
+        toggle.click()
+
+
 def add_expense(page: Page, month: str, desc: str, amount: float, cat: str, day: int | None = None, kind: str = "single", parcelas: int | None = None):
     page.get_by_role("button", name="Nova despesa", exact=True).click()
     d = dialog(page)
@@ -346,10 +361,12 @@ def undo_delete(page: Page, month: str):
     add_expense(page, month, "Lançamento errado", 12.34, "Outros", 3)
     row = page.locator(".ledger__row", has_text="Lançamento errado")
     expect(row).to_have_count(1)
+    row.hover()  # v1.7: as ações da linha aparecem ao passar o mouse
     row.get_by_role("button", name="Excluir Lançamento errado").click()
     expect(row).to_have_count(0)
     page.get_by_role("button", name="Desfazer").click()
     expect(row).to_have_count(1)
+    row.hover()  # v1.7: as ações da linha aparecem ao passar o mouse
     row.get_by_role("button", name="Excluir Lançamento errado").click()
     expect(row).to_have_count(0)
     page.wait_for_timeout(6800)
@@ -358,7 +375,9 @@ def undo_delete(page: Page, month: str):
     assert not any(e["description"] == "Lançamento errado" for e in data["expenses"]), "não foi excluída"
     # Excluir e recarregar (ou fechar) antes do fim do prazo do Desfazer: a exclusão tem de valer.
     add_expense(page, month, "Excluir e recarregar", 7.77, "Outros", 4)
-    page.locator(".ledger__row", has_text="Excluir e recarregar").get_by_role("button", name="Excluir Excluir e recarregar").click()
+    row = page.locator(".ledger__row", has_text="Excluir e recarregar")
+    row.hover()
+    row.get_by_role("button", name="Excluir Excluir e recarregar").click()
     page.wait_for_timeout(800)
     page.reload()
     idle(page, 1500)
@@ -681,6 +700,7 @@ def flexible_entries(page: Page, months: list[str]):
     idle(page)
     income = next(i for i in api(page, f"/months/{month}")["incomes"] if i["description"] == "Freelance (logo)")
     assert (income["income_type"], income["day"]) == ("variable", 25), income
+    open_incomes(page)
     expect(page.get_by_text("Variáveis", exact=True)).to_be_visible()
 
     # Categoria sugerida pelo nome; forma de pagamento; "Salvar e adicionar outro".
@@ -738,6 +758,7 @@ def flexible_entries(page: Page, months: list[str]):
 
     # Busca e filtro na lista.
     open_month(page, month)
+    page.get_by_role("button", name="Buscar no mês").click()
     page.get_by_placeholder("Buscar no mês").fill("geladeira")
     expect(page.locator(".ledger__row")).to_have_count(1)
     page.get_by_role("button", name="Limpar filtros").click()
@@ -821,6 +842,7 @@ def quick_and_bulk(page: Page):
     expect(page.get_by_text("Disponível hoje", exact=True)).to_be_visible()
 
     # Lote: seleciona 2 contas e muda a categoria.
+    page.get_by_role("button", name="Mais ações").click()
     page.get_by_role("button", name="Selecionar", exact=True).click()
     page.get_by_role("checkbox", name="Selecionar Padaria").check()
     page.get_by_role("checkbox", name=re.compile("^Selecionar Uber para o trabalho")).check()
@@ -908,9 +930,9 @@ def rules_privacy_feedback(page: Page):
 
     open_month(page, CURRENT)
     page.locator("body").press("p")
-    expect(page.locator(".kpi").first).to_contain_text("R$ ••••")
+    expect(page.locator(".month-summary")).to_contain_text("R$ ••••")
     page.locator("body").press("p")
-    expect(page.locator(".kpi").first).not_to_contain_text("R$ ••••")
+    expect(page.locator(".month-summary")).not_to_contain_text("R$ ••••")
 
     page.goto(f"{BASE}/preferencias")
     idle(page)
@@ -2071,6 +2093,7 @@ def v13_planning(page: Page):
     # Plano sem culpa: o mês está no negativo.
     open_month(page, month)
     assert float(api(page, f"/months/{month}")["summary"]["balance"]) < 0
+    open_notices(page)
     page.get_by_role("region", name="Plano para equilibrar o mês").get_by_role("button", name="Ver o plano").click()
     d = dialog(page)
     expect(d).to_contain_text("O tamanho da diferença")
@@ -2391,6 +2414,7 @@ def mobile(browser):
     page.goto(f"{BASE}/orcamento")
     idle(page, 600)
     page.screenshot(path=OUT / "celular-orcamento.png", full_page=True)
+    open_notices(page)
     expect(page.locator(".teaser")).to_be_visible()
     page.locator(".teaser").click()
     page.wait_for_url("**/analises**")

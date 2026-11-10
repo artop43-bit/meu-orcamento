@@ -22,6 +22,7 @@ import {
   TrendingUp,
   WandSparkles,
   Calculator,
+  MessageCircleQuestion,
   type LucideIcon,
 } from "lucide-react";
 import { Link, useNavigate, useSearchParams } from "react-router";
@@ -32,6 +33,7 @@ import { errorMessage } from "../api/client";
 import { insightsApi, type AnalysisConfig, type SavedAnalysis } from "../api/insights";
 import { AnalysisResult, Builder, PRESETS, SavedCard, useSaved } from "../components/AnalysisBuilder";
 import { Bar } from "../components/budget";
+import { AskBot } from "../components/AskBot";
 import { Calculators } from "../components/Calculators";
 import { Chart } from "../components/chart/Chart";
 import { FeesCard, PersonalInflationCard } from "../components/XRay";
@@ -913,10 +915,11 @@ function SimulatorTab() {
 
 // ---------------------------------------------------------------- página
 
-type SectionKey = "resumo" | "tendencias" | "categorias" | "saude" | "patrimonio" | "comparar" | "projecao" | "simulador" | "calculadoras" | "monte";
+type SectionKey = "resumo" | "tendencias" | "categorias" | "saude" | "patrimonio" | "comparar" | "projecao" | "simulador" | "calculadoras" | "duvida" | "monte";
 
 const SECTIONS: { key: SectionKey; label: string; group: string; icon: LucideIcon }[] = [
   { key: "resumo", label: "Resumo", group: "Visão geral", icon: LayoutDashboard },
+  { key: "duvida", label: "Tire sua dúvida", group: "Visão geral", icon: MessageCircleQuestion },
   { key: "tendencias", label: "Tendências", group: "Visão geral", icon: TrendingUp },
   { key: "categorias", label: "Categorias", group: "Visão geral", icon: Tags },
   { key: "saude", label: "Saúde financeira", group: "Visão geral", icon: HeartPulse },
@@ -1010,6 +1013,12 @@ export default function Analysis() {
             <>
               <SectionTitle title="Calculadoras" text="Juros compostos, planejamento, à vista ou parcelado, antecipação de parcelas e reserva de emergência." />
               <Calculators />
+            </>
+          )}
+          {section === "duvida" && (
+            <>
+              <SectionTitle title="Tire sua dúvida" text="Pergunte sobre os seus gastos, receitas, vencimentos e metas, ou onde fica algo no site." />
+              <AskBot />
             </>
           )}
           {section === "monte" && <BuilderSection initial={builderStart} />}
