@@ -1692,6 +1692,8 @@ select option:checked {
   flex-direction: column;
   gap: 12px;
   min-width: 0;
+  /* As regras @container abaixo medem esta coluna (o próprio container não pode se medir). */
+  container-type: inline-size;
 }
 
 .month-summary__grid {
@@ -1699,7 +1701,6 @@ select option:checked {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
   margin: 0;
-  container-type: inline-size;
 }
 
 .month-summary__grid > div {
@@ -1732,7 +1733,9 @@ select option:checked {
   font-weight: 650;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.01em;
-  white-space: nowrap;
+  /* Quebra só no espaço depois de "R$" (nunca no meio do número), em vez de vazar. */
+  overflow-wrap: normal;
+  word-break: keep-all;
 }
 
 .month-summary__foot {
@@ -1742,12 +1745,14 @@ select option:checked {
 }
 
 @container (max-width: 400px) {
+  /* Celular: receitas e despesas lado a lado; comprometimento na linha de baixo. */
   .month-summary__grid {
-    gap: 8px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px 12px;
   }
 
   .month-summary__num {
-    font-size: 0.9rem;
+    font-size: 0.98rem;
   }
 
   .month-summary__grid dt svg,
@@ -1758,7 +1763,7 @@ select option:checked {
 
 @container (max-width: 290px) {
   .month-summary__num {
-    font-size: 0.8rem;
+    font-size: 0.9rem;
   }
 
   .month-summary__grid dt {
