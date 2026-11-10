@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Bug, Check } from "lucide-react";
+import { Bug, Check, Gauge } from "lucide-react";
 
 import { api, errorMessage } from "../api/client";
 import { Alert, Button, LoadingRegion, Skeleton } from "../components/ui";
@@ -21,6 +21,79 @@ type ErrorEvent = {
 };
 
 const KEY = ["admin", "errors"] as const;
+
+type PerfRow = { screen: string; count: number; average_ms: number; max_ms: number; slow_pct: number; frame_ms: number };
+
+const SCREEN_NAMES: Record<string, string> = {
+  orcamento: "Orçamento",
+  calendario: "Calendário",
+  cartoes: "Cartões",
+  contas: "Contas",
+  revisar: "Revisar",
+  busca: "Busca",
+  mensagens: "Mensagens",
+  dividas: "Dívidas",
+  divisoes: "Divisões",
+  metas: "Metas",
+  historico: "Histórico",
+  analises: "Insights",
+  investimentos: "Investimentos",
+  ajustes: "Ajustes",
+  relatorio: "Relatório",
+  admin: "Administração",
+  outras: "Outras",
+};
+
+const seconds = (ms: number) => `${(ms / 1000).toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} s`;
+
+/** v1.7.5: velocidade das telas com usuários reais (médias anônimas dos últimos 7 dias). */
+function SpeedCard() {
+  const perf = useQuery({ queryKey: ["admin", "perf"], queryFn: () => api.get<PerfRow[]>("/admin/perf"), refetchInterval: 300_000 });
+  const rows = perf.data ?? [];
+  return (
+    <section className="card stack" aria-labelledby="velocidade-das-telas">
+      <h2 id="velocidade-das-telas">
+        <Gauge size={18} aria-hidden /> Velocidade das telas (7 dias)
+      </h2>
+      <p className="muted small" style={{ margin: 0 }}>
+        Tempo até a tela ficar pronta, medido no aparelho de quem usa. Só médias por tela: não guarda quem abriu, aparelho nem endereço.
+        “Lentas” são as aberturas acima de 2,5 s.
+      </p>
+      {rows.length === 0 ? (
+        <p className="muted" style={{ margin: 0 }}>
+          Ainda sem medições.
+        </p>
+      ) : (
+        <div className="table-wrap" tabIndex={0} role="region" aria-label="Tabela da velocidade das telas">
+          <table className="table table--compact">
+            <thead>
+              <tr>
+                <th>Tela</th>
+                <th className="num">Aberturas</th>
+                <th className="num">Média</th>
+                <th className="num">Pior</th>
+                <th className="num">Lentas</th>
+                <th className="num">Travada média</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr key={row.screen}>
+                  <td>{SCREEN_NAMES[row.screen] ?? row.screen}</td>
+                  <td className="num">{row.count}</td>
+                  <td className={`num ${row.average_ms > 2500 ? "tone--error" : ""}`}>{seconds(row.average_ms)}</td>
+                  <td className="num">{seconds(row.max_ms)}</td>
+                  <td className="num">{row.slow_pct.toLocaleString("pt-BR")}%</td>
+                  <td className="num">{row.frame_ms} ms</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  );
+}
 
 function when(iso: string) {
   return new Date(iso).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
@@ -81,6 +154,7 @@ export default function AdminErrors() {
           </div>
         </details>
       )}
+      <SpeedCard />
     </div>
   );
 }

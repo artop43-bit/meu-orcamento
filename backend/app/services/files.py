@@ -97,18 +97,28 @@ def prepare(raw: bytes, purpose: str) -> tuple[bytes, str, int, int]:
     image = ImageOps.exif_transpose(image)
     image.thumbnail((rule.max_side, rule.max_side))
     out = io.BytesIO()
-    if fmt == "JPEG":
-        image.convert("RGB").save(out, "JPEG", quality=86, optimize=True)
-    elif fmt == "PNG":
-        image.save(out, "PNG", optimize=True)
-    elif fmt == "GIF":
+    if fmt == "GIF":
         image.save(out, "GIF")
+        kind = "GIF"
     else:
-        image.save(out, "WEBP", quality=86)
+        # v1.7.5: tudo o que é estático é gravado em WebP (arquivo bem menor, abre mais rápido no
+        # celular). Foto (JPEG/WebP) com perda quase invisível; PNG (print, logo, transparência)
+        # sem perda, para o texto não borrar.
+        kind = "WEBP"
+        if fmt == "PNG":
+            if image.mode not in ("RGB", "RGBA"):
+                image = image.convert(
+                    "RGBA" if "A" in image.getbands() or "transparency" in image.info else "RGB"
+                )
+            image.save(out, "WEBP", lossless=True, method=4)
+        else:
+            if image.mode not in ("RGB", "RGBA"):
+                image = image.convert("RGB")
+            image.save(out, "WEBP", quality=84, method=4)
     data = out.getvalue()
     if len(data) > rule.max_bytes:
         raise _too_big(rule)
-    return data, CONTENT_TYPES[fmt], image.width, image.height
+    return data, CONTENT_TYPES[kind], image.width, image.height
 
 
 def store(

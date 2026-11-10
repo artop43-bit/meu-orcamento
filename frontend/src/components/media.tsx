@@ -67,7 +67,7 @@ export function AttachmentGrid({ items }: { items: Message["attachments"] }) {
       <Sheet open={open !== null} title="Imagem anexada" onClose={() => setOpen(null)} wide>
         {open && (
           <div className="lightbox">
-            <img src={fileUrl(open)} alt="Imagem anexada ampliada" />
+            <img loading="lazy" decoding="async" src={fileUrl(open)} alt="Imagem anexada ampliada" />
             <a className="small" href={fileUrl(open)} target="_blank" rel="noreferrer">
               Abrir em tamanho original
             </a>
@@ -140,7 +140,7 @@ export function ImagePicker({ files, onChange }: { files: File[]; onChange: (fil
           {files.map((file, index) => (
             <li key={`${file.name}-${index}`}>
               {previews[index] ? (
-                <img src={previews[index]} alt={`Prévia: ${file.name}`} />
+                <img loading="lazy" decoding="async" src={previews[index]} alt={`Prévia: ${file.name}`} />
               ) : (
                 <span className="image-picker__doc" title={file.name}>
                   <FileText size={18} aria-hidden />

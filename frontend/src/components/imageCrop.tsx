@@ -174,7 +174,7 @@ export function ImageEditor({
               onPointerUp={() => (drag.current = null)}
               onPointerCancel={() => (drag.current = null)}
             >
-              <img
+              <img loading="lazy" decoding="async"
                 src={url}
                 alt="Prévia"
                 draggable={false}

@@ -7,10 +7,11 @@ import { installFormErrors } from "./lib/formErrors";
 import { captureInstallPrompt } from "./lib/install";
 import { startOfflineSync } from "./lib/offline";
 import { installErrorReporting } from "./lib/errorReport";
+import { installPerfReport } from "./lib/perfReport";
 import { applyPrefs } from "./lib/prefs";
 import { installNavIndicator } from "./lib/navIndicator";
 import { installScrollEdges } from "./lib/scrollEdges";
-import "@fontsource-variable/space-grotesk";
+import "./fonts.css";
 import "./theme.css";
 import "./styles.css";
 import "./visual.css";
@@ -29,6 +30,7 @@ installFormErrors();
 
 // Erros inesperados das telas vão para Administração › Erros (só no site publicado).
 installErrorReporting();
+installPerfReport();
 
 // Convite de instalação ("Instalar no computador"): chega só uma vez, logo no início.
 captureInstallPrompt();

@@ -1,5 +1,6 @@
 import { Suspense, useEffect, useLayoutEffect, useRef, useState, type MouseEvent, type ReactNode } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useIsFetching, useQuery, useQueryClient } from "@tanstack/react-query";
+import { startMeasure } from "../lib/perfReport";
 import {
   Banknote,
   CalendarDays,
@@ -173,12 +174,33 @@ function NavBadge({ count, label }: { count: number; label: string }) {
   );
 }
 
+/** v1.7.5: mede quanto cada tela leva para ficar pronta (ver lib/perfReport). */
+function usePerfReport(pathname: string) {
+  const fetching = useIsFetching();
+  const measure = useRef<ReturnType<typeof startMeasure> | null>(null);
+  const first = useRef(true);
+  const screen = pathname.split("/").slice(0, 2).join("/");
+  useEffect(() => {
+    measure.current?.cancel();
+    measure.current = startMeasure(screen, first.current);
+    first.current = false;
+    return () => measure.current?.cancel();
+  }, [screen]);
+  useEffect(() => {
+    if (fetching > 0) return;
+    // Dados prontos: espera o navegador desenhar (dois quadros) e fecha a medida.
+    const id = requestAnimationFrame(() => requestAnimationFrame(() => measure.current?.done()));
+    return () => cancelAnimationFrame(id);
+  }, [fetching, screen]);
+}
+
 export function Shell() {
   const queryClient = useQueryClient();
   const { data: user } = useMe();
   // Mês financeiro da conta: definido antes de as telas calcularem o "mês atual".
   setCycleStart(user?.month_start_day ?? 1);
   const location = useLocation();
+  usePerfReport(location.pathname);
   const navigate = useNavigate();
   const [moreOpen, setMoreOpen] = useState(false);
   const prefs = usePrefs();

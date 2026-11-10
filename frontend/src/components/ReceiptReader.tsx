@@ -44,6 +44,11 @@ export function ReceiptReader({ onRead }: { onRead: (reading: ReceiptReading, fi
         data-testid="receipt-reader-input"
         onChange={(e) => void pick(e.target.files?.[0])}
       />
+      {busy && (
+        <p className="muted small" role="status" style={{ margin: 0 }}>
+          A leitura roda em segundo plano: pode continuar preenchendo. Os campos são completados quando ela terminar.
+        </p>
+      )}
       {error && (
         <p className="tone--error small" role="alert" style={{ margin: 0 }}>
           {error}

@@ -92,12 +92,13 @@ def test_images_are_validated_and_cleaned(user: TestClient) -> None:
     detail = user.get(f"/api/support/threads/{ok.json()['id']}").json()
     [photo, shot] = detail["messages"][0]["attachments"]
     raw = user.get(f"/api/files/{photo['id']}")
-    assert raw.status_code == 200 and raw.headers["content-type"] == "image/jpeg"
+    # v1.7.5: fotos e prints são gravados em WebP (menores); o EXIF continua sendo removido.
+    assert raw.status_code == 200 and raw.headers["content-type"] == "image/webp"
     assert raw.headers["x-content-type-options"] == "nosniff"
     # O EXIF (com a localização GPS) foi removido.
     with Image.open(io.BytesIO(raw.content)) as image:
         assert not image.getexif()
-    assert user.get(f"/api/files/{shot['id']}").headers["content-type"] == "image/png"
+    assert user.get(f"/api/files/{shot['id']}").headers["content-type"] == "image/webp"
 
 
 def test_files_are_private(

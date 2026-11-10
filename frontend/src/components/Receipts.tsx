@@ -97,7 +97,7 @@ export function ReceiptsField({
           ))}
           {pending.map((file, i) => (
             <li key={`${file.name}-${i}`}>
-              <img src={previews[i]} alt={`Prévia: ${file.name}`} />
+              <img loading="lazy" decoding="async" src={previews[i]} alt={`Prévia: ${file.name}`} />
               <button type="button" className="icon-btn image-picker__remove" aria-label={`Remover ${file.name}`} onClick={() => setPending(pending.filter((_, j) => j !== i))}>
                 <X size={16} />
               </button>
@@ -128,7 +128,7 @@ export function ReceiptsField({
       <Sheet open={open !== null} title="Comprovante" onClose={() => setOpen(null)} wide>
         {open && (
           <div className="lightbox">
-            <img src={fileUrl(open)} alt="Comprovante ampliado" />
+            <img loading="lazy" decoding="async" src={fileUrl(open)} alt="Comprovante ampliado" />
             <a className="small" href={fileUrl(open)} target="_blank" rel="noreferrer">
               Abrir em tamanho original
             </a>

@@ -1,4 +1,4 @@
-"""v1.7.5: histórico do Tire sua dúvida (conversas guardadas por 30 dias)
+"""v1.7.5: histórico do Tire sua dúvida (30 dias), índices de vencimento e velocidade das telas
 
 Revision ID: 0029
 Revises: 0028
@@ -46,9 +46,24 @@ def upgrade() -> None:
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
     )
     op.create_index("ix_ask_messages_conversation_id", "ask_messages", ["conversation_id"])
+    op.create_index("ix_expenses_user_id_due_date", "expenses", ["user_id", "due_date"])
+    op.create_index("ix_expenses_user_id_created_at", "expenses", ["user_id", "created_at"])
+    op.create_table(
+        "perf_daily",
+        sa.Column("day", sa.Date(), primary_key=True),
+        sa.Column("screen", sa.String(length=40), primary_key=True),
+        sa.Column("count", sa.Integer(), nullable=False),
+        sa.Column("total_ms", sa.Integer(), nullable=False),
+        sa.Column("max_ms", sa.Integer(), nullable=False),
+        sa.Column("slow", sa.Integer(), nullable=False),
+        sa.Column("frame_ms", sa.Integer(), nullable=False),
+    )
 
 
 def downgrade() -> None:
+    op.drop_table("perf_daily")
+    op.drop_index("ix_expenses_user_id_created_at", table_name="expenses")
+    op.drop_index("ix_expenses_user_id_due_date", table_name="expenses")
     op.drop_index("ix_ask_messages_conversation_id", table_name="ask_messages")
     op.drop_table("ask_messages")
     op.drop_index("ix_ask_conversations_user_id_updated_at", table_name="ask_conversations")

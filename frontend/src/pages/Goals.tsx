@@ -118,7 +118,7 @@ function GoalForm({ goal, onDone }: { goal?: Goal; onDone: () => void }) {
             <span className="field-label">Imagem do objetivo (opcional)</span>
             {preview || goal?.image_id ? (
               <span className="goal-image-pick__preview">
-                <img src={preview ?? fileUrl(goal!.image_id!)} alt="Imagem do objetivo" />
+                <img loading="lazy" decoding="async" src={preview ?? fileUrl(goal!.image_id!)} alt="Imagem do objetivo" />
                 {preview && (
                   <button type="button" className="icon-btn" aria-label="Remover imagem escolhida" onClick={() => setImage(null)}>
                     <X size={16} />

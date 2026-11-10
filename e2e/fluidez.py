@@ -8,6 +8,8 @@
 2. Fluidez: troca as abas de baixo várias vezes e mede o tempo entre os quadros desenhados.
    Falha se a troca travar além do limite (o site publicado é bem mais rápido que o modo de
    desenvolvimento usado no CI; os limites têm folga para isso).
+3. Celular básico (v1.7.5): com o processador 4× mais lento e rede 3G, troca as abas de baixo e
+   mede quanto cada tela leva para ficar pronta (dados carregados e desenhados).
 
     uv run --no-project --with playwright python e2e/fluidez.py
 Mesmas variáveis do e2e/persona.py (QA_BASE_URL, QA_CREDENTIALS, QA_OUT, QA_BROWSER).
@@ -144,6 +146,40 @@ def fluidity(page: Page, problems: list[str]) -> dict:
     return result
 
 
+# Celular básico: processador 4× mais lento e rede 3G rápida (1,6 Mbps, 150 ms de latência).
+SLOW_CPU = 4
+SLOW_NET = {"offline": False, "latency": 150, "downloadThroughput": 1_600_000 / 8, "uploadThroughput": 750_000 / 8}
+SLOW_MEDIAN_MS = 3000
+SLOW_MAX_MS = 6000
+
+
+def slow_phone(page: Page, problems: list[str]) -> dict:
+    page.set_viewport_size({"width": 360, "height": 740})
+    page.goto(f"{BASE}/orcamento")
+    page.wait_for_load_state("networkidle")
+    page.wait_for_timeout(2500)  # telas baixadas em segundo plano depois de entrar
+    cdp = page.context.new_cdp_session(page)
+    cdp.send("Network.enable")
+    cdp.send("Network.emulateNetworkConditions", SLOW_NET)
+    cdp.send("Emulation.setCPUThrottlingRate", {"rate": SLOW_CPU})
+    times: list[float] = []
+    try:
+        for name in ["Carteira", "Planejamento", "Análises", "Orçamento"] * 2:
+            page.evaluate("window.__t0 = performance.now()")
+            page.locator(".tabbar").get_by_role("link", name=name).first.click()
+            page.wait_for_load_state("networkidle", timeout=30000)
+            # Pronta = sem "carregando" na tela e dois quadros desenhados depois dos dados.
+            page.wait_for_function("!document.querySelector('.content [aria-busy=\"true\"]')", timeout=30000)
+            times.append(page.evaluate("new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => r(performance.now() - window.__t0))))"))
+    finally:
+        cdp.send("Emulation.setCPUThrottlingRate", {"rate": 1})
+        cdp.send("Network.emulateNetworkConditions", {"offline": False, "latency": 0, "downloadThroughput": -1, "uploadThroughput": -1})
+    result = {"telas_ms": [round(t) for t in times], "mediana_ms": round(statistics.median(times)), "maximo_ms": round(max(times))}
+    if result["mediana_ms"] > SLOW_MEDIAN_MS or result["maximo_ms"] > SLOW_MAX_MS:
+        problems.append(f"CELULAR BÁSICO: telas demorando (mediana {result['mediana_ms']} ms, máximo {result['maximo_ms']} ms)")
+    return result
+
+
 def main() -> int:
     problems: list[str] = []
     with sync_playwright() as p:
@@ -155,12 +191,14 @@ def main() -> int:
         combos = framing(page, problems)
         page.evaluate(APPLY, "padrao")
         speed = fluidity(page, problems)
+        slow = slow_phone(page, problems)
         browser.close()
-    (OUT / "fluidez.json").write_text(json.dumps({"problemas": problems, "fluidez": speed}, ensure_ascii=False, indent=2), encoding="utf-8")
+    (OUT / "fluidez.json").write_text(json.dumps({"problemas": problems, "fluidez": speed, "celular_basico": slow}, ensure_ascii=False, indent=2), encoding="utf-8")
     for problem in problems:
         print(problem)
     print(f"Enquadramento: {len(PAGES)} telas × {len(STYLES)} estilos × {len(WIDTHS)} larguras = {combos} combinações.")
     print(f"Fluidez: pior quadro por troca de aba {speed['pior_quadro_ms']} (mediana {speed['mediana_ms']} ms).")
+    print(f"Celular básico (CPU 4× mais lenta, rede 3G): tela pronta em {slow['telas_ms']} ms (mediana {slow['mediana_ms']} ms).")
     print(f"{len(problems)} problema(s).")
     return 1 if problems else 0
 
