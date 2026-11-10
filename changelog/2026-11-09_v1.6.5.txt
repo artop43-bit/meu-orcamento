@@ -1,0 +1,30 @@
+MEU ORÇAMENTO · UPDATE LOG
+Versão 1.6.5 · Fluidez e enquadramento
+Data: 09/11/2026 às 21:35 (horário de Brasília)
+
+Enquadramento
+- [x] Abas (Administração, Contas, Mensagens e demais) nunca partem palavras: no celular ocupam a largura quando cabem e viram uma faixa que desliza quando não cabem
+- [x] Faixas que deslizam (abas, seções do Insights, seletor de calculadoras) mostram um esmaecido na borda onde há mais conteúdo
+- [x] Linhas de itens (Investimentos, Recorrências, Contas e listas em geral): o título fica inteiro; valor e ações descem para a linha de baixo, à direita, quando não cabem
+- [x] Títulos quebram só entre palavras (metas, dívidas, divisões, notas da versão, tarefas e outros)
+- [x] Conteúdo do fim da tela conferido acima da barra de abas flutuante em todas as telas
+
+Desempenho
+- [x] Liquid glass e Padrão: desfoque só no menu, na barra de abas e nas janelas; os cartões mantêm o vidro pela cor translúcida e pelo reflexo (muito mais leve no celular)
+- [x] Deslizar entre abas sem copiar a tela inteira: a tela atual sai, a prévia da próxima cobre a tela e a nova surge no lugar (sem vão vazio)
+- [x] Troca de telas por toque mais curta (0,2 s) e com deslocamento menor
+- [x] Extrato do mês: linhas fora da tela só são desenhadas quando chegam perto
+
+Fluidez
+- [x] Marcador que desliza com efeito de mola até o item ativo: menu lateral, barra de abas do celular, submenus e abas das telas
+- [x] Entrada das telas com os cartões surgindo em sequência rápida (até ~0,3 s)
+- [x] Números principais sobem até o valor (resumo do mês, saldos, indicadores e calculadoras); leitores de tela leem só o valor final
+- [x] Gráficos das calculadoras crescem ao aparecer (barras e anel)
+- [x] Toque com resposta: botões, abas e cartões clicáveis afundam levemente ao pressionar
+- [x] Troca de tema, estilo ou cor com revelação circular a partir do toque (onde o navegador permite)
+- [x] Tudo desligado com "reduzir movimento"; sem biblioteca nova (animações nativas do navegador)
+
+Técnico
+- [x] Teste novo e2e/fluidez.py no CI: palavra partida, rolagem lateral e fim da tela atrás da barra em todas as telas × 2 estilos × 3 larguras de celular (240 combinações), e quadros travados na troca de abas
+- [x] Conferido contra a versão anterior: o teste acusa 142 problemas na v1.6.0 e nenhum na v1.6.5
+- [x] Testes de unidade: marcador deslizante, esmaecido das faixas e números que sobem

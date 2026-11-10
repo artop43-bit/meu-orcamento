@@ -45,7 +45,7 @@ import { releaseLabel } from "../release";
 import { Tour } from "./help";
 import { Avatar } from "./media";
 import { openPalette, PowerLayer } from "./power";
-import { nextTheme, setAppearance, syncAppearance, THEMES } from "../lib/appearance";
+import { nextTheme, originOf, setAppearance, syncAppearance, THEMES } from "../lib/appearance";
 import { togglePrivacy, usePrefs } from "../lib/prefs";
 import { Brand, LoadingRegion, Sheet, Skeleton } from "./ui";
 import { UndoProvider } from "./undo";
@@ -76,29 +76,6 @@ function saveOpenGroups(open: string[]) {
 }
 
 /** Enquanto a tela é baixada (primeira visita, conexão lenta). */
-/**
- * Cópia da página que está saindo (deslize no celular): continua o movimento junto com a nova
- * tela, como no iPhone, em vez de sumir de uma vez e deixar um vazio por um instante.
- */
-function swipeGhost(page: HTMLElement | null, content: HTMLElement | null): HTMLElement | null {
-  if (!page || !content) return null;
-  const rect = page.getBoundingClientRect();
-  const pad = parseFloat(getComputedStyle(content).paddingLeft) || 0;
-  const ghost = document.createElement("div");
-  ghost.className = "swipe-ghost";
-  ghost.setAttribute("aria-hidden", "true");
-  ghost.inert = true;
-  ghost.style.left = `${rect.left - pad}px`;
-  ghost.style.width = `${rect.width + pad * 2}px`;
-  const copy = page.cloneNode(true) as HTMLElement;
-  copy.removeAttribute("data-enter");
-  copy.style.width = `${rect.width}px`;
-  copy.style.margin = `${rect.top}px 0 0 ${pad}px`;
-  ghost.append(copy);
-  document.body.append(ghost);
-  return ghost;
-}
-
 function PageLoading() {
   return (
     <LoadingRegion label="Carregando a tela">
@@ -211,7 +188,6 @@ export function Shell() {
   const peekRef = useRef<HTMLDivElement>(null);
   // Troca feita pelo deslize: a nova tela começa nesta posição (px) e termina o movimento.
   const swipeFrom = useRef<number | null>(null);
-  const ghostRef = useRef<HTMLElement | null>(null);
   const previousSection = useRef<string | null>(null);
 
   const section = sectionOf(location.pathname);
@@ -300,18 +276,10 @@ export function Shell() {
     resetSwipe(contentRef.current, peekRef.current);
     const swiped = swipeFrom.current;
     swipeFrom.current = null;
-    const ghost = ghostRef.current;
-    ghostRef.current = null;
     if (swiped !== null && swiped !== 0 && pageRef.current) {
-      // Veio do deslize: a nova tela e a que sai continuam o movimento do dedo, coladas.
-      const timing = { duration: 220, easing: "cubic-bezier(0.2, 0.8, 0.2, 1)" };
-      pageRef.current.animate([{ transform: `translate3d(${swiped}px, 0, 0)` }, { transform: "translate3d(0, 0, 0)" }], timing);
-      if (ghost) {
-        ghost.animate([{ transform: "translate3d(0, 0, 0)" }, { transform: `translate3d(${-swiped}px, 0, 0)` }], { ...timing, fill: "forwards" });
-        window.setTimeout(() => ghost.remove(), timing.duration + 30);
-      }
-    } else {
-      ghost?.remove();
+      // Veio do deslize: a tela que saiu e a prévia já terminaram o movimento; a nova surge no
+      // lugar da prévia (v1.6.5).
+      pageRef.current.animate([{ opacity: 0.55 }, { opacity: 1 }], { duration: 160, easing: "ease-out" });
     }
     if (from === null || from === section) return;
     if (swiped === null && pageRef.current) {
@@ -356,9 +324,23 @@ export function Shell() {
       const to = swipeTarget(dir);
       if (!to) return;
       swipeFrom.current = from;
-      ghostRef.current?.remove();
-      ghostRef.current = from !== 0 ? swipeGhost(pageRef.current, contentRef.current) : null;
-      navigate(to);
+      const content = contentRef.current;
+      if (from === 0 || !content) {
+        navigate(to);
+        return;
+      }
+      // A tela atual termina de sair na direção do dedo e a prévia da vizinha (que já acompanhava
+      // o dedo) cobre a tela; só então troca. Sem copiar a tela (v1.6.5): só transform, que o
+      // navegador anima fora do processamento principal, e nunca fica um vão vazio.
+      const width = window.innerWidth;
+      const timing: KeyframeAnimationOptions = { duration: 120, easing: "cubic-bezier(0.4, 0, 0.6, 1)", fill: "forwards" };
+      const out = content.animate(
+        [{ transform: content.style.transform || "none" }, { transform: `translate3d(${from > 0 ? -width : width}px, 0, 0)` }],
+        timing,
+      );
+      const peek = peekRef.current;
+      if (peek && !peek.hidden) peek.animate([{ transform: peek.style.transform || "none" }, { transform: "translate3d(0, 0, 0)" }], timing);
+      out.finished.then(() => navigate(to)).catch(() => navigate(to));
     },
     refresh: async () => {
       await queryClient.refetchQueries({ type: "active" });
@@ -398,9 +380,9 @@ export function Shell() {
   const displayName = profile.data?.display_name || user?.email || "";
   const unreadLabel = `${inboxUnread} mensagem(ns) não lida(s)`;
   const themeLabel = THEMES.find(([value]) => value === prefs.theme)?.[1] ?? "Automático";
-  const cycleTheme = () => {
+  const cycleTheme = (e?: MouseEvent<HTMLButtonElement>) => {
     const theme = nextTheme(prefs.theme);
-    setAppearance({ theme }, queryClient);
+    setAppearance({ theme }, queryClient, originOf(e));
     announce(`Tema: ${THEMES.find(([value]) => value === theme)?.[1]}`);
   };
 
@@ -726,7 +708,7 @@ export function Shell() {
               <div className="segmented segmented--3 segmented--pills">
                 {THEMES.map(([value, label]) => (
                   <label key={value}>
-                    <input type="radio" name="menu-theme" checked={prefs.theme === value} onChange={() => setAppearance({ theme: value }, queryClient)} />
+                    <input type="radio" name="menu-theme" checked={prefs.theme === value} onChange={(e) => setAppearance({ theme: value }, queryClient, originOf(e))} />
                     {label}
                   </label>
                 ))}

@@ -1612,11 +1612,13 @@ def visual_style(page: Page):
     expect(page.locator("html")).to_have_attribute("data-accent", "roxo")
     page.goto(f"{BASE}/orcamento")
     idle(page)
-    # Vidro: cantos bem arredondados; o desfoque só fora do modo leve (aparelhos simples).
+    # Vidro: cantos bem arredondados; o desfoque fica no menu (v1.6.5: não nos cartões, que
+    # pesavam no celular) e só fora do modo leve (aparelhos simples).
     card = page.locator(".card").first
     assert card.evaluate("(e) => getComputedStyle(e).borderTopLeftRadius") == "26px"
+    assert card.evaluate("(e) => getComputedStyle(e).backdropFilter") == "none"
     if page.locator("html").get_attribute("data-lite") is None:
-        assert "blur" in card.evaluate("(e) => getComputedStyle(e).backdropFilter")
+        assert "blur" in page.locator(".sidebar").evaluate("(e) => getComputedStyle(e).backdropFilter")
     page.screenshot(path=OUT / "v16-liquid-glass.png", full_page=True)
     # Outro "aparelho" (sem nada salvo no navegador): o estilo vem da conta.
     page.evaluate("localStorage.removeItem('preferencias-v1')")

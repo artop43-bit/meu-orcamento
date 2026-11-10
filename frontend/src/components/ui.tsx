@@ -14,6 +14,7 @@ import { Link } from "react-router";
 
 import { prefersReducedMotion } from "../lib/announce";
 import { haptic } from "../lib/haptics";
+import { maybeCountUp } from "./CountUp";
 
 export function Brand({ to }: { to?: string }) {
   const content = (
@@ -123,7 +124,7 @@ export function Kpi({
         </span>
         {label}
       </div>
-      <div className={`kpi__value ${valueClass ?? ""}`}>{value}</div>
+      <div className={`kpi__value ${valueClass ?? ""}`}>{maybeCountUp(value)}</div>
       {foot && <div className="kpi__foot">{foot}</div>}
     </div>
   );

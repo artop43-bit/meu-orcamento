@@ -509,7 +509,7 @@ svg {
   flex-wrap: wrap;
   gap: 8px;
   min-width: 0;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
   color: var(--muted);
   font-size: 0.85rem;
   font-weight: 550;
@@ -552,7 +552,7 @@ svg {
 .kpi__foot {
   font-size: 0.8rem;
   color: var(--subtle);
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 
 /* Compatibilidade com telas que usam .stats/.stat */
@@ -1130,7 +1130,7 @@ input.color {
 
 .item__title {
   font-weight: 550;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 
 .item__meta {
@@ -1236,7 +1236,7 @@ input.color {
 }
 
 .ledger__title > span:first-child {
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
   min-width: 0;
 }
 
@@ -1796,11 +1796,11 @@ input[type="range"]:focus-visible {
 
 @media (max-width: 1023px) {
   .page[data-enter="1"] {
-    animation: page-in-next 0.26s cubic-bezier(0.2, 0.8, 0.2, 1);
+    animation: page-in-next 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
   }
 
   .page[data-enter="-1"] {
-    animation: page-in-prev 0.26s cubic-bezier(0.2, 0.8, 0.2, 1);
+    animation: page-in-prev 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
   }
 
   /* Rolagem vertical e zoom continuam com o navegador; o arrasto lateral fica com o app. */
@@ -1823,15 +1823,15 @@ input[type="range"]:focus-visible {
 
 @keyframes page-in-next {
   from {
-    opacity: 0.6;
-    transform: translateX(18%);
+    opacity: 0.5;
+    transform: translate3d(28px, 0, 0);
   }
 }
 
 @keyframes page-in-prev {
   from {
-    opacity: 0.6;
-    transform: translateX(-18%);
+    opacity: 0.5;
+    transform: translate3d(-28px, 0, 0);
   }
 }
 
@@ -3612,7 +3612,8 @@ ul.legend {
   line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
+  hyphens: auto;
   line-height: 1.25;
 }
 
@@ -3915,7 +3916,7 @@ button.quote:hover {
   font-size: 0.82rem;
   color: var(--muted);
   max-width: calc(100% - 24px);
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 
 .quote__price {
@@ -3979,7 +3980,7 @@ button.quote:hover {
 }
 
 .rank__name {
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
   line-height: 1.25;
 }
 
@@ -5071,7 +5072,7 @@ kbd {
 
 .thread-list__title {
   min-width: 0;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 
 .thread-list__top time {
@@ -5098,7 +5099,7 @@ kbd {
 
 .thread-view__header h2 {
   margin: 0;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 
 .thread-view__back {
@@ -5310,7 +5311,7 @@ kbd {
 .profile-hero__name {
   margin: 0;
   font-size: 1.5rem;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 
 .profile-hero__meta {
@@ -5683,19 +5684,22 @@ textarea {
   flex: none;
 }
 
-/* Abas de página: no celular, as abas dividem a largura (nenhuma fica fora da tela). */
+/* Abas de página: no celular, ocupam a largura quando cabem e viram uma faixa que desliza
+   quando não cabem (v1.6.5: nunca partem uma palavra no meio). */
 @media (max-width: 599px) {
   .page-tabs {
-    display: grid;
-    grid-auto-flow: column;
-    grid-auto-columns: minmax(0, 1fr);
+    display: flex;
     width: 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
+    overscroll-behavior-x: contain;
   }
 
   .page-tabs a {
-    padding: 8px 6px;
+    flex: 1 0 auto;
+    padding: 8px 12px;
     text-align: center;
-    overflow-wrap: anywhere;
+    white-space: nowrap;
   }
 }
 
@@ -6051,14 +6055,14 @@ textarea {
 
 .goal-card__title h2 {
   margin: 0;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 
 .goal-card__motivation {
   margin: 0;
   font-style: italic;
   color: var(--muted);
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 
 .goal-card__amount {
@@ -6121,7 +6125,7 @@ textarea {
   display: flex;
   flex-direction: column;
   min-width: 0;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 
 .goal-suggestion {
@@ -6211,7 +6215,7 @@ textarea {
 
 .release__title {
   grid-column: 1;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 
 .release__head .muted {
@@ -6388,17 +6392,6 @@ textarea {
 }
 
 /* Página que sai, terminando o movimento ao lado da nova (removida ao fim da animação). */
-.swipe-ghost {
-  position: fixed;
-  top: 0;
-  bottom: 0;
-  z-index: 12;
-  overflow: hidden;
-  background: var(--bg);
-  pointer-events: none;
-  will-change: transform;
-}
-
 .swipe-peek__title {
   display: block;
   margin-bottom: 16px;
@@ -6533,7 +6526,7 @@ textarea {
 
 .loan-card__title h2 {
   margin: 0;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 
 .loan-card__facts {
@@ -6556,7 +6549,7 @@ textarea {
   margin: 2px 0 0;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 
 .loan-card__actions {
@@ -6633,7 +6626,7 @@ textarea {
 
 .split-person h2 {
   margin: 0;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 
 .split-person__balance {
@@ -6987,7 +6980,7 @@ textarea {
 }
 
 .task-card__title {
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
   font-size: 0.92rem;
 }
 

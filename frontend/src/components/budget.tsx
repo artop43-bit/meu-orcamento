@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import type { Category } from "../api/budget";
 import { parseMoney } from "../lib/format";
 import { Button } from "./ui";
+import { maybeCountUp } from "./CountUp";
 
 export function Badge({ children, tone = "neutral" }: { children: ReactNode; tone?: "neutral" | "accent" | "warn" }) {
   return <span className={`badge badge--${tone}`}>{children}</span>;
@@ -12,7 +13,7 @@ export function Stat({ label, value, tone }: { label: string; value: string; ton
   return (
     <div className="stat">
       <span className="stat__label">{label}</span>
-      <strong className={tone ? `stat__value tone--${tone}` : "stat__value"}>{value}</strong>
+      <strong className={tone ? `stat__value tone--${tone}` : "stat__value"}>{maybeCountUp(value)}</strong>
     </div>
   );
 }

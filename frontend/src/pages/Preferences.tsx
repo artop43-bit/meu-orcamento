@@ -8,7 +8,7 @@ import { sharingApi } from "../api/sharing";
 import { openFeedback, openShortcuts, SHORTCUTS } from "../components/power";
 import { Alert, Button, PageHeader } from "../components/ui";
 import { announce } from "../lib/announce";
-import { setAppearance } from "../lib/appearance";
+import { originOf, setAppearance } from "../lib/appearance";
 import { cycleLabel, setCycleStart, thisMonth } from "../lib/format";
 import { setPrefs, usePrefs, type Prefs } from "../lib/prefs";
 import { PixMeiSettings } from "../components/PixMeiSettings";
@@ -37,10 +37,10 @@ function Choice<K extends keyof Prefs>({
               type="radio"
               name={String(name)}
               checked={value === option}
-              onChange={() =>
+              onChange={(e) =>
                 // Tema e cor de destaque ficam salvos na conta (valem em todos os aparelhos).
                 name === "theme" || name === "accent"
-                  ? setAppearance({ [name]: option } as Partial<Pick<Prefs, "theme" | "accent">>, queryClient)
+                  ? setAppearance({ [name]: option } as Partial<Pick<Prefs, "theme" | "accent">>, queryClient, originOf(e))
                   : setPrefs({ [name]: option } as Partial<Prefs>)
               }
             />
@@ -65,7 +65,7 @@ function StylePicker({ value }: { value: StyleName }) {
       <div className="style-picker">
         {styles.map(([name, style]) => (
           <label key={name} className="style-option">
-            <input type="radio" name="style" checked={value === name} onChange={() => setAppearance({ style: name }, queryClient)} />
+            <input type="radio" name="style" checked={value === name} onChange={(e) => setAppearance({ style: name }, queryClient, originOf(e))} />
             <span className="style-thumb" data-thumb={name} aria-hidden>
               <span className="style-thumb__side" />
               <span className="style-thumb__body">
@@ -97,7 +97,7 @@ function AccentPicker({ value }: { value: AccentName }) {
       <div className="accent-swatches">
         {accents.map(([name, accent]) => (
           <label key={name} className="accent-swatch" style={{ "--swatch": accent.light.accent, "--swatch-dark": accent.dark.accent } as CSSProperties}>
-            <input type="radio" name="accent" checked={value === name} onChange={() => setAppearance({ accent: name }, queryClient)} />
+            <input type="radio" name="accent" checked={value === name} onChange={(e) => setAppearance({ accent: name }, queryClient, originOf(e))} />
             <span className="accent-swatch__dot" aria-hidden />
             {accent.label}
           </label>

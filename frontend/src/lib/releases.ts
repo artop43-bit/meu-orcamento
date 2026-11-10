@@ -11,6 +11,27 @@ export type Release = {
 
 export const RELEASES: Release[] = [
   {
+    version: "1.6.5",
+    date: "09/11/2026 às 21:35",
+    title: "Fluidez e enquadramento",
+    sections: [
+      {
+        title: "Mais fluido",
+        items: [
+          "Troca de telas e deslizar entre abas mais leves, principalmente no celular e no Liquid glass.",
+          "Um marcador desliza até a aba ativa no menu, na barra de baixo e nas abas das telas.",
+          "Os cartões surgem em sequência, os números sobem até o valor e trocar de tema ou estilo revela a nova aparência a partir do toque.",
+        ],
+      },
+      {
+        title: "Tudo no lugar",
+        items: [
+          "Abas, títulos e linhas de itens não partem mais palavras no celular; faixas que deslizam mostram quando há mais conteúdo ao lado.",
+        ],
+      },
+    ],
+  },
+  {
     version: "1.6.0",
     date: "09/11/2026 às 17:45",
     title: "Estilos visuais e parcelamento que conhece as suas contas",
