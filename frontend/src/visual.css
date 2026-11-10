@@ -2411,13 +2411,14 @@ select option:checked {
     display: none;
   }
 
-  /* Etiqueta com o nome ao passar o mouse ou focar com o teclado. */
-  .shell[data-menu="collapsed"] .sidebar__link[data-label]::after {
+  /* Etiqueta com o nome ao passar o mouse ou focar com o teclado. Só existe nessa hora (fora
+     dela não ocupa espaço nem conta como conteúdo saindo do botão). */
+  .shell[data-menu="collapsed"] .sidebar__link[data-label]:is(:hover, :focus-visible):not([aria-expanded="true"])::after {
     content: attr(data-label);
     position: absolute;
     left: calc(100% + 12px);
     top: 50%;
-    translate: -4px -50%;
+    translate: 0 -50%;
     z-index: 40;
     padding: 6px 10px;
     border: 1px solid var(--border-strong);
@@ -2428,14 +2429,15 @@ select option:checked {
     font-weight: 600;
     white-space: nowrap;
     box-shadow: var(--shadow-lg);
-    opacity: 0;
     pointer-events: none;
-    transition: opacity 0.12s, translate 0.12s;
+    animation: tip-in 0.12s ease-out both;
   }
 
-  .shell[data-menu="collapsed"] .sidebar__link[data-label]:is(:hover, :focus-visible):not([aria-expanded="true"])::after {
-    opacity: 1;
-    translate: 0 -50%;
+  @keyframes tip-in {
+    from {
+      opacity: 0;
+      translate: -4px -50%;
+    }
   }
 
   /* Contadores viram um selo no canto do ícone. */

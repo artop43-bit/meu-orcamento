@@ -216,9 +216,9 @@ function CardStack({ cards }: { cards: CardSummary[] }) {
               style={style}
               onClick={() => setTop((value) => (value + 1) % count)}
               disabled={count < 2}
-              aria-label={count < 2 ? item.name : `${item.name}. Ver o próximo cartão`}
             >
               {face}
+              {count > 1 && <span className="sr-only">. Ver o próximo cartão</span>}
             </button>
           ) : (
             <span key={item.id} className="card-stack__card" style={style} aria-hidden>
