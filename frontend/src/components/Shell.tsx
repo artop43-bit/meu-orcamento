@@ -1,6 +1,7 @@
 import { Suspense, useEffect, useLayoutEffect, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import { useIsFetching, useQuery, useQueryClient } from "@tanstack/react-query";
 import { startMeasure } from "../lib/perfReport";
+import { useReviewCount } from "../api/money";
 import {
   Banknote,
   CalendarDays,
@@ -17,6 +18,8 @@ import {
   Mail,
   Monitor,
   Moon,
+  PanelLeftClose,
+  PanelLeftOpen,
   RefreshCw,
   Scale,
   Search,
@@ -66,6 +69,19 @@ function readOpenGroups(current?: string): string[] {
     // Sem acesso ao armazenamento (janela privada): começa só com o grupo da tela atual.
   }
   return current && !open.includes(current) ? [...open, current] : open;
+}
+
+const COLLAPSED_KEY = "menu-recolhido";
+
+/** Menu recolhido (v1.7.5): a escolha fica neste aparelho; sem escolha, telas médias começam recolhidas. */
+function readCollapsed(): boolean {
+  try {
+    const saved = localStorage.getItem(COLLAPSED_KEY);
+    if (saved === "1" || saved === "0") return saved === "1";
+  } catch {
+    // Sem armazenamento: vale o tamanho da tela.
+  }
+  return typeof window !== "undefined" && window.innerWidth >= 1024 && window.innerWidth < 1280;
 }
 
 function saveOpenGroups(open: string[]) {
@@ -217,6 +233,57 @@ export function Shell() {
   const group = groupOf(location.pathname);
   // Grupos abertos no menu: vários ao mesmo tempo, lembrados neste aparelho.
   const [openGroups, setOpenGroups] = useState<string[]>(() => readOpenGroups(group?.key));
+  const reviewCount = useReviewCount();
+  const [collapsed, setCollapsed] = useState(readCollapsed);
+  // Com o menu recolhido, os subitens de um grupo abrem num painel ao lado do ícone.
+  const [flyout, setFlyout] = useState<string | null>(null);
+  const sidebarRef = useRef<HTMLElement>(null);
+
+  function toggleCollapsed() {
+    setFlyout(null);
+    setCollapsed((value) => {
+      try {
+        localStorage.setItem(COLLAPSED_KEY, value ? "0" : "1");
+      } catch {
+        // Sem armazenamento: só não lembra na próxima visita.
+      }
+      announce(value ? "Menu expandido" : "Menu recolhido");
+      return !value;
+    });
+  }
+
+  // Ctrl+B (⌘B no Mac) recolhe ou expande o menu.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === "b") {
+        e.preventDefault();
+        toggleCollapsed();
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  // O painel flutuante fecha ao trocar de tela, com Esc ou ao clicar fora do menu.
+  useEffect(() => setFlyout(null), [location.pathname]);
+  useEffect(() => {
+    if (!flyout) return;
+    function onDown(e: PointerEvent) {
+      if (!sidebarRef.current?.contains(e.target as Node)) setFlyout(null);
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        sidebarRef.current?.querySelector<HTMLElement>(`[aria-controls="grupo-${flyout}"]`)?.focus();
+        setFlyout(null);
+      }
+    }
+    document.addEventListener("pointerdown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [flyout]);
   const [twoFactorLater, setTwoFactorLater] = useState(() => readSession(LATER_KEY));
   const showTwoFactorBanner =
     user && !user.totp_enabled && !user.twofa_prompt_dismissed && !twoFactorLater && location.pathname !== "/seguranca";
@@ -431,12 +498,24 @@ export function Shell() {
 
   return (
     <UndoProvider>
-    <div className="shell">
+    <div className="shell" data-menu={collapsed ? "collapsed" : undefined}>
       <a href="#conteudo" className="skip-link">
         Pular para o conteúdo
       </a>
-      <aside className="sidebar no-print" aria-label="Menu principal">
-        <Brand to="/" />
+      <aside ref={sidebarRef} className="sidebar no-print" aria-label="Menu principal">
+        <div className="sidebar__head">
+          <Brand to="/" />
+          <button
+            type="button"
+            className="icon-btn sidebar__collapse"
+            onClick={toggleCollapsed}
+            aria-pressed={collapsed}
+            aria-label={collapsed ? "Expandir o menu" : "Recolher o menu"}
+            title={collapsed ? "Expandir o menu (Ctrl+B)" : "Recolher o menu (Ctrl+B)"}
+          >
+            {collapsed ? <PanelLeftOpen size={18} aria-hidden /> : <PanelLeftClose size={18} aria-hidden />}
+          </button>
+        </div>
         <nav className="stack stack--tight" style={{ gap: 2 }} aria-label="Seções">
           {GROUPS.map((g) =>
             g.children ? (
@@ -444,16 +523,18 @@ export function Shell() {
                 <button
                   type="button"
                   className="sidebar__link nav-group__toggle"
-                  aria-expanded={openGroups.includes(g.key)}
+                  aria-expanded={collapsed ? flyout === g.key : openGroups.includes(g.key)}
                   aria-controls={`grupo-${g.key}`}
-                  onClick={() => toggleGroup(g)}
+                  data-label={g.label}
+                  onClick={() => (collapsed ? setFlyout((open) => (open === g.key ? null : g.key)) : toggleGroup(g))}
                 >
                   {GROUP_ICONS[g.key]}
                   {g.label}
                   <ChevronDown size={16} className="nav-group__chevron" aria-hidden />
                 </button>
-                {openGroups.includes(g.key) && (
+                {(collapsed ? flyout === g.key : openGroups.includes(g.key)) && (
                   <div id={`grupo-${g.key}`} className="nav-group__items">
+                    {collapsed && <span className="nav-group__flyout-title">{g.label}</span>}
                     {g.children.map((c) => (
                       <NavLink
                         key={c.to}
@@ -470,19 +551,27 @@ export function Shell() {
                 )}
               </div>
             ) : (
-              <NavLink key={g.key} to={g.to!} className="sidebar__link" onClick={(e) => onNavClick(e, g.to!)} {...prefetchProps(queryClient, g.to!)}>
+              <NavLink
+                key={g.key}
+                to={g.to!}
+                className="sidebar__link"
+                data-label={g.label}
+                onClick={(e) => onNavClick(e, g.to!)}
+                {...prefetchProps(queryClient, g.to!)}
+              >
                 {GROUP_ICONS[g.key]}
                 {g.label}
+                {g.key === "orcamento" && <NavBadge count={reviewCount} label={`${reviewCount} lançamento(s) para revisar`} />}
               </NavLink>
             ),
           )}
           <p className="sidebar__group" aria-hidden></p>
-          <NavLink to={SETTINGS.to} className="sidebar__link" onClick={(e) => onNavClick(e, SETTINGS.to)}>
+          <NavLink to={SETTINGS.to} className="sidebar__link" data-label={SETTINGS.label} onClick={(e) => onNavClick(e, SETTINGS.to)}>
             {SETTINGS.icon}
             {SETTINGS.label}
           </NavLink>
           {user?.is_admin && (
-            <NavLink to="/admin" className="sidebar__link">
+            <NavLink to="/admin" className="sidebar__link" data-label={ADMIN.label}>
               {ADMIN.icon}
               {ADMIN.label}
               <NavBadge count={adminUnread} label={`${adminUnread} solicitação(ões) não lida(s)`} />
@@ -518,7 +607,7 @@ export function Shell() {
           </NavLink>
         </div>
         <div className="sidebar__footer">
-          <Link to="/ajustes/perfil" className="sidebar__profile" title="Meu perfil">
+          <Link to="/ajustes/perfil" className="sidebar__profile" title={collapsed ? `${displayName} · ${releaseLabel()}` : "Meu perfil"}>
             <Avatar fileId={profile.data?.avatar_id} name={displayName} size={32} />
             <span className="sidebar__user">
               <strong>{displayName}</strong>
@@ -526,7 +615,7 @@ export function Shell() {
             </span>
           </Link>
           <div className="sidebar__footer-row">
-            <button type="button" className="sidebar__link sidebar__logout" onClick={logout}>
+            <button type="button" className="sidebar__link sidebar__logout" data-label="Sair" onClick={logout}>
               <LogOut size={18} /> Sair
             </button>
             <button

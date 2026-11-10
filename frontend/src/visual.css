@@ -2347,3 +2347,195 @@ select option:checked {
 :root :is(a, button).notice-row:hover {
   border-left-color: var(--tone);
 }
+
+/* ---------------------------------------------------------- menu lateral recolhível (v1.7.5) */
+
+.sidebar__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.sidebar__head .brand {
+  min-width: 0;
+}
+
+.sidebar__collapse {
+  flex: none;
+  width: 32px;
+  height: 32px;
+}
+
+@media (min-width: 1024px) {
+  .shell {
+    transition: grid-template-columns 0.26s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+
+  .shell[data-menu="collapsed"] {
+    --sidebar-w: 76px;
+  }
+
+  .shell[data-menu="collapsed"] .sidebar {
+    padding-inline: 12px;
+    align-items: stretch;
+    /* Etiquetas e painéis flutuantes saem para a direita do menu. */
+    overflow: visible;
+    z-index: 30;
+  }
+
+  .shell[data-menu="collapsed"] .sidebar__head {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  /* Os nomes continuam no HTML (leitor de tela e etiqueta); só deixam de ocupar espaço. */
+  .shell[data-menu="collapsed"] :is(.brand, .sidebar__link) {
+    font-size: 0;
+    gap: 0;
+    justify-content: center;
+  }
+
+  .shell[data-menu="collapsed"] .brand {
+    padding: 0;
+  }
+
+  .shell[data-menu="collapsed"] .sidebar__link {
+    position: relative;
+    height: 44px;
+    padding: 0;
+  }
+
+  .shell[data-menu="collapsed"] :is(.nav-group__chevron, .sidebar__group, .sidebar__user, .app-version, .sidebar__tool--wide span),
+  .shell[data-menu="collapsed"] .sidebar__footer > .row {
+    display: none;
+  }
+
+  /* Etiqueta com o nome ao passar o mouse ou focar com o teclado. */
+  .shell[data-menu="collapsed"] .sidebar__link[data-label]::after {
+    content: attr(data-label);
+    position: absolute;
+    left: calc(100% + 12px);
+    top: 50%;
+    translate: -4px -50%;
+    z-index: 40;
+    padding: 6px 10px;
+    border: 1px solid var(--border-strong);
+    border-radius: 10px;
+    background: var(--surface-solid);
+    color: var(--fg);
+    font-size: 0.8rem;
+    font-weight: 600;
+    white-space: nowrap;
+    box-shadow: var(--shadow-lg);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.12s, translate 0.12s;
+  }
+
+  .shell[data-menu="collapsed"] .sidebar__link[data-label]:is(:hover, :focus-visible):not([aria-expanded="true"])::after {
+    opacity: 1;
+    translate: 0 -50%;
+  }
+
+  /* Contadores viram um selo no canto do ícone. */
+  .shell[data-menu="collapsed"] .nav-badge {
+    position: absolute;
+    top: 3px;
+    right: 6px;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    font-size: 0.62rem;
+    margin: 0;
+  }
+
+  /* Subitens de um grupo: painel flutuante ao lado do ícone. */
+  .shell[data-menu="collapsed"] .nav-group {
+    position: relative;
+  }
+
+  .shell[data-menu="collapsed"] .nav-group__items {
+    position: absolute;
+    left: calc(100% + 12px);
+    top: -6px;
+    z-index: 40;
+    min-width: 13rem;
+    margin: 0;
+    padding: 6px;
+    border: 1px solid var(--border-strong);
+    border-radius: 14px;
+    background: var(--surface-solid);
+    box-shadow: var(--shadow-lg), var(--glow-ring);
+    animation: card-in 0.16s ease both;
+  }
+
+  .shell[data-menu="collapsed"] .nav-group__items .sidebar__link {
+    height: auto;
+    min-height: 40px;
+    padding: 8px 10px;
+    gap: 10px;
+    font-size: 0.9rem;
+    justify-content: flex-start;
+  }
+
+  .shell[data-menu="collapsed"] .nav-group__items .sidebar__link::after {
+    content: none;
+  }
+
+  .nav-group__flyout-title {
+    padding: 4px 10px 6px;
+    color: var(--subtle);
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .shell[data-menu="collapsed"] .nav-group.is-current > .nav-group__toggle {
+    color: var(--accent);
+  }
+
+  /* Ferramentas e rodapé empilhados. */
+  .shell[data-menu="collapsed"] .sidebar__tools {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .shell[data-menu="collapsed"] .sidebar__tool {
+    padding: 0;
+  }
+
+  .shell[data-menu="collapsed"] .sidebar__tool--wide {
+    grid-column: auto;
+  }
+
+  .shell[data-menu="collapsed"] .sidebar__profile {
+    justify-content: center;
+    padding: 6px 0;
+  }
+
+  .shell[data-menu="collapsed"] .sidebar__footer-row {
+    flex-direction: column-reverse;
+    gap: 6px;
+  }
+
+  .shell[data-menu="collapsed"] .sidebar__footer-row > * {
+    width: 100%;
+  }
+
+  :root[data-style="glass"] .shell[data-menu="collapsed"] .sidebar {
+    border-radius: 26px;
+  }
+}
+
+@media (max-width: 1023px) {
+  .sidebar__collapse {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shell {
+    transition: none;
+  }
+}

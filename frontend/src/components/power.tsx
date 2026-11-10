@@ -70,6 +70,7 @@ export const SHORTCUTS: [string, string][] = [
   ["N", "Nova despesa"],
   ["/", "Buscar na lista da tela"],
   ["P", "Ocultar ou exibir valores"],
+  ["Ctrl + B", "Recolher ou expandir o menu lateral"],
   ["Ctrl + Z", "Desfazer a última exclusão ou alteração"],
   ["?", "Exibir a lista de atalhos"],
 ];
