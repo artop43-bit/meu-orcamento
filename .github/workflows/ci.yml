@@ -171,7 +171,8 @@ jobs:
     needs: changes
     if: needs.changes.outputs.e2e == 'true' && needs.changes.outputs.heavy == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # Persona + layout + acessibilidade + cores (com listas abertas) + fluidez: ~31 min em v1.7.
+    timeout-minutes: 45
     env:
       ENVIRONMENT: development
       DATABASE_URL: sqlite+pysqlite:///${{ github.workspace }}/backend/e2e.db
