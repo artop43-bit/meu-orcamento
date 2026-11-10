@@ -11,8 +11,42 @@ export type Release = {
 
 export const RELEASES: Release[] = [
   {
+    version: "1.7.5",
+    date: "10/11/2026 às 18:00",
+    title: "Painel vivo, menu recolhível e Tire sua dúvida com histórico",
+    sections: [
+      {
+        title: "Painel do Orçamento",
+        items: [
+          "Saudação com o resumo de agora numa frase e mini gráficos dos últimos 6 meses.",
+          "Linha do mês: receitas e vencimentos ao longo do mês, com um marcador até hoje.",
+          "Avisos todos no mesmo formato: com seta, a linha inteira abre; sem seta, só informa.",
+          "Controle deslizante para simular uma despesa e comparação com o mês anterior por categoria.",
+        ],
+      },
+      {
+        title: "Menu e telas",
+        items: [
+          "Menu lateral recolhível: botão ao lado do logo ou Ctrl+B.",
+          "Cartões em pilha, metas com trilha e marcos, e período em pílulas em Insights › Categorias.",
+        ],
+      },
+      {
+        title: "Tire sua dúvida",
+        items: [
+          "Entende hoje, ontem, semana, faturas, parcelas que faltam, financiamentos, assinaturas, média por mês e comparações.",
+          "Continua a conversa (“e em setembro?”) e guarda o histórico por 30 dias; dá para desligar em Preferências.",
+        ],
+      },
+      {
+        title: "Mais rápido",
+        items: ["Fontes hospedadas no site, fotos em formato mais leve e imagens carregadas só quando aparecem."],
+      },
+    ],
+  },
+  {
     version: "1.7.0",
-    date: "10/11/2026 às 11:00",
+    date: "10/11/2026 às 11:57",
     title: "Painel mais leve, cores consistentes e Tire sua dúvida",
     sections: [
       {

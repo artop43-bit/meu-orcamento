@@ -2437,6 +2437,118 @@ def mobile(browser):
 STATE = {}
 
 
+@step("v1.7.5: saudação, linha do mês, avisos padronizados, menu recolhível, pilha de cartões e trilha da meta")
+def v175_panel(page: Page):
+    open_month(page, CURRENT)
+    expect(page.locator(".greeting__hello")).to_contain_text(re.compile("Bom dia|Boa tarde|Boa noite"))
+    expect(page.locator(".month-line")).to_be_visible()
+    assert page.locator(".month-line__stop").count() >= 2
+    expect(page.locator(".period-pills")).to_contain_text("Este mês")
+    # Avisos: todos no mesmo formato; quem tem seta é clicável, quem não tem só informa.
+    open_notices(page)
+    rows = page.locator(".notice-row")
+    assert rows.count() >= 2
+    for index in range(rows.count()):
+        row = rows.nth(index)
+        clickable = row.evaluate("(e) => e.tagName === 'A' || e.tagName === 'BUTTON'")
+        assert clickable == (row.locator(".notice-row__arrow").count() == 1), row.inner_text()
+    # O traço lateral não some ao passar o mouse.
+    first = page.locator("a.notice-row, button.notice-row").first
+    before = first.evaluate("(e) => getComputedStyle(e).borderLeftColor")
+    first.hover()
+    page.wait_for_timeout(250)
+    assert first.evaluate("(e) => getComputedStyle(e).borderLeftColor") == before
+    page.screenshot(path=OUT / "v175-painel.png", full_page=True)
+
+    # Menu recolhível: botão, etiqueta, submenu flutuante, lembrado ao recarregar e Ctrl+B.
+    shell = page.locator(".shell")
+    page.get_by_role("button", name="Recolher o menu").click()
+    expect(shell).to_have_attribute("data-menu", "collapsed")
+    assert page.locator(".sidebar").evaluate("(e) => e.getBoundingClientRect().width") < 110
+    page.locator(".sidebar .nav-group__toggle", has_text="Carteira").click()
+    flyout = page.locator("#grupo-carteira")
+    expect(flyout).to_be_visible()
+    page.screenshot(path=OUT / "v175-menu-recolhido.png")
+    flyout.get_by_role("link", name="Cartões").click()
+    page.wait_for_url("**/cartoes")
+    expect(flyout).to_have_count(0)
+    page.reload()
+    idle(page)
+    expect(shell).to_have_attribute("data-menu", "collapsed")
+    # Pilha de cartões: tocar no de cima passa para o próximo.
+    stack = page.locator(".card-stack")
+    expect(stack).to_be_visible()
+    top = stack.locator("button.card-stack__card")
+    name = top.locator(".card-stack__name").inner_text()
+    if not top.is_disabled():
+        top.click()
+        page.wait_for_timeout(500)
+        assert stack.locator("button.card-stack__card .card-stack__name").inner_text() != name
+    page.screenshot(path=OUT / "v175-cartoes.png")
+    page.keyboard.press("Control+b")
+    expect(shell).not_to_have_attribute("data-menu", "collapsed")
+    page.goto(f"{BASE}/metas")
+    idle(page)
+    expect(page.locator(".goal-track").first).to_be_visible()
+
+
+@step("v1.7.5: Tire sua dúvida — períodos em dias, continuação, histórico, apagar e desligar em Preferências")
+def v175_ask(page: Page):
+    page.goto(f"{BASE}/analises?secao=duvida")
+    idle(page)
+    box = page.get_by_label("Sua pergunta")
+
+    def ask(question: str):
+        count = page.locator(".ask__turn").count()
+        box.fill(question)
+        page.keyboard.press("Enter")
+        expect(page.locator(".ask__turn")).to_have_count(count + 1)
+        answer = page.locator(".ask__turn").last.locator(".ask__a")
+        expect(answer).not_to_have_class(re.compile("ask__a--wait"))
+        return answer
+
+    first = ask("Qual foi meu maior lançamento")
+    expect(first).to_contain_text("maior")
+    assert first.locator(".ask__items li").count() >= 1
+    expect(ask("quanto gastei com mercado este ano")).to_contain_text("R$")
+    follow = ask("e no mês passado?")
+    expect(follow).to_contain_text(re.compile("mercado|Mercado"))
+    expect(ask("o que vence nos próximos dias")).to_contain_text(re.compile("venc|Nada"))
+    expect(ask("onde encontro as recorrências?").get_by_role("link")).to_have_attribute("href", "/ajustes/recorrencias")
+    # Histórico: a conversa aparece na lista, reabre e pode ser apagada.
+    side = page.locator(".ask__side")
+    expect(side.locator(".ask__conversation")).to_have_count(1)
+    expect(side.locator(".ask__conversation-title")).to_have_text("Qual foi meu maior lançamento")
+    side.get_by_role("button", name="Nova conversa").click()
+    expect(page.locator(".ask__turn")).to_have_count(0)
+    ask("quanto posso gastar hoje")
+    expect(side.locator(".ask__conversation")).to_have_count(2)
+    side.locator(".ask__conversation", has_text="Qual foi meu maior lançamento").click()
+    expect(page.locator(".ask__turn")).to_have_count(5)
+    page.screenshot(path=OUT / "v175-tire-sua-duvida.png", full_page=True)
+    assert len(api(page, "/ask/conversations")) == 2
+    side.get_by_role("button", name=re.compile("^Apagar a conversa quanto posso")).click()
+    expect(side.locator(".ask__conversation")).to_have_count(1)
+    # Desligar em Preferências apaga o que estava guardado e a lista some.
+    page.goto(f"{BASE}/ajustes/preferencias")
+    idle(page)
+    toggle = page.get_by_label("Guardar histórico do Tire sua dúvida")
+    expect(toggle).to_be_checked()
+    toggle.uncheck()
+    idle(page, 400)
+    assert api(page, "/auth/me")["ask_history"] is False
+    assert api(page, "/ask/conversations") == []
+    page.goto(f"{BASE}/analises?secao=duvida")
+    idle(page)
+    expect(page.locator(".ask__side")).to_have_count(0)
+    expect(ask("quanto gastei hoje")).to_contain_text(re.compile("Hoje|hoje"))
+    page.goto(f"{BASE}/ajustes/preferencias")
+    idle(page)
+    page.get_by_label("Guardar histórico do Tire sua dúvida").check()
+    idle(page, 400)
+    assert api(page, "/auth/me")["ask_history"] is True
+
+
 def main():
     with sync_playwright() as p:
         browser = p.chromium.launch(
@@ -2508,6 +2620,8 @@ def main():
         v14_money(page)
         v14_insights(page)
         v15_entries(page)
+        v175_panel(page)
+        v175_ask(page)
         two_factor(page)
         banner_never(page)
         STATE["state"] = ctx.storage_state()
