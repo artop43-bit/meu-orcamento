@@ -361,10 +361,12 @@ def undo_delete(page: Page, month: str):
     add_expense(page, month, "Lançamento errado", 12.34, "Outros", 3)
     row = page.locator(".ledger__row", has_text="Lançamento errado")
     expect(row).to_have_count(1)
+    row.hover()  # v1.7: as ações da linha aparecem ao passar o mouse
     row.get_by_role("button", name="Excluir Lançamento errado").click()
     expect(row).to_have_count(0)
     page.get_by_role("button", name="Desfazer").click()
     expect(row).to_have_count(1)
+    row.hover()  # v1.7: as ações da linha aparecem ao passar o mouse
     row.get_by_role("button", name="Excluir Lançamento errado").click()
     expect(row).to_have_count(0)
     page.wait_for_timeout(6800)
@@ -373,7 +375,9 @@ def undo_delete(page: Page, month: str):
     assert not any(e["description"] == "Lançamento errado" for e in data["expenses"]), "não foi excluída"
     # Excluir e recarregar (ou fechar) antes do fim do prazo do Desfazer: a exclusão tem de valer.
     add_expense(page, month, "Excluir e recarregar", 7.77, "Outros", 4)
-    page.locator(".ledger__row", has_text="Excluir e recarregar").get_by_role("button", name="Excluir Excluir e recarregar").click()
+    row = page.locator(".ledger__row", has_text="Excluir e recarregar")
+    row.hover()
+    row.get_by_role("button", name="Excluir Excluir e recarregar").click()
     page.wait_for_timeout(800)
     page.reload()
     idle(page, 1500)
