@@ -2640,7 +2640,7 @@ def v176(page: Page):
     field = quick.get_by_role("textbox")
     expect(field).to_have_value("gastei 37 no mercadinho de teste")
     expect(quick).to_contain_text("Confira a frase")
-    quick.get_by_role("button", name="Lançar").click()
+    quick.get_by_role("button", name="Lançar", exact=True).click()
     expect(field).to_have_value("")
     idle(page, 300)
     expenses = api(page, f"/months/{CURRENT}")["expenses"]
@@ -2649,7 +2649,7 @@ def v176(page: Page):
     assert created["amount"] == "37.00", created
     # O Lançamento rápido só registra: pergunta é encaminhada para o bot, que já responde.
     field.fill("quanto gastei este mês?")
-    quick.get_by_role("button", name="Lançar").click()
+    quick.get_by_role("button", name="Lançar", exact=True).click()
     expect(quick).to_contain_text("Isto parece uma pergunta")
     assert len(api(page, f"/months/{CURRENT}")["expenses"]) == before + 1
     quick.get_by_role("link", name="Perguntar no Tire sua dúvida").click()
