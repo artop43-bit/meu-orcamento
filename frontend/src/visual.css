@@ -2123,9 +2123,6 @@ select option:checked {
     border-right: 1px solid var(--border);
   }
 
-  .ask__history-toggle {
-    display: none;
-  }
 }
 
 .ask__history-toggle {
@@ -2134,6 +2131,13 @@ select option:checked {
   align-items: center;
   gap: 6px;
   font-size: 0.85rem;
+}
+
+/* Depois da regra acima, para valer: no computador a lista já fica ao lado. */
+@media (min-width: 900px) {
+  .ask__history-toggle {
+    display: none;
+  }
 }
 
 .ask__new {
@@ -2685,7 +2689,8 @@ select option:checked {
   --line: 58px;
   position: relative;
   list-style: none;
-  min-width: 640px;
+  /* 12% de distância mínima entre paradas precisa caber a largura de uma parada. */
+  min-width: 900px;
   height: 132px;
   margin: 0 46px;
   padding: 0;
@@ -2757,7 +2762,7 @@ select option:checked {
   flex-direction: column;
   align-items: center;
   gap: 1px;
-  width: 92px;
+  width: 104px;
   translate: -50% 0;
   text-align: center;
 }
