@@ -2,7 +2,10 @@
 
 Tudo roda aqui no servidor, sem serviço externo: a pergunta é lida por palavras-chave
 (período, assunto e o que se quer saber) e a resposta sai das tabelas do próprio usuário.
-A pergunta não é guardada.
+
+Desde a v1.7.6 o vocabulário é o mesmo do Lançamento rápido (`lexicon.py`) e a pergunta é
+entendida por partes (`understand.py`): medida, agrupamento, direção e receita ou despesa. O
+bot nunca registra nada: quem tenta lançar por aqui é encaminhado para o Orçamento.
 
 Exemplos: "o que mais gastei esse mês?", "qual mês gastei mais esse ano?",
 "quando gastei mais em mercado?", "quanto gastei com ifood em outubro?",
@@ -18,15 +21,24 @@ from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 from typing import Any
+from urllib.parse import quote
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
-from app.core.months import add_months, format_month, month_of, today_local, with_day
+from app.core.months import (
+    add_months,
+    cycle_date,
+    cycle_range,
+    format_month,
+    month_of,
+    today_local,
+    with_day,
+)
 from app.models import Category, Expense, Goal, Income, Investment, OtherDebt, RecurringItem, User
-from app.services import budget, cards, daily, goals, loans
+from app.services import budget, cards, daily, goals, lexicon, loans, understand
 from app.services.category_words import FALLBACK
 from app.services.insights import MONTH_NAMES, brl
 from app.services.suggest import keyword_category, normalize
@@ -240,6 +252,23 @@ _STOP = set(
     faltam falta ainda quanto quantas media medio mensal fiz feito feita foram total
     comparar compare comparacao comparado versus vs x contra entre do que
     saiu sairam parcela parcelas aberto abertas acabam acaba terminam termina devo
+    """.split()
+)
+
+
+# Palavras das perguntas por partes (v1.7.6): medida, agrupamento e receita. Não são assunto.
+_PART_WORDS = set(
+    """
+    semana semanas percentual porcentagem porcentual percentagem porcento cento proporcao fatia fracao
+    comprometimento comprometido comprometida comprometi compromete participacao peso
+    renda rendas receita receitas recebi recebeu recebemos receber recebimento recebimentos recebido recebidos
+    ganhei ganho ganhos ganhar ganhou entrou entraram entrada entradas salario salarios faturei faturamento
+    provento proventos frequencia numero quantidade qtd idas pedidos transacoes
+    diario diaria diarios diarias diariamente semanal semanais semanalmente evolucao evoluiu
+    barato barata baratos baratas menor menores pior piores melhor melhores recorde pico auge
+    estabelecimento estabelecimentos local locais comercio comercios fornecedor fornecedores
+    cada todo todos todas tempo longo linha periodo gente orcamento vai vao indo usei uso usar
+    fui pedi comprei paguei fiz baixo baixa baixos baixas leve leves pesado pesada economico economica
     """.split()
 )
 
@@ -1280,6 +1309,501 @@ def _logged(db: Session, user: User, period: Period) -> dict[str, Any]:
     return _answer("logged", f"{_cap(period.label)} você lançou {' e '.join(parts)}.", items=items)
 
 
+# ---------------------------------------------------------------- perguntas por partes (v1.7.6)
+
+_ALL_TIME = date(2000, 1, 1)
+# nome, com artigo, plural
+_UNITS: dict[str, tuple[str, str, str]] = {
+    "day": ("dia", "o dia", "dias"),
+    "weekday": ("dia da semana", "o dia da semana", "dias da semana"),
+    "week": ("semana", "a semana", "semanas"),
+    "month": ("mês", "o mês", "meses"),
+    "year": ("ano", "o ano", "anos"),
+    "place": ("lugar", "o lugar", "lugares"),
+}
+
+
+@dataclass
+class _Entry:
+    when: date
+    month: date
+    amount: Decimal
+    description: str
+
+
+def _income_date(income: Income, start_day: int) -> date:
+    return cycle_date(income.month, income.day, start_day) if income.day else income.month
+
+
+def _income_rows(db: Session, user: User, period: Period, words: list[str]) -> list[Income]:
+    start, end = period.start, period.end
+    if period.day_start and period.day_end:
+        start, end = add_months(start, -1), add_months(end, 1)
+    rows = list(
+        db.scalars(
+            select(Income).where(Income.user_id == user.id, Income.month.between(start, end))
+        )
+    )
+    if period.day_start and period.day_end:
+        rows = [
+            i
+            for i in rows
+            if period.day_start <= _income_date(i, user.month_start_day) <= period.day_end
+        ]
+    if words:  # "quanto recebi de freela": só vale se alguma receita tiver a palavra
+        named = [i for i in rows if any(w in normalize(i.description) for w in words)]
+        if named:
+            return named
+    return rows
+
+
+def _entries(
+    db: Session, user: User, period: Period, subject: Subject | None, domain: str, words: list[str]
+) -> list[_Entry]:
+    if domain == "income":
+        return [
+            _Entry(_income_date(i, user.month_start_day), i.month, i.amount, i.description)
+            for i in _income_rows(db, user, period, words)
+        ]
+    return [
+        _Entry(_when(e), e.month, e.amount, e.description)
+        for e in _expenses(db, user, period, subject)
+    ]
+
+
+def _default_period(grouping: str | None, current: date, period: Period | None) -> Period:
+    """Período de quem não disse o período: depende do que se compara."""
+    if grouping == "year":
+        if period is None or period.single:
+            return Period(_ALL_TIME, current, "em todo o seu histórico", False)
+        return period
+    if grouping == "month":
+        if period is None:
+            return _this_year(current)
+        if period.single and not period.day_start:
+            return Period(
+                date(period.start.year, 1, 1),
+                period.end,
+                f"em {period.start.year}",
+                period.explicit,
+            )
+        return period
+    if period is not None:
+        return period
+    if grouping in ("week", "weekday"):
+        return Period(add_months(current, -2), current, "nos últimos 3 meses", False)
+    return _this_month(current)
+
+
+def _group(entry: _Entry, grouping: str) -> Any:
+    if grouping == "year":
+        return entry.month.year
+    if grouping == "month":
+        return entry.month
+    if grouping == "week":
+        return entry.when - timedelta(days=entry.when.weekday())
+    if grouping == "weekday":
+        return entry.when.weekday()
+    if grouping == "place":
+        return normalize(entry.description)
+    return entry.when
+
+
+def _group_label(key: Any, grouping: str, names: dict[Any, str]) -> str:
+    if grouping == "year":
+        return str(key)
+    if grouping == "month":
+        return _month_name(key)
+    if grouping == "week":
+        end = key + timedelta(days=6)
+        return f"{key.day:02d}/{key.month:02d} a {end.day:02d}/{end.month:02d}/{end.year}"
+    if grouping == "weekday":
+        return lexicon.WEEKDAY_LABELS[key]
+    if grouping == "place":
+        return names.get(key, str(key))
+    return f"{_short_date(key)} ({lexicon.WEEKDAY_LABELS[key.weekday()]})"
+
+
+def _grouped(
+    rows: list[_Entry], grouping: str
+) -> tuple[dict[Any, Decimal], dict[Any, int], dict[Any, date], dict[Any, str]]:
+    totals: dict[Any, Decimal] = defaultdict(Decimal)
+    counts: dict[Any, int] = defaultdict(int)
+    months: dict[Any, date] = {}
+    names: dict[Any, str] = {}
+    for entry in rows:
+        key = _group(entry, grouping)
+        totals[key] += entry.amount
+        counts[key] += 1
+        months.setdefault(key, entry.month)
+        names.setdefault(key, entry.description)
+    return totals, counts, months, names
+
+
+def _group_items(
+    keys: list[Any],
+    grouping: str,
+    totals: dict[Any, Decimal],
+    counts: dict[Any, int],
+    months: dict[Any, date],
+    names: dict[Any, str],
+) -> list[dict[str, Any]]:
+    linked = grouping in ("day", "week", "month")
+    return [
+        {
+            "label": names[key]
+            if grouping == "place"
+            else _cap(_group_label(key, grouping, names)),
+            "detail": _plural(counts[key], "lançamento", "lançamentos"),
+            "value": brl(totals[key]),
+            "link": f"/orcamento/{format_month(months[key])}" if linked else None,
+        }
+        for key in keys
+    ]
+
+
+def _no_rows(period: Period, subject: Subject | None, domain: str) -> dict[str, Any]:
+    if domain == "income":
+        return _answer(
+            "empty",
+            f"Não há receitas lançadas {period.label}.",
+            links=[{"label": "Lançar receita", "to": "/orcamento"}],
+        )
+    return _nothing(period, subject)
+
+
+def _rank(
+    db: Session,
+    user: User,
+    period: Period,
+    subject: Subject | None,
+    parts: understand.Parts,
+    words: list[str],
+) -> dict[str, Any]:
+    grouping = parts.grouping or "month"
+    rows = _entries(db, user, period, subject, parts.domain, words)
+    if not rows:
+        return _no_rows(period, subject, parts.domain)
+    totals, counts, months, names = _grouped(rows, grouping)
+    most = parts.order == "most"
+    ranking = sorted(totals, key=lambda key: -totals[key] if most else totals[key])
+    first = ranking[0]
+    income = parts.domain == "income"
+    about = f" com {subject.label}" if subject and not income else ""
+    _, article, plural = _UNITS[grouping]
+    amount = "mais" if most else "menos"
+    label = _group_label(first, grouping, names)
+    if grouping == "weekday":
+        verb = "recebe" if income else "gasta"
+        text = (
+            f"{_cap(period.label)}, {article} em que você {amount} {verb}{about} é {label}: "
+            f"{brl(totals[first])} em {_plural(counts[first], 'lançamento', 'lançamentos')}."
+        )
+    else:
+        verb = "recebeu" if income else "gastou"
+        where = "onde" if grouping == "place" else f"{article} em que"
+        text = f"{_cap(period.label)}, {where} você {amount} {verb}{about} foi {label}: {brl(totals[first])}."
+    if len(totals) > 1 and grouping not in ("place", "weekday"):
+        average = sum(totals.values(), Decimal(0)) / len(totals)
+        kind = "receita" if income else "gasto"
+        text += f" Foram {len(totals)} {plural} com {kind}; a média foi {brl(average)}."
+        if not most:
+            text += " Só entram os períodos que tiveram lançamento."
+    elif len(totals) == 1 and grouping != "place":
+        text += f" Só há lançamentos {'nesse' if grouping != 'week' else 'nessa'} {_UNITS[grouping][0]}."
+    links = []
+    if grouping in ("day", "week", "month"):
+        month = months[first]
+        links = [
+            {"label": f"Abrir {_month_name(month)}", "to": f"/orcamento/{format_month(month)}"}
+        ]
+    name = {
+        "day": "dia",
+        "weekday": "dia da semana",
+        "week": "semana",
+        "month": "mês",
+        "year": "ano",
+    }
+    other = "menos" if most else "mais"
+    did = "recebi" if income else "gastei"
+    suggestions = (
+        [f"Qual {name[grouping]} {did} {other}?"] if grouping in name and len(totals) > 1 else []
+    )
+    return _answer(
+        f"{grouping}_{'max' if most else 'min'}",
+        text,
+        items=_group_items(ranking[:TOP], grouping, totals, counts, months, names),
+        links=links,
+        suggestions=suggestions,
+    )
+
+
+def _list_groups(
+    db: Session,
+    user: User,
+    period: Period,
+    subject: Subject | None,
+    parts: understand.Parts,
+    words: list[str],
+) -> dict[str, Any]:
+    grouping = parts.grouping or "month"
+    rows = _entries(db, user, period, subject, parts.domain, words)
+    if not rows:
+        return _no_rows(period, subject, parts.domain)
+    totals, counts, months, names = _grouped(rows, grouping)
+    keys = sorted(totals)
+    high = max(keys, key=lambda key: totals[key])
+    low = min(keys, key=lambda key: totals[key])
+    total = sum(totals.values(), Decimal(0))
+    income = parts.domain == "income"
+    about = f" com {subject.label}" if subject and not income else ""
+    unit, _, plural = _UNITS[grouping]
+    verb = "recebeu" if income else "gastou"
+    text = f"{_cap(period.label)} você {verb} {brl(total)}{about} em {len(keys)} {plural if len(keys) > 1 else unit}."
+    if len(keys) > 1:
+        text += (
+            f" O maior foi {_group_label(high, grouping, names)} ({brl(totals[high])}) e o menor, "
+            f"{_group_label(low, grouping, names)} ({brl(totals[low])}). Média de {brl(total / len(keys))} por {unit}."
+        )
+    shown = keys[-12:]
+    if len(keys) > len(shown):
+        text += f" Abaixo, os {len(shown)} mais recentes."
+    return _answer(
+        f"{grouping}_list",
+        text,
+        items=_group_items(shown, grouping, totals, counts, months, names),
+        links=[{"label": "Ver tendências nos Insights", "to": "/analises?secao=tendencias"}],
+    )
+
+
+def _totals(db: Session, user: User, period: Period) -> tuple[Decimal, Decimal]:
+    """Despesas e receitas do período (por mês do orçamento)."""
+    spent = db.scalar(
+        select(func.coalesce(func.sum(Expense.amount), 0)).where(
+            Expense.user_id == user.id, Expense.month.between(period.start, period.end)
+        )
+    )
+    earned = db.scalar(
+        select(func.coalesce(func.sum(Income.amount), 0)).where(
+            Income.user_id == user.id, Income.month.between(period.start, period.end)
+        )
+    )
+    return Decimal(spent or 0), Decimal(earned or 0)
+
+
+def _pct(part: Decimal, whole: Decimal) -> str:
+    return f"{part / whole * 100:.1f}".replace(".", ",") + "%"
+
+
+def _percent(
+    db: Session, user: User, period: Period, subject: Subject | None, of_income: bool
+) -> dict[str, Any]:
+    spent, earned = _totals(db, user, period)
+    part = spent
+    if subject is not None:
+        part = sum((e.amount for e in _expenses(db, user, period, subject)), Decimal(0))
+    if of_income:
+        if earned <= 0:
+            return _answer(
+                "percent",
+                f"Não há receitas lançadas {period.label}, então não dá para calcular o percentual. "
+                f"As despesas somam {brl(spent)}.",
+                links=[{"label": "Lançar receita", "to": "/orcamento"}],
+            )
+        if subject is not None:
+            text = f"{_cap(period.label)}, {subject.label} levou {_pct(part, earned)} das suas receitas: {brl(part)} de {brl(earned)}."
+        else:
+            text = f"{_cap(period.label)} você gastou {brl(spent)} de {brl(earned)} recebidos: {_pct(spent, earned)} das receitas."
+            rest = earned - spent
+            text += (
+                f" Sobraram {brl(rest)} ({_pct(rest, earned)})."
+                if rest >= 0
+                else f" As despesas passaram {brl(-rest)} do que entrou."
+            )
+        items = [
+            {"label": "Receitas", "detail": None, "value": brl(earned), "link": None},
+            {
+                "label": subject.label if subject else "Despesas",
+                "detail": None,
+                "value": brl(part),
+                "link": None,
+            },
+            {
+                "label": "Percentual das receitas",
+                "detail": None,
+                "value": _pct(part, earned),
+                "link": None,
+            },
+        ]
+        return _answer(
+            "percent",
+            text,
+            items=items,
+            links=[{"label": "Ver saúde financeira", "to": "/analises?secao=saude"}],
+            suggestions=["Quanto sobrou este mês?", "O que mais gastei este mês?"],
+        )
+    if subject is None:
+        return _top_categories(db, user, period)
+    if spent <= 0:
+        return _nothing(period, None)
+    return _answer(
+        "percent",
+        f"{_cap(period.label)}, {subject.label} foi {_pct(part, spent)} dos seus gastos: {brl(part)} de {brl(spent)}.",
+        items=[
+            {"label": subject.label, "detail": None, "value": brl(part), "link": None},
+            {"label": "Todas as despesas", "detail": None, "value": brl(spent), "link": None},
+            {"label": "Percentual", "detail": None, "value": _pct(part, spent), "link": None},
+        ],
+        links=[{"label": "Ver categorias nos Insights", "to": "/analises?secao=categorias"}],
+    )
+
+
+def _count(
+    db: Session,
+    user: User,
+    period: Period,
+    subject: Subject | None,
+    domain: str,
+    words: list[str],
+) -> dict[str, Any]:
+    rows = _entries(db, user, period, subject, domain, words)
+    if not rows:
+        return _no_rows(period, subject, domain)
+    total = sum((r.amount for r in rows), Decimal(0))
+    income = domain == "income"
+    about = f" com {subject.label}" if subject and not income else ""
+    one, many = ("receita", "receitas") if income else ("lançamento", "lançamentos")
+    text = f"{_cap(period.label)} {'foi' if len(rows) == 1 else 'foram'} {_plural(len(rows), one, many)}{about}, somando {brl(total)}."
+    if len(rows) > 1:
+        text += f" Média de {brl(total / len(rows))} cada."
+    latest = sorted(rows, key=lambda r: r.when, reverse=True)[:TOP]
+    return _answer(
+        "count",
+        text,
+        items=[
+            {
+                "label": r.description,
+                "detail": _short_date(r.when),
+                "value": brl(r.amount),
+                "link": f"/orcamento/{format_month(r.month)}",
+            }
+            for r in latest
+        ],
+    )
+
+
+def _smallest(db: Session, user: User, period: Period, subject: Subject | None) -> dict[str, Any]:
+    rows = _expenses(db, user, period, subject)
+    if not rows:
+        return _nothing(period, subject)
+    names = _category_names(db, user)
+    ranking = sorted(rows, key=lambda e: (e.amount, _when(e)))[:TOP]
+    low = ranking[0]
+    about = f" com {subject.label}" if subject else ""
+    return _answer(
+        "smallest",
+        f"Os menores gastos{about} {period.label}: o menor foi {low.description}, "
+        f"{brl(low.amount)} em {_short_date(_when(low))}.",
+        items=[_item(e, names) for e in ranking],
+    )
+
+
+def _period_days(period: Period, today: date, start_day: int) -> int:
+    if period.day_start and period.day_end:
+        first, last = period.day_start, period.day_end
+    else:
+        first = cycle_range(period.start, start_day)[0]
+        last = cycle_range(period.end, start_day)[1]
+    return max(1, (min(last, today) - first).days + 1)
+
+
+def _per(
+    db: Session,
+    user: User,
+    period: Period,
+    subject: Subject | None,
+    parts: understand.Parts,
+    today: date,
+    words: list[str],
+) -> dict[str, Any]:
+    rows = _entries(db, user, period, subject, parts.domain, words)
+    if not rows:
+        return _no_rows(period, subject, parts.domain)
+    total = sum((r.amount for r in rows), Decimal(0))
+    days = _period_days(period, today, user.month_start_day)
+    income = parts.domain == "income"
+    about = f" com {subject.label}" if subject and not income else ""
+    verb = "recebeu" if income else "gastou"
+    if parts.grouping == "week":
+        weeks = max(Decimal(1), Decimal(days) / 7)
+        text = (
+            f"{_cap(period.label)} você {verb} em média {brl(total / weeks)} por semana{about} "
+            f"({brl(total)} em {_plural(days, 'dia', 'dias')})."
+        )
+    else:
+        text = (
+            f"{_cap(period.label)} você {verb} em média {brl(total / days)} por dia{about} "
+            f"({brl(total)} em {_plural(days, 'dia', 'dias')})."
+        )
+    totals, counts, months, names = _grouped(rows, "week" if parts.grouping == "week" else "day")
+    top = sorted(totals, key=lambda key: -totals[key])[:TOP]
+    grouping = "week" if parts.grouping == "week" else "day"
+    return _answer(
+        f"per_{grouping}",
+        text,
+        items=_group_items(top, grouping, totals, counts, months, names),
+    )
+
+
+def _entry(question: str, kind: str) -> dict[str, Any]:
+    """Tentativa de lançamento: o bot não registra, encaminha para o Lançamento rápido."""
+    phrase = " ".join(question.split())[:MAX_QUESTION]
+    if kind == "amount":
+        return _answer(
+            "entry",
+            "Aqui eu só tiro dúvidas, não registro lançamentos. Para lançar, use o Lançamento rápido "
+            "do Orçamento: a sua frase já vai preenchida, é só conferir e tocar em “Lançar”.",
+            links=[
+                {"label": "Abrir o Lançamento rápido", "to": f"/orcamento?lancar={quote(phrase)}"}
+            ],
+            suggestions=["Quanto gastei hoje?", "O que lancei hoje?"],
+        )
+    return _answer(
+        "entry",
+        "Aqui eu só tiro dúvidas, não registro lançamentos. Para lançar, use o Lançamento rápido "
+        "do Orçamento: escreva o que foi e o valor, como “mercado 120 pix ontem”.",
+        links=[{"label": "Abrir o Lançamento rápido", "to": "/orcamento?lancar="}],
+        suggestions=["Quanto gastei hoje?", "O que lancei hoje?"],
+    )
+
+
+def _own_words(db: Session, user: User) -> set[str]:
+    """Palavras do próprio usuário (categorias, descrições e receitas): nunca são "corrigidas"."""
+    words: set[str] = set()
+    for name in db.scalars(select(Category.name).where(Category.user_id == user.id)):
+        words.update(normalize(name).split())
+    descriptions = db.scalars(
+        select(Expense.description).where(Expense.user_id == user.id).distinct().limit(3000)
+    )
+    for description in descriptions:
+        words.update(re.split(r"[^a-z0-9]+", normalize(description)))
+    for description in db.scalars(
+        select(Income.description).where(Income.user_id == user.id).distinct().limit(500)
+    ):
+        words.update(re.split(r"[^a-z0-9]+", normalize(description)))
+    return words
+
+
+def _close_subjects(db: Session, user: User, term: str) -> list[str]:
+    """Nomes parecidos com o termo não encontrado (categorias e palavras das descrições)."""
+    names = {normalize(c): c for c in _category_names(db, user).values()}
+    for word in _own_words(db, user):
+        if len(word) >= 4 and not word.isdigit():
+            names.setdefault(word, word)
+    close = difflib.get_close_matches(term, list(names), n=3, cutoff=0.72)
+    return [names[key] for key in close]
+
+
 # ---------------------------------------------------------------- pergunta
 
 _SUBSCRIPTION = r"assinatura|streaming|netflix|spotify|prime|disney|hbo|max\b|youtube|icloud|google one|globoplay|deezer|apple|plano|mensalidade|academia|clube"
@@ -1304,6 +1828,18 @@ EXAMPLES = [
     "Qual foi minha última receita?",
     "Quanto sobrou este mês?",
     "O que lancei hoje?",
+    "Qual ano gastei mais?",
+    "Qual dia gastei mais este mês?",
+    "Qual dia da semana eu gasto mais?",
+    "Qual semana gastei mais?",
+    "Qual mês gastei menos este ano?",
+    "Quantos % da minha renda eu gastei?",
+    "Quantas vezes pedi ifood este mês?",
+    "Quanto gasto por dia em média?",
+    "Quanto gastei mês a mês?",
+    "Em que loja gastei mais?",
+    "Qual foi meu menor gasto?",
+    "Qual mês recebi mais?",
 ]
 _NEEDS_SUBJECT = {
     "month_max",
@@ -1315,7 +1851,9 @@ _NEEDS_SUBJECT = {
     "compare",
     "top",
 }
-_SPEND = r"\bsaiu\b|\bsairam\b|\bgast|\bpague|\bdespes|\bcompr|\blancament|\bsaid[ao]s?\b|\bdebit"
+_SPEND = understand.SPEND
+# Intenções gerais: se a pergunta tiver partes mais específicas (v1.7.6), elas valem mais.
+_GENERAL = {None, "sum", "top", "biggest", "month_max", "average", "incomes", "balance"}
 
 
 def _classify(text: str, rest: str, two_periods: bool) -> str | None:
@@ -1410,6 +1948,15 @@ def _classify(text: str, rest: str, two_periods: bool) -> str | None:
     return None
 
 
+# O que as regras antigas já entendem não passa pela correção de digitação.
+understand.register_known(
+    _NAV_STOP
+    | _PART_WORDS
+    | {word for _, _, keys in PLACES for word in keys.split()}
+    | {word for example in EXAMPLES for word in _plain(example).rstrip("?").split()}
+)
+
+
 def _suggest_close(text: str) -> list[str]:
     table = {normalize(e).rstrip("?"): e for e in EXAMPLES}
     close = difflib.get_close_matches(text, list(table), n=4, cutoff=0.45)
@@ -1430,8 +1977,8 @@ def answer(
     com ele, "e em setembro?" ou "e com uber?" continuam o assunto."""
     today = today or today_local()
     current = month_of(today, user.month_start_day)
-    text = _plain(question[:MAX_QUESTION])
-    text = re.sub(r"[?!.,;:]+", " ", text)
+    raw = _plain(question[:MAX_QUESTION])
+    text = re.sub(r"[?!.,;:]+", " ", raw)
     text = re.sub(r"\s+", " ", text).strip()
     if not text or re.fullmatch(
         r"(oi+|ola|opa|ajuda|bom dia|boa tarde|boa noite|o que voce (faz|sabe)|e ai|menu|help)",
@@ -1439,11 +1986,22 @@ def answer(
     ):
         return _answer(
             "help",
-            "Pergunte sobre os seus lançamentos: gastos por categoria ou lugar, períodos (hoje, semana, mês, ano), vencimentos, "
-            "faturas, parcelas, financiamentos, assinaturas, receitas, metas e investimentos. Também mostro onde fica cada coisa no site.",
+            "Pergunte sobre os seus lançamentos: gastos por categoria ou lugar, períodos (hoje, semana, mês, ano), "
+            "em que dia, semana, mês ou ano você gastou mais, percentual da renda, vencimentos, faturas, parcelas, "
+            "financiamentos, assinaturas, receitas, metas e investimentos. Também mostro onde fica cada coisa no site. "
+            "Para registrar um gasto, use o Lançamento rápido do Orçamento.",
             suggestions=SUGGESTIONS,
         )
 
+    # Lançamento ("gastei 50 no mercado"): o bot não registra, encaminha para o Orçamento.
+    kind = understand.entry_guess(understand.fix_typos(raw))
+    if kind is not None:
+        out = _entry(question, kind)
+        out["context"] = {"intent": None, "subject": None, "period": None}
+        return out
+
+    text = understand.fix_typos(text, lambda: _own_words(db, user))
+    text, weekday = understand.cut_weekday(text)
     start_day = user.month_start_day
     period, rest = _parse_period(text, current, today, start_day)
     second: Period | None = None
@@ -1452,15 +2010,32 @@ def answer(
         if second is not None:
             rest = rest2
     intent = _classify(text, rest, second is not None)
+    parts = understand.parse(text, rest, weekday)
+    if parts.intent is not None and second is None:
+        if intent in _GENERAL or (parts.intent == "percent" and intent == "salary"):
+            intent = parts.intent
+        else:
+            parts = understand.Parts()
+    elif parts.intent is not None:
+        parts = understand.Parts()
+    # Receita e despesa na mesma pergunta ("quanto recebi e quanto gastei"): mostra as duas.
+    if (
+        parts.intent is None
+        and intent in (None, "sum", "top", "incomes")
+        and understand.mixed(text)
+    ):
+        intent = "balance"
 
     # Continuação: "e em setembro?", "e com uber?", "e ontem?".
     previous = context if isinstance(context, dict) else None
     follow = previous is not None and re.match(r"e\b", text) is not None
     subject_text = re.sub(r"^e\b", " ", rest).strip() if follow else rest
+    subject_text = re.sub(r"\bdiasemana\b", " ", subject_text).strip()
     if follow and previous:
         own_subject = bool(_subject_words(subject_text))
         if intent in (None, "sum", "navigate") and previous.get("intent"):
             intent = str(previous["intent"])
+            parts = understand.Parts.load(previous.get("parts")) or parts
         if period is None:
             period = Period.load(previous.get("period"))
         if not own_subject and previous.get("subject"):
@@ -1468,18 +2043,32 @@ def answer(
 
     found: Subject | None = None
     missing: str | None = None
-    if intent is None or intent in _NEEDS_SUBJECT:
+    income = parts.intent in ("rank", "list", "count", "per") and parts.domain == "income"
+    if parts.intent is not None:
+        # Palavras que já viraram parte da pergunta ("semana", "percentual", "renda") não são assunto.
+        subject_text = " ".join(w for w in subject_text.split() if w not in _PART_WORDS)
+    if (intent is None or intent in _NEEDS_SUBJECT or parts.intent is not None) and not income:
         found, missing = _resolve_subject(db, user, subject_text)
+    words = [w for w in _subject_words(subject_text) if len(w) >= 3]
 
     def finish(out: dict[str, Any], key: str | None) -> dict[str, Any]:
         out["context"] = {
             "intent": key,
             "subject": subject_text if found is not None else None,
             "period": period.dump() if period else None,
+            "parts": parts.dump() if parts.intent is not None else None,
         }
         return out
 
     def unknown(term: str) -> dict[str, Any]:
+        close = _close_subjects(db, user, term)
+        if close:
+            # Sem certeza, pergunta: mostra as opções parecidas em vez de chutar.
+            return _answer(
+                "unknown_subject",
+                f"Não achei nenhuma categoria ou lançamento com “{term}”. Você quis dizer:",
+                suggestions=[f"Quanto gastei com {name.lower()}?" for name in close],
+            )
         return _answer(
             "unknown_subject",
             f"Não achei nenhuma categoria ou lançamento com “{term}”.",
@@ -1540,6 +2129,37 @@ def answer(
         days = period if period and period.day_start else _days(today, today, "hoje", start_day)
         return finish(_logged(db, user, days), intent)
 
+    if parts.intent is not None:
+        if missing and not income and parts.intent != "percent":
+            return finish(unknown(missing), intent)
+        if parts.intent == "rank":
+            if parts.grouping == "month" and parts.order == "most" and not income:
+                return finish(
+                    _month_max(db, user, period or _this_year(current), found), "month_max"
+                )
+            span = _default_period(parts.grouping, current, period)
+            return finish(_rank(db, user, span, found, parts, words), "rank")
+        if parts.intent == "list":
+            span = period
+            if span is None and parts.grouping == "month":
+                span = _last_year(current)
+            span = span if span is not None else _default_period(parts.grouping, current, None)
+            return finish(_list_groups(db, user, span, found, parts, words), "list")
+        if parts.intent == "percent":
+            of_income = parts.domain == "income"
+            if missing and not of_income:
+                return finish(unknown(missing), intent)
+            return finish(_percent(db, user, month, found, of_income), "percent")
+        if parts.intent == "count":
+            return finish(_count(db, user, month, found, parts.domain, words), "count")
+        if parts.intent == "smallest":
+            default = (
+                _this_month(current) if re.search(r"\blancament", text) else _last_year(current)
+            )
+            return finish(_smallest(db, user, period or default, found), "smallest")
+        if parts.intent == "per":
+            return finish(_per(db, user, month, found, parts, today, words), "per")
+
     if intent in _NEEDS_SUBJECT and missing and intent != "top":
         return finish(unknown(missing), intent)
     if intent == "compare":
@@ -1591,6 +2211,20 @@ def answer(
     if intent == "top":
         if found is not None:
             return finish(_biggest(db, user, month, found), "biggest")
+        if missing:
+            # Sobrou uma palavra que não é categoria nem lançamento: pergunta em vez de chutar.
+            return finish(
+                _answer(
+                    "clarify",
+                    f"Não tenho certeza do que você quis dizer com “{missing}”. Escolha uma opção:",
+                    suggestions=[
+                        f"O que mais gastei {month.label}?",
+                        f"Quanto gastei com {missing}?",
+                        f"Qual mês gastei mais {_this_year(current).label}?",
+                    ],
+                ),
+                None,
+            )
         return finish(_top_categories(db, user, month), intent)
     if intent == "sum":
         return finish(_sum(db, user, month, found), intent)
@@ -1602,6 +2236,10 @@ def answer(
     if place:
         return finish(place, None)
     return finish(
-        _answer("fallback", "Não entendi essa. Você quis dizer:", suggestions=_suggest_close(text)),
+        _answer(
+            "fallback",
+            "Não tenho certeza do que você quis dizer. Escolha uma opção ou pergunte de outro jeito:",
+            suggestions=_suggest_close(text),
+        ),
         None,
     )

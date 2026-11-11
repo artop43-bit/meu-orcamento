@@ -234,3 +234,10 @@ EXACT_ONLY = {
 
 # Categoria que recebe o termo quando o usuário não tem a categoria padrão.
 FALLBACK = {"Assinaturas": "Serviços", "Compras": "Outros", "Pets": "Outros"}
+
+# Vocabulário ampliado (v1.7.6): entra só o que ainda não existia, sem mudar o que já valia.
+from app.services.category_words_more import MORE, MORE_EXACT_ONLY  # noqa: E402
+
+for _term, _category in MORE.items():
+    WORDS.setdefault(_term, _category)
+EXACT_ONLY |= MORE_EXACT_ONLY

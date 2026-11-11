@@ -6,8 +6,10 @@ python -m app.cli seed-demo  cria a conta de demonstração com dados (nunca em 
 """
 
 import argparse
+import json
 import time
 from datetime import datetime, timedelta
+from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import delete, or_
@@ -180,11 +182,42 @@ def run_admin(command: str, email: str) -> None:
         print(admin.cli_action(db, command, email), flush=True)
 
 
+LEXICON_TS = (
+    Path(__file__).resolve().parents[2] / "frontend" / "src" / "lib" / "lexicon.generated.ts"
+)
+
+
+def lexicon_ts() -> str:
+    """Cópia do núcleo de linguagem para o site (o Lançamento rápido roda no navegador)."""
+    from app.services import lexicon
+
+    body = json.dumps(lexicon.frontend(), ensure_ascii=False, indent=2)
+    return (
+        "// Arquivo gerado por `uv run python -m app.cli lexicon` (backend). Não edite à mão:\n"
+        "// a fonte é backend/app/services/lexicon.py; um teste confere que a cópia está em dia.\n"
+        f"export const LEXICON = {body} as const;\n"
+    )
+
+
+def run_lexicon() -> None:
+    LEXICON_TS.write_text(lexicon_ts(), encoding="utf-8")
+    print(f"Atualizado: {LEXICON_TS}")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(prog="python -m app.cli", description=__doc__)
     parser.add_argument(
         "command",
-        choices=["cleanup", "schedule", "seed-demo", "feedback", "make-admin", "approve", "block"],
+        choices=[
+            "cleanup",
+            "schedule",
+            "seed-demo",
+            "feedback",
+            "make-admin",
+            "approve",
+            "block",
+            "lexicon",
+        ],
     )
     parser.add_argument("email", nargs="?", help="make-admin/approve/block: e-mail da conta")
     parser.add_argument(
@@ -204,6 +237,8 @@ def main() -> None:
         schedule()
     elif args.command == "feedback":
         run_feedback()
+    elif args.command == "lexicon":
+        run_lexicon()
     elif args.command in ("make-admin", "approve", "block"):
         if not args.email:
             parser.error("informe o e-mail da conta")
