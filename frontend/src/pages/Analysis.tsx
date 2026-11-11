@@ -392,21 +392,102 @@ function CategoriesSection({ month, setMonth }: { month: string; setMonth: (m: s
   const trends = useTrends(month);
   const monthData = useMonth(month);
   const [view, setView] = useState<"hbar" | "donut">("hbar");
+  // v1.7.5: período em pílulas e a visão por lugar (descrição do lançamento).
+  const [three, setThree] = useState(false);
+  const [by, setBy] = useState<"category" | "place">("category");
   const colors = new Map((useCategories().data ?? []).map((c) => [c.id, c.color]));
   if (trends.isPending || monthData.isPending) return <Loading />;
   if (trends.isError) return <Alert tone="error">{errorMessage(trends.error)}</Alert>;
   const t = trends.data;
-  const byCategory = monthData.data?.summary.by_category ?? [];
+  const monthCategories = monthData.data?.summary.by_category ?? [];
+  // "3 meses": soma dos três últimos meses de cada categoria (a série já vem do servidor).
+  const lastThree = t.categories
+    .map((c) => ({ category_id: c.category_id, name: c.name, total: String(c.totals.slice(-3).reduce((sum, v) => sum + Number(v), 0)) }))
+    .filter((c) => Number(c.total) > 0)
+    .sort((a, b) => Number(b.total) - Number(a.total));
+  const byCategory = three ? lastThree : monthCategories;
+  const places = new Map<string, { name: string; total: number; count: number }>();
+  for (const e of monthData.data?.expenses ?? []) {
+    const key = e.description.trim().toLowerCase().replace(/\s*\(?\d+\s*\/\s*\d+\)?$/, "");
+    const place = places.get(key) ?? { name: e.description.replace(/\s*\(?\d+\s*\/\s*\d+\)?$/, ""), total: 0, count: 0 };
+    place.total += Number(e.amount);
+    place.count += 1;
+    places.set(key, place);
+  }
+  const topPlaces = [...places.values()].sort((a, b) => b.total - a.total).slice(0, 12);
+  const current = thisMonth();
+  const period = three ? "3m" : month === current ? "now" : month === addMonths(current, -1) ? "last" : "other";
+  const periodLabel = three ? `3 meses até ${monthLabel(month).toLowerCase()}` : monthLabel(month);
   const last6 = t.months.slice(-6);
-  const withLimit = byCategory.filter((c) => c.limit);
+  const withLimit = monthCategories.filter((c) => c.limit);
 
   return (
     <>
       <SectionTitle title="Categorias" text="Para onde vai o dinheiro e como cada categoria evolui." month={month} setMonth={setMonth} />
+      <div className="period-tabs">
+        <div className="pill-group" role="group" aria-label="Período">
+          <button
+            type="button"
+            className="chip-btn"
+            aria-pressed={period === "now"}
+            onClick={() => {
+              setThree(false);
+              setMonth(current);
+            }}
+          >
+            Este mês
+          </button>
+          <button
+            type="button"
+            className="chip-btn"
+            aria-pressed={period === "last"}
+            onClick={() => {
+              setThree(false);
+              setMonth(addMonths(current, -1));
+            }}
+          >
+            Mês passado
+          </button>
+          <button type="button" className="chip-btn" aria-pressed={period === "3m"} onClick={() => setThree(true)}>
+            3 meses
+          </button>
+        </div>
+        <div className="pill-group" role="group" aria-label="Agrupar por">
+          <button type="button" className="chip-btn" aria-pressed={by === "category"} onClick={() => setBy("category")}>
+            Categorias
+          </button>
+          <button
+            type="button"
+            className="chip-btn"
+            aria-pressed={by === "place"}
+            onClick={() => {
+              setBy("place");
+              setThree(false);
+            }}
+          >
+            Lugares
+          </button>
+        </div>
+      </div>
       <div className="layout-2">
+        {by === "place" ? (
+          <section className="card stack">
+            <h3 className="builder__title">Onde você mais gastou em {monthLabel(month).toLowerCase()}</h3>
+            {topPlaces.length === 0 ? (
+              <p className="muted">Nenhum gasto neste mês.</p>
+            ) : (
+              <Chart
+                type="hbar"
+                labels={topPlaces.map((p) => ({ key: p.name, label: p.count > 1 ? `${p.name} (${p.count}×)` : p.name }))}
+                series={[{ key: "total", name: "Gastos", values: topPlaces.map((p) => p.total) }]}
+                description={`Gastos por lugar em ${monthLabel(month)}`}
+              />
+            )}
+          </section>
+        ) : (
         <section className="card stack">
           <div className="builder__result-head">
-            <h3 className="builder__title">{monthLabel(month)}</h3>
+            <h3 className="builder__title">{periodLabel}</h3>
             <div className="chart-types" role="radiogroup" aria-label="Visualização">
               {(["hbar", "donut"] as const).map((type) => {
                 const Icon = type === "hbar" ? ChartBarDecreasing : ChartPie;
@@ -422,16 +503,17 @@ function CategoriesSection({ month, setMonth }: { month: string; setMonth: (m: s
             </div>
           </div>
           {byCategory.length === 0 ? (
-            <p className="muted">Nenhum gasto neste mês.</p>
+            <p className="muted">Nenhum gasto no período.</p>
           ) : (
             <Chart
               type={view}
               labels={byCategory.map((c) => ({ key: c.category_id ?? "none", label: c.name, color: c.category_id ? colors.get(c.category_id) : "var(--subtle)" }))}
               series={[{ key: "total", name: "Gastos", values: byCategory.map((c) => Number(c.total)) }]}
-              description={`Gastos por categoria em ${monthLabel(month)}`}
+              description={`Gastos por categoria em ${periodLabel}`}
             />
           )}
         </section>
+        )}
         <section className="card stack">
           <h3 className="builder__title">Últimos 6 meses</h3>
           {t.categories.length === 0 ? (

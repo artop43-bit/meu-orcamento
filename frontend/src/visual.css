@@ -85,8 +85,8 @@ body {
 @media (min-width: 1024px) {
   .sidebar {
     background: color-mix(in srgb, var(--surface) 82%, transparent);
-    backdrop-filter: blur(14px);
     -webkit-backdrop-filter: blur(14px);
+    backdrop-filter: blur(14px);
   }
 
   .sidebar__link.active {
@@ -209,8 +209,8 @@ textarea:focus {
     border: 1px solid var(--border);
     border-radius: 30px;
     background: var(--surface);
-    backdrop-filter: blur(var(--glass-blur)) saturate(180%);
     -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(180%);
+    backdrop-filter: blur(var(--glass-blur)) saturate(180%);
     box-shadow: var(--glass-highlight), var(--shadow-lg);
   }
 
@@ -226,8 +226,8 @@ textarea:focus {
 @media (max-width: 1023px) {
   :root[data-style="glass"] .mobile-bar {
     background: var(--surface);
-    backdrop-filter: blur(var(--glass-blur)) saturate(180%);
     -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(180%);
+    backdrop-filter: blur(var(--glass-blur)) saturate(180%);
   }
 
   /* Abas flutuantes em cápsula. */
@@ -238,8 +238,8 @@ textarea:focus {
     border: 1px solid var(--border);
     border-radius: 999px;
     background: var(--surface);
-    backdrop-filter: blur(var(--glass-blur)) saturate(190%);
     -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(190%);
+    backdrop-filter: blur(var(--glass-blur)) saturate(190%);
     box-shadow: var(--glass-highlight), var(--shadow-lg);
   }
 
@@ -251,8 +251,8 @@ textarea:focus {
 /* Vidro mais leve: aparelhos simples ([data-lite], por public/aparencia.js) e quem pede menos
    transparência no sistema. Sem desfoque; superfícies opacas (o contraste continua o testado). */
 :root[data-style="glass"][data-lite] * {
-  backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
 }
 
 :root[data-style="glass"][data-lite] {
@@ -261,8 +261,8 @@ textarea:focus {
 
 @media (prefers-reduced-transparency: reduce) {
   :root[data-style="glass"] * {
-    backdrop-filter: none !important;
     -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
   }
 
   :root[data-style="glass"] {
@@ -2075,4 +2075,1094 @@ select option:checked {
   align-self: flex-start;
   text-decoration: none;
   font-size: 0.9rem;
+}
+
+/* ---------------------------------------------------------- tire sua dúvida: histórico (v1.7.5) */
+
+.ask--history {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.ask__main {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+.ask--history .ask__main {
+  padding: 20px;
+}
+
+.ask__side {
+  display: none;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  min-width: 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.ask.is-history-open .ask__side {
+  display: flex;
+}
+
+@media (min-width: 900px) {
+  .ask--history {
+    grid-template-columns: 260px minmax(0, 1fr);
+    min-height: 26rem;
+  }
+
+  .ask__side {
+    display: flex;
+    border-bottom: none;
+    border-right: 1px solid var(--border);
+  }
+
+}
+
+.ask__history-toggle {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+}
+
+/* Depois da regra acima, para valer: no computador a lista já fica ao lado. */
+@media (min-width: 900px) {
+  .ask__history-toggle {
+    display: none;
+  }
+}
+
+.ask__new {
+  border-radius: 999px;
+  justify-content: center;
+}
+
+.ask__side-title {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.ask__conversations {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 22rem;
+  overflow-y: auto;
+}
+
+.ask__conversations li {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  border-radius: 12px;
+}
+
+.ask__conversations li.is-current {
+  background: var(--accent-soft);
+  box-shadow: var(--glow-ring);
+}
+
+.ask__conversation {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 12px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ask__conversation-title {
+  font-size: 0.88rem;
+  font-weight: 550;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+
+.ask__conversations li.is-current .ask__conversation-title {
+  color: var(--accent);
+}
+
+.ask__conversation-date {
+  color: var(--subtle);
+  font-size: 0.74rem;
+}
+
+.ask__conversations .icon-btn {
+  width: 32px;
+  height: 32px;
+  opacity: 0.7;
+}
+
+.ask__side-foot {
+  margin: auto 0 0;
+  padding-top: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  font-size: 0.8rem;
+}
+
+@media (hover: hover) {
+  .ask__conversations li:not(.is-current):hover {
+    background: color-mix(in srgb, var(--accent) 7%, transparent);
+  }
+}
+
+/* ---------------------------------------------------------- avisos num formato só (v1.7.5) */
+
+/* Todo aviso é uma linha igual: traço lateral na cor do tom, ícone, título e texto. Com ação
+   (link ou botão) a linha inteira é clicável e tem seta; sem ação, não reage ao mouse. */
+.notice-row {
+  --tone: var(--accent);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--tone);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--fg);
+  font: inherit;
+  text-align: left;
+  text-decoration: none;
+}
+
+.notice-row--danger {
+  --tone: var(--error);
+}
+
+.notice-row--warn {
+  --tone: var(--warn);
+}
+
+:is(a, button).notice-row {
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.notice-row__icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--tone) 15%, transparent);
+  color: var(--tone);
+}
+
+.notice-row__body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  overflow-wrap: break-word;
+}
+
+.notice-row__text {
+  color: var(--muted);
+  font-size: 0.86rem;
+  line-height: 1.4;
+}
+
+.notice-row__arrow {
+  flex: none;
+  color: var(--muted);
+}
+
+.notices__group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+@media (min-width: 900px) {
+  .notices__body:has(> :nth-child(2)) {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .notices__body[hidden] {
+    display: none;
+  }
+
+  .notices__group {
+    display: contents;
+  }
+}
+
+/* ---------------------------------------------------------- hover padrão dos cartões (v1.7.5) */
+
+/* Um cartão clicável reage sempre do mesmo jeito: borda e brilho leves na cor de destaque. O
+   traço lateral (a cor do tom) nunca muda no hover: só as outras três bordas. */
+@media (hover: hover) {
+  :is(a, button).notice-row:hover,
+  :root :is(a, button):is(.teaser, .task-card, .review-banner, .preset, .quote, .stat--button, .invoice-chip, .settings-list__item, .doc-chip):hover {
+    border-top-color: color-mix(in srgb, var(--accent) 45%, transparent);
+    border-right-color: color-mix(in srgb, var(--accent) 45%, transparent);
+    border-bottom-color: color-mix(in srgb, var(--accent) 45%, transparent);
+    box-shadow: var(--glow-ring);
+  }
+
+  :is(a, button).notice-row:hover .notice-row__arrow {
+    color: var(--accent);
+  }
+}
+
+:root :is(.consultant, .teaser):hover {
+  border-left-color: var(--mood, var(--accent));
+}
+
+:root :is(.reminder, .notice.is-important):hover {
+  border-left-color: var(--warn);
+}
+
+:root .task-card.is-unread:hover {
+  border-left-color: var(--accent);
+}
+
+:root :is(a, button).notice-row:hover {
+  border-left-color: var(--tone);
+}
+
+/* ---------------------------------------------------------- menu lateral recolhível (v1.7.5) */
+
+.sidebar__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.sidebar__head .brand {
+  min-width: 0;
+}
+
+.sidebar__collapse {
+  flex: none;
+  width: 32px;
+  height: 32px;
+}
+
+@media (min-width: 1024px) {
+  .shell {
+    transition: grid-template-columns 0.26s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+
+  .shell[data-menu="collapsed"] {
+    --sidebar-w: 76px;
+  }
+
+  .shell[data-menu="collapsed"] .sidebar {
+    padding-inline: 12px;
+    align-items: stretch;
+    /* Etiquetas e painéis flutuantes saem para a direita do menu. */
+    overflow: visible;
+    z-index: 30;
+  }
+
+  .shell[data-menu="collapsed"] .sidebar__head {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  /* Os nomes continuam no HTML (leitor de tela e etiqueta); só deixam de ocupar espaço. */
+  .shell[data-menu="collapsed"] :is(.brand, .sidebar__link) {
+    font-size: 0;
+    gap: 0;
+    justify-content: center;
+  }
+
+  .shell[data-menu="collapsed"] .brand {
+    padding: 0;
+  }
+
+  .shell[data-menu="collapsed"] .sidebar__link {
+    position: relative;
+    height: 44px;
+    padding: 0;
+  }
+
+  .shell[data-menu="collapsed"] :is(.nav-group__chevron, .sidebar__group, .sidebar__user, .app-version, .sidebar__tool--wide span),
+  .shell[data-menu="collapsed"] .sidebar__footer > .row {
+    display: none;
+  }
+
+  /* Etiqueta com o nome ao passar o mouse ou focar com o teclado. Só existe nessa hora (fora
+     dela não ocupa espaço nem conta como conteúdo saindo do botão). */
+  .shell[data-menu="collapsed"] .sidebar__link[data-label]:is(:hover, :focus-visible):not([aria-expanded="true"])::after {
+    content: attr(data-label);
+    position: absolute;
+    left: calc(100% + 12px);
+    top: 50%;
+    translate: 0 -50%;
+    z-index: 40;
+    padding: 6px 10px;
+    border: 1px solid var(--border-strong);
+    border-radius: 10px;
+    background: var(--surface-solid);
+    color: var(--fg);
+    font-size: 0.8rem;
+    font-weight: 600;
+    white-space: nowrap;
+    box-shadow: var(--shadow-lg);
+    pointer-events: none;
+    animation: tip-in 0.12s ease-out both;
+  }
+
+  @keyframes tip-in {
+    from {
+      opacity: 0;
+      translate: -4px -50%;
+    }
+  }
+
+  /* Contadores viram um selo no canto do ícone. */
+  .shell[data-menu="collapsed"] .nav-badge {
+    position: absolute;
+    top: 3px;
+    right: 6px;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    font-size: 0.62rem;
+    margin: 0;
+  }
+
+  /* Subitens de um grupo: painel flutuante ao lado do ícone. */
+  .shell[data-menu="collapsed"] .nav-group {
+    position: relative;
+  }
+
+  .shell[data-menu="collapsed"] .nav-group__items {
+    position: absolute;
+    left: calc(100% + 12px);
+    top: -6px;
+    z-index: 40;
+    min-width: 13rem;
+    margin: 0;
+    padding: 6px;
+    border: 1px solid var(--border-strong);
+    border-radius: 14px;
+    background: var(--surface-solid);
+    box-shadow: var(--shadow-lg), var(--glow-ring);
+    animation: card-in 0.16s ease both;
+  }
+
+  .shell[data-menu="collapsed"] .nav-group__items .sidebar__link {
+    height: auto;
+    min-height: 40px;
+    padding: 8px 10px;
+    gap: 10px;
+    font-size: 0.9rem;
+    justify-content: flex-start;
+  }
+
+  .shell[data-menu="collapsed"] .nav-group__items .sidebar__link::after {
+    content: none;
+  }
+
+  .nav-group__flyout-title {
+    padding: 4px 10px 6px;
+    color: var(--subtle);
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .shell[data-menu="collapsed"] .nav-group.is-current > .nav-group__toggle {
+    color: var(--accent);
+  }
+
+  /* Ferramentas e rodapé empilhados. */
+  .shell[data-menu="collapsed"] .sidebar__tools {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .shell[data-menu="collapsed"] .sidebar__tool {
+    padding: 0;
+  }
+
+  .shell[data-menu="collapsed"] .sidebar__tool--wide {
+    grid-column: auto;
+  }
+
+  .shell[data-menu="collapsed"] .sidebar__profile {
+    justify-content: center;
+    padding: 6px 0;
+  }
+
+  .shell[data-menu="collapsed"] .sidebar__footer-row {
+    flex-direction: column-reverse;
+    gap: 6px;
+  }
+
+  .shell[data-menu="collapsed"] .sidebar__footer-row > * {
+    width: 100%;
+  }
+
+  :root[data-style="glass"] .shell[data-menu="collapsed"] .sidebar {
+    border-radius: 26px;
+  }
+}
+
+@media (max-width: 1023px) {
+  .sidebar__collapse {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shell {
+    transition: none;
+  }
+}
+
+/* ---------------------------------------------------------- painel do Orçamento (v1.7.5) */
+
+/* Saudação com o resumo de agora numa frase. */
+.greeting {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.greeting__date {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.greeting__hello {
+  margin: 0;
+  font-family: var(--display);
+  font-size: clamp(1.3rem, 1.1rem + 0.8vw, 1.7rem);
+  letter-spacing: -0.02em;
+}
+
+.greeting__text {
+  margin: 0;
+  max-width: 62ch;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+/* Mini gráfico de tendência ao lado do valor. */
+.spark {
+  flex: none;
+  vertical-align: middle;
+  margin-left: 4px;
+  color: var(--accent);
+}
+
+.spark--expense {
+  color: var(--error);
+}
+
+.spark--warn {
+  color: var(--warn);
+}
+
+.spark path {
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 1;
+  animation: spark-draw 0.7s ease-out both;
+}
+
+.spark circle {
+  fill: currentColor;
+}
+
+@keyframes spark-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+}
+
+@container (max-width: 520px) {
+  .spark {
+    display: none;
+  }
+}
+
+/* Gastos por período: informativos (não são botões). */
+.period-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+  margin: 0;
+}
+
+.period-pills > div {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 4px 11px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  font-size: 0.8rem;
+}
+
+.period-pills dt {
+  color: var(--muted);
+}
+
+.period-pills dd {
+  margin: 0;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
+.period-pills__delta.is-up {
+  background: color-mix(in srgb, var(--error) 12%, transparent);
+  color: var(--error);
+}
+
+.period-pills__delta.is-down {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+/* Linha do mês: do primeiro ao último dia, com receitas e vencimentos como paradas. */
+.month-line {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-bottom: 14px;
+}
+
+.month-line__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.month-line__head h2 {
+  margin: 0;
+}
+
+.month-line__scroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+  padding: 0 8px;
+  margin: 0 -8px;
+  border-radius: var(--radius-sm);
+}
+
+.month-line__track {
+  --line: 58px;
+  position: relative;
+  list-style: none;
+  /* 12% de distância mínima entre paradas precisa caber a largura de uma parada. */
+  min-width: 900px;
+  height: 132px;
+  margin: 0 46px;
+  padding: 0;
+}
+
+.month-line__track::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: var(--line);
+  height: 4px;
+  border-radius: 9px;
+  background: var(--surface-2);
+}
+
+.month-line__fill {
+  position: absolute;
+  left: 0;
+  top: var(--line);
+  width: var(--progress);
+  height: 4px;
+  border-radius: 9px;
+  background: var(--accent);
+  box-shadow: 0 0 14px var(--glow);
+  animation: line-grow 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.month-line__today {
+  position: absolute;
+  left: var(--progress);
+  top: calc(var(--line) - 10px);
+  z-index: 2;
+  translate: -50% 0;
+  animation: line-move 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.month-line__marker {
+  display: grid;
+  place-items: center;
+  height: 24px;
+  padding: 0 9px;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  background: var(--accent);
+  color: var(--accent-fg);
+  box-shadow: 0 0 0 5px var(--accent-soft), 0 0 20px var(--glow);
+}
+
+@keyframes line-grow {
+  from {
+    width: 0;
+  }
+}
+
+@keyframes line-move {
+  from {
+    left: 0;
+  }
+}
+
+.month-line__stop {
+  position: absolute;
+  top: calc(var(--line) - 5px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  width: 104px;
+  translate: -50% 0;
+  text-align: center;
+}
+
+.month-line__dot {
+  display: grid;
+  place-items: center;
+  width: 14px;
+  height: 14px;
+  margin-bottom: 9px;
+  box-sizing: border-box;
+  border-radius: 99px;
+  border: 2px solid var(--subtle);
+  background: var(--surface-solid);
+  color: var(--accent-fg);
+}
+
+.month-line__stop--paid .month-line__dot,
+.month-line__stop--income .month-line__dot {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+/* Receitas ficam acima da linha e contas abaixo: no mesmo dia, uma não cobre a outra. */
+.month-line__stop--income {
+  top: auto;
+  bottom: calc(100% - var(--line) - 9px);
+  flex-direction: column-reverse;
+}
+
+.month-line__stop--income .month-line__dot {
+  margin: 9px 0 0;
+}
+
+.month-line__stop--next .month-line__dot {
+  border-color: var(--warn);
+}
+
+.month-line__stop--late .month-line__dot {
+  border-color: var(--error);
+  background: var(--error);
+}
+
+.month-line__label {
+  max-width: 100%;
+  font-size: 0.78rem;
+  font-weight: 600;
+  line-height: 1.2;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: break-word;
+  hyphens: auto;
+  -webkit-hyphens: auto;
+}
+
+.month-line__stop--paid .month-line__label {
+  color: var(--muted);
+}
+
+.month-line__meta {
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Barra "fantasma": o mesmo trecho do mês anterior atrás da barra da categoria. */
+.ghost-bar {
+  position: relative;
+  display: block;
+}
+
+.ghost-bar .bar {
+  background: transparent;
+  position: relative;
+}
+
+.ghost-bar::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 99px;
+  background: var(--border);
+}
+
+.ghost-bar__before {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  border-radius: 99px;
+  background: color-mix(in srgb, var(--fg) 22%, transparent);
+}
+
+/* Anel de essencial × não essencial. */
+.breakdown-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.breakdown-head h2 {
+  margin: 0;
+}
+
+.ring {
+  position: relative;
+  flex: none;
+  width: 76px;
+  height: 76px;
+}
+
+.ring svg {
+  width: 100%;
+  height: 100%;
+}
+
+.ring circle {
+  fill: none;
+  stroke-width: 3.4;
+}
+
+.ring__track {
+  stroke: var(--surface-2);
+}
+
+.ring__value {
+  stroke: var(--accent);
+  stroke-linecap: round;
+  /* Só o traço cresce: nada de girar ou mudar de tamanho (o anel não sai do lugar). */
+  animation: ring-draw 0.8s ease-out both;
+}
+
+@keyframes ring-draw {
+  from {
+    stroke-dasharray: 0 95;
+  }
+}
+
+.ring__text {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  line-height: 1.1;
+}
+
+.ring__text strong {
+  font-family: var(--display);
+  font-size: 1.05rem;
+}
+
+.ring__text span {
+  color: var(--muted);
+  font-size: 0.62rem;
+}
+
+/* Disponível hoje: controle deslizante da simulação. */
+.simulate {
+  max-width: none;
+}
+
+.simulate__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.simulate__row input[type="range"] {
+  flex: 1;
+  min-width: 0;
+  accent-color: var(--accent);
+}
+
+.simulate__row input:not([type="range"]) {
+  width: 6.5rem !important;
+  flex: none;
+}
+
+/* Troca de tela com desfoque curto (só no computador: no celular o desfoque da tela inteira pesa). */
+@media (hover: hover) and (min-width: 1024px) and (prefers-reduced-motion: no-preference) {
+  .page[data-enter] {
+    animation-name: page-in-blur;
+    animation-duration: 0.22s;
+  }
+
+  @keyframes page-in-blur {
+    from {
+      opacity: 0.4;
+      filter: blur(6px);
+      transform: translate3d(0, 6px, 0);
+    }
+  }
+}
+
+/* ---------------------------------------------------------- trilha da meta (v1.7.5) */
+
+.goal-track {
+  position: relative;
+  height: 46px;
+  margin: 6px 14px 0;
+}
+
+.goal-track::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 12px;
+  height: 5px;
+  border-radius: 9px;
+  background: var(--surface-2);
+}
+
+.goal-track__fill {
+  position: absolute;
+  left: 0;
+  top: 12px;
+  width: var(--progress);
+  height: 5px;
+  border-radius: 9px;
+  background: var(--accent);
+  box-shadow: 0 0 14px var(--glow);
+  animation: line-grow 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.goal-track__mark {
+  position: absolute;
+  top: 7px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  translate: -50% 0;
+}
+
+.goal-track__dot {
+  width: 15px;
+  height: 15px;
+  box-sizing: border-box;
+  border-radius: 99px;
+  border: 2px solid var(--subtle);
+  background: var(--surface-solid);
+}
+
+.goal-track__mark.is-done .goal-track__dot {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+.goal-track__label {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.goal-track__mark.is-done .goal-track__label {
+  color: var(--fg);
+  font-weight: 600;
+}
+
+.goal-track__marker {
+  position: absolute;
+  left: var(--progress);
+  top: 3px;
+  width: 22px;
+  height: 22px;
+  border-radius: 8px;
+  background: var(--accent);
+  box-shadow: 0 0 0 4px var(--accent-soft), 0 0 18px var(--glow);
+  translate: -50% 0;
+  animation: line-move 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+/* ---------------------------------------------------------- pilha de cartões (v1.7.5) */
+
+.card-stack {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 20px;
+  align-items: center;
+}
+
+@media (min-width: 760px) {
+  .card-stack {
+    grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
+    gap: 32px;
+  }
+}
+
+.card-stack__pile {
+  position: relative;
+  height: 212px;
+  max-width: 340px;
+  width: 100%;
+  margin-inline: auto;
+}
+
+.card-stack__card {
+  --depth: 0;
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 176px;
+  box-sizing: border-box;
+  padding: 18px;
+  border: none;
+  border-radius: 20px;
+  font: inherit;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  box-shadow: 0 16px 36px color-mix(in srgb, black 34%, transparent), inset 0 1px 0 color-mix(in srgb, white 35%, transparent);
+  transform-origin: 50% 0;
+  translate: 0 calc(var(--depth) * -16px);
+  scale: calc(1 - var(--depth) * 0.06);
+  filter: brightness(calc(1 - var(--depth) * 0.14));
+  transition: translate 0.4s cubic-bezier(0.3, 0.9, 0.3, 1), scale 0.4s cubic-bezier(0.3, 0.9, 0.3, 1), filter 0.4s;
+}
+
+button.card-stack__card:not(:disabled) {
+  cursor: pointer;
+}
+
+button.card-stack__card:disabled {
+  opacity: 1;
+}
+
+.card-stack__name {
+  font-weight: 650;
+  font-size: 1.02rem;
+  overflow-wrap: anywhere;
+}
+
+.card-stack__chip {
+  width: 36px;
+  height: 27px;
+  border-radius: 7px;
+  background: color-mix(in srgb, currentColor 30%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, currentColor 35%, transparent);
+}
+
+.card-stack__foot {
+  font-size: 0.8rem;
+  opacity: 0.92;
+}
+
+.card-stack__stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 12px;
+  margin: 0;
+}
+
+.card-stack__stats > div:first-child {
+  grid-column: 1 / -1;
+}
+
+.card-stack__stats dt {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.card-stack__stats > div:first-child dt {
+  color: var(--fg);
+  font-family: var(--display);
+  font-size: 1.15rem;
+}
+
+.card-stack__stats dd {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
+.card-stack__stats dd.small {
+  font-size: 0.82rem;
+  font-weight: 400;
+}
+
+@media (hover: hover) {
+  button.card-stack__card:not(:disabled):hover {
+    translate: 0 -4px;
+  }
+}
+
+/* ---------------------------------------------------------- período em pílulas (v1.7.5) */
+
+.period-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 10px;
 }

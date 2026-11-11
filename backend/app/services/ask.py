@@ -9,20 +9,24 @@ Exemplos: "o que mais gastei esse mês?", "qual mês gastei mais esse ano?",
 "onde encontro as recorrências?".
 """
 
+import difflib
 import re
+import unicodedata
 import uuid
 from collections import defaultdict
 from dataclasses import dataclass, field
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.core.months import add_months, format_month, month_of, today_local
-from app.models import Category, Expense, Goal, Income, User
-from app.services import cards
+from app.core.config import get_settings
+from app.core.months import add_months, format_month, month_of, today_local, with_day
+from app.models import Category, Expense, Goal, Income, Investment, OtherDebt, RecurringItem, User
+from app.services import budget, cards, daily, goals, loans
 from app.services.category_words import FALLBACK
 from app.services.insights import MONTH_NAMES, brl
 from app.services.suggest import keyword_category, normalize
@@ -52,15 +56,38 @@ def _short_date(day: date) -> str:
     return f"{day.day:02d}/{day.month:02d}/{day.year}"
 
 
+def _plain(text: str) -> str:
+    """Minúsculas e sem acento, mantendo datas como "12/02" (o normalize do lançamento rápido
+    apaga "2/10" por ser número de parcela)."""
+    text = unicodedata.normalize("NFKD", text.lower())
+    return "".join(ch for ch in text if not unicodedata.combining(ch))
+
+
+def _cap(text: str) -> str:
+    """Primeira letra maiúscula sem mexer no resto ("R$" continua "R$")."""
+    return text[:1].upper() + text[1:]
+
+
 def _plural(count: int, one: str, many: str) -> str:
     return f"{count} {one if count == 1 else many}"
 
 
 # ---------------------------------------------------------------- período
 
+_DAY_NUMBERS = {
+    "dois": 2,
+    "tres": 3,
+    "quatro": 4,
+    "cinco": 5,
+    "seis": 6,
+    "sete": 7,
+    "dez": 10,
+    "quinze": 15,
+    "trinta": 30,
+}
 _NUMBERS = {"dois": 2, "tres": 3, "quatro": 4, "cinco": 5, "seis": 6, "doze": 12}
 _MONTHS = {normalize(name): i + 1 for i, name in enumerate(MONTH_NAMES)}
-_THIS = r"(?:este|esse|neste|nesse|deste|desse|nesta|nessa|o|no|do)"
+_THIS = r"(?:este|esse|neste|nesse|deste|desse|nesta|nessa|no|do)"
 
 
 @dataclass
@@ -69,17 +96,91 @@ class Period:
     end: date
     label: str  # "em novembro de 2026", "neste ano"...
     explicit: bool = True
+    # Período em dias ("hoje", "esta semana", "dia 15"): filtra pela data do lançamento.
+    day_start: date | None = None
+    day_end: date | None = None
 
     @property
     def single(self) -> bool:
         return self.start == self.end
 
+    def dump(self) -> dict[str, Any]:
+        return {
+            "start": self.start.isoformat(),
+            "end": self.end.isoformat(),
+            "label": self.label,
+            "day_start": self.day_start.isoformat() if self.day_start else None,
+            "day_end": self.day_end.isoformat() if self.day_end else None,
+        }
 
-def _parse_period(text: str, current: date) -> tuple[Period | None, str]:
+    @staticmethod
+    def load(data: Any) -> "Period | None":
+        try:
+            return Period(
+                date.fromisoformat(data["start"]),
+                date.fromisoformat(data["end"]),
+                str(data["label"])[:60],
+                True,
+                date.fromisoformat(data["day_start"]) if data.get("day_start") else None,
+                date.fromisoformat(data["day_end"]) if data.get("day_end") else None,
+            )
+        except (KeyError, TypeError, ValueError, AttributeError):
+            return None
+
+
+def _days(first: date, last: date, label: str, start_day: int) -> Period:
+    return Period(month_of(first, start_day), month_of(last, start_day), label, True, first, last)
+
+
+def _parse_period(
+    text: str, current: date, today: date | None = None, start_day: int = 1
+) -> tuple[Period | None, str]:
     """Acha o período na pergunta e devolve o texto sem ele."""
 
     def cut(match: re.Match[str]) -> str:
         return (text[: match.start()] + " " + text[match.end() :]).strip()
+
+    if today is not None:
+        if m := re.search(r"\b(?:de |desde )?anteontem\b", text):
+            day = today - timedelta(days=2)
+            return _days(day, day, "anteontem", start_day), cut(m)
+        if m := re.search(r"\b(?:de )?ontem\b", text):
+            day = today - timedelta(days=1)
+            return _days(day, day, "ontem", start_day), cut(m)
+        if m := re.search(r"\b(?:de )?hoje\b", text):
+            return _days(today, today, "hoje", start_day), cut(m)
+        if m := re.search(r"\b(?:n?a |d?a )?semana passada\b|\bultima semana\b", text):
+            monday = today - timedelta(days=today.weekday() + 7)
+            return _days(monday, monday + timedelta(days=6), "na semana passada", start_day), cut(m)
+        if m := re.search(r"\b(?:n?es[st]a|d?es[st]a|na|da) semana\b", text):
+            monday = today - timedelta(days=today.weekday())
+            return _days(monday, today, "nesta semana", start_day), cut(m)
+        if m := re.search(
+            r"\bultimos?\s+(\d{1,3}|dois|tres|quatro|cinco|seis|sete|dez|quinze|trinta)\s+dias\b",
+            text,
+        ):
+            count = int(m[1]) if m[1].isdigit() else _DAY_NUMBERS[m[1]]
+            count = max(1, min(count, 366))
+            return _days(
+                today - timedelta(days=count - 1), today, f"nos últimos {count} dias", start_day
+            ), cut(m)
+        if m := re.search(r"\b(?:n?o |em |de )?(?:dia )?(\d{1,2})/(\d{1,2})(?:/(20\d\d))?\b", text):
+            try:
+                year = int(m[3]) if m[3] else today.year
+                day = date(year, int(m[2]), int(m[1]))
+                if not m[3] and day > today:
+                    day = date(year - 1, int(m[2]), int(m[1]))
+                return _days(day, day, f"em {_short_date(day)}", start_day), cut(m)
+            except ValueError:
+                pass
+        if m := re.search(r"\b(?:n?o |em |de )?dia (\d{1,2})\b", text):
+            number = int(m[1])
+            if 1 <= number <= 31:
+                month = today.replace(day=1)
+                if number > today.day:
+                    month = add_months(month, -1)
+                day = with_day(month, number)
+                return _days(day, day, f"em {_short_date(day)}", start_day), cut(m)
 
     if m := re.search(r"\bultimos?\s+(\d{1,2}|dois|tres|quatro|cinco|seis|doze)\s+meses\b", text):
         count = int(m[1]) if m[1].isdigit() else _NUMBERS[m[1]]
@@ -95,7 +196,7 @@ def _parse_period(text: str, current: date) -> tuple[Period | None, str]:
         return Period(date(year, 1, 1), date(year, 12, 1), f"em {year}"), cut(m)
     if m := re.search(rf"\b{_THIS}\s+ano\b|\bano atual\b", text):
         return Period(date(current.year, 1, 1), current, "neste ano"), cut(m)
-    if m := re.search(rf"\b{_THIS}\s+mes\b|\bmes atual\b|\bhoje\b", text):
+    if m := re.search(rf"\b{_THIS}\s+mes\b|\bmes atual\b", text):
         return Period(current, current, "neste mês"), cut(m)
     names = "|".join(_MONTHS)
     if m := re.search(rf"\b(?:em |de |no mes de )?({names})(?:\s+(?:de\s+)?(20\d\d))?\b", text):
@@ -135,6 +236,10 @@ _STOP = set(
     mes meses ano anos dia dias vez vezes categoria categorias lugar lugares loja lojas
     tenho tem tive teve ta esta estao estou sao era ser registrado registrada lancei lancado
     este esse isso isto aqui agora neste nesse pesou pesa sozinho sozinha la
+    lancamento lancamentos saida saidas debito debitos algo alguma algum coisa coisas ate
+    faltam falta ainda quanto quantas media medio mensal fiz feito feita foram total
+    comparar compare comparacao comparado versus vs x contra entre do que
+    saiu sairam parcela parcelas aberto abertas acabam acaba terminam termina devo
     """.split()
 )
 
@@ -216,13 +321,18 @@ def _matches(expense: Expense, subject: Subject | None) -> bool:
 
 
 def _expenses(db: Session, user: User, period: Period, subject: Subject | None) -> list[Expense]:
-    query = select(Expense).where(
-        Expense.user_id == user.id, Expense.month.between(period.start, period.end)
-    )
+    start, end = period.start, period.end
+    if period.day_start and period.day_end:
+        # A data do lançamento pode cair num mês do orçamento vizinho (mês financeiro, fatura).
+        start = add_months(min(start, period.day_start.replace(day=1)), -1)
+        end = add_months(max(end, period.day_end.replace(day=1)), 2)
+    query = select(Expense).where(Expense.user_id == user.id, Expense.month.between(start, end))
     if subject is not None and subject.condition() is not None:
         query = query.where(subject.condition())
-    rows = list(db.scalars(query))
-    return [e for e in rows if _matches(e, subject)]
+    rows = [e for e in db.scalars(query) if _matches(e, subject)]
+    if period.day_start and period.day_end:
+        rows = [e for e in rows if period.day_start <= _when(e) <= period.day_end]
+    return rows
 
 
 def _when(expense: Expense) -> date:
@@ -286,7 +396,7 @@ def _top_categories(db: Session, user: User, period: Period) -> dict[str, Any]:
     biggest = max(rows, key=lambda e: e.amount)
     share = f"{value / total * 100:.0f}%" if total else "0%"
     answer = (
-        f"{period.label.capitalize()}, o que mais pesou foi {first}: {brl(value)} ({share} de {brl(total)}). "
+        f"{_cap(period.label)}, o que mais pesou foi {first}: {brl(value)} ({share} de {brl(total)}). "
         f"A maior despesa sozinha foi {biggest.description}, {brl(biggest.amount)} em {_short_date(_when(biggest))}."
     )
     items = [
@@ -322,7 +432,7 @@ def _month_max(db: Session, user: User, period: Period, subject: Subject | None)
     month, value = ranking[0]
     average = sum(totals.values(), Decimal(0)) / len(totals)
     about = f" com {subject.label}" if subject else ""
-    answer = f"{period.label.capitalize()}, o mês em que você mais gastou{about} foi {_month_name(month)}: {brl(value)}."
+    answer = f"{_cap(period.label)}, o mês em que você mais gastou{about} foi {_month_name(month)}: {brl(value)}."
     if len(totals) > 1:
         answer += (
             f" A média dos {_plural(len(totals), 'mês', 'meses')} com gastos foi {brl(average)}."
@@ -373,7 +483,7 @@ def _sum(db: Session, user: User, period: Period, subject: Subject | None) -> di
         return _nothing(period, subject)
     total = sum((e.amount for e in rows), Decimal(0))
     about = f" com {subject.label}" if subject else ""
-    answer = f"{period.label.capitalize()} você gastou {brl(total)}{about}, em {_plural(len(rows), 'lançamento', 'lançamentos')}."
+    answer = f"{_cap(period.label)} você gastou {brl(total)}{about}, em {_plural(len(rows), 'lançamento', 'lançamentos')}."
     if not period.single:
         months = len({e.month for e in rows})
         answer += f" Média de {brl(total / months)} por mês com gasto."
@@ -434,7 +544,7 @@ def _incomes(db: Session, user: User, period: Period) -> dict[str, Any]:
     ranking = sorted(totals.items(), key=lambda kv: -kv[1])[:TOP]
     return _answer(
         "incomes",
-        f"{period.label.capitalize()} entraram {brl(total)} em {_plural(len(rows), 'receita', 'receitas')}.",
+        f"{_cap(period.label)} entraram {brl(total)} em {_plural(len(rows), 'receita', 'receitas')}.",
         items=[
             {"label": name, "detail": None, "value": brl(v), "link": None} for name, v in ranking
         ],
@@ -457,7 +567,7 @@ def _balance(db: Session, user: User, period: Period) -> dict[str, Any]:
     word = "sobraram" if result >= 0 else "faltaram"
     return _answer(
         "balance",
-        f"{period.label.capitalize()}: receitas {brl(earned)}, despesas {brl(spent)}. {word.capitalize()} {brl(result)}.",
+        f"{_cap(period.label)}: receitas {brl(earned)}, despesas {brl(spent)}. {word.capitalize()} {brl(result)}.",
         items=[
             {"label": "Receitas", "detail": None, "value": brl(earned), "link": None},
             {"label": "Despesas", "detail": None, "value": brl(spent), "link": None},
@@ -468,51 +578,6 @@ def _balance(db: Session, user: User, period: Period) -> dict[str, Any]:
                 "link": None,
             },
         ],
-    )
-
-
-def _due(db: Session, user: User, today: date) -> dict[str, Any]:
-    until = today + timedelta(days=10)
-    rows = list(
-        db.scalars(
-            select(Expense)
-            .where(
-                Expense.user_id == user.id,
-                Expense.paid.is_(False),
-                Expense.due_date.is_not(None),
-                Expense.due_date <= until,
-            )
-            .order_by(Expense.due_date)
-            .limit(200)
-        )
-    )
-    late = [e for e in rows if e.due_date and e.due_date < today]
-    soon = [e for e in rows if e.due_date and e.due_date >= today]
-    if not rows:
-        return _answer("due", "Nada vencendo nos próximos 10 dias e nenhuma conta atrasada. 👍")
-    parts = []
-    if soon:
-        parts.append(
-            f"{_plural(len(soon), 'conta vence', 'contas vencem')} nos próximos 10 dias ({brl(sum((e.amount for e in soon), Decimal(0)))})"
-        )
-    if late:
-        parts.append(
-            f"{_plural(len(late), 'está atrasada', 'estão atrasadas')} ({brl(sum((e.amount for e in late), Decimal(0)))})"
-        )
-    names = _category_names(db, user)
-    items = []
-    for e in (late + soon)[:8]:
-        item = _item(e, names)
-        assert e.due_date is not None
-        item["detail"] = (
-            "atrasada · " if e.due_date < today else ""
-        ) + f"vence {_short_date(e.due_date)}"
-        items.append(item)
-    return _answer(
-        "due",
-        " e ".join(parts).capitalize() + ".",
-        items=items,
-        links=[{"label": "Abrir o calendário", "to": "/calendario"}],
     )
 
 
@@ -549,35 +614,6 @@ def _cards(db: Session, user: User, today: date) -> dict[str, Any]:
         items=items,
         links=[{"label": "Abrir cartões", "to": "/cartoes"}],
     )
-
-
-def _goals(db: Session, user: User) -> dict[str, Any]:
-    goals = list(
-        db.scalars(
-            select(Goal)
-            .where(Goal.user_id == user.id)
-            .order_by(Goal.is_main.desc(), Goal.created_at)
-        )
-    )
-    if not goals:
-        return _answer(
-            "goals",
-            "Você ainda não tem metas.",
-            links=[{"label": "Criar uma meta", "to": "/metas"}],
-        )
-    items = []
-    for g in goals[:TOP]:
-        pct = int(g.current_amount / g.target_amount * 100) if g.target_amount else 0
-        detail = f"{pct}% de {brl(g.target_amount)}"
-        if g.target_date:
-            detail += f" · até {_short_date(g.target_date)}"
-        items.append(
-            {"label": g.name, "detail": detail, "value": brl(g.current_amount), "link": "/metas"}
-        )
-    done = sum(1 for g in goals if g.target_amount and g.current_amount >= g.target_amount)
-    answer = f"Você tem {_plural(len(goals), 'meta', 'metas')}"
-    answer += f", {_plural(done, 'concluída', 'concluídas')}." if done else "."
-    return _answer("goals", answer, items=items, links=[{"label": "Abrir metas", "to": "/metas"}])
 
 
 # ---------------------------------------------------------------- "onde encontro…"
@@ -697,109 +733,875 @@ def _navigate(text: str) -> dict[str, Any] | None:
     )
 
 
+# ---------------------------------------------------------------- temas novos (v1.7.5)
+
+
+def _due(db: Session, user: User, today: date, only_late: bool = False) -> dict[str, Any]:
+    until = today + timedelta(days=10)
+    rows = list(
+        db.scalars(
+            select(Expense)
+            .where(
+                Expense.user_id == user.id,
+                Expense.paid.is_(False),
+                Expense.due_date.is_not(None),
+                Expense.due_date <= until,
+            )
+            .order_by(Expense.due_date)
+            .limit(200)
+        )
+    )
+    late = [e for e in rows if e.due_date and e.due_date < today]
+    soon = [] if only_late else [e for e in rows if e.due_date and e.due_date >= today]
+    names = _category_names(db, user)
+
+    def total(items: list[Expense]) -> str:
+        return brl(sum((e.amount for e in items), Decimal(0)))
+
+    if only_late and not late:
+        return _answer(
+            "due",
+            "Nenhuma conta atrasada. 👍",
+            links=[{"label": "Abrir o calendário", "to": "/calendario"}],
+        )
+    if not late and not soon:
+        return _answer("due", "Nada vencendo nos próximos 10 dias e nenhuma conta atrasada. 👍")
+    parts = []
+    if soon:
+        parts.append(
+            f"{_plural(len(soon), 'conta vence', 'contas vencem')} nos próximos 10 dias ({total(soon)})"
+        )
+    if late:
+        parts.append(
+            f"{_plural(len(late), 'conta está atrasada', 'contas estão atrasadas')} ({total(late)})"
+        )
+    items = []
+    for e in (late + soon)[:8]:
+        item = _item(e, names)
+        assert e.due_date is not None
+        item["detail"] = (
+            "atrasada · " if e.due_date < today else ""
+        ) + f"vence {_short_date(e.due_date)}"
+        items.append(item)
+    return _answer(
+        "due",
+        _cap(" e ".join(parts)) + ".",
+        items=items,
+        links=[{"label": "Abrir o calendário", "to": "/calendario"}],
+    )
+
+
+def _goals(db: Session, user: User, today: date | None = None) -> dict[str, Any]:
+    found = list(
+        db.scalars(
+            select(Goal)
+            .where(Goal.user_id == user.id)
+            .order_by(Goal.is_main.desc(), Goal.created_at)
+        )
+    )
+    if not found:
+        return _answer(
+            "goals",
+            "Você ainda não tem metas.",
+            links=[{"label": "Criar uma meta", "to": "/metas"}],
+        )
+    items = []
+    sentences = []
+    for g in found[:TOP]:
+        proj = goals.projection(db, user, g, today)
+        pct = int(g.current_amount / g.target_amount * 100) if g.target_amount else 0
+        if proj["status"] == "completed":
+            detail = "concluída 🎉"
+            sentence = f"{g.name} já foi concluída"
+        else:
+            detail = f"faltam {brl(proj['remaining'])} · {pct}%"
+            sentence = (
+                f"para {g.name} faltam {brl(proj['remaining'])} ({pct}% de {brl(g.target_amount)})"
+            )
+            if proj.get("eta"):
+                detail += f" · previsão {_month_name(proj['eta'])}"
+                sentence += f"; no ritmo atual você chega lá em {_month_name(proj['eta'])}"
+            elif proj.get("required_monthly"):
+                sentence += f"; precisa guardar {brl(proj['required_monthly'])} por mês"
+        sentences.append(sentence)
+        items.append(
+            {"label": g.name, "detail": detail, "value": brl(g.current_amount), "link": "/metas"}
+        )
+    return _answer(
+        "goals",
+        _cap("; ".join(sentences[:2])) + ".",
+        items=items,
+        links=[{"label": "Abrir metas", "to": "/metas"}],
+    )
+
+
+def _invoices(db: Session, user: User, today: date) -> dict[str, Any]:
+    summary = [s for s in cards.summary(db, user, today) if s["open_invoice"]]
+    if not summary:
+        return _answer(
+            "cards",
+            "Você ainda não cadastrou cartão de crédito.",
+            links=[{"label": "Cadastrar cartão", "to": "/cartoes"}],
+        )
+    rows = []
+    for s in summary:
+        for invoice in (s["closed_invoice"], s["open_invoice"]):
+            if (
+                invoice
+                and invoice["status"] != "paid"
+                and (invoice["total"] or invoice is s["open_invoice"])
+            ):
+                rows.append((invoice["due_date"], s["card"].name, invoice))
+    rows.sort(key=lambda r: r[0])
+    status = {"open": "aberta", "closed": "fechada", "overdue": "vencida", "paid": "paga"}
+    items = [
+        {
+            "label": name,
+            "detail": f"fatura {status[inv['status']]} · fecha {_short_date(inv['closing_date'])} · vence {_short_date(due)}",
+            "value": brl(inv["total"]),
+            "link": "/cartoes",
+        }
+        for due, name, inv in rows[:6]
+    ]
+    if not rows:
+        return _answer(
+            "invoices",
+            "Nenhuma fatura em aberto. 👍",
+            links=[{"label": "Abrir cartões", "to": "/cartoes"}],
+        )
+    due, name, first = rows[0]
+    return _answer(
+        "invoices",
+        f"A próxima fatura a vencer é a do {name}: {brl(first['total'])}, vence em {_short_date(due)} (fecha em {_short_date(first['closing_date'])}).",
+        items=items,
+        links=[{"label": "Abrir cartões", "to": "/cartoes"}],
+    )
+
+
+def _can_spend(db: Session, user: User, today: date, current: date) -> dict[str, Any]:
+    data = daily.forecast(db, user, current, today)
+    can = data.get("can_spend")
+    links = [{"label": "Abrir o Orçamento", "to": "/orcamento"}]
+    if not can:
+        return _answer(
+            "can_spend",
+            f"O saldo previsto para o fim do mês é {('−' if data['end_balance'] < 0 else '') + brl(data['end_balance'])}.",
+            links=links,
+        )
+    if can["rest_of_month"] <= 0:
+        text = "Hoje não há saldo livre: as despesas previstas consomem toda a receita do mês."
+        if data.get("first_negative"):
+            text += f" O saldo fica negativo a partir de {_short_date(data['first_negative'])}."
+        return _answer("can_spend", text, links=links)
+    return _answer(
+        "can_spend",
+        f"Hoje você pode gastar até {brl(can['today'])}. São {brl(can['rest_of_month'])} livres até o fim do mês, em {_plural(can['days_left'], 'dia', 'dias')}, já descontando tudo o que está previsto.",
+        links=links,
+    )
+
+
+def _installments(
+    db: Session, user: User, current: date, subject: Subject | None
+) -> dict[str, Any]:
+    rows = [
+        e
+        for e in db.scalars(
+            select(Expense).where(
+                Expense.user_id == user.id,
+                Expense.installment_group_id.is_not(None),
+                Expense.month >= current,
+            )
+        )
+        if _matches(e, subject)
+    ]
+    about = f" de {subject.label}" if subject else ""
+    if not rows:
+        return _answer("installments", f"Não há parcelas em aberto{about}. 👍")
+    groups: dict[uuid.UUID, list[Expense]] = defaultdict(list)
+    for e in rows:
+        assert e.installment_group_id is not None
+        groups[e.installment_group_id].append(e)
+    items = []
+    total = Decimal(0)
+    for group in sorted(groups.values(), key=lambda g: -sum((e.amount for e in g), Decimal(0))):
+        left = [e for e in group if not e.paid]
+        if not left:
+            continue
+        amount = sum((e.amount for e in left), Decimal(0))
+        total += amount
+        last = max(left, key=lambda e: e.month)
+        name = re.sub(r"\s*\(?\d+\s*/\s*\d+\)?\s*$", "", left[0].description)
+        items.append(
+            {
+                "label": name,
+                "detail": f"faltam {_plural(len(left), 'parcela', 'parcelas')} de {brl(left[0].amount)} · até {_month_name(last.month)}",
+                "value": brl(amount),
+                "link": f"/orcamento/{format_month(min(e.month for e in left))}",
+            }
+        )
+    if not items:
+        return _answer("installments", f"Não há parcelas em aberto{about}. 👍")
+    first = items[0]
+    text = (
+        f"{first['label']}: {first['detail']} ({first['value']} no total)."
+        if len(items) == 1
+        else f"Você tem {len(items)} compras parceladas em aberto, somando {brl(total)}. A maior é {first['label']}: {first['detail']}."
+    )
+    return _answer("installments", text, items=items[:6])
+
+
+def _loans(db: Session, user: User) -> dict[str, Any]:
+    items = []
+    total = Decimal(0)
+    for loan in loans.list_loans(db, user):
+        info = loans.summary(db, loan)
+        total += info["balance"]
+        detail = f"{info['paid_installments']}/{loan.installments} parcelas pagas"
+        if info["next_payment"] is not None and info["next_due"]:
+            detail += f" · próxima {brl(info['next_payment'])} em {_short_date(info['next_due'])}"
+        items.append(
+            {
+                "label": loan.name,
+                "detail": detail,
+                "value": brl(info["balance"]),
+                "link": "/dividas",
+            }
+        )
+    for debt in db.scalars(select(OtherDebt).where(OtherDebt.user_id == user.id)):
+        total += debt.balance
+        items.append(
+            {
+                "label": debt.name,
+                "detail": "outra dívida",
+                "value": brl(debt.balance),
+                "link": "/dividas",
+            }
+        )
+    if not items:
+        return _answer(
+            "loans",
+            "Você não tem financiamentos nem dívidas cadastradas.",
+            links=[{"label": "Abrir dívidas", "to": "/dividas"}],
+        )
+    return _answer(
+        "loans",
+        f"O saldo devedor é de {brl(total)} em {_plural(len(items), 'contrato', 'contratos')}.",
+        items=items[:6],
+        links=[{"label": "Abrir dívidas", "to": "/dividas"}],
+    )
+
+
+def _recurring(db: Session, user: User, current: date, only_subscriptions: bool) -> dict[str, Any]:
+    names = _category_names(db, user)
+    rows = [
+        r
+        for r in db.scalars(
+            select(RecurringItem).where(
+                RecurringItem.user_id == user.id, RecurringItem.kind == "expense"
+            )
+        )
+        if budget.active_in(r, current) or (r.end_month is None or r.end_month >= current)
+    ]
+    if only_subscriptions:
+        subs = [
+            r
+            for r in rows
+            if normalize(names.get(r.category_id, "")) == "assinaturas"
+            or keyword_category(r.description) == "Assinaturas"
+            or re.search(_SUBSCRIPTION, normalize(r.description))
+        ]  # type: ignore[arg-type]
+        rows = subs
+    label = "assinaturas" if only_subscriptions else "despesas fixas"
+    if not rows:
+        return _answer(
+            "recurring",
+            f"Não encontrei {label} nas recorrências.",
+            links=[{"label": "Abrir recorrências", "to": "/ajustes/recorrencias"}],
+        )
+    monthly = sum((r.amount / max(r.interval_months or 1, 1) for r in rows), Decimal(0))
+    rows.sort(key=lambda r: -r.amount)
+    items = [
+        {
+            "label": r.description,
+            "detail": " · ".join(
+                x
+                for x in (
+                    names.get(r.category_id) if r.category_id else None,
+                    f"dia {r.due_day}" if r.due_day else None,
+                    None if (r.interval_months or 1) == 1 else f"a cada {r.interval_months} meses",
+                )
+                if x
+            ),
+            "value": brl(r.amount),
+            "link": "/ajustes/recorrencias",
+        }
+        for r in rows[:8]
+    ]
+    return _answer(
+        "recurring",
+        f"Você tem {len(rows)} {label}, somando {brl(monthly)} por mês.",
+        items=items,
+        links=[{"label": "Abrir recorrências", "to": "/ajustes/recorrencias"}],
+    )
+
+
+def _investments(db: Session, user: User) -> dict[str, Any]:
+    rows = list(db.scalars(select(Investment).where(Investment.user_id == user.id)))
+    if not rows:
+        return _answer(
+            "investments",
+            "Você ainda não cadastrou investimentos.",
+            links=[{"label": "Abrir investimentos", "to": "/investimentos"}],
+        )
+    invested = sum((r.invested_amount for r in rows), Decimal(0))
+    value = sum((r.current_value for r in rows), Decimal(0))
+    gain = value - invested
+    pct = f" ({gain / invested * 100:+.1f}%)".replace(".", ",") if invested else ""
+    rows.sort(key=lambda r: -r.current_value)
+    return _answer(
+        "investments",
+        f"Você tem {brl(value)} investidos (aplicou {brl(invested)}). O resultado é de {'−' if gain < 0 else '+'}{brl(gain)}{pct}.",
+        items=[
+            {
+                "label": r.name,
+                "detail": r.institution,
+                "value": brl(r.current_value),
+                "link": "/investimentos",
+            }
+            for r in rows[:6]
+        ],
+        links=[{"label": "Abrir investimentos", "to": "/investimentos"}],
+    )
+
+
+def _salary(db: Session, user: User, period: Period) -> dict[str, Any]:
+    rows = list(
+        db.scalars(
+            select(Income).where(
+                Income.user_id == user.id, Income.month.between(period.start, period.end)
+            )
+        )
+    )
+    named = [i for i in rows if "salario" in normalize(i.description)]
+    fixed = named or [i for i in rows if i.income_type != "variable"]
+    if not fixed:
+        return _incomes(db, user, period)
+    top = max(fixed, key=lambda i: i.amount)
+    day = f", no dia {top.day}" if top.day else ""
+    return _answer(
+        "salary",
+        f"{_cap(period.label)}, {top.description} foi de {brl(top.amount)}{day}.",
+        items=[
+            {
+                "label": i.description,
+                "detail": f"dia {i.day}" if i.day else None,
+                "value": brl(i.amount),
+                "link": None,
+            }
+            for i in sorted(fixed, key=lambda i: -i.amount)[:5]
+        ],
+    )
+
+
+def _last_income(db: Session, user: User, current: date) -> dict[str, Any]:
+    rows = list(
+        db.scalars(
+            select(Income)
+            .where(Income.user_id == user.id, Income.month <= current)
+            .order_by(Income.month.desc(), Income.created_at.desc())
+            .limit(40)
+        )
+    )
+    if not rows:
+        return _answer(
+            "empty",
+            "Ainda não há receitas lançadas.",
+            links=[{"label": "Lançar receita", "to": "/orcamento"}],
+        )
+
+    def when(i: Income) -> date:
+        return with_day(i.month, i.day) if i.day else i.month
+
+    today = today_local()
+    rows = [i for i in rows if when(i) <= today] or rows
+    rows.sort(key=lambda i: (when(i), i.created_at), reverse=True)
+    last = rows[0]
+    return _answer(
+        "last_income",
+        f"A última receita foi {last.description}, {brl(last.amount)} em {_short_date(when(last))}.",
+        items=[
+            {
+                "label": i.description,
+                "detail": _short_date(when(i)),
+                "value": brl(i.amount),
+                "link": f"/orcamento/{format_month(i.month)}",
+            }
+            for i in rows[:3]
+        ],
+    )
+
+
+def _average(
+    db: Session, user: User, period: Period, subject: Subject | None, current: date
+) -> dict[str, Any]:
+    if period.single and not period.explicit:
+        period = Period(
+            add_months(current, -6), add_months(current, -1), "nos últimos 6 meses fechados", False
+        )
+    rows = _expenses(db, user, period, subject)
+    if not rows:
+        return _nothing(period, subject)
+    totals: dict[date, Decimal] = defaultdict(Decimal)
+    for e in rows:
+        totals[e.month] += e.amount
+    total = sum(totals.values(), Decimal(0))
+    about = f" com {subject.label}" if subject else ""
+    ranking = sorted(totals.items())
+    return _answer(
+        "average",
+        f"{_cap(period.label)} você gastou em média {brl(total / len(totals))} por mês{about} ({brl(total)} em {_plural(len(totals), 'mês', 'meses')} com gasto).",
+        items=[
+            {
+                "label": _cap(_month_name(m)),
+                "detail": None,
+                "value": brl(v),
+                "link": f"/orcamento/{format_month(m)}",
+            }
+            for m, v in ranking[-6:]
+        ],
+    )
+
+
+def _compare(
+    db: Session, user: User, a: Period, b: Period, subject: Subject | None
+) -> dict[str, Any]:
+    rows_a, rows_b = _expenses(db, user, a, subject), _expenses(db, user, b, subject)
+    total_a = sum((e.amount for e in rows_a), Decimal(0))
+    total_b = sum((e.amount for e in rows_b), Decimal(0))
+    names = _category_names(db, user)
+
+    def by_category(rows: list[Expense]) -> dict[str, Decimal]:
+        out: dict[str, Decimal] = defaultdict(Decimal)
+        for e in rows:
+            out[
+                names.get(e.category_id, "Sem categoria") if e.category_id else "Sem categoria"
+            ] += e.amount
+        return out
+
+    cats_a, cats_b = by_category(rows_a), by_category(rows_b)
+    diff = total_a - total_b
+    about = f" com {subject.label}" if subject else ""
+    if not rows_a and not rows_b:
+        return _nothing(a, subject)
+    if diff == 0:
+        verdict = "o mesmo valor"
+    else:
+        pct = f" ({abs(diff) / total_b * 100:.0f}%)" if total_b else ""
+        verdict = f"{brl(diff)}{pct} {'a mais' if diff > 0 else 'a menos'}"
+    changes = sorted(
+        (
+            (c, cats_a.get(c, Decimal(0)) - cats_b.get(c, Decimal(0)))
+            for c in set(cats_a) | set(cats_b)
+        ),
+        key=lambda kv: -abs(kv[1]),
+    )
+    items = [
+        {
+            "label": c,
+            "detail": f"{brl(cats_b.get(c, Decimal(0)))} → {brl(cats_a.get(c, Decimal(0)))}",
+            "value": ("+" if d > 0 else "−") + brl(d),
+            "link": None,
+        }
+        for c, d in changes[:5]
+        if d != 0
+    ]
+    text = f"{_cap(a.label)} você gastou {brl(total_a)}{about}; {b.label}, {brl(total_b)}. Foram {verdict}."
+    if items and subject is None:
+        up = next(((c, d) for c, d in changes if d > 0), None)
+        if up:
+            text += f" O que mais subiu foi {up[0]} (+{brl(up[1])})."
+    return _answer(
+        "compare",
+        text,
+        items=[] if subject else items,
+        links=[{"label": "Comparar meses nos Insights", "to": "/analises?secao=comparar"}],
+    )
+
+
+def _logged(db: Session, user: User, period: Period) -> dict[str, Any]:
+    zone = ZoneInfo(get_settings().timezone)
+    first, last = period.day_start, period.day_end
+    assert first is not None and last is not None
+    since = datetime.combine(first, datetime.min.time(), zone)
+    until = datetime.combine(last + timedelta(days=1), datetime.min.time(), zone)
+    names = _category_names(db, user)
+    expenses = list(
+        db.scalars(
+            select(Expense)
+            .where(
+                Expense.user_id == user.id, Expense.created_at >= since, Expense.created_at < until
+            )
+            .order_by(Expense.created_at.desc())
+            .limit(500)
+        )
+    )
+    incomes = list(
+        db.scalars(
+            select(Income)
+            .where(Income.user_id == user.id, Income.created_at >= since, Income.created_at < until)
+            .order_by(Income.created_at.desc())
+            .limit(20)
+        )
+    )
+    if not expenses and not incomes:
+        return _answer(
+            "logged",
+            f"Nada foi lançado {period.label}.",
+            links=[{"label": "Lançar agora", "to": "/orcamento"}],
+        )
+    parts = []
+    if expenses:
+        parts.append(
+            f"{_plural(len(expenses), 'despesa', 'despesas')} ({brl(sum((e.amount for e in expenses), Decimal(0)))})"
+        )
+    if incomes:
+        parts.append(
+            f"{_plural(len(incomes), 'receita', 'receitas')} ({brl(sum((i.amount for i in incomes), Decimal(0)))})"
+        )
+    items = [_item(e, names) for e in expenses[:6]] + [
+        {
+            "label": i.description,
+            "detail": "receita",
+            "value": brl(i.amount),
+            "link": f"/orcamento/{format_month(i.month)}",
+        }
+        for i in incomes[:3]
+    ]
+    return _answer("logged", f"{_cap(period.label)} você lançou {' e '.join(parts)}.", items=items)
+
+
 # ---------------------------------------------------------------- pergunta
 
+_SUBSCRIPTION = r"assinatura|streaming|netflix|spotify|prime|disney|hbo|max\b|youtube|icloud|google one|globoplay|deezer|apple|plano|mensalidade|academia|clube"
 
-def answer(db: Session, user: User, question: str, today: date | None = None) -> dict[str, Any]:
-    today = today or today_local()
-    current = month_of(today, user.month_start_day)
-    text = normalize(question[:MAX_QUESTION]).replace("?", " ").replace("!", " ")
-    text = re.sub(r"\s+", " ", text).strip()
-    if not text or re.fullmatch(
-        r"(oi|ola|ajuda|bom dia|boa tarde|boa noite|o que voce faz|e ai)", text
+EXAMPLES = [
+    *SUGGESTIONS,
+    "Qual foi meu maior lançamento?",
+    "Quanto gastei hoje?",
+    "Quanto gastei esta semana?",
+    "Quanto gasto por mês em média?",
+    "Quanto posso gastar hoje?",
+    "Tenho alguma conta atrasada?",
+    "Qual fatura vence primeiro?",
+    "Quantas parcelas faltam?",
+    "Quanto devo de financiamento?",
+    "Quais assinaturas eu tenho?",
+    "Quais são minhas despesas fixas?",
+    "Comparar outubro com setembro",
+    "Quanto tenho investido?",
+    "Quanto falta para minha meta?",
+    "Qual meu salário?",
+    "Qual foi minha última receita?",
+    "Quanto sobrou este mês?",
+    "O que lancei hoje?",
+]
+_NEEDS_SUBJECT = {
+    "month_max",
+    "last",
+    "biggest",
+    "sum",
+    "average",
+    "installments",
+    "compare",
+    "top",
+}
+_SPEND = r"\bsaiu\b|\bsairam\b|\bgast|\bpague|\bdespes|\bcompr|\blancament|\bsaid[ao]s?\b|\bdebit"
+
+
+def _classify(text: str, rest: str, two_periods: bool) -> str | None:
+    spends = re.search(_SPEND, text) is not None
+    if re.fullmatch(
+        r"(muito )?(obrigad[oa]|valeu|vlw|brigad[oa]|show|perfeito|otimo|legal|ok|tchau|ate mais)( mesmo| demais)?",
+        text,
     ):
-        return _answer(
-            "help",
-            "Pergunte sobre os seus lançamentos: gastos por categoria ou lugar, meses, vencimentos, cartões, receitas e metas. "
-            "Também mostro onde fica cada coisa no site.",
-            suggestions=SUGGESTIONS,
-        )
-
-    period, rest = _parse_period(text, current)
-    spends = re.search(r"\bgast|\bpague|\bdespes|\bcompr", text) is not None
-
-    def subject() -> tuple[Subject | None, str | None]:
-        return _resolve_subject(db, user, rest)
-
-    def unknown(term: str) -> dict[str, Any]:
-        return _answer(
-            "unknown_subject",
-            f"Não achei nenhuma categoria ou lançamento com “{term}”.",
-            links=[{"label": "Ver categorias", "to": "/ajustes/categorias"}],
-            suggestions=["O que mais gastei este mês?"],
-        )
-
-    # "Onde encontro…" / "Como faço…" (antes de "onde mais gastei", que é sobre gastos).
+        return "thanks"
     status = re.match(r"como (esta|estao|anda|andam|vai|vao|foi|foram|fiquei|ficou)\b", text)
     if (
         re.match(r"(onde|como|aonde|cade|em que tela|qual tela|tem como)\b", text)
         and not spends
         and not status
     ):
-        found = _navigate(rest)
-        if found:
-            return found
-        return _answer(
-            "navigate",
-            "Não achei esse lugar. Estes são os mais procurados:",
-            links=[
-                {"label": label, "to": path}
-                for label, path, _ in PLACES[:1] + PLACES[11:13] + PLACES[18:19]
-            ],
-            suggestions=["Onde encontro as metas?", "Como exporto meus dados?"],
-        )
-
+        return "navigate"
+    if two_periods or re.search(
+        r"\bcompar|\bversus\b|\bvs\b|\b x \b|\bmais\b.*\b(que|do que)\b.*\b(mes|ano|semana)\b", text
+    ):
+        return "compare"
     if re.search(r"\bqual (o )?mes\b|\bmes (em )?que\b|\bmes mais\b|\bem que mes\b", text) and (
         spends or "mais car" in text
     ):
-        found, missing = subject()
-        if missing:
-            return unknown(missing)
-        return _month_max(db, user, period or _this_year(current), found)
-
-    if re.search(r"\bultim[oa]s? (vez|compra|gasto|despesa|lancamento|pagamento)", rest):
-        found, missing = subject()
-        if missing:
-            return unknown(missing)
-        return _last(db, user, found)
-
-    if text.startswith("quando") or re.search(
-        r"\bmaior(es)? (gasto|despesa|compra|valor)|\bmais (car|alt)[oa]s?\b", text
+        return "month_max"
+    if re.search(r"\bmeta|\bobjetivo|\bfalta\w* (para|pra)\b", text) and not re.search(
+        r"\bparcela", text
     ):
-        found, missing = subject()
-        if missing:
-            return unknown(missing)
-        return _biggest(db, user, period or _last_year(current), found)
-
-    if re.search(r"\bvenc|\ba pagar\b|\bpendente|\batrasad|\bpra pagar\b|\bpara pagar\b", text):
-        return _due(db, user, today)
-    if re.search(r"\bcarto|\bcartao|\bfatura|\blimite\b", text):
-        return _cards(db, user, today)
-    if re.search(r"\bmeta|\bobjetivo", text):
-        return _goals(db, user)
-    if re.search(r"\brecebi|\brenda|\breceita|\bsalario|\bganhei|\bentrou|\bentrada", text):
-        return _incomes(db, user, period or _this_month(current))
-    if re.search(r"\bsaldo|\bsobr|\bresultado|\bbalanco|\bfechei|\bfaltou|\bfiquei\b", text):
-        return _balance(db, user, period or _this_month(current))
-
-    found, missing = subject()
+        return "goals"
+    if re.search(r"\bparcela", text):
+        return "installments"
+    if (
+        re.search(r"\bfinanciament|\bemprestimo|\bdivida|\bsaldo devedor|\bdevo\b", text)
+        and not re.search(r"\bcart[ao]", text)
+        and not re.search(r"\bquanto (eu )?(gastei|paguei)\b", text)
+    ):
+        return "loans"
+    if re.search(r"\binvest|\baplicad|\baplicac|\brendimento", text):
+        return "investments"
+    if re.search(r"\bassinatura|\bfixas?\b|\brecorren|\bmensalidade", text) and not re.search(
+        r"\bquanto (eu )?(gastei|paguei)\b", text
+    ):
+        return "subscriptions" if "assinatura" in text else "recurring"
     if re.search(
-        r"\bmais gast|\bgast\w* mais\b|\bonde mais\b|\bcom o que\b|\bo que mais\b|\bpesou\b|\bpesa mais\b",
+        r"\bposso gastar|\bdisponivel|\b(tenho|sobra|resta|restou) (pra|para) gastar|\bainda (tenho|posso)\b|\blivre\b",
         text,
     ):
-        if found is not None:
-            return _biggest(db, user, period or _this_month(current), found)
-        return _top_categories(db, user, period or _this_month(current))
-    if missing and (spends or text.startswith("quanto")):
-        return unknown(missing)
-    if spends or text.startswith("quanto") or found is not None:
-        return _sum(db, user, period or _this_month(current), found)
+        return "can_spend"
+    if re.search(r"\bultim[oa]s? (receita|salario|entrada|recebimento|renda)", rest):
+        return "last_income"
+    if re.search(r"\bsalario", text):
+        return "salary"
+    if re.search(r"\bultim[oa]s? (vez|compra|gasto|despesa|lancamento|pagamento|saida)", rest):
+        return "last"
+    if re.search(r"\blancei|\bregistrei|\bcadastrei|\blancad[oa]s?\b|\bo que (eu )?lanc", text):
+        return "logged"
+    if re.search(r"\bmedia\b|\bem media\b|\bmedi[oa] (por|de)\b|\bpor mes\b", text):
+        return "average"
+    if re.search(r"\bfatura", text) and not re.search(r"\bquanto (eu )?(gastei|paguei)\b", text):
+        return "invoices"
+    if text.startswith("quando") or re.search(
+        r"\bmaior(es)? (gasto|despesa|compra|valor|lancamento|conta|saida|debito)|\bmais (car|alt)[oa]s?\b|\b(gasto|despesa|compra|lancamento)s? mais (car|alt)",
+        text,
+    ):
+        return "biggest"
+    if re.search(r"\batrasad|\bvencid|\bem atraso", text):
+        return "late"
+    if (
+        re.search(r"\bvenc|\ba pagar\b|\bpendente|\bpra pagar\b|\bpara pagar\b", text)
+        and "fatura" not in text
+    ):
+        return "due"
+    if re.search(r"\bfatura", text):
+        return "invoices"
+    if re.search(r"\bcarto|\bcartao|\blimite\b", text):
+        return "cards"
+    if re.search(r"\bmeta|\bobjetivo", text):
+        return "goals"
+    if re.search(r"\brecebi|\brenda|\breceita|\bganhei|\bentrou|\bentrada", text):
+        return "incomes"
+    if re.search(
+        r"\bsaldo|\bsobr|\bresultado|\bbalanco|\bfechei|\bfaltou|\bfiquei\b|\beconom|\bpoupei|\bguardei",
+        text,
+    ):
+        return "balance"
+    if re.search(
+        r"\bmais gast|\bgast\w* mais\b|\bonde mais\b|\bcom o que\b|\bo que mais\b|\bpesou\b|\bpesa mais\b|\bem que (eu )?gast|\bcategoria\b.*\bmais\b",
+        text,
+    ):
+        return "top"
+    if spends or text.startswith("quanto"):
+        return "sum"
+    return None
 
-    found_place = _navigate(text)
-    if found_place:
-        return found_place
-    return _answer(
-        "fallback",
-        "Não entendi essa. Tente perguntar assim:",
-        suggestions=SUGGESTIONS[:5],
+
+def _suggest_close(text: str) -> list[str]:
+    table = {normalize(e).rstrip("?"): e for e in EXAMPLES}
+    close = difflib.get_close_matches(text, list(table), n=4, cutoff=0.45)
+    words = set(_subject_words(text)) | set(text.split())
+    by_word = [e for k, e in table.items() if len(words & set(k.split())) >= 2]
+    out = [table[k] for k in close] + [e for e in by_word if e not in [table[k] for k in close]]
+    return (out or SUGGESTIONS)[:5]
+
+
+def answer(
+    db: Session,
+    user: User,
+    question: str,
+    today: date | None = None,
+    context: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Responde a pergunta. `context` é o campo `context` da resposta anterior da conversa:
+    com ele, "e em setembro?" ou "e com uber?" continuam o assunto."""
+    today = today or today_local()
+    current = month_of(today, user.month_start_day)
+    text = _plain(question[:MAX_QUESTION])
+    text = re.sub(r"[?!.,;:]+", " ", text)
+    text = re.sub(r"\s+", " ", text).strip()
+    if not text or re.fullmatch(
+        r"(oi+|ola|opa|ajuda|bom dia|boa tarde|boa noite|o que voce (faz|sabe)|e ai|menu|help)",
+        text,
+    ):
+        return _answer(
+            "help",
+            "Pergunte sobre os seus lançamentos: gastos por categoria ou lugar, períodos (hoje, semana, mês, ano), vencimentos, "
+            "faturas, parcelas, financiamentos, assinaturas, receitas, metas e investimentos. Também mostro onde fica cada coisa no site.",
+            suggestions=SUGGESTIONS,
+        )
+
+    start_day = user.month_start_day
+    period, rest = _parse_period(text, current, today, start_day)
+    second: Period | None = None
+    if period is not None:
+        second, rest2 = _parse_period(rest, current, today, start_day)
+        if second is not None:
+            rest = rest2
+    intent = _classify(text, rest, second is not None)
+
+    # Continuação: "e em setembro?", "e com uber?", "e ontem?".
+    previous = context if isinstance(context, dict) else None
+    follow = previous is not None and re.match(r"e\b", text) is not None
+    subject_text = re.sub(r"^e\b", " ", rest).strip() if follow else rest
+    if follow and previous:
+        own_subject = bool(_subject_words(subject_text))
+        if intent in (None, "sum", "navigate") and previous.get("intent"):
+            intent = str(previous["intent"])
+        if period is None:
+            period = Period.load(previous.get("period"))
+        if not own_subject and previous.get("subject"):
+            subject_text = str(previous["subject"])[:80]
+
+    found: Subject | None = None
+    missing: str | None = None
+    if intent is None or intent in _NEEDS_SUBJECT:
+        found, missing = _resolve_subject(db, user, subject_text)
+
+    def finish(out: dict[str, Any], key: str | None) -> dict[str, Any]:
+        out["context"] = {
+            "intent": key,
+            "subject": subject_text if found is not None else None,
+            "period": period.dump() if period else None,
+        }
+        return out
+
+    def unknown(term: str) -> dict[str, Any]:
+        return _answer(
+            "unknown_subject",
+            f"Não achei nenhuma categoria ou lançamento com “{term}”.",
+            links=[{"label": "Ver categorias", "to": "/ajustes/categorias"}],
+            suggestions=_suggest_close(text),
+        )
+
+    month = period or _this_month(current)
+
+    if intent == "thanks":
+        return finish(
+            _answer(
+                "thanks", "Por nada! Se quiser, pergunte outra coisa.", suggestions=SUGGESTIONS[:3]
+            ),
+            None,
+        )
+    if intent == "navigate":
+        place = _navigate(rest)
+        if place:
+            return finish(place, None)
+        return finish(
+            _answer(
+                "navigate",
+                "Não achei esse lugar. Estes são os mais procurados:",
+                links=[
+                    {"label": label, "to": path}
+                    for label, path, _ in PLACES[:1] + PLACES[11:13] + PLACES[18:19]
+                ],
+                suggestions=["Onde encontro as metas?", "Como exporto meus dados?"],
+            ),
+            None,
+        )
+    if intent in ("late", "due"):
+        return finish(_due(db, user, today, only_late=intent == "late"), intent)
+    if intent == "invoices":
+        return finish(_invoices(db, user, today), intent)
+    if intent == "cards":
+        return finish(_cards(db, user, today), intent)
+    if intent == "goals":
+        return finish(_goals(db, user, today), intent)
+    if intent == "loans":
+        return finish(_loans(db, user), intent)
+    if intent in ("recurring", "subscriptions"):
+        return finish(_recurring(db, user, current, intent == "subscriptions"), intent)
+    if intent == "investments":
+        return finish(_investments(db, user), intent)
+    if intent == "can_spend":
+        return finish(_can_spend(db, user, today, current), intent)
+    if intent == "salary":
+        return finish(_salary(db, user, month), intent)
+    if intent == "last_income":
+        return finish(_last_income(db, user, current), intent)
+    if intent == "incomes":
+        return finish(_incomes(db, user, month), intent)
+    if intent == "balance":
+        return finish(_balance(db, user, month), intent)
+    if intent == "logged":
+        days = period if period and period.day_start else _days(today, today, "hoje", start_day)
+        return finish(_logged(db, user, days), intent)
+
+    if intent in _NEEDS_SUBJECT and missing and intent != "top":
+        return finish(unknown(missing), intent)
+    if intent == "compare":
+        first = period or _this_month(current)
+        if second is None:
+            if first.day_start and first.day_end:
+                span = (first.day_end - first.day_start).days + 1
+                second = _days(
+                    first.day_start - timedelta(days=span),
+                    first.day_start - timedelta(days=1),
+                    "no período anterior",
+                    start_day,
+                )
+            elif first.single:
+                before = add_months(first.start, -1)
+                second = Period(before, before, f"em {_month_name(before)}")
+            else:
+                months = (
+                    (first.end.year - first.start.year) * 12
+                    + first.end.month
+                    - first.start.month
+                    + 1
+                )
+                second = Period(
+                    add_months(first.start, -months),
+                    add_months(first.start, -1),
+                    "no período anterior",
+                )
+        if second.start > first.start or (
+            second.day_start and first.day_start and second.day_start > first.day_start
+        ):
+            first, second = second, first  # o mais recente primeiro: "X a mais que antes"
+        return finish(_compare(db, user, first, second, found), intent)
+    if intent == "month_max":
+        return finish(_month_max(db, user, period or _this_year(current), found), intent)
+    if intent == "installments":
+        return finish(_installments(db, user, current, found), intent)
+    if intent == "last":
+        return finish(_last(db, user, found), intent)
+    if intent == "average":
+        return finish(_average(db, user, month, found, current), intent)
+    if intent == "biggest":
+        default = (
+            _this_month(current)
+            if re.search(r"\blancament", text) and not text.startswith("quando")
+            else _last_year(current)
+        )
+        return finish(_biggest(db, user, period or default, found), intent)
+    if intent == "top":
+        if found is not None:
+            return finish(_biggest(db, user, month, found), "biggest")
+        return finish(_top_categories(db, user, month), intent)
+    if intent == "sum":
+        return finish(_sum(db, user, month, found), intent)
+
+    # Nada reconhecido: um assunto solto ("uber"), um lugar do site ou sugestões parecidas.
+    if found is not None:
+        return finish(_sum(db, user, month, found), "sum")
+    place = _navigate(text)
+    if place:
+        return finish(place, None)
+    return finish(
+        _answer("fallback", "Não entendi essa. Você quis dizer:", suggestions=_suggest_close(text)),
+        None,
     )

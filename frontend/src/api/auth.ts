@@ -18,6 +18,8 @@ export type User = {
   accent?: AccentName | null;
   /** v1.6: estilo visual. */
   style?: StyleName | null;
+  /** v1.7.5: guardar o histórico do Tire sua dúvida (30 dias). */
+  ask_history?: boolean;
   /** v1.3: cartões do Orçamento (JSON); null = padrão. */
   dashboard?: string | null;
   /** v1.4: chave Pix e MEI. */

@@ -1,4 +1,6 @@
 import uuid
+from datetime import datetime
+from decimal import Decimal
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Query, status
@@ -6,7 +8,7 @@ from pydantic import BaseModel, Field
 
 from app.api.budget import _changes
 from app.api.deps import CurrentUser, DbSession
-from app.core.months import current_month, format_month, parse_month
+from app.core.months import current_month, format_month, parse_month, today_local
 from app.schemas.analysis import (
     AnalysisConfig,
     CompareOut,
@@ -25,7 +27,7 @@ from app.schemas.analysis import (
     SeriesOut,
     TrendsOut,
 )
-from app.services import analysis, ask, indicators, insights, investments, series
+from app.services import analysis, ask, ask_history, indicators, insights, investments, series
 
 router = APIRouter(tags=["análises"])
 
@@ -42,6 +44,28 @@ def overview(user: CurrentUser, db: DbSession, month: str | None = None) -> Over
         score=ScoreOut.model_validate(analysis.score(db, user, target)),
         rule=RuleOut.model_validate(analysis.rule_50_30_20(db, user, target)),
     )
+
+
+class PeriodCategory(BaseModel):
+    category_id: uuid.UUID | None
+    total: Decimal
+
+
+class PeriodsOut(BaseModel):
+    today: Decimal
+    week: Decimal
+    month: Decimal
+    year: Decimal
+    previous: Decimal
+    previous_same_days: Decimal
+    previous_by_category: list[PeriodCategory]
+
+
+@router.get("/analysis/periods")
+def periods(user: CurrentUser, db: DbSession, month: str | None = None) -> PeriodsOut:
+    """Gastos de hoje, da semana, do mês e do ano, e o mesmo trecho do mês anterior (v1.7.5)."""
+    target = parse_month(month) if month else current_month(user.month_start_day)
+    return PeriodsOut.model_validate(analysis.periods(db, user, target, today_local()))
 
 
 @router.get("/analysis/compare")
@@ -224,6 +248,10 @@ def set_targets(body: TargetsIn, user: CurrentUser, db: DbSession) -> dict[str, 
 
 class AskIn(BaseModel):
     question: str = Field(min_length=1, max_length=200)
+    # Continua uma conversa guardada (o servidor usa a resposta anterior como contexto).
+    conversation_id: uuid.UUID | None = None
+    # Com o histórico desligado, o navegador devolve o `context` da resposta anterior.
+    context: dict[str, Any] | None = None
 
 
 class AskItem(BaseModel):
@@ -244,9 +272,69 @@ class AskOut(BaseModel):
     items: list[AskItem]
     links: list[AskLink]
     suggestions: list[str]
+    context: dict[str, Any] | None = None
+    conversation_id: uuid.UUID | None = None
+
+
+class AskConversationOut(BaseModel):
+    model_config = {"from_attributes": True}
+
+    id: uuid.UUID
+    title: str
+    updated_at: datetime
+
+
+class AskMessageOut(BaseModel):
+    id: uuid.UUID
+    question: str
+    answer: AskOut
+    created_at: datetime
+
+
+class AskSettingsIn(BaseModel):
+    history: bool
 
 
 @router.post("/ask")
 def ask_question(body: AskIn, user: CurrentUser, db: DbSession) -> AskOut:
-    """Responde perguntas sobre os próprios dados por regras locais (a pergunta não é guardada)."""
-    return AskOut.model_validate(ask.answer(db, user, body.question))
+    """Responde perguntas sobre os próprios dados por regras locais, sem serviço externo. Com o
+    histórico ligado (padrão), a conversa fica guardada na conta por 30 dias."""
+    context = body.context
+    if body.conversation_id is not None and user.ask_history:
+        context = ask_history.last_context(db, user, body.conversation_id) or context
+    out = ask.answer(db, user, body.question, context=context)
+    out["conversation_id"] = ask_history.record(
+        db, user, body.conversation_id if user.ask_history else None, body.question, out
+    )
+    return AskOut.model_validate(out)
+
+
+@router.get("/ask/conversations")
+def ask_conversations(user: CurrentUser, db: DbSession) -> list[AskConversationOut]:
+    return [AskConversationOut.model_validate(c) for c in ask_history.conversations(db, user)]
+
+
+@router.get("/ask/conversations/{conversation_id}")
+def ask_conversation(
+    conversation_id: uuid.UUID, user: CurrentUser, db: DbSession
+) -> list[AskMessageOut]:
+    return [
+        AskMessageOut.model_validate(m) for m in ask_history.messages(db, user, conversation_id)
+    ]
+
+
+@router.delete("/ask/conversations/{conversation_id}", status_code=status.HTTP_204_NO_CONTENT)
+def ask_conversation_delete(conversation_id: uuid.UUID, user: CurrentUser, db: DbSession) -> None:
+    ask_history.remove(db, user, conversation_id)
+
+
+@router.delete("/ask/conversations", status_code=status.HTTP_204_NO_CONTENT)
+def ask_conversations_delete(user: CurrentUser, db: DbSession) -> None:
+    ask_history.remove(db, user)
+
+
+@router.patch("/ask/settings")
+def ask_settings(body: AskSettingsIn, user: CurrentUser, db: DbSession) -> AskSettingsIn:
+    """Liga ou desliga o histórico. Desligar apaga na hora as conversas guardadas."""
+    ask_history.set_enabled(db, user, body.history)
+    return AskSettingsIn(history=user.ask_history)

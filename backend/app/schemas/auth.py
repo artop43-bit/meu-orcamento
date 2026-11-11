@@ -29,6 +29,8 @@ class UserOut(BaseModel):
     accent: str | None = None
     # v1.6: estilo visual ("padrao" ou "glass").
     style: str | None = None
+    # v1.7.5: guardar o histórico do Tire sua dúvida.
+    ask_history: bool = True
     # v1.0: dia em que começa o mês financeiro.
     month_start_day: int = 1
     # v1.3: cartões do Orçamento (ordem e visibilidade), em JSON; None = padrão.

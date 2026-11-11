@@ -3,15 +3,16 @@
  * do changelog (pasta changelog/), que tem a mesma versão, data e hora.
  */
 export const RELEASE = {
-  version: "1.7.0",
+  version: "1.7.5",
   // Data e hora (Brasília) em que o update foi publicado.
-  releasedAt: "2026-11-10T11:00:00-03:00",
+  releasedAt: "2026-11-11T00:15:00-03:00",
 };
 
 /** Mostrado uma vez em "Novidades" depois do update (curto: o detalhe fica no changelog). */
 export const RELEASE_NOTES: { title: string; text: string }[] = [
-  { title: "Painel mais leve.", text: "As mesmas informações do Orçamento num resumo só, com os avisos reunidos numa faixa." },
-  { title: "Tire sua dúvida.", text: "Em Insights, pergunte “o que mais gastei este mês?” e outras sobre os seus lançamentos." },
+  { title: "Painel vivo.", text: "Saudação com o resumo de agora, linha do mês com os vencimentos e avisos num formato só." },
+  { title: "Menu recolhível.", text: "Recolha o menu lateral para ganhar espaço (botão ao lado do logo ou Ctrl+B)." },
+  { title: "Tire sua dúvida lembra.", text: "Entende mais perguntas, continua a conversa e guarda o histórico por 30 dias." },
 ];
 
 export function releaseLabel(): string {

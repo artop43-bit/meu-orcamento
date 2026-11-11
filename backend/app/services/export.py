@@ -356,7 +356,14 @@ def backup(db: Session, user: User) -> dict[str, Any]:
         "other_debts": _rows(db, OtherDebt, user),
         "splits": _rows(db, SplitShare, user),
         "support_requests": _support(db, user),
+        "ask_conversations": _ask(db, user),
     }
+
+
+def _ask(db: Session, user: User) -> list[dict[str, Any]]:
+    from app.services import ask_history
+
+    return ask_history.export(db, user)
 
 
 def _support(db: Session, user: User) -> list[dict[str, Any]]:

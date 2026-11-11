@@ -1,9 +1,9 @@
 """Solicitações (conversas com a administração), arquivos de imagem e perfil."""
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 
-from sqlalchemy import ForeignKey, Index, Integer, LargeBinary, String, Text, Uuid
+from sqlalchemy import Date, ForeignKey, Index, Integer, LargeBinary, String, Text, Uuid
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -170,3 +170,47 @@ class ErrorEvent(Base):
     first_seen: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
     last_seen: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, index=True)
     resolved_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+
+
+class AskConversation(Base):
+    """Conversa do Tire sua dúvida (v1.7.5). Apagada 30 dias depois da última mensagem."""
+
+    __tablename__ = "ask_conversations"
+    __table_args__ = (Index("ix_ask_conversations_user_id_updated_at", "user_id", "updated_at"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    title: Mapped[str] = mapped_column(String(200))
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+
+
+class AskMessage(Base):
+    """Pergunta e resposta (a resposta em JSON, do jeito que foi mostrada)."""
+
+    __tablename__ = "ask_messages"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    conversation_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("ask_conversations.id", ondelete="CASCADE"), index=True
+    )
+    question: Mapped[str] = mapped_column(String(200))
+    answer: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+
+
+class PerfDaily(Base):
+    """Velocidade das telas com usuários reais (v1.7.5): só somas por dia e por tela.
+    Não guarda quem abriu, nem aparelho, nem endereço: é uma média anônima."""
+
+    __tablename__ = "perf_daily"
+
+    day: Mapped[date] = mapped_column(Date, primary_key=True)
+    screen: Mapped[str] = mapped_column(String(40), primary_key=True)
+    count: Mapped[int] = mapped_column(Integer, default=0)
+    total_ms: Mapped[int] = mapped_column(Integer, default=0)
+    max_ms: Mapped[int] = mapped_column(Integer, default=0)
+    # Aberturas acima de 2,5 s (o limite de "boa" do Core Web Vitals para o maior conteúdo).
+    slow: Mapped[int] = mapped_column(Integer, default=0)
+    # Pior quadro (travada) somado, para a média.
+    frame_ms: Mapped[int] = mapped_column(Integer, default=0)

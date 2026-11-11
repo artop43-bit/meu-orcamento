@@ -13,3 +13,13 @@ describe("boxWithin", () => {
     expect(boxWithin(rect(50, 10, 90, 40), rect(20, 10, 300, 48), 140, 0)).toEqual({ x: 170, y: 0, w: 90, h: 40 });
   });
 });
+
+describe("marcador elástico (v1.7.5)", () => {
+  it("no meio do caminho cobre do item antigo ao novo e termina no novo", async () => {
+    const { stretchFrames } = await import("./navIndicator");
+    const frames = stretchFrames({ x: 0, y: 0, w: 100, h: 40 }, { x: 0, y: 120, w: 100, h: 40 });
+    expect(frames[0]).toMatchObject({ transform: "translate3d(0px, 0px, 0)", height: "40px" });
+    expect(frames[1]).toMatchObject({ transform: "translate3d(0px, 0px, 0)", height: "160px", offset: 0.42 });
+    expect(frames[2]).toMatchObject({ transform: "translate3d(0px, 120px, 0)", height: "40px" });
+  });
+});

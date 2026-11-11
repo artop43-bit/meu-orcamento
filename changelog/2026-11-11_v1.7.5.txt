@@ -1,0 +1,63 @@
+MEU ORÇAMENTO · UPDATE LOG
+Versão 1.7.5 · Painel vivo, menu recolhível, Tire sua dúvida com histórico e site mais rápido
+Data: 11/11/2026 às 00:15 (horário de Brasília)
+
+Avisos e cartões clicáveis num padrão só
+- [x] Todo aviso do Orçamento tem o mesmo formato: traço lateral na cor do tom (vermelho, âmbar ou a cor de destaque), ícone, título, texto e seta quando há ação
+- [x] Aviso com ação: a linha inteira é clicável. "Plano para equilibrar o mês" abre pela linha (o botão "Ver o plano" saiu); "Resultado do mês" abre a análise; "Importados para revisar" abre a revisão
+- [x] Alertas que só informam (valor alto em lugar novo, gasto fora do padrão, assinatura mais cara, renovação) viraram linhas próprias, sem seta e sem reagir ao mouse
+- [x] Hover igual em todo cartão clicável: borda e brilho leves na cor de destaque; o traço lateral nunca some
+
+Painel do Orçamento
+- [x] Saudação com a data e o resumo de agora numa frase (saldo do mês, contas em atraso, o que vence em 7 dias e quando cai a próxima receita)
+- [x] Mini gráficos dos últimos 6 meses em Receitas, Despesas e Comprometimento
+- [x] Gastos de hoje, da semana, do mês e do ano, e a diferença para o mesmo trecho do mês anterior
+- [x] Linha do mês: do primeiro ao último dia, com receitas e vencimentos como paradas (pagas, a vencer, atrasadas) e um marcador animado até hoje; o que cai perto é agrupado
+- [x] Disponível hoje: controle deslizante para simular uma despesa, com o resultado na hora
+- [x] Para onde foi: barra clara com o mesmo trecho do mês anterior atrás de cada categoria e anel de essencial × não essencial
+
+Menu lateral recolhível (computador)
+- [x] Botão ao lado do logo e atalho Ctrl+B (⌘B no Mac) recolhem o menu para uma barra só de ícones
+- [x] Passar o mouse ou focar num ícone mostra o nome; Carteira, Planejamento e Análises abrem os subitens num painel ao lado
+- [x] Busca, ocultar valores, mensagens, perfil, tema e Sair continuam como ícones; contadores viram selos
+- [x] A escolha fica lembrada no aparelho; telas médias começam com o menu recolhido; no celular nada muda
+- [x] Contador de lançamentos para revisar no item Orçamento
+
+Tire sua dúvida, segunda versão
+- [x] Entende hoje, ontem, anteontem, esta semana, semana passada, últimos N dias, "dia 15" e "12/02"
+- [x] Novos assuntos: maior lançamento, média por mês, quanto posso gastar hoje, fatura de cada cartão (valor, fechamento, vencimento), parcelas que faltam, financiamentos e dívidas, assinaturas e despesas fixas, comparação entre dois períodos, investimentos, salário, última receita e o que foi lançado no dia
+- [x] Respostas específicas: "atrasadas" mostra só as vencidas; "quanto falta para a meta" traz o que falta e a previsão
+- [x] Continua a conversa: "e em setembro?", "e com uber?"
+- [x] Entende "obrigado" e, quando não entende a pergunta, sugere as mais parecidas
+- [x] "R$" sempre em maiúsculas
+- [x] Histórico: as conversas ficam na conta, com lista ao lado, "Nova conversa" e apagar uma ou todas; cada conversa some sozinha 30 dias depois da última mensagem
+- [x] Preferências › Privacidade: "Guardar histórico do Tire sua dúvida" (desligar apaga na hora o que estava guardado)
+- [x] As conversas entram no backup completo e no "Começar do zero" (junto das análises salvas); texto de Privacidade atualizado
+
+Mais ideias dos vídeos de referência
+- [x] Marcador do menu e das abas com efeito elástico (a borda da frente chega primeiro)
+- [x] Troca de tela com um desfoque curto (só no computador)
+- [x] Cartões em pilha, com a cor e o nome de cada um: tocar no de cima passa para o próximo, com fatura aberta, disponível e melhor dia ao lado
+- [x] Metas com trilha animada e marcos em 25, 50, 75 e 100%
+- [x] Insights › Categorias: período em pílulas (Este mês, Mês passado, 3 meses) e a visão por Lugares
+
+Desempenho
+- [x] Fonte Inter hospedada no próprio site (antes dependia de estar instalada no aparelho): o texto fica igual em todo lugar. Só o alfabeto latino das duas fontes
+- [x] Fotos enviadas (comprovantes, metas, perfil, prints) gravadas em WebP; as antigas continuam abrindo
+- [x] Imagens fora da tela só carregam quando chegam perto
+- [x] Índices novos para vencimentos e lançamentos do dia
+- [x] Velocidade das telas medida com usuários reais, só como média por tela e por dia (sem pessoa, aparelho ou endereço), em Administração › Erros
+- [x] Leitura de comprovante: aviso de que roda em segundo plano enquanto você preenche
+
+Correções
+- [x] Desfoque do menu no Liquid glass: no site publicado ele não aparecia no Chrome e no Firefox (o empacotamento descartava a regra padrão)
+- [x] Excluir e recarregar a página logo em seguida: em alguns casos a exclusão se perdia; agora o envio fica anotado no aparelho e é refeito na próxima abertura
+- [x] Horário da v1.7.0 nas notas da versão corrigido para 11:57
+
+Técnico
+- [x] Bateria de 165 perguntas reais nos testes do Tire sua dúvida, mais histórico, privacidade entre contas e expiração em 30 dias
+- [x] Teste que conta as consultas ao banco nas telas principais (não crescem com o número de lançamentos)
+- [x] Auditoria de cores passa o mouse em cada cartão com traço lateral e confere a regra "tem seta se e somente se é clicável"
+- [x] Teste de "celular básico" no CI (processador 4× mais lento e rede 3G)
+- [x] Os testes de ponta a ponta do CI passam a rodar contra o site empacotado como em produção (com o service worker)
+- [x] Persona com dois passos novos cobrindo o painel, o menu recolhido, a pilha de cartões e o Tire sua dúvida

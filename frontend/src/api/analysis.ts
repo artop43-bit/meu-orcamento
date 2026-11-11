@@ -143,3 +143,19 @@ export const analysisApi = {
   inflation: (amount: string, start: string, end: string) =>
     api.get<Inflation>(`/indicators/inflation?amount=${amount}&start=${start}&end=${end}`),
 };
+
+// ---------------------------------------------------------------- resumo por período (v1.7.5)
+
+export type Periods = {
+  today: string;
+  week: string;
+  month: string;
+  year: string;
+  previous: string;
+  previous_same_days: string;
+  previous_by_category: { category_id: string | null; total: string }[];
+};
+
+export const periodsApi = {
+  get: (month: string) => api.get<Periods>(`/analysis/periods?month=${month}`),
+};

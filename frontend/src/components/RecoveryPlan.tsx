@@ -1,38 +1,16 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { HeartHandshake } from "lucide-react";
 
 import { errorMessage } from "../api/client";
 import { habitsApi } from "../api/habits";
-import { money, monthLabel } from "../lib/format";
-import { Alert, Button, LoadingRegion, Sheet, Skeleton } from "./ui";
+import { money } from "../lib/format";
+import { Alert, LoadingRegion, Skeleton } from "./ui";
 
 /**
- * Modo sem culpa (v1.3): aparece quando o mês fecha (ou vai fechar) com despesas acima das
- * receitas. Um plano curto, em passos, sem julgamento e sem recomendar produto financeiro.
+ * Modo sem culpa (v1.3): um plano curto, em passos, sem julgamento e sem recomendar produto
+ * financeiro. Abre pelo aviso "Plano para equilibrar o mês" do Orçamento (MonthNotices).
  */
-export function RecoveryCard({ month }: { month: string }) {
-  const [open, setOpen] = useState(false);
-  return (
-    <section className="card recovery-card" aria-labelledby="plano-equilibrar">
-      <HeartHandshake size={22} className="recovery-card__icon" aria-hidden />
-      <div className="stack stack--tight" style={{ flex: 1 }}>
-        <h2 id="plano-equilibrar">Plano para equilibrar o mês</h2>
-        <p className="muted small" style={{ margin: 0 }}>
-          Acontece. Veja em poucos passos quanto falta, em quanto tempo dá para cobrir e onde ajustar.
-        </p>
-      </div>
-      <Button type="button" variant="secondary" onClick={() => setOpen(true)}>
-        Ver o plano
-      </Button>
-      <Sheet open={open} title={`Plano para ${monthLabel(month).toLowerCase()}`} onClose={() => setOpen(false)}>
-        {open && <RecoveryPlan month={month} />}
-      </Sheet>
-    </section>
-  );
-}
-
-function RecoveryPlan({ month }: { month: string }) {
+export function RecoveryPlan({ month }: { month: string }) {
   const plan = useQuery({ queryKey: ["budget", "recovery", month], queryFn: () => habitsApi.recovery(month) });
   const [spread, setSpread] = useState(3);
   if (plan.isPending) {

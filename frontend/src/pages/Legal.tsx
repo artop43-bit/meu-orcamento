@@ -104,6 +104,11 @@ export function Privacy() {
         <li>Dados da conta e financeiros: enquanto sua conta existir.</li>
         <li>Registros de segurança: 180 dias.</li>
         <li>Sessões e links de e-mail: apagados automaticamente após expirarem.</li>
+        <li>
+          Conversas do Tire sua dúvida: 30 dias depois da última mensagem. Você pode apagar antes ou desligar o histórico em{" "}
+          <Link to="/ajustes/preferencias#privacidade">Preferências</Link>; as respostas são geradas no próprio site, sem enviar seus dados
+          a terceiros.
+        </li>
         <li>Backups do banco de dados: até 30 dias, depois são sobrescritos.</li>
       </ul>
       <p>Ao excluir a conta, seus dados são apagados na hora do banco principal e somem dos backups em até 30 dias.</p>

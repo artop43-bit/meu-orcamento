@@ -142,6 +142,20 @@ describe("tema", () => {
 
   // No Liquid glass as superfícies são translúcidas: como cor de TEXTO, use --surface-solid ou
   // --accent-fg (opacos e testados), nunca --surface/--surface-2.
+  it("backdrop-filter: o prefixo -webkit- vem antes do padrão (senão o build descarta o padrão)", () => {
+    // v1.7.5: com o padrão antes do prefixado, o minificador mantinha só o -webkit-, que o
+    // Chrome e o Firefox ignoram: o desfoque do menu sumia no site publicado.
+    for (const file of ["visual.css", "styles.css"]) {
+      const lines = read(`../${file}`).split("\n");
+      lines.forEach((line, index) => {
+        if (/^\s*-webkit-backdrop-filter:/.test(line)) {
+          const value = line.split(":")[1]!.trim();
+          expect(lines[index + 1]?.trim(), `${file}:${index + 1}`).toBe(`backdrop-filter: ${value}`);
+        }
+      });
+    }
+  });
+
   it("nenhum texto pintado com a cor translúcida das superfícies", () => {
     const css = read("../styles.css") + read("../visual.css");
     expect(css.match(/(?<![-\w])color:\s*var\(--surface(-2)?\)/g)).toBeNull();

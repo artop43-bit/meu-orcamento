@@ -24,8 +24,11 @@ from app.models.indexes import FOREIGN_KEY_INDEXES  # noqa: F401 (registra os í
 from app.models.support import (
     Announcement,
     AnnouncementReply,
+    AskConversation,
+    AskMessage,
     ErrorEvent,
     InboxItem,
+    PerfDaily,
     StoredFile,
     SupportMessage,
     SupportThread,
@@ -45,6 +48,8 @@ from app.models.user import (
 __all__ = [
     "Project",
     "AnnouncementReply",
+    "AskConversation",
+    "AskMessage",
     "ErrorEvent",
     "Challenge",
     "Announcement",
@@ -65,6 +70,7 @@ __all__ = [
     "OtherDebt",
     "NotificationLog",
     "InboxItem",
+    "PerfDaily",
     "Income",
     "Investment",
     "MoneyAccount",

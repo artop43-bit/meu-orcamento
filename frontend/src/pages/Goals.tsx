@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { GoalTrack } from "../components/monthPanel";
 import { useQuery } from "@tanstack/react-query";
 import { ImagePlus, Pencil, Plus, Star, Target, Trash2, X } from "lucide-react";
 
@@ -6,7 +7,7 @@ import { budgetApi, keys, useBudgetMutation, type Goal, type GoalKind } from "..
 import { errorMessage } from "../api/client";
 import { Challenges } from "../components/Challenges";
 import { checkImage, fileUrl, IMAGE_ACCEPT } from "../api/support";
-import { Bar, MoneyInput, requireMoney } from "../components/budget";
+import { MoneyInput, requireMoney } from "../components/budget";
 import { DateField } from "../components/DateField";
 import { EmptyGuide, Tip } from "../components/help";
 import { Alert, Button, LoadingRegion, PageHeader, Sheet, Skeleton } from "../components/ui";
@@ -118,7 +119,7 @@ function GoalForm({ goal, onDone }: { goal?: Goal; onDone: () => void }) {
             <span className="field-label">Imagem do objetivo (opcional)</span>
             {preview || goal?.image_id ? (
               <span className="goal-image-pick__preview">
-                <img src={preview ?? fileUrl(goal!.image_id!)} alt="Imagem do objetivo" />
+                <img loading="lazy" decoding="async" src={preview ?? fileUrl(goal!.image_id!)} alt="Imagem do objetivo" />
                 {preview && (
                   <button type="button" className="icon-btn" aria-label="Remover imagem escolhida" onClick={() => setImage(null)}>
                     <X size={16} />
@@ -286,7 +287,7 @@ function GoalCard({ goal }: { goal: Goal }) {
         </span>
         <strong>{percent(goal.progress_pct)}</strong>
       </div>
-      <Bar pct={goal.progress_pct} />
+      <GoalTrack pct={goal.progress_pct ?? 0} />
       {projection.text && <p className={`goal-status goal-status--${projection.tone}`}>{projection.text}</p>}
       {!done && (
         <>

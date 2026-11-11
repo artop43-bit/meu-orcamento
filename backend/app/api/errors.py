@@ -5,11 +5,11 @@ from datetime import datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request, status
-from pydantic import BaseModel, StringConstraints
+from pydantic import BaseModel, Field, StringConstraints
 
-from app.api.deps import AdminUser, DbSession
+from app.api.deps import AdminUser, CurrentUser, DbSession
 from app.core.rate_limit import rate_limit
-from app.services import errors
+from app.services import errors, perf
 
 router = APIRouter(tags=["erros"])
 
@@ -66,3 +66,40 @@ def list_errors(_: AdminUser, db: DbSession) -> list[ErrorOut]:
 @router.post("/admin/errors/{event_id}/resolve", status_code=status.HTTP_204_NO_CONTENT)
 def resolve_error(event_id: uuid.UUID, _: AdminUser, db: DbSession) -> None:
     errors.resolve(db, event_id)
+
+
+# ---------------------------------------------------------------- velocidade das telas (v1.7.5)
+
+
+class PerfSample(BaseModel):
+    screen: Annotated[str, StringConstraints(max_length=40)]
+    load_ms: int = Field(ge=1, le=60_000)
+    frame_ms: int = Field(default=0, ge=0, le=60_000)
+
+
+class PerfIn(BaseModel):
+    samples: list[PerfSample] = Field(max_length=20)
+
+
+class PerfRow(BaseModel):
+    screen: str
+    count: int
+    average_ms: int
+    max_ms: int
+    slow_pct: float
+    frame_ms: int
+
+
+@router.post(
+    "/perf",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(rate_limit("perf", 30, 60))],
+)
+def perf_record(body: PerfIn, _: CurrentUser, db: DbSession) -> None:
+    """Tempo de abertura das telas, somado por dia e por tela (não guarda quem enviou)."""
+    perf.record(db, [s.model_dump() for s in body.samples])
+
+
+@router.get("/admin/perf")
+def perf_summary(_: AdminUser, db: DbSession, days: int = 7) -> list[PerfRow]:
+    return [PerfRow.model_validate(r) for r in perf.summary(db, max(1, min(days, 90)))]

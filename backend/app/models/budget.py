@@ -128,6 +128,9 @@ class Expense(Base):
     __table_args__ = (
         Index("ix_expenses_user_id_month", "user_id", "month"),
         Index("ix_expenses_user_id_import_ref", "user_id", "import_ref"),
+        # v1.7.5: vencimentos ("o que vence", atrasadas, calendário) e lançados no dia.
+        Index("ix_expenses_user_id_due_date", "user_id", "due_date"),
+        Index("ix_expenses_user_id_created_at", "user_id", "created_at"),
         UniqueConstraint("recurring_id", "month"),
     )
 

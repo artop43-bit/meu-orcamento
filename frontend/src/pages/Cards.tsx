@@ -174,6 +174,87 @@ function CardTile({ summary, onEdit }: { summary: CardSummary; onEdit: () => voi
   );
 }
 
+/**
+ * Pilha de cartões (v1.7.5): os cartões empilhados com o nome e a cor de cada um. Tocar no de
+ * cima passa para o próximo; ao lado, a fatura aberta, o disponível e o melhor dia dele.
+ */
+function CardStack({ cards }: { cards: CardSummary[] }) {
+  const [top, setTop] = useState(0);
+  const count = cards.length;
+  const current = cards[top % count]!;
+  const card = current.card;
+  const credit = card.kind !== "debit";
+  return (
+    <section className="card card-stack" aria-label="Seus cartões">
+      <div className="card-stack__pile">
+        {cards.map((summary, index) => {
+          const depth = (index - (top % count) + count) % count;
+          const item = summary.card;
+          const style = {
+            "--depth": Math.min(depth, 3),
+            background: item.color ?? "var(--accent)",
+            color: item.color ? textOn(item.color) : "var(--accent-fg)",
+            zIndex: count - depth,
+          } as React.CSSProperties;
+          const face = (
+            <>
+              <span className="card-stack__name">{item.name}</span>
+              <span className="card-stack__chip" aria-hidden />
+              <span className="card-stack__foot">
+                {item.kind === "debit"
+                  ? "Débito"
+                  : [item.closing_day ? `fecha dia ${item.closing_day}` : null, item.due_day ? `vence dia ${item.due_day}` : null].filter(Boolean).join(" · ") ||
+                    "Crédito"}
+              </span>
+            </>
+          );
+          return depth === 0 ? (
+            <button
+              key={item.id}
+              type="button"
+              className="card-stack__card"
+              style={style}
+              onClick={() => setTop((value) => (value + 1) % count)}
+              disabled={count < 2}
+            >
+              {face}
+              {count > 1 && <span className="sr-only">. Ver o próximo cartão</span>}
+            </button>
+          ) : (
+            <span key={item.id} className="card-stack__card" style={style} aria-hidden>
+              {face}
+            </span>
+          );
+        })}
+      </div>
+      <dl className="card-stack__stats" aria-live="polite">
+        <div>
+          <dt>{card.name}</dt>
+          <dd className="muted small">{count > 1 ? `${(top % count) + 1} de ${count} · toque no cartão para ver o próximo` : credit ? "Crédito" : "Débito"}</dd>
+        </div>
+        {credit && current.open_invoice && (
+          <div>
+            <dt>Fatura aberta</dt>
+            <dd>{money(current.open_invoice.total)}</dd>
+          </div>
+        )}
+        {credit && current.available !== null && (
+          <div>
+            <dt>Disponível</dt>
+            <dd className="tone--ok">{money(current.available)}</dd>
+          </div>
+        )}
+        {credit && current.best_day && (
+          <div>
+            <dt>Melhor dia de compra</dt>
+            <dd>dia {current.best_day}</dd>
+          </div>
+        )}
+      </dl>
+    </section>
+  );
+}
+
 export default function CardsPage() {
   const cards = useCards();
   const [search, setSearch] = useSearchParams();
@@ -215,6 +296,7 @@ export default function CardsPage() {
           />
         </section>
       )}
+      {cards.data && cards.data.length > 0 && <CardStack cards={cards.data} />}
       <div className="cards-grid">
         {cards.data?.map((s) => (
           <CardTile key={s.card.id} summary={s} onEdit={() => setEditing(s.card)} />

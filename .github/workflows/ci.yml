@@ -203,7 +203,10 @@ jobs:
           uv run python -m app.cli seed-demo --vazia --credentials-file "$QA_CREDENTIALS"
           nohup uv run uvicorn app.main:app --port 8000 > /tmp/api.log 2>&1 &
           cd ../frontend
-          API_PROXY_TARGET=http://127.0.0.1:8000 nohup npm run dev -- --clearScreen false > /tmp/web.log 2>&1 &
+          # v1.7.5: o site empacotado como em produção (com o service worker), não o modo de
+          # desenvolvimento: dois defeitos só apareciam no site publicado.
+          npm run build
+          API_PROXY_TARGET=http://127.0.0.1:8000 nohup npx vite preview --port 5173 --strictPort > /tmp/web.log 2>&1 &
           for _ in $(seq 1 60); do curl -fsS -o /dev/null http://localhost:5173/ && curl -fsS -o /dev/null http://127.0.0.1:8000/api/health && break; sleep 1; done
       - name: Persona (QA pela interface)
         run: uv run --no-project --with playwright --with pyotp python e2e/persona.py
