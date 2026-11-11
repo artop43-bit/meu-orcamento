@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowUp, History, MessageCircleQuestion, Plus, Trash2 } from "lucide-react";
-import { Link } from "react-router";
+import { Link, useSearchParams } from "react-router";
 
 import { useMe } from "../api/auth";
 import { errorMessage } from "../api/client";
@@ -47,6 +47,20 @@ export function AskBot() {
   useEffect(() => {
     if (turns.length) endRef.current?.scrollIntoView({ block: "nearest", behavior: prefersReducedMotion() ? "auto" : "smooth" });
   }, [turns]);
+
+  // Pergunta encaminhada pelo Lançamento rápido (?pergunta=…): já chega respondida.
+  const [search, setSearch] = useSearchParams();
+  const asked = useRef(false);
+  useEffect(() => {
+    const question = search.get("pergunta");
+    if (!question || asked.current) return;
+    asked.current = true;
+    const next = new URLSearchParams(search);
+    next.delete("pergunta");
+    setSearch(next, { replace: true });
+    void ask(question);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search]);
 
   async function ask(question: string) {
     const clean = question.trim().slice(0, 200);

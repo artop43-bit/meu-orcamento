@@ -40,20 +40,20 @@ for _method, _terms in {
 # No começo da frase, marcam uma receita e saem da descrição ("recebi 3000 de salário").
 INCOME_VERBS = _words(
     "recebi, recebido, recebemos, ganhei, ganhamos, entrou, entraram, caiu, cairam, pingou, faturei, "
-    "depositaram, depositou, creditou, creditaram, pagaram, me pagaram, vendi, vendemos"
+    "depositaram, depositou, creditou, creditaram, pagaram, me pagaram, vendi, vendemos, "
+    "renda, entrada, receita, receitas"
 )
 # Marcam uma receita e ficam na descrição ("salário 3000", "freela 600").
 INCOME_NOUNS = _words(
-    "salario, salarios, holerite, contracheque, pagamento do mes, adiantamento, adiantamento salarial, vale salario, "
+    "salario, salarios, holerite, contracheque, adiantamento, adiantamento salarial, vale salario, "
     "freela, freelas, freelance, freelancer, frila, renda extra, hora extra, horas extras, "
     "comissao, comissoes, bonus, bonificacao, gratificacao, premiacao, plr, ppr, participacao nos lucros, "
     "decimo terceiro, 13o, 13 salario, decimo, ferias recebidas, rescisao, fgts, saque fgts, abono, abono salarial, "
     "seguro desemprego, aposentadoria, pensao recebida, bolsa familia, auxilio, auxilio estudo, "
     "bolsa de estudos, bolsa estagio, pro labore, prolabore, distribuicao de lucros, "
     "dividendos, dividendo, proventos, provento, jcp, juros sobre capital, rendimento, rendimentos, aluguel recebido, "
-    "aluguel do inquilino, reembolso, restituicao, restituicao do ir, estorno, cashback, devolucao, venda, vendas, "
-    "gorjeta, gorjetas, caixinha, doacao recebida, presente em dinheiro, pix recebido, transferencia recebida, "
-    "recarga vale, receita, receitas, renda, rendas, entrada, entradas, recebimento, recebimentos"
+    "aluguel do inquilino, reembolso, restituicao, restituicao do ir, estorno, cashback, devolucao, "
+    "doacao recebida, presente em dinheiro, pix recebido, transferencia recebida, recarga vale"
 )
 # No começo da frase, dizem "isto é um lançamento" e saem da descrição ("gastei 50 no mercado").
 ENTRY_VERBS = _words(
@@ -78,15 +78,17 @@ VERB_NOUNS: dict[str, str] = {
     "lanchei": "lanche",
     "abasteci": "combustível",
     "abastecemos": "combustível",
+    "saquei": "saque",
+    "transferi": "transferência",
+    "doei": "doação",
+    "emprestei": "empréstimo",
 }
-# Substantivos que só anunciam o lançamento ("despesa mercado 50"): saem se sobrar descrição.
-ENTRY_NOUNS = _words(
-    "despesa, despesas, gasto, gastos, compra, compras, conta, pagamento, lancamento, saida, novo, nova, um, uma"
-)
+# Palavras que só anunciam o lançamento ("despesa mercado 50"): saem se sobrar descrição.
+ENTRY_NOUNS = _words("despesa, despesas, gasto, gastos, lancamento, saida, novo, nova, um, uma")
 # Palavras de ligação que não entram na descrição.
 FILLER = _words(
     "no, na, nos, nas, de, do, da, dos, das, em, com, por, pra, pro, para, a, o, ao, um, uma, r$, rs, brl, reais, "
-    "real, conto, contos, pila, pilas, mango, mangos"
+    "real, conto, contos, pila, pilas, mango, mangos, ai"
 )
 MONEY_UNITS = _words("r$, rs, brl, reais, real, conto, contos, pila, pilas, mango, mangos")
 # Multiplicadores do valor ("2 mil", "1,5k").
