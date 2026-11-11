@@ -3,16 +3,16 @@
  * do changelog (pasta changelog/), que tem a mesma versão, data e hora.
  */
 export const RELEASE = {
-  version: "1.7.5",
+  version: "1.7.6",
   // Data e hora (Brasília) em que o update foi publicado.
-  releasedAt: "2026-11-11T00:15:00-03:00",
+  releasedAt: "2026-11-11T19:45:00-03:00",
 };
 
 /** Mostrado uma vez em "Novidades" depois do update (curto: o detalhe fica no changelog). */
 export const RELEASE_NOTES: { title: string; text: string }[] = [
-  { title: "Painel vivo.", text: "Saudação com o resumo de agora, linha do mês com os vencimentos e avisos num formato só." },
-  { title: "Menu recolhível.", text: "Recolha o menu lateral para ganhar espaço (botão ao lado do logo ou Ctrl+B)." },
-  { title: "Tire sua dúvida lembra.", text: "Entende mais perguntas, continua a conversa e guarda o histórico por 30 dias." },
+  { title: "Tire sua dúvida entende mais.", text: "Em que dia, semana, mês ou ano você gastou mais, percentual da renda, quantas vezes e muito mais." },
+  { title: "Cada um na sua função.", text: "O Lançamento rápido registra; o Tire sua dúvida responde. Um encaminha para o outro quando a frase é do outro." },
+  { title: "Cartões e menu.", text: "O limite do cartão da frente aparece ao lado da pilha, e o menu recolhido ficou sem a faixa sobrando." },
 ];
 
 export function releaseLabel(): string {

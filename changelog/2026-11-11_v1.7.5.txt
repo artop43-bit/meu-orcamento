@@ -1,6 +1,6 @@
 MEU ORÇAMENTO · UPDATE LOG
 Versão 1.7.5 · Painel vivo, menu recolhível, Tire sua dúvida com histórico e site mais rápido
-Data: 11/11/2026 às 00:15 (horário de Brasília)
+Data: 11/11/2026 às 00:05 (horário de Brasília)
 
 Avisos e cartões clicáveis num padrão só
 - [x] Todo aviso do Orçamento tem o mesmo formato: traço lateral na cor do tom (vermelho, âmbar ou a cor de destaque), ícone, título, texto e seta quando há ação

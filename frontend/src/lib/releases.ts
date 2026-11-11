@@ -11,8 +11,39 @@ export type Release = {
 
 export const RELEASES: Release[] = [
   {
+    version: "1.7.6",
+    date: "11/11/2026 às 19:45",
+    title: "Um vocabulário só para lançar e para perguntar",
+    sections: [
+      {
+        title: "Tire sua dúvida",
+        items: [
+          "Entende a pergunta por partes: em que dia, dia da semana, semana, mês, ano ou lugar você gastou mais (ou menos).",
+          "Percentual da renda (“quantos % das receitas eu gastei?”), quantas vezes, menor gasto, média por dia e mês a mês.",
+          "Conserta erros de digitação e abreviações, e pergunta em vez de chutar quando não tem certeza.",
+          "Não registra lançamentos: a frase vai para o Lançamento rápido do Orçamento, já preenchida.",
+        ],
+      },
+      {
+        title: "Lançamento rápido",
+        items: [
+          "Usa o mesmo vocabulário do Tire sua dúvida, com mais de 7 mil termos, guardado no próprio site.",
+          "Entende “gastei 50 no mercado”, “paguei 200 de luz na sexta”, “recebi 3 mil de salário” e “em 12 vezes no cartão de crédito”.",
+          "Só registra: se a frase for uma pergunta, oferece abrir no Tire sua dúvida.",
+        ],
+      },
+      {
+        title: "Cartões e menu",
+        items: [
+          "Ao lado da pilha de cartões, a barra de limite do cartão da frente; o cartão correspondente fica destacado na lista.",
+          "Menu recolhido sem a faixa de destaque sobrando sobre a página, e barra de rolagem discreta no menu aberto.",
+        ],
+      },
+    ],
+  },
+  {
     version: "1.7.5",
-    date: "11/11/2026 às 00:15",
+    date: "11/11/2026 às 00:05",
     title: "Painel vivo, menu recolhível e Tire sua dúvida com histórico",
     sections: [
       {

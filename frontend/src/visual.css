@@ -1613,6 +1613,22 @@ select option:checked {
   margin-top: 52px;
 }
 
+/* No celular o aviso pode ter mais de uma linha (v1.7.6: "isto parece uma pergunta…"): fica
+   dentro do fluxo, embaixo do campo, em vez de flutuar sobre a saudação. */
+@media (max-width: 1023.98px) {
+  .month-actions .quick-bar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    align-items: center;
+  }
+
+  .month-actions .quick-bar__error {
+    position: static;
+    grid-column: 1 / -1;
+    margin: 0 0 4px;
+  }
+}
+
 @media (min-width: 1024px) {
   .page-header:has(.month-actions .quick-bar) {
     align-items: center;
@@ -2363,6 +2379,9 @@ select option:checked {
 
 .sidebar__head .brand {
   min-width: 0;
+  /* O nome nunca quebra em duas linhas, mesmo com a barra de rolagem do menu (v1.7.6). */
+  padding-inline: 4px;
+  white-space: nowrap;
 }
 
 .sidebar__collapse {
@@ -3150,6 +3169,31 @@ button.card-stack__card:disabled {
 .card-stack__stats dd.small {
   font-size: 0.82rem;
   font-weight: 400;
+}
+
+/* Limite do cartão que está na frente da pilha (v1.7.6): mesma barra dos cartões de baixo. */
+.card-stack__limit {
+  grid-column: 1 / -1;
+}
+
+.card-stack__limit dd {
+  display: grid;
+  gap: 6px;
+  margin-top: 4px;
+  font-size: 0.9rem;
+  font-weight: 400;
+}
+
+.card-stack__limit dd.small {
+  font-size: 0.82rem;
+}
+
+/* O cartão da lista que corresponde ao da frente da pilha. */
+.card-tile--selected {
+  border-right-color: var(--accent);
+  border-bottom-color: var(--accent);
+  border-left-color: var(--accent);
+  box-shadow: var(--glow-ring);
 }
 
 @media (hover: hover) {

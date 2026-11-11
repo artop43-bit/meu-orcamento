@@ -60,6 +60,7 @@ import { MonthNotices } from "../components/MonthNotices";
 import { EssentialRing, MonthGreeting, MonthLine, PeriodPills, Spark, usePeriods, useSixMonths } from "../components/monthPanel";
 import { useUndo } from "../components/undo";
 import { addMonths, cycleLabel, money, monthLabel, parseMoney, percent, shortDate, thisMonth, todayISO } from "../lib/format";
+import { looksLikeQuestion } from "../lib/quickEntry";
 import { normalizeText } from "../lib/text";
 import { sendOrQueue, useOfflineQueue } from "../lib/offline";
 import { listen, speechSupported } from "../lib/voice";
@@ -665,8 +666,21 @@ function MoreMenu({ items }: { items: { label: string; icon: ReactNode; onClick:
 }
 
 /** Campo "lançar numa frase": "mercado 120 pix ontem". */
-function QuickBar({ month, categories, autoListen = false }: { month: string; categories: Category[]; autoListen?: boolean }) {
-  const [text, setText] = useState("");
+function QuickBar({
+  month,
+  categories,
+  autoListen = false,
+  prefill = null,
+}: {
+  month: string;
+  categories: Category[];
+  autoListen?: boolean;
+  /** Frase vinda do Tire sua dúvida (?lancar=…): chega preenchida para conferir, sem lançar sozinha. */
+  prefill?: string | null;
+}) {
+  const [text, setText] = useState(prefill ?? "");
+  const [arrived, setArrived] = useState(Boolean(prefill));
+  const [question, setQuestion] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [hearing, setHearing] = useState(false);
@@ -676,6 +690,14 @@ function QuickBar({ month, categories, autoListen = false }: { month: string; ca
   const cards = useCards();
   // Sai da tela ouvindo: desliga o microfone.
   useEffect(() => () => stopRef.current?.(), []);
+  // Frase vinda do bot: preenche e põe o foco no campo.
+  useEffect(() => {
+    if (prefill === null) return;
+    setText(prefill);
+    setArrived(Boolean(prefill));
+    setQuestion("");
+    inputRef.current?.focus();
+  }, [prefill]);
   // Atalho do ícone "Lançar por voz": já abre ouvindo.
   useEffect(() => {
     if (autoListen && speechSupported() && !stopRef.current) toggleVoice();
@@ -714,6 +736,13 @@ function QuickBar({ month, categories, autoListen = false }: { month: string; ca
     if (!text.trim()) return;
     setError("");
     setHeard(false);
+    setArrived(false);
+    // Este campo só registra: pergunta vai para o Tire sua dúvida.
+    if (looksLikeQuestion(text)) {
+      setQuestion(text.trim());
+      return;
+    }
+    setQuestion("");
     setBusy(true);
     try {
       const saved = await save.mutateAsync(text);
@@ -739,6 +768,8 @@ function QuickBar({ month, categories, autoListen = false }: { month: string; ca
           onChange={(e) => {
             setText(e.target.value);
             setHeard(false);
+            setArrived(false);
+            setQuestion("");
           }}
           placeholder={hearing ? "Pode falar: mercado 120 no pix ontem" : "Ex.: mercado 120 pix ontem"}
           autoComplete="off"
@@ -762,14 +793,21 @@ function QuickBar({ month, categories, autoListen = false }: { month: string; ca
       <Tip label="Como escrever o lançamento rápido">
         Descrição + valor, e opcionalmente forma de pagamento, data e parcelas. Exemplos: “mercado 120 pix ontem”, “uber 23,50
         débito”, “geladeira 1800 em 10x crédito” (10 parcelas de R$ 180), “+ freelance 600” (receita). O valor informado com
-        parcelas é o total da compra.
+        parcelas é o total da compra. Também entende frases faladas: “gastei 50 no mercado”, “paguei 200 de luz na sexta”,
+        “recebi 3 mil de salário”. Este campo só registra; para perguntas, use o Tire sua dúvida.
       </Tip>
       <Button type="submit" loading={busy} disabled={!text.trim()}>
         Lançar
       </Button>
-      {heard && !error && (
+      {(heard || arrived) && !error && !question && (
         <p className="muted small quick-bar__error" role="status">
-          Confira o texto entendido e toque em “Lançar”.
+          {arrived ? "Confira a frase e toque em “Lançar”." : "Confira o texto entendido e toque em “Lançar”."}
+        </p>
+      )}
+      {question && (
+        <p className="small quick-bar__error" role="status">
+          Isto parece uma pergunta, e este campo só registra lançamentos.{" "}
+          <Link to={`/analises?secao=duvida&pergunta=${encodeURIComponent(question)}`}>Perguntar no Tire sua dúvida</Link>
         </p>
       )}
       {error && (
@@ -1209,18 +1247,22 @@ export default function MonthPage() {
     return novo === "conta" ? { type: "new-expense" } : novo === "renda" ? { type: "new-income" } : null;
   });
   const [voice, setVoice] = useState(() => search.get("voz") === "1");
+  // Frase encaminhada pelo Tire sua dúvida (o bot não registra nada).
+  const [prefill, setPrefill] = useState<string | null>(() => search.get("lancar"));
   const [customizing, setCustomizing] = useState(false);
   const me = useMe();
   const layout = readDashboard(me.data?.dashboard);
   const shown = (area: "top" | "side"): DashboardKey[] =>
-    layout.filter((c) => (c.visible || (c.key === "quick" && voice)) && areaOf(c.key) === area).map((c) => c.key);
+    layout.filter((c) => (c.visible || (c.key === "quick" && (voice || prefill !== null))) && areaOf(c.key) === area).map((c) => c.key);
   // Atalho "N", Ctrl+K e os atalhos do ícone chegam com ?novo=… ou ?voz=1; abre e limpa o endereço.
   useEffect(() => {
     const novo = search.get("novo");
     const voz = search.get("voz");
-    if (!novo && !voz) return;
+    const lancar = search.get("lancar");
+    if (!novo && !voz && lancar === null) return;
     if (novo) setEditing(novo === "renda" ? { type: "new-income" } : { type: "new-expense" });
     if (voz === "1") setVoice(true);
+    if (lancar !== null) setPrefill(lancar.slice(0, 200));
     setSearch({}, { replace: true });
   }, [search, setSearch]);
   const cats = categories.data ?? [];
@@ -1258,7 +1300,7 @@ export default function MonthPage() {
         }
         actions={
           <span className="row month-actions">
-            {shown("top").includes("quick") && <QuickBar month={month} categories={cats} autoListen={voice} />}
+            {shown("top").includes("quick") && <QuickBar month={month} categories={cats} autoListen={voice} prefill={prefill} />}
             <button
               type="button"
               className="icon-btn icon-btn--bordered"
