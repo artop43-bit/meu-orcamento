@@ -1,0 +1,43 @@
+MEU ORÇAMENTO · UPDATE LOG
+Versão 1.7.6 · Um vocabulário só para lançar e para perguntar, e correções de tela
+Data: 11/11/2026 às HORA (horário de Brasília)
+
+Correções de tela
+- [x] Menu recolhido: o destaque do item ativo acompanha a largura do menu ao recolher e ao expandir (antes ficava largo e cobria a saudação do Orçamento)
+- [x] Menu aberto: quando o menu não cabe na altura da tela, a barra de rolagem é fina e discreta (a barra grossa quebrava "Meu Orçamento" em duas linhas)
+- [x] Hora da v1.7.5 corrigida para 00:05 no rodapé, nas Novidades e no changelog
+
+Cartões
+- [x] O resumo ao lado da pilha mostra a barra de limite do cartão da frente: usado, disponível e limite, no mesmo formato dos cartões de baixo
+- [x] A barra e os valores trocam junto quando o cartão da frente muda
+- [x] O cartão correspondente na lista de baixo ganha destaque e o selo "Selecionado"; cartão só de débito continua sem barra
+
+Núcleo de linguagem único (Lançamento rápido + Tire sua dúvida)
+- [x] Um vocabulário só para os dois, guardado no próprio site: 7.134 termos (6.200 lojas, marcas e categorias, antes 1.202; e 934 palavras de medidas, períodos, formas de pagamento e verbos)
+- [x] Nada de IA nem de serviço externo: tudo roda no servidor que já existe, sem custo novo; as perguntas não saem do site
+- [x] O Lançamento rápido (que funciona sem internet) usa uma cópia do mesmo vocabulário; um teste automático confere que a cópia está em dia
+- [x] Correção de digitação e abreviações: "qto gastey no mes pasado com mercdo", "oq vence hj". Palavras das suas próprias descrições e categorias nunca são alteradas
+
+Tire sua dúvida entende por partes
+- [x] A pergunta é separada em medida (soma, maior, menor, média, percentual, contagem), assunto, período e agrupamento (dia, dia da semana, semana, mês, ano, lugar), e as partes se combinam
+- [x] "Qual ano mais gastei?" responde o ano, com a lista dos anos (antes respondia sobre o mês); vale também para dia, semana, dia da semana e lugar, e para "menos" ("qual mês gastei menos?")
+- [x] "Quantos % foram gastos dos meus recebimentos?" responde o percentual das receitas gasto no período (antes listava as receitas); "quanto da minha renda vai para moradia" e "qual o percentual de gastos com alimentação" também
+- [x] Novas contas: quantas vezes ("quantas vezes pedi ifood"), menor gasto, média por dia e por semana, mês a mês, ano a ano e em que mês ou ano você recebeu mais
+- [x] Receita e despesa na mesma pergunta ("quanto recebi e quanto gastei") mostra as duas e o saldo
+- [x] Continuação funciona com as perguntas novas: "e com lazer?", "e no ano passado?"
+- [x] Sem certeza, pergunta em vez de chutar: mostra as opções parecidas quando não acha o assunto ou não entende a frase
+
+Cada um na sua função
+- [x] Tire sua dúvida não registra nada: frase de lançamento ("gastei 50 no mercado", "mercado 120 pix ontem") recebe a explicação e um botão que abre o Orçamento com a frase já preenchida no Lançamento rápido, para conferir e lançar
+- [x] Lançamento rápido só registra: se a frase for uma pergunta, ele não lança e oferece abrir a pergunta no Tire sua dúvida, que já responde
+- [x] Lançamento rápido entende mais formas de escrever: verbos ("gastei", "paguei", "comprei", "lançar", "pedi", "almocei 35"), pagamento em frase ("no cartão de crédito", "em dinheiro"), valores falados ("3 mil", "4,5k", "50 reais"), datas ("anteontem", "amanhã", "na sexta", "segunda-feira") e parcelas por extenso ("em 12 vezes")
+- [x] Receita pelo nome: "salário 3000" e "freela 600" entram como receita
+
+Testes
+- [x] Bateria do bot de 166 para 2.477 perguntas: 2.230 geradas por combinação, 81 reais novas e as 166 anteriores
+- [x] 36 frases de "é lançamento ou pergunta?", 16 de correção de digitação e 56 de vocabulário
+- [x] Lançamento rápido: 18 testes (8 novos)
+- [x] Auditoria pela interface: marcador do menu logo depois de recolher e de expandir, resumo do cartão trocando com a pilha, e o caminho completo bot → Lançamento rápido → bot
+
+Fora desta versão
+- [ ] Versão dos termos de uso: continua a mesma

@@ -2550,6 +2550,118 @@ def v175_ask(page: Page):
     assert api(page, "/auth/me")["ask_history"] is True
 
 
+@step("v1.7.6: marcador do menu recolhido, limite do cartão selecionado, bot por partes e encaminhamento de lançamentos")
+def v176(page: Page):
+    # Marcador do menu: acompanha a largura ao recolher e ao expandir (não sobra sobre a página).
+    open_month(page, CURRENT)
+    shell = page.locator(".shell")
+    if shell.get_attribute("data-menu") == "collapsed":
+        page.keyboard.press("Control+b")
+        page.wait_for_timeout(700)
+    fits = """() => {
+        const side = document.querySelector('.sidebar').getBoundingClientRect();
+        const pill = document.querySelector('.sidebar nav > .nav-pill').getBoundingClientRect();
+        return [Math.round(pill.width), pill.right <= side.right + 1];
+    }"""
+    wide, inside = page.evaluate(fits)
+    assert inside and wide > 150, (wide, inside)
+    page.get_by_role("button", name="Recolher o menu").click()
+    expect(shell).to_have_attribute("data-menu", "collapsed")
+    page.wait_for_timeout(900)
+    narrow, inside = page.evaluate(fits)
+    assert inside and narrow < 80, f"marcador com {narrow}px no menu recolhido"
+    page.screenshot(path=OUT / "v176-menu-recolhido.png")
+    page.get_by_role("button", name="Expandir o menu").click()
+    expect(shell).not_to_have_attribute("data-menu", "collapsed")
+    page.wait_for_timeout(900)
+    wide, inside = page.evaluate(fits)
+    assert inside and wide > 150, (wide, inside)
+
+    # Cartões: o resumo ao lado da pilha e o destaque na lista seguem o cartão da frente.
+    page.goto(f"{BASE}/cartoes")
+    idle(page)
+    stack = page.locator(".card-stack")
+    expect(stack).to_be_visible()
+    top = stack.locator("button.card-stack__card")
+
+    def front() -> str:
+        return top.locator(".card-stack__name").inner_text()
+
+    def check_front():
+        name = front()
+        expect(stack.locator(".card-stack__stats dt").first).to_have_text(name)
+        selected = page.locator(".card-tile--selected")
+        expect(selected).to_have_count(1)
+        expect(selected.locator("h2")).to_contain_text(name)
+        expect(selected.locator("h2")).to_contain_text("Selecionado")
+        # Com limite cadastrado, a barra do resumo mostra os mesmos valores do cartão de baixo.
+        tile_limit = selected.locator(".split").first
+        if tile_limit.count() and "Disponível" in tile_limit.inner_text():
+            summary = stack.locator(".card-stack__limit")
+            expect(summary).to_contain_text("Usado")
+            available = re.search(r"Disponível\s*(R\$\s*[\d.,]+)", tile_limit.inner_text())
+            assert available and available[1] in summary.inner_text(), summary.inner_text()
+
+    if not top.is_disabled():
+        check_front()
+        first = front()
+        top.click()
+        page.wait_for_timeout(500)
+        assert front() != first
+        check_front()
+    page.screenshot(path=OUT / "v176-cartoes.png")
+
+    # Tire sua dúvida: ano, percentual da renda e tentativa de lançamento.
+    page.goto(f"{BASE}/analises?secao=duvida")
+    idle(page)
+    box = page.get_by_label("Sua pergunta")
+
+    def ask(question: str):
+        count = page.locator(".ask__turn").count()
+        box.fill(question)
+        page.keyboard.press("Enter")
+        expect(page.locator(".ask__turn")).to_have_count(count + 1)
+        answer = page.locator(".ask__turn").last.locator(".ask__a")
+        expect(answer).not_to_have_class(re.compile("ask__a--wait"))
+        return answer
+
+    expect(ask("Qual ano mais gastei?")).to_contain_text("o ano em que você mais gastou foi")
+    expect(ask("Quantos % foram gastos dos meus recebimentos?")).to_contain_text(re.compile("das receitas|Não há receitas"))
+    expect(ask("qual dia da semana eu gasto mais")).to_contain_text("dia da semana")
+    before = len(api(page, f"/months/{CURRENT}")["expenses"])
+    entry = ask("gastei 37 no mercadinho de teste")
+    expect(entry).to_contain_text("não registro lançamentos")
+    assert len(api(page, f"/months/{CURRENT}")["expenses"]) == before  # o bot não lança nada
+    page.screenshot(path=OUT / "v176-tire-sua-duvida.png", full_page=True)
+    entry.get_by_role("link", name="Abrir o Lançamento rápido").click()
+    page.wait_for_url(re.compile("/orcamento"))
+    idle(page)
+    quick = page.get_by_role("search", name="Lançamento rápido")
+    field = quick.get_by_role("textbox")
+    expect(field).to_have_value("gastei 37 no mercadinho de teste")
+    expect(quick).to_contain_text("Confira a frase")
+    quick.get_by_role("button", name="Lançar").click()
+    expect(field).to_have_value("")
+    idle(page, 300)
+    expenses = api(page, f"/months/{CURRENT}")["expenses"]
+    assert len(expenses) == before + 1
+    created = next(e for e in expenses if e["description"] == "Mercadinho de teste")
+    assert created["amount"] == "37.00", created
+    # O Lançamento rápido só registra: pergunta é encaminhada para o bot, que já responde.
+    field.fill("quanto gastei este mês?")
+    quick.get_by_role("button", name="Lançar").click()
+    expect(quick).to_contain_text("Isto parece uma pergunta")
+    assert len(api(page, f"/months/{CURRENT}")["expenses"]) == before + 1
+    quick.get_by_role("link", name="Perguntar no Tire sua dúvida").click()
+    page.wait_for_url(re.compile("secao=duvida"))
+    answer = page.locator(".ask__turn").last.locator(".ask__a")
+    expect(answer).not_to_have_class(re.compile("ask__a--wait"))
+    expect(answer).to_contain_text("você gastou")
+    # Limpeza: o lançamento de teste sai.
+    response = page.request.delete(f"{BASE}/api/expenses/{created['id']}", headers={"X-Requested-With": "fetch"})
+    assert response.ok, response.status
+
+
 def main():
     with sync_playwright() as p:
         browser = p.chromium.launch(
@@ -2623,6 +2735,7 @@ def main():
         v15_entries(page)
         v175_panel(page)
         v175_ask(page)
+        v176(page)
         two_factor(page)
         banner_never(page)
         STATE["state"] = ctx.storage_state()

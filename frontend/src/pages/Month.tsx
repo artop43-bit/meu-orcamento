@@ -793,7 +793,8 @@ function QuickBar({
       <Tip label="Como escrever o lançamento rápido">
         Descrição + valor, e opcionalmente forma de pagamento, data e parcelas. Exemplos: “mercado 120 pix ontem”, “uber 23,50
         débito”, “geladeira 1800 em 10x crédito” (10 parcelas de R$ 180), “+ freelance 600” (receita). O valor informado com
-        parcelas é o total da compra.
+        parcelas é o total da compra. Também entende frases faladas: “gastei 50 no mercado”, “paguei 200 de luz na sexta”,
+        “recebi 3 mil de salário”. Este campo só registra; para perguntas, use o Tire sua dúvida.
       </Tip>
       <Button type="submit" loading={busy} disabled={!text.trim()}>
         Lançar
