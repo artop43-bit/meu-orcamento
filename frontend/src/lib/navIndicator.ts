@@ -85,12 +85,21 @@ function place(group: HTMLElement) {
 
 export function installNavIndicator(root: Document = document): () => void {
   let queued = false;
+  // Cada grupo é observado: quando a largura dele muda sem a página mudar (ex.: o menu lateral
+  // recolhe ou expande, v1.7.6), o marcador acompanha quadro a quadro.
+  const watched = new WeakSet<Element>();
   const update = () => {
     if (queued) return;
     queued = true;
     requestAnimationFrame(() => {
       queued = false;
-      root.querySelectorAll<HTMLElement>(PILL_GROUPS).forEach(place);
+      root.querySelectorAll<HTMLElement>(PILL_GROUPS).forEach((group) => {
+        if (!watched.has(group)) {
+          watched.add(group);
+          resize.observe(group);
+        }
+        place(group);
+      });
     });
   };
   const mutation = new MutationObserver((records) => {
@@ -98,7 +107,12 @@ export function installNavIndicator(root: Document = document): () => void {
     if (records.every((r) => r.target instanceof HTMLElement && r.target.classList.contains("nav-pill"))) return;
     update();
   });
-  mutation.observe(root.body, { subtree: true, childList: true, attributes: true, attributeFilter: ["class", "aria-current", "aria-expanded"] });
+  mutation.observe(root.body, {
+    subtree: true,
+    childList: true,
+    attributes: true,
+    attributeFilter: ["class", "aria-current", "aria-expanded", "data-menu"],
+  });
   const resize = new ResizeObserver(update);
   resize.observe(root.body);
   window.addEventListener("resize", update);

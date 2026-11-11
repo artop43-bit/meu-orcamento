@@ -275,6 +275,10 @@ svg {
     background: var(--surface);
     border-right: 1px solid var(--border);
     overflow-y: auto;
+    /* Barra fina e discreta quando o menu não cabe na altura (v1.7.6): a barra padrão do
+       sistema roubava espaço e quebrava o nome do site em duas linhas. */
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-strong) transparent;
   }
 
   .sidebar .brand {

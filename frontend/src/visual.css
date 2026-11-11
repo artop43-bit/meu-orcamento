@@ -3152,6 +3152,31 @@ button.card-stack__card:disabled {
   font-weight: 400;
 }
 
+/* Limite do cartão que está na frente da pilha (v1.7.6): mesma barra dos cartões de baixo. */
+.card-stack__limit {
+  grid-column: 1 / -1;
+}
+
+.card-stack__limit dd {
+  display: grid;
+  gap: 6px;
+  margin-top: 4px;
+  font-size: 0.9rem;
+  font-weight: 400;
+}
+
+.card-stack__limit dd.small {
+  font-size: 0.82rem;
+}
+
+/* O cartão da lista que corresponde ao da frente da pilha. */
+.card-tile--selected {
+  border-right-color: var(--accent);
+  border-bottom-color: var(--accent);
+  border-left-color: var(--accent);
+  box-shadow: var(--glow-ring);
+}
+
 @media (hover: hover) {
   button.card-stack__card:not(:disabled):hover {
     translate: 0 -4px;

@@ -82,7 +82,7 @@ function InvoiceSheet({ summary, invoice, onClose }: { summary: CardSummary; inv
   );
 }
 
-function CardTile({ summary, onEdit }: { summary: CardSummary; onEdit: () => void }) {
+function CardTile({ summary, selected, onEdit }: { summary: CardSummary; selected: boolean; onEdit: () => void }) {
   const { card } = summary;
   const [open, setOpen] = useState<Invoice | null>(null);
   const credit = hasCredit(card);
@@ -91,7 +91,7 @@ function CardTile({ summary, onEdit }: { summary: CardSummary; onEdit: () => voi
   const invoices = useQuery({ queryKey: extrasKeys.invoices(card.id), queryFn: () => extrasApi.invoices(card.id), enabled: credit });
   const remove = useBudgetMutation(() => extrasApi.deleteCard(card.id));
   return (
-    <section className="card stack card-tile" style={{ borderTopColor: card.color ?? undefined }}>
+    <section className={`card stack card-tile ${selected ? "card-tile--selected" : ""}`} style={{ borderTopColor: card.color ?? undefined }}>
       <div className="section-header">
         <h2 className="row" style={{ gap: 8 }}>
           <span className="card-tile__icon" style={{ background: card.color ?? "var(--accent)", color: card.color ? textOn(card.color) : "var(--accent-fg)" }} aria-hidden>
@@ -99,6 +99,7 @@ function CardTile({ summary, onEdit }: { summary: CardSummary; onEdit: () => voi
           </span>{" "}
           {card.name}
           <span className="badge">{CARD_KIND_LABEL[card.kind]}</span>
+          {selected && <span className="badge badge--accent">Selecionado</span>}
         </h2>
         <span className="row" style={{ gap: 4 }}>
           <button type="button" className="icon-btn" aria-label={`Editar ${card.name}`} onClick={onEdit}>
@@ -178,12 +179,11 @@ function CardTile({ summary, onEdit }: { summary: CardSummary; onEdit: () => voi
  * Pilha de cartões (v1.7.5): os cartões empilhados com o nome e a cor de cada um. Tocar no de
  * cima passa para o próximo; ao lado, a fatura aberta, o disponível e o melhor dia dele.
  */
-function CardStack({ cards }: { cards: CardSummary[] }) {
-  const [top, setTop] = useState(0);
+function CardStack({ cards, top, onNext }: { cards: CardSummary[]; top: number; onNext: () => void }) {
   const count = cards.length;
   const current = cards[top % count]!;
   const card = current.card;
-  const credit = card.kind !== "debit";
+  const credit = hasCredit(card);
   return (
     <section className="card card-stack" aria-label="Seus cartões">
       <div className="card-stack__pile">
@@ -214,7 +214,7 @@ function CardStack({ cards }: { cards: CardSummary[] }) {
               type="button"
               className="card-stack__card"
               style={style}
-              onClick={() => setTop((value) => (value + 1) % count)}
+              onClick={onNext}
               disabled={count < 2}
             >
               {face}
@@ -232,16 +232,32 @@ function CardStack({ cards }: { cards: CardSummary[] }) {
           <dt>{card.name}</dt>
           <dd className="muted small">{count > 1 ? `${(top % count) + 1} de ${count} · toque no cartão para ver o próximo` : credit ? "Crédito" : "Débito"}</dd>
         </div>
+        {credit && card.limit_amount && (
+          <div className="card-stack__limit">
+            <dt>Limite</dt>
+            <dd>
+              <Bar pct={current.used_pct ?? 0} color={(current.used_pct ?? 0) >= 90 ? "var(--error)" : card.color ?? undefined} />
+              <span className="split small">
+                <span>
+                  Usado <strong>{money(current.used)}</strong>
+                </span>
+                <span>
+                  Disponível <strong>{money(current.available)}</strong> de {money(card.limit_amount)}
+                </span>
+              </span>
+            </dd>
+          </div>
+        )}
+        {credit && !card.limit_amount && (
+          <div className="card-stack__limit">
+            <dt>Limite</dt>
+            <dd className="muted small">Sem limite cadastrado neste cartão.</dd>
+          </div>
+        )}
         {credit && current.open_invoice && (
           <div>
             <dt>Fatura aberta</dt>
             <dd>{money(current.open_invoice.total)}</dd>
-          </div>
-        )}
-        {credit && current.available !== null && (
-          <div>
-            <dt>Disponível</dt>
-            <dd className="tone--ok">{money(current.available)}</dd>
           </div>
         )}
         {credit && current.best_day && (
@@ -260,6 +276,10 @@ export default function CardsPage() {
   const [search, setSearch] = useSearchParams();
   const [adding, setAdding] = useState(() => search.get("novo") === "1");
   const [editing, setEditing] = useState<Card | null>(null);
+  // Cartão na frente da pilha: o resumo ao lado e o destaque na lista seguem este (v1.7.6).
+  const [top, setTop] = useState(0);
+  const count = cards.data?.length ?? 0;
+  const selectedId = count > 1 ? cards.data![top % count]!.card.id : null;
   function closeAdd() {
     setAdding(false);
     if (search.get("novo")) setSearch({}, { replace: true });
@@ -296,10 +316,10 @@ export default function CardsPage() {
           />
         </section>
       )}
-      {cards.data && cards.data.length > 0 && <CardStack cards={cards.data} />}
+      {cards.data && cards.data.length > 0 && <CardStack cards={cards.data} top={top} onNext={() => setTop((value) => (value + 1) % count)} />}
       <div className="cards-grid">
         {cards.data?.map((s) => (
-          <CardTile key={s.card.id} summary={s} onEdit={() => setEditing(s.card)} />
+          <CardTile key={s.card.id} summary={s} selected={s.card.id === selectedId} onEdit={() => setEditing(s.card)} />
         ))}
       </div>
       <Sheet open={adding} title="Novo cartão" onClose={closeAdd}>
