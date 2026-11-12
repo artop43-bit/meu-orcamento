@@ -1397,6 +1397,7 @@ def exports(page: Page):
     filtered = count()
     assert 0 < filtered < only, (filtered, only)
     expect(page.locator(".export-filters")).to_contain_text("só entram despesas")
+    expect(totals).not_to_contain_text("Receitas")  # com categoria, só despesas entram
     page.screenshot(path=OUT / "v1761-exportar.png", full_page=True)
     toggle.click()
     menu.get_by_label("Todas as categorias").check()

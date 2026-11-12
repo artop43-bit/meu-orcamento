@@ -3447,6 +3447,32 @@ button.card-stack__card:disabled {
   border-radius: var(--radius-sm);
 }
 
+/* Formato: ícone, nome e botão na linha de cima; a explicação embaixo, na largura toda. */
+.export-format {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    "icon name action"
+    "icon about about";
+  row-gap: 4px;
+}
+
+.export-format > .export-format__icon {
+  grid-area: icon;
+  align-self: start;
+}
+
+.export-format__name {
+  grid-area: name;
+}
+
+.export-format__about {
+  grid-area: about;
+}
+
+.export-format > .btn {
+  grid-area: action;
+}
+
 .export-format__icon {
   display: grid;
   place-items: center;
@@ -3495,10 +3521,12 @@ button.card-stack__card:disabled {
     grid-column: 1 / -1;
   }
 
+  .export-row__pick > *,
   .export-row__pick select,
   .export-row__pick input {
     max-width: none;
     flex: 1;
+    min-width: 0;
   }
 
   .export-row__actions > * {
@@ -3506,12 +3534,4 @@ button.card-stack__card:disabled {
   }
 }
 
-@media (max-width: 420px) {
-  .export-format {
-    grid-template-columns: auto minmax(0, 1fr);
-  }
 
-  .export-format > .btn {
-    grid-column: 1 / -1;
-  }
-}

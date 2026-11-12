@@ -839,7 +839,10 @@ function PickMany({
   const ref = useRef<HTMLDivElement>(null);
   const listId = useId();
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      setQuery(""); // ao reabrir, a lista volta inteira
+      return;
+    }
     function onDown(e: PointerEvent) {
       if (!ref.current?.contains(e.target as Node)) setOpen(false);
     }
@@ -1005,6 +1008,8 @@ function ExportPanel() {
   const n = data?.count;
   const period = range[0] === range[1] ? monthLabel(range[0]) : `${monthLabel(range[0])} a ${monthLabel(range[1]).toLowerCase()}`;
   const onlyExpenses = kind === "all" && (cats.length > 0 || places.some((p) => p.startsWith("c:")));
+  // Com categoria ou cartão escolhidos, receitas não entram: o resumo mostra só despesas.
+  const shownKind = onlyExpenses ? "expense" : kind;
 
   return (
     <div className="stack" style={{ gap: 20 }}>
@@ -1014,7 +1019,7 @@ function ExportPanel() {
           <div>
             <h2 id="recorte">O que exportar</h2>
             <p className="muted small" style={{ margin: "2px 0 0" }}>
-              Escolha o recorte; o resumo ao lado acompanha na hora.
+              Escolha o recorte; o resumo acompanha na hora.
             </p>
           </div>
           <div className="export-field">
@@ -1076,19 +1081,19 @@ function ExportPanel() {
               <dt>Lançamentos</dt>
               <dd>{n === undefined ? "…" : n}</dd>
             </div>
-            {kind !== "expense" && (
+            {shownKind !== "expense" && (
               <div>
                 <dt>Receitas</dt>
                 <dd className="tone--ok">{data ? money(data.income) : "…"}</dd>
               </div>
             )}
-            {kind !== "income" && (
+            {shownKind !== "income" && (
               <div>
                 <dt>Despesas</dt>
                 <dd>{data ? money(data.expenses) : "…"}</dd>
               </div>
             )}
-            {kind === "all" && (
+            {shownKind === "all" && (
               <div>
                 <dt>Saldo</dt>
                 <dd className={data && Number(data.balance) < 0 ? "tone--error" : "tone--ok"}>{data ? money(data.balance) : "…"}</dd>
@@ -1099,10 +1104,8 @@ function ExportPanel() {
             {FORMATS.map((f) => (
               <div key={f.key} className="export-format">
                 <span className="export-format__icon">{f.icon}</span>
-                <span className="export-format__text">
-                  <strong>{f.name}</strong>
-                  <span className="muted small">{f.text}</span>
-                </span>
+                <strong className="export-format__name">{f.name}</strong>
+                <span className="muted small export-format__about">{f.text}</span>
                 <Button
                   type="button"
                   variant={f.key === "pdf" ? "primary" : "secondary"}
