@@ -5,6 +5,7 @@ import { analysisApi } from "../api/analysis";
 import { useMe } from "../api/auth";
 import { useCategories, useMonth } from "../api/budget";
 import { errorMessage } from "../api/client";
+import { PdfButton } from "../components/PdfButton";
 import { Alert, Button } from "../components/ui";
 import { money, monthLabel, percent, shortDate, thisMonth } from "../lib/format";
 
@@ -33,9 +34,10 @@ export default function Report() {
         <Link className="btn btn--secondary" to="/ajustes/dados?aba=exportar">
           Voltar
         </Link>
-        <Button type="button" onClick={() => window.print()}>
-          Imprimir / salvar em PDF
+        <Button type="button" variant="secondary" onClick={() => window.print()}>
+          Imprimir
         </Button>
+        <PdfButton path={`/export/transactions?start=${month}&end=${month}&kind=all&format=pdf`} name={`relatorio-${month}.pdf`} />
       </div>
 
       <header className="report__header">

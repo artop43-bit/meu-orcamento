@@ -1,4 +1,4 @@
-"""Exportação: lançamentos em CSV ou Excel e backup completo em JSON."""
+"""Exportação: lançamentos em CSV, Excel ou PDF (v1.7.6.1) e backup completo em JSON."""
 
 import csv
 import io
@@ -154,6 +154,32 @@ def by_category(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
         {"name": name, "total": total, "share": float(total / grand) if grand else 0.0}
         for name, total in sorted(totals.items(), key=lambda kv: kv[1], reverse=True)
     ]
+
+
+def describe_filters(
+    db: Session, user: User, start: date, end: date, filters: Filters
+) -> list[tuple[str, str]]:
+    """O recorte em palavras, para o cabeçalho do PDF."""
+    from app.services.pdf_export import period_label
+
+    kind = {"all": "Receitas e despesas", "expense": "Só despesas", "income": "Só receitas"}
+    lines = [("Período", period_label(start, end)), ("Conteúdo", kind[filters.kind])]
+    places = [
+        a.name
+        for a in db.scalars(select(MoneyAccount).where(MoneyAccount.user_id == user.id))
+        if a.id in filters.account_ids
+    ] + [
+        c.name
+        for c in db.scalars(select(CreditCard).where(CreditCard.user_id == user.id))
+        if c.id in filters.card_ids
+    ]
+    lines.append(("Contas e cartões", ", ".join(sorted(places)) if places else "Todos"))
+    if filters.kind != "income":
+        names = [c.name for c in budget.list_categories(db, user) if c.id in filters.category_ids]
+        lines.append(("Categorias", ", ".join(sorted(names)) if names else "Todas"))
+    if filters.kind == "all" and (filters.category_ids or filters.card_ids):
+        lines.append(("Observação", "Com categoria ou cartão escolhidos, só entram despesas."))
+    return lines
 
 
 def _yes_no(value: bool | None) -> str:

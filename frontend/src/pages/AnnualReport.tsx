@@ -4,6 +4,7 @@ import { Link, useParams } from "react-router";
 import { useMe } from "../api/auth";
 import { errorMessage } from "../api/client";
 import { dataApi, type TaxReport } from "../api/data";
+import { PdfButton } from "../components/PdfButton";
 import { Alert, Button } from "../components/ui";
 import { money, monthLabel, percent } from "../lib/format";
 
@@ -100,9 +101,10 @@ export default function AnnualReport() {
         <Link className="btn btn--secondary" to="/ajustes/dados?aba=exportar">
           Voltar
         </Link>
-        <Button type="button" onClick={() => window.print()}>
-          Imprimir / salvar em PDF
+        <Button type="button" variant="secondary" onClick={() => window.print()}>
+          Imprimir
         </Button>
+        <PdfButton path={`/export/annual.pdf?year=${year}`} name={`resumo-anual-${year}.pdf`} />
       </div>
 
       <header className="report__header">

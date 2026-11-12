@@ -1,8 +1,10 @@
-import { useEffect, useMemo, useRef, useState, type DragEvent } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type DragEvent } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Archive,
   CheckCircle2,
+  ChevronDown,
+  Download,
   FileJson,
   FileSpreadsheet,
   FileText,
@@ -10,6 +12,7 @@ import {
   History,
   Landmark,
   RotateCcw,
+  Search,
   Sheet as SheetIcon,
   Undo2,
 } from "lucide-react";
@@ -36,6 +39,7 @@ import { Tip } from "../components/help";
 import { Alert, Button, PageHeader } from "../components/ui";
 import { announce } from "../lib/announce";
 import { addMonths, money, monthLabel, shortDate, thisMonth } from "../lib/format";
+import { normalizeText } from "../lib/text";
 
 // ================================================================ importar
 
@@ -816,6 +820,138 @@ function presetRange(preset: Preset): [string, string] {
   return [addMonths(now, -11), now];
 }
 
+/** Lista suspensa com caixas de marcar e busca (v1.7.6.1). Nada marcado = todas. */
+function PickMany({
+  label,
+  allLabel,
+  options,
+  value,
+  onChange,
+}: {
+  label: string;
+  allLabel: string;
+  options: { id: string; name: string; hint?: string }[];
+  value: string[];
+  onChange: (next: string[]) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const ref = useRef<HTMLDivElement>(null);
+  const listId = useId();
+  useEffect(() => {
+    if (!open) {
+      setQuery(""); // ao reabrir, a lista volta inteira
+      return;
+    }
+    function onDown(e: PointerEvent) {
+      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        setOpen(false);
+        ref.current?.querySelector<HTMLButtonElement>(".pick__toggle")?.focus();
+      }
+    }
+    document.addEventListener("pointerdown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+  const chosen = options.filter((o) => value.includes(o.id));
+  const summary =
+    chosen.length === 0
+      ? allLabel
+      : chosen.length <= 2
+        ? chosen.map((o) => o.name).join(" e ")
+        : `${chosen.length} de ${options.length} escolhidas`;
+  const q = normalizeText(query);
+  const shown = q ? options.filter((o) => normalizeText(o.name).includes(q)) : options;
+  const toggle = (id: string) => onChange(value.includes(id) ? value.filter((v) => v !== id) : [...value, id]);
+  return (
+    <div
+      className="pick"
+      ref={ref}
+      onBlur={(e) => {
+        const next = e.relatedTarget as Node | null;
+        if (open && next && !ref.current?.contains(next)) setOpen(false);
+      }}
+    >
+      <span className="field-label">{label}</span>
+      <button
+        type="button"
+        className={`pick__toggle ${chosen.length ? "is-filtered" : ""}`}
+        aria-expanded={open}
+        aria-controls={listId}
+        aria-label={`${label}: ${summary}`}
+        onClick={() => setOpen((v) => !v)}
+      >
+        <span className="pick__summary">{summary}</span>
+        <ChevronDown size={16} aria-hidden />
+      </button>
+      {open && (
+        <div className="pick__menu" id={listId}>
+          {options.length > 6 && (
+            <label className="pick__search">
+              <Search size={15} aria-hidden />
+              <span className="sr-only">Buscar em {label.toLowerCase()}</span>
+              <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar" autoFocus />
+            </label>
+          )}
+          <fieldset className="pick__list">
+            <legend className="sr-only">{label}</legend>
+            {!q && (
+              <label className="pick__option pick__option--all">
+                <input type="checkbox" checked={value.length === 0} onChange={() => onChange([])} />
+                {allLabel}
+              </label>
+            )}
+            {shown.map((o) => (
+              <label key={o.id} className="pick__option">
+                <input type="checkbox" checked={value.includes(o.id)} onChange={() => toggle(o.id)} />
+                <span>{o.name}</span>
+                {o.hint && <span className="pick__hint">{o.hint}</span>}
+              </label>
+            ))}
+            {shown.length === 0 && <p className="muted small pick__empty">Nada encontrado.</p>}
+          </fieldset>
+        </div>
+      )}
+    </div>
+  );
+}
+
+const KINDS: [ExportFilters["kind"], string][] = [
+  ["all", "Receitas e despesas"],
+  ["expense", "Só despesas"],
+  ["income", "Só receitas"],
+];
+
+const FORMATS = [
+  {
+    key: "pdf",
+    icon: <FileText size={20} aria-hidden />,
+    name: "PDF",
+    text: "Para ler, imprimir ou enviar: resumo, categorias, mês a mês e a lista de lançamentos.",
+    file: "lancamentos.pdf",
+  },
+  {
+    key: "xlsx",
+    icon: <SheetIcon size={20} aria-hidden />,
+    name: "Planilha Excel",
+    text: "Para analisar: abas de lançamentos, resumo mensal e total por categoria, já formatadas.",
+    file: "lancamentos.xlsx",
+  },
+  {
+    key: "csv",
+    icon: <FileSpreadsheet size={20} aria-hidden />,
+    name: "CSV",
+    text: "Para levar a outro aplicativo ou ao contador. Abre no Excel e no Google Planilhas.",
+    file: "lancamentos.csv",
+  },
+] as const;
+
 function ExportPanel() {
   const categories = useCategories();
   const accounts = useAccounts();
@@ -835,7 +971,7 @@ function ExportPanel() {
       start: range[0],
       end: range[1],
       kind,
-      categories: cats,
+      categories: kind === "income" ? [] : cats,
       places: {
         accounts: places.filter((p) => p.startsWith("a:")).map((p) => p.slice(2)),
         cards: places.filter((p) => p.startsWith("c:")).map((p) => p.slice(2)),
@@ -854,6 +990,7 @@ function ExportPanel() {
     setBusy(key);
     try {
       await download(path, name);
+      announce("Download iniciado.");
     } catch (err) {
       setError(errorMessage(err));
     } finally {
@@ -861,164 +998,215 @@ function ExportPanel() {
     }
   }
 
-  const toggleIn = (list: string[], set: (v: string[]) => void, value: string) =>
-    set(list.includes(value) ? list.filter((v) => v !== value) : [...list, value]);
   const placeOptions = [
-    ...(accounts.data ?? []).map((b) => ({ id: `a:${b.account.id}`, name: b.account.name })),
-    ...(cards.data ?? []).map((c) => ({ id: `c:${c.card.id}`, name: c.card.name })),
+    ...(accounts.data ?? []).map((b) => ({ id: `a:${b.account.id}`, name: b.account.name, hint: "conta" })),
+    ...(cards.data ?? []).map((c) => ({ id: `c:${c.card.id}`, name: c.card.name, hint: "cartão" })),
   ];
+  const categoryOptions = (categories.data ?? []).map((c) => ({ id: c.id, name: c.name }));
   const years = Array.from({ length: 6 }, (_, i) => String(new Date().getFullYear() - i));
-  const n = count.data?.count;
+  const data = count.data;
+  const n = data?.count;
+  const period = range[0] === range[1] ? monthLabel(range[0]) : `${monthLabel(range[0])} a ${monthLabel(range[1]).toLowerCase()}`;
+  const onlyExpenses = kind === "all" && (cats.length > 0 || places.some((p) => p.startsWith("c:")));
+  // Com categoria ou cartão escolhidos, receitas não entram: o resumo mostra só despesas.
+  const shownKind = onlyExpenses ? "expense" : kind;
 
   return (
     <div className="stack" style={{ gap: 20 }}>
       <Alert tone="error">{error}</Alert>
-      <section className="card stack">
-        <div className="section-header">
-          <h2>Lançamentos</h2>
-          <span className="muted small" aria-live="polite">
-            {n === undefined ? "Contando…" : `${n} lançamento(s) no recorte`}
-          </span>
-        </div>
-        <fieldset className="radios">
-          <legend className="field-label">Período</legend>
-          <div className="chips" role="group" aria-label="Período">
-            {PRESETS.map(([value, label]) => (
-              <button key={value} type="button" className={`chip-btn ${preset === value ? "is-active" : ""}`} aria-pressed={preset === value} onClick={() => setPreset(value)}>
-                {label}
-              </button>
-            ))}
+      <div className="export-layout">
+        <section className="card stack export-filters" aria-labelledby="recorte">
+          <div>
+            <h2 id="recorte">O que exportar</h2>
+            <p className="muted small" style={{ margin: "2px 0 0" }}>
+              Escolha o recorte; o resumo acompanha na hora.
+            </p>
           </div>
-          {preset === "custom" && (
-            <div className="row row--end" style={{ marginTop: 8 }}>
-              <label className="month-picker">
-                De
-                <DateField month value={range[0]} onChange={(v) => v && setRange([v, range[1]])} />
-              </label>
-              <label className="month-picker">
-                Até
-                <DateField month value={range[1]} min={range[0]} onChange={(v) => v && setRange([range[0], v])} />
-              </label>
-            </div>
-          )}
-          <p className="muted small" style={{ margin: "6px 0 0" }}>
-            {monthLabel(range[0])} a {monthLabel(range[1])}
-          </p>
-        </fieldset>
-        <fieldset className="radios">
-          <legend className="field-label">Conteúdo</legend>
-          <div className="segmented">
-            {(
-              [
-                ["all", "Receitas e despesas"],
-                ["expense", "Só despesas"],
-                ["income", "Só receitas"],
-              ] as const
-            ).map(([value, label]) => (
-              <label key={value}>
-                <input type="radio" name="export-kind" checked={kind === value} onChange={() => setKind(value)} />
-                {label}
-              </label>
-            ))}
-          </div>
-        </fieldset>
-        {placeOptions.length > 0 && (
-          <fieldset className="radios">
-            <legend className="field-label">Contas e cartões</legend>
-            <div className="chips" role="group" aria-label="Contas e cartões">
-              {placeOptions.map((p) => (
-                <button key={p.id} type="button" className={`chip-btn ${places.includes(p.id) ? "is-active" : ""}`} aria-pressed={places.includes(p.id)} onClick={() => toggleIn(places, setPlaces, p.id)}>
-                  {p.name}
+          <div className="export-field">
+            <span className="field-label" id="export-periodo">
+              Período
+            </span>
+            <div className="chips" role="group" aria-labelledby="export-periodo">
+              {PRESETS.map(([value, label]) => (
+                <button key={value} type="button" className="chip-btn" aria-pressed={preset === value} onClick={() => setPreset(value)}>
+                  {label}
                 </button>
               ))}
             </div>
-            <p className="muted small" style={{ margin: "6px 0 0" }}>{places.length ? `${places.length} selecionado(s)` : "Todos"}</p>
-          </fieldset>
-        )}
-        {kind !== "income" && (
-          <fieldset className="radios">
-            <legend className="field-label">Categorias</legend>
-            <div className="chips" role="group" aria-label="Categorias">
-              {(categories.data ?? []).map((c) => (
-                <button key={c.id} type="button" className={`chip-btn ${cats.includes(c.id) ? "is-active" : ""}`} aria-pressed={cats.includes(c.id)} onClick={() => toggleIn(cats, setCats, c.id)}>
-                  {c.name}
+            {preset === "custom" && (
+              <div className="export-range">
+                <label className="month-picker">
+                  De
+                  <DateField month value={range[0]} onChange={(v) => v && setRange([v, range[1] < v ? v : range[1]])} />
+                </label>
+                <label className="month-picker">
+                  Até
+                  <DateField month value={range[1]} min={range[0]} onChange={(v) => v && setRange([range[0], v])} />
+                </label>
+              </div>
+            )}
+          </div>
+          <div className="export-field">
+            <span className="field-label" id="export-conteudo">
+              Conteúdo
+            </span>
+            <div className="chips" role="group" aria-labelledby="export-conteudo">
+              {KINDS.map(([value, label]) => (
+                <button key={value} type="button" className="chip-btn" aria-pressed={kind === value} onClick={() => setKind(value)}>
+                  {label}
                 </button>
               ))}
             </div>
-            <p className="muted small" style={{ margin: "6px 0 0" }}>{cats.length ? `${cats.length} selecionada(s)` : "Todas"}</p>
-          </fieldset>
-        )}
-        <div className="export-grid">
-          <div className="export-card">
-            <SheetIcon size={20} aria-hidden />
-            <strong>Planilha Excel</strong>
-            <p className="muted small">Para analisar: abas de lançamentos, resumo mensal e total por categoria, já formatadas.</p>
-            <Button type="button" variant="secondary" disabled={n === 0} loading={busy === "xlsx"} onClick={() => void get("xlsx", `/export/transactions?${exportQuery(filters)}&format=xlsx`, "lancamentos.xlsx")}>
-              Baixar Excel
-            </Button>
           </div>
-          <div className="export-card">
-            <FileText size={20} aria-hidden />
-            <strong>CSV</strong>
-            <p className="muted small">Para levar a outro aplicativo ou enviar ao contador. Abre no Excel e no Google Planilhas.</p>
-            <Button type="button" variant="secondary" disabled={n === 0} loading={busy === "csv"} onClick={() => void get("csv", `/export/transactions?${exportQuery(filters)}&format=csv`, "lancamentos.csv")}>
-              Baixar CSV
-            </Button>
+          <div className="export-picks">
+            {placeOptions.length > 0 && (
+              <PickMany label="Contas e cartões" allLabel="Todas as contas e cartões" options={placeOptions} value={places} onChange={setPlaces} />
+            )}
+            {kind !== "income" && categoryOptions.length > 0 && (
+              <PickMany label="Categorias" allLabel="Todas as categorias" options={categoryOptions} value={cats} onChange={setCats} />
+            )}
           </div>
-        </div>
-      </section>
+          {onlyExpenses && <p className="muted small" style={{ margin: 0 }}>Com categoria ou cartão escolhidos, só entram despesas.</p>}
+        </section>
 
-      <section className="card stack">
-        <h2>Relatórios em PDF</h2>
-        <p className="muted small" style={{ margin: 0 }}>
-          Os relatórios abrem prontos para imprimir. Na janela de impressão, escolha “Salvar como PDF”.
-        </p>
-        <div className="export-grid">
-          <div className="export-card">
-            <FileText size={20} aria-hidden />
-            <strong>Relatório do mês</strong>
-            <p className="muted small">Resultado, despesas por categoria, metas e lançamentos do mês.</p>
-            <label className="month-picker">
-              Mês
+        <section className="card stack export-summary" aria-labelledby="resumo-recorte">
+          <div>
+            <h2 id="resumo-recorte">Resumo do recorte</h2>
+            <p className="muted small" style={{ margin: "2px 0 0" }}>
+              {period}
+            </p>
+          </div>
+          <dl className="export-totals" aria-live="polite">
+            <div>
+              <dt>Lançamentos</dt>
+              <dd>{n === undefined ? "…" : n}</dd>
+            </div>
+            {shownKind !== "expense" && (
+              <div>
+                <dt>Receitas</dt>
+                <dd className="tone--ok">{data ? money(data.income) : "…"}</dd>
+              </div>
+            )}
+            {shownKind !== "income" && (
+              <div>
+                <dt>Despesas</dt>
+                <dd>{data ? money(data.expenses) : "…"}</dd>
+              </div>
+            )}
+            {shownKind === "all" && (
+              <div>
+                <dt>Saldo</dt>
+                <dd className={data && Number(data.balance) < 0 ? "tone--error" : "tone--ok"}>{data ? money(data.balance) : "…"}</dd>
+              </div>
+            )}
+          </dl>
+          <div className="export-formats" role="group" aria-label="Baixar o recorte">
+            {FORMATS.map((f) => (
+              <div key={f.key} className="export-format">
+                <span className="export-format__icon">{f.icon}</span>
+                <strong className="export-format__name">{f.name}</strong>
+                <span className="muted small export-format__about">{f.text}</span>
+                <Button
+                  type="button"
+                  variant={f.key === "pdf" ? "primary" : "secondary"}
+                  disabled={n === 0}
+                  loading={busy === f.key}
+                  aria-label={`Baixar ${f.name}`}
+                  onClick={() => void get(f.key, `/export/transactions?${exportQuery(filters)}&format=${f.key}`, f.file)}
+                >
+                  <Download size={16} aria-hidden /> Baixar
+                </Button>
+              </div>
+            ))}
+          </div>
+          {n === 0 && <p className="muted small" style={{ margin: 0 }}>Nenhum lançamento neste recorte. Mude o período ou os filtros.</p>}
+        </section>
+      </div>
+
+      <section className="card stack" aria-labelledby="relatorios-prontos">
+        <div>
+          <h2 id="relatorios-prontos">Relatórios prontos</h2>
+          <p className="muted small" style={{ margin: "2px 0 0" }}>
+            Baixe em PDF ou abra na tela para imprimir.
+          </p>
+        </div>
+        <div className="export-rows">
+          <div className="export-row">
+            <span className="export-format__icon">
+              <FileText size={20} aria-hidden />
+            </span>
+            <span className="export-format__text">
+              <strong>Relatório do mês</strong>
+              <span className="muted small">Resumo, despesas por categoria e lançamentos do mês.</span>
+            </span>
+            <label className="month-picker export-row__pick">
+              <span className="sr-only">Mês do relatório</span>
               <DateField month value={reportMonth} onChange={(v) => v && setReportMonth(v)} />
             </label>
-            <Link className="btn btn--secondary" to={`/relatorio/${reportMonth}`}>
-              Abrir relatório do mês
-            </Link>
+            <span className="export-row__actions">
+              <Link className="btn btn--secondary" to={`/relatorio/${reportMonth}`}>
+                Abrir
+              </Link>
+              <Button
+                type="button"
+                variant="secondary"
+                loading={busy === "month"}
+                aria-label="Baixar o relatório do mês em PDF"
+                onClick={() =>
+                  void get("month", `/export/transactions?start=${reportMonth}&end=${reportMonth}&kind=all&format=pdf`, `relatorio-${reportMonth}.pdf`)
+                }
+              >
+                <Download size={16} aria-hidden /> PDF
+              </Button>
+            </span>
           </div>
-          <div className="export-card">
-            <FileText size={20} aria-hidden />
-            <strong>Resumo anual</strong>
-            <p className="muted small">
-              Receitas, despesas por categoria, mês a mês e uma parte para o Imposto de Renda: pagamentos dedutíveis, rendimentos, bens e dívidas em
-              31/12. Não é documento fiscal.
-            </p>
-            <label>
-              Ano
+          <div className="export-row">
+            <span className="export-format__icon">
+              <FileText size={20} aria-hidden />
+            </span>
+            <span className="export-format__text">
+              <strong>Resumo anual</strong>
+              <span className="muted small">Mês a mês, categorias e uma parte para o Imposto de Renda. Não é documento fiscal.</span>
+            </span>
+            <label className="export-row__pick">
+              <span className="sr-only">Ano do resumo</span>
               <select value={year} onChange={(e) => setYear(e.target.value)}>
                 {years.map((y) => (
                   <option key={y}>{y}</option>
                 ))}
               </select>
             </label>
-            <Link className="btn btn--secondary" to={`/relatorio/ano/${year}`}>
-              Abrir resumo anual
-            </Link>
+            <span className="export-row__actions">
+              <Link className="btn btn--secondary" to={`/relatorio/ano/${year}`}>
+                Abrir
+              </Link>
+              <Button
+                type="button"
+                variant="secondary"
+                loading={busy === "year"}
+                aria-label="Baixar o resumo anual em PDF"
+                onClick={() => void get("year", `/export/annual.pdf?year=${year}`, `resumo-anual-${year}.pdf`)}
+              >
+                <Download size={16} aria-hidden /> PDF
+              </Button>
+            </span>
           </div>
-        </div>
-      </section>
-
-      <section className="card stack">
-        <h2>Backup completo</h2>
-        <p className="muted" style={{ margin: 0 }}>
-          Todos os seus dados (contas, cartões, categorias, lançamentos, recorrências, metas, investimentos e solicitações) em um arquivo JSON.
-          Use para guardar uma cópia ou restaurar em “Importar dados”. É também o seu direito de portabilidade previsto na LGPD.
-        </p>
-        <p className="muted small" style={{ margin: 0 }}>Guarde em local seguro: o arquivo contém toda a sua vida financeira.</p>
-        <div>
-          <Button type="button" variant="secondary" loading={busy === "backup"} onClick={() => void get("backup", "/export/backup", "meu-orcamento-backup.json")}>
-            <Archive size={16} /> Baixar backup
-          </Button>
+          <div className="export-row">
+            <span className="export-format__icon">
+              <Archive size={20} aria-hidden />
+            </span>
+            <span className="export-format__text">
+              <strong>Backup completo</strong>
+              <span className="muted small">
+                Todos os seus dados em JSON, para guardar ou restaurar em “Importar”. É o seu direito de portabilidade (LGPD). Guarde em local seguro.
+              </span>
+            </span>
+            <span className="export-row__actions">
+              <Button type="button" variant="secondary" loading={busy === "backup"} onClick={() => void get("backup", "/export/backup", "meu-orcamento-backup.json")}>
+                <Download size={16} aria-hidden /> Backup
+              </Button>
+            </span>
+          </div>
         </div>
       </section>
     </div>

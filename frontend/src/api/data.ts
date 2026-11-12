@@ -155,7 +155,8 @@ export const dataApi = {
   restore: (file: File) => api.form<Record<string, number>>("POST", "/import/restore", fileForm(file)),
   batches: () => api.get<ImportBatch[]>("/import/batches"),
   undo: (id: string) => api.post<{ removed: number }>(`/import/batches/${id}/undo`),
-  exportCount: (f: ExportFilters) => api.get<{ count: number }>(`/export/count?${exportQuery(f)}`),
+  exportCount: (f: ExportFilters) =>
+    api.get<{ count: number; income: string; expenses: string; balance: string }>(`/export/count?${exportQuery(f)}`),
   annual: (year: number) => api.get<AnnualSummary>(`/export/annual?year=${year}`),
 };
 

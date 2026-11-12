@@ -1,6 +1,7 @@
 import json
 import uuid
 from datetime import datetime
+from decimal import Decimal
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, File, Form, Query, Response, UploadFile
@@ -98,10 +99,18 @@ def export_count(
     category: IdList = [],  # noqa: B006 (padrão do FastAPI para listas na query)
     account: IdList = [],  # noqa: B006
     card: IdList = [],  # noqa: B006
-) -> dict[str, int]:
+) -> dict[str, Any]:
     first, last = _period(start, end, user.month_start_day)
     rows = export.transactions(db, user, first, last, _filters(kind, category, account, card))
-    return {"count": len(rows)}
+    # v1.7.6.1: o resumo do recorte na tela (receitas, despesas e saldo).
+    income = sum((r["amount"] for r in rows if r["type"] == "Receita"), Decimal(0))
+    expenses = sum((-r["amount"] for r in rows if r["type"] == "Despesa"), Decimal(0))
+    return {
+        "count": len(rows),
+        "income": str(income),
+        "expenses": str(expenses),
+        "balance": str(income - expenses),
+    }
 
 
 @router.get("/export/annual")
@@ -111,13 +120,29 @@ def export_annual(
     return export.annual(db, user, year)
 
 
+@router.get("/export/annual.pdf")
+def export_annual_pdf(
+    user: CurrentUser, db: DbSession, year: Annotated[int, Query(ge=2000, le=2100)]
+) -> Response:
+    """Resumo anual em PDF (v1.7.6.1), com a parte para o Imposto de Renda."""
+    from datetime import date
+
+    from app.services import pdf_export
+
+    rows = export.transactions(db, user, date(year, 1, 1), date(year, 12, 1))
+    content = pdf_export.annual_pdf(
+        export.annual(db, user, year), rows, user.display_name or user.email
+    )
+    return _attachment(content, f"meu-orcamento_resumo-anual_{year}.pdf", "application/pdf")
+
+
 @router.get("/export/transactions")
 def export_transactions(
     user: CurrentUser,
     db: DbSession,
     start: str,
     end: str | None = None,
-    format: Literal["csv", "xlsx"] = "csv",
+    format: Literal["csv", "xlsx", "pdf"] = "csv",
     kind: ExportKind = "all",
     category: IdList = [],  # noqa: B006
     account: IdList = [],  # noqa: B006
@@ -128,6 +153,21 @@ def export_transactions(
     name = f"meu-orcamento_{format_month(first)}_a_{format_month(last)}"
     if format == "csv":
         return _attachment(export.to_csv(rows), f"{name}.csv", "text/csv; charset=utf-8")
+    if format == "pdf":
+        from app.services import pdf_export
+
+        content = pdf_export.transactions_pdf(
+            rows,
+            export.by_category(rows),
+            start=first,
+            end=last,
+            kind=kind,
+            filters=export.describe_filters(
+                db, user, first, last, _filters(kind, category, account, card)
+            ),
+            owner=user.display_name or user.email,
+        )
+        return _attachment(content, f"{name}.pdf", "application/pdf")
     summary = export.period_summary(db, user, first, last)
     return _attachment(export.to_xlsx(rows, summary), f"{name}.xlsx", XLSX)
 

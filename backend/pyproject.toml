@@ -19,6 +19,7 @@ dependencies = [
     "pillow>=11",
     "python-multipart>=0.0.20",
     "pywebpush>=2.0",
+    "fpdf2>=2.8",
 ]
 
 [dependency-groups]
@@ -26,6 +27,7 @@ dev = [
     "pytest>=8.3",
     "httpx2",
     "ruff>=0.9",
+    "pypdf>=5",
 ]
 
 [tool.pytest.ini_options]
@@ -44,6 +46,7 @@ select = ["E", "F", "I", "B", "UP"]
 "app/services/category_words_more.py" = ["E501"]
 "app/services/lexicon.py" = ["E501"]  # listas de palavras do núcleo de linguagem
 "app/services/understand.py" = ["E501"]
+"app/services/pdf_export.py" = ["E501"]  # textos do PDF
 # Modelos de e-mail em HTML: linhas longas de estilos embutidos.
 "app/services/notify.py" = ["E501"]
 "app/services/ask.py" = ["E501"]  # frases das respostas e lista de telas
