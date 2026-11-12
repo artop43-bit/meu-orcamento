@@ -457,7 +457,12 @@ def test_export_csv(user: TestClient) -> None:
     assert kinds == {"Despesa"}
     moradia = next(c["id"] for c in user.get("/api/categories").json() if c["name"] == "Moradia")
     count = user.get(f"/api/export/count?start={MONTH}&end=2030-02&category={moradia}").json()
-    assert count == {"count": 1}
+    assert count == {
+        "count": 1,
+        "income": "0",
+        "expenses": "1234.50",
+        "balance": "-1234.50",
+    }
     assert user.get(f"/api/export/count?start={MONTH}&end=2030-02").json()["count"] == len(rows) - 1
 
 
