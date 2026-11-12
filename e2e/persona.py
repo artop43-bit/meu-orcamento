@@ -1173,7 +1173,7 @@ def validation(page: Page):
 def version(page: Page):
     page.goto(f"{BASE}/orcamento")
     idle(page)
-    expect(page.locator(".sidebar .app-version")).to_contain_text(re.compile(r"Versão \d+\.\d+\.\d+ · \d{2}/\d{2}/\d{4} às \d{2}:\d{2}"))
+    expect(page.locator(".sidebar .app-version")).to_contain_text(re.compile(r"Versão \d+\.\d+\.\d+(?:\.\d+)? · \d{2}/\d{2}/\d{4} às \d{2}:\d{2}"))
 
 
 @step("Celular: deslizar entre telas, abas dos grupos, voltar da sub-tela e arrastar a janela para fechar")
@@ -1361,36 +1361,80 @@ def history_report(page: Page, months: list[str]):
     expect(page.get_by_text("Aluguel").first).to_be_visible()
 
 
-@step("Exportar: recorte com contagem ao vivo, Excel, CSV, relatório anual e backup")
+@step("Exportar: recorte com resumo ao vivo, listas suspensas, PDF, Excel, CSV, relatórios em PDF e backup")
 def exports(page: Page):
     page.goto(f"{BASE}/ajustes/dados?aba=exportar")
     idle(page, 500)
-    counter = page.locator("[aria-live]", has_text="no recorte")
-    expect(counter).to_contain_text(re.compile(r"\d+ lançamento"))
+    totals = page.locator(".export-totals")
+
+    def count() -> int:
+        idle(page, 400)
+        return int(totals.locator("div", has_text="Lançamentos").locator("dd").inner_text())
+
     page.get_by_role("button", name="12 meses").click()
-    idle(page, 400)
-    total = int(re.search(r"(\d+) lançamento", counter.inner_text())[1])
-    page.get_by_label("Só despesas").check()
-    idle(page, 400)
-    only = int(re.search(r"(\d+) lançamento", counter.inner_text())[1])
+    total = count()
+    expect(totals).to_contain_text("Receitas")
+    expect(totals).to_contain_text("Saldo")
+    # Conteúdo: pílulas iguais às do período (sem bolinha de rádio).
+    page.get_by_role("button", name="Só despesas", exact=True).click()
+    only = count()
     assert 0 < only < total, (only, total)
-    page.get_by_label("Receitas e despesas").check()
-    idle(page, 300)
-    page.screenshot(path=OUT / "v08-exportar.png", full_page=True)
-    for name in ("Baixar Excel", "Baixar CSV", "Baixar backup"):
+    expect(totals).not_to_contain_text("Receitas")
+    page.get_by_role("button", name="Receitas e despesas", exact=True).click()
+    assert count() == total
+    # Categorias: lista suspensa com busca; escolher uma diminui o recorte e o campo mostra o nome.
+    picker = page.locator(".pick", has_text="Categorias")
+    toggle = picker.locator(".pick__toggle")
+    expect(toggle).to_contain_text("Todas as categorias")
+    toggle.click()
+    menu = picker.locator(".pick__menu")
+    expect(menu).to_be_visible()
+    menu.get_by_role("textbox").fill("morad")
+    menu.get_by_label("Moradia").check()
+    page.keyboard.press("Escape")
+    expect(menu).to_have_count(0)
+    expect(toggle).to_contain_text("Moradia")
+    filtered = count()
+    assert 0 < filtered < only, (filtered, only)
+    expect(page.locator(".export-filters")).to_contain_text("só entram despesas")
+    page.screenshot(path=OUT / "v1761-exportar.png", full_page=True)
+    toggle.click()
+    menu.get_by_label("Todas as categorias").check()
+    page.keyboard.press("Escape")
+    expect(toggle).to_contain_text("Todas as categorias")
+    assert count() == total
+    for name, extension, magic in (("PDF", ".pdf", b"%PDF"), ("Planilha Excel", ".xlsx", b"PK"), ("CSV", ".csv", None)):
         with page.expect_download() as info:
-            page.get_by_role("button", name=name).click()
+            page.get_by_role("button", name=f"Baixar {name}", exact=True).click()
         download = info.value
+        assert download.suggested_filename.endswith(extension), download.suggested_filename
         path = OUT / download.suggested_filename
         download.save_as(path)
         assert path.stat().st_size > 200, f"{name} vazio"
+        if magic:
+            assert path.read_bytes().startswith(magic), name
+    # Relatórios prontos em PDF e backup.
+    for label, extension in (
+        ("Baixar o relatório do mês em PDF", ".pdf"),
+        ("Baixar o resumo anual em PDF", ".pdf"),
+        ("Backup", ".json"),
+    ):
+        with page.expect_download() as info:
+            page.get_by_role("button", name=label, exact=label != "Backup").click()
+        download = info.value
+        path = OUT / download.suggested_filename
+        download.save_as(path)
+        assert path.suffix == extension and path.stat().st_size > 200, label
     # O último download é o backup: precisa ser um JSON com os lançamentos da persona.
     backup = json.loads(path.read_text(encoding="utf-8"))
     assert backup and "expenses" in json.dumps(backup), "backup sem os lançamentos"
-    page.get_by_role("link", name="Abrir resumo anual").click()
+    page.locator(".export-row", has_text="Resumo anual").get_by_role("link", name="Abrir").click()
     page.wait_for_url("**/relatorio/ano/**")
     idle(page, 500)
     expect(page.get_by_role("heading", name=re.compile(r"Resumo anual de \d{4}"))).to_be_visible()
+    with page.expect_download() as info:
+        page.get_by_role("button", name="Baixar PDF").click()
+    assert info.value.suggested_filename.endswith(".pdf")
     page.screenshot(path=OUT / "v08-resumo-anual.png", full_page=True)
 
 
@@ -1497,14 +1541,14 @@ def release_notes(page: Page):
     page.wait_for_url("**/ajustes/notas")
     idle(page)
     current = page.locator(".release--current")
-    expect(current).to_contain_text(re.compile(r"Versão \d+\.\d+\.\d+"))
+    expect(current).to_contain_text(re.compile(r"Versão \d+\.\d+\.\d+(?:\.\d+)?"))
     head = page.locator(".release__head").nth(1)
     head.click()
     expect(head).to_have_attribute("aria-expanded", "true")
     page.get_by_role("button", name="Enviar sugestão").first.click()
     d = dialog(page)
     expect(d).to_contain_text("Nova solicitação")
-    expect(d).to_contain_text(re.compile(r"Referente a: Versão \d+\.\d+\.\d+"))
+    expect(d).to_contain_text(re.compile(r"Referente a: Versão \d+\.\d+\.\d+(?:\.\d+)?"))
     page.keyboard.press("Escape")
     expect(d).to_have_count(0)
 

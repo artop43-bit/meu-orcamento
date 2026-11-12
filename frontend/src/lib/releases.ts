@@ -11,6 +11,22 @@ export type Release = {
 
 export const RELEASES: Release[] = [
   {
+    version: "1.7.6.1",
+    date: "12/11/2026 às 12:00",
+    title: "Exportar em PDF e tela de exportar reorganizada",
+    sections: [
+      {
+        title: "Exportar",
+        items: [
+          "Novo formato PDF: o recorte escolhido (período, conteúdo, contas e categorias) com resumo, categorias, mês a mês e lançamentos.",
+          "Relatório do mês e Resumo anual também baixam direto em PDF.",
+          "Tela reorganizada: o recorte de um lado e, do outro, o resumo na hora (lançamentos, receitas, despesas e saldo) e os três formatos.",
+          "Contas, cartões e categorias em listas suspensas com busca, no lugar das fileiras de botões.",
+        ],
+      },
+    ],
+  },
+  {
     version: "1.7.6",
     date: "11/11/2026 às 19:45",
     title: "Um vocabulário só para lançar e para perguntar",

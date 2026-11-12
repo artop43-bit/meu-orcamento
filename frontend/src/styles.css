@@ -5909,47 +5909,6 @@ textarea {
 }
 
 /* ---------------------------------------------------------------- exportação */
-.export-grid {
-  display: grid;
-  gap: 12px;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr));
-}
-
-.export-card {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 8px;
-  padding: 16px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  color: var(--accent);
-}
-
-.export-card strong,
-.export-card p,
-.export-card label {
-  color: var(--fg);
-}
-
-.export-card p {
-  margin: 0;
-  color: var(--muted);
-}
-
-.export-card > label {
-  align-self: stretch;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  font-size: 0.88rem;
-  font-weight: 600;
-}
-
-.export-card .btn {
-  margin-top: auto;
-}
-
 /* ---------------------------------------------------------------- metas */
 .goal-kinds {
   display: grid;
@@ -6298,10 +6257,6 @@ textarea {
 .goal-card .section-header {
   flex-wrap: nowrap;
   align-items: flex-start;
-}
-
-.export-card > label > select {
-  max-width: 240px;
 }
 
 .inbox-item {
