@@ -12,7 +12,7 @@ export type Release = {
 export const RELEASES: Release[] = [
   {
     version: "1.8.0",
-    date: "13/11/2026 às 23:00",
+    date: "13/11/2026 às 19:15",
     title: "Empréstimos com juros nas Divisões",
     sections: [
       {

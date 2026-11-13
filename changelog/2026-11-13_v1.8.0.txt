@@ -1,6 +1,6 @@
 MEU ORÇAMENTO · UPDATE LOG
 Versão 1.8.0 · Empréstimos com juros nas Divisões
-Data: 13/11/2026 às 23:00 (horário de Brasília)
+Data: 13/11/2026 às 19:15 (horário de Brasília)
 
 Simulador de empréstimo (Divisões › Nova anotação › Empréstimo com juros e parcelas)
 - [x] "O que você quer definir?": a taxa, o lucro (ex.: emprestar R$ 1.000 e lucrar R$ 200), o valor da parcela ou o total; a taxa necessária é calculada
