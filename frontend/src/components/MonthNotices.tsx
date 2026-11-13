@@ -5,6 +5,7 @@ import {
   CalendarClock,
   ChevronDown,
   ChevronRight,
+  HandCoins,
   HeartHandshake,
   ListChecks,
   Store,
@@ -32,6 +33,7 @@ const ALERT_ICONS: Record<MonthAlert["kind"], LucideIcon> = {
   new_merchant: Store,
   price_up: TrendingUp,
   renewal: CalendarClock,
+  loan_late: HandCoins,
 };
 
 const MOOD: Record<string, { icon: LucideIcon; tone: Tone }> = {
