@@ -126,14 +126,30 @@ def board(db: Session, user: User) -> dict[str, Any]:
             .order_by(SplitShare.created_at.desc())
         )
     )
+    from app.services import personal_loans
+
+    loans = personal_loans.all_loans(db, user)
     people: dict[str, dict[str, Any]] = {}
     totals: dict[str, Decimal] = defaultdict(lambda: ZERO)
     for share in open_shares:
         key = share.person.casefold()
-        entry = people.setdefault(key, {"person": share.person, "items": []})
+        entry = people.setdefault(key, {"person": share.person, "items": [], "loans": []})
         entry["items"].append(share)
         totals[key] += share.amount if share.direction == "owes_me" else -share.amount
-    rows = [{**entry, "balance": totals[key]} for key, entry in people.items() if entry["items"]]
+    # v1.8: empréstimos com juros entram na linha da pessoa (o que falta pagar conta no saldo).
+    for loan in loans:
+        key = loan["person"].casefold()
+        if loan["settled_at"] and key not in people:
+            continue
+        entry = people.setdefault(key, {"person": loan["person"], "items": [], "loans": []})
+        entry["loans"].append(loan)
+        sign = 1 if loan["direction"] == "owes_me" else -1
+        totals[key] += sign * loan["remaining"]
+    rows = [
+        {**entry, "balance": totals[key]}
+        for key, entry in people.items()
+        if entry["items"] or entry["loans"]
+    ]
     rows.sort(key=lambda r: abs(r["balance"]), reverse=True)
     history = list(
         db.scalars(
@@ -147,8 +163,12 @@ def board(db: Session, user: User) -> dict[str, Any]:
         "people": rows,
         "owed_to_me": sum((r["balance"] for r in rows if r["balance"] > 0), ZERO),
         "i_owe": -sum((r["balance"] for r in rows if r["balance"] < 0), ZERO),
-        "names": sorted({s.person for s in open_shares + history}, key=str.casefold),
+        "names": sorted(
+            {s.person for s in open_shares + history} | {x["person"] for x in loans},
+            key=str.casefold,
+        ),
         "history": history,
+        "loans": personal_loans.totals(loans),
     }
 
 

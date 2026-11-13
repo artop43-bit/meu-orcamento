@@ -1,6 +1,6 @@
 MEU ORÇAMENTO · UPDATE LOG
 Versão 1.7.6.1 · Exportar em PDF e tela de exportar reorganizada (hotfix)
-Data: 12/11/2026 às 11:45 (horário de Brasília)
+Data: 12/11/2026 às 11:36 (horário de Brasília)
 
 Exportar em PDF
 - [x] Novo formato PDF ao lado de Excel e CSV: segue exatamente o recorte escolhido (período, conteúdo, contas e cartões, categorias)

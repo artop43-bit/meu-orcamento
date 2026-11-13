@@ -19,7 +19,14 @@ from app.models.budget import (
     Transfer,
     WatchItem,
 )
-from app.models.debts import Loan, NetWorthSnapshot, OtherDebt, SplitShare
+from app.models.debts import (
+    Loan,
+    LoanInstallment,
+    NetWorthSnapshot,
+    OtherDebt,
+    PersonalLoan,
+    SplitShare,
+)
 from app.models.indexes import FOREIGN_KEY_INDEXES  # noqa: F401 (registra os índices)
 from app.models.support import (
     Announcement,
@@ -46,6 +53,8 @@ from app.models.user import (
 )
 
 __all__ = [
+    "LoanInstallment",
+    "PersonalLoan",
     "Project",
     "AnnouncementReply",
     "AskConversation",

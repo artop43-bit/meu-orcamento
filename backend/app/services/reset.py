@@ -27,6 +27,7 @@ from app.models import (
     MoneyAccount,
     NetWorthSnapshot,
     OtherDebt,
+    PersonalLoan,
     PlannedExpense,
     RecurringItem,
     SavedAnalysis,
@@ -80,7 +81,9 @@ def preview(db: Session, user: User) -> dict[str, int]:
         "investments": _count(db, Investment, user) + _count(db, WatchItem, user),
         "categories": custom + _count(db, CategoryRule, user),
         "analyses": _count(db, SavedAnalysis, user),
-        "debts": _count(db, Loan, user) + _count(db, OtherDebt, user),
+        "debts": _count(db, Loan, user)
+        + _count(db, OtherDebt, user)
+        + _count(db, PersonalLoan, user),
     }
 
 
@@ -197,6 +200,13 @@ def reset(
             )
             db.execute(update(Expense).where(Expense.user_id == uid).values(loan_id=None))
             db.execute(delete(Loan).where(Loan.user_id == uid))
+            # v1.8: empréstimos a amigos (o que já foi recebido ou pago fica, sem o vínculo).
+            from app.services import personal_loans
+
+            for friend_loan in list(
+                db.scalars(select(PersonalLoan).where(PersonalLoan.user_id == uid))
+            ):
+                personal_loans.remove(db, user, friend_loan.id, commit=False)
             db.execute(delete(OtherDebt).where(OtherDebt.user_id == uid))
             db.execute(delete(NetWorthSnapshot).where(NetWorthSnapshot.user_id == uid))
         elif "entries" in chosen:
@@ -205,6 +215,10 @@ def reset(
 
             for loan in loans.list_loans(db, user):
                 loans._materialize(db, user, loan)
+            from app.services import personal_loans
+
+            for friend_loan in db.scalars(select(PersonalLoan).where(PersonalLoan.user_id == uid)):
+                personal_loans.sync(db, user, friend_loan)
         if len(chosen) == len(AREAS):
             user.onboarded_at = None  # recomeço completo: a configuração inicial aparece de novo
         auth._record(db, user, "data_reset")

@@ -1,0 +1,38 @@
+MEU ORÇAMENTO · UPDATE LOG
+Versão 1.8.0 · Empréstimos com juros nas Divisões
+Data: 13/11/2026 às 19:15 (horário de Brasília)
+
+Simulador de empréstimo (Divisões › Nova anotação › Empréstimo com juros e parcelas)
+- [x] "O que você quer definir?": a taxa, o lucro (ex.: emprestar R$ 1.000 e lucrar R$ 200), o valor da parcela ou o total; a taxa necessária é calculada
+- [x] Formas de juros: sobre o total, simples ao mês, compostos (Tabela Price, parcelas iguais), SAC (parcelas que diminuem) e sem juros
+- [x] Pagamentos por dia, por semana, a cada 15 dias ou por mês, com a data de cada pagamento; a última parcela fecha os centavos
+- [x] Resultado na hora: taxa, cada pagamento, total, lucro, taxa equivalente ao mês e ao ano
+- [x] Mesmo lucro nas outras formas de juros, lado a lado
+- [x] "Vale a pena?": rendimento do CDB (100% do CDI, com IR) e lucro descontada a inflação (IPCA), quando os indicadores do Banco Central estão disponíveis; parcela em que o dinheiro volta e perda se a pessoa parar no meio
+- [x] Aviso (sem bloquear) acima de 1% ao mês, limite da Lei da Usura entre pessoas
+- [x] Opcional: cobrar atraso com multa de 2% e juros de 1% ao mês proporcionais aos dias
+- [x] Também no sentido contrário: "Eu devo à pessoa"
+
+Acompanhar e cobrar
+- [x] Cada pagamento entra no Orçamento do mês como receita prevista (ou despesa, quando é você quem deve); pagamentos por dia ou semana viram uma linha por mês
+- [x] Recebi a parcela: valor e data; menos que a parcela deixa o resto em aberto, mais adianta as próximas; desfazer pelo cronograma
+- [x] Cronograma com data, valor, juros, devolução e situação (prevista, recebida, parcial, atrasada com multa e juros)
+- [x] Quitar antecipado, com desconto dos juros das parcelas que ainda não venceram
+- [x] Cobrar via Pix (valor da parcela, com atraso quando houver), mensagem pronta para mandar e termo de empréstimo em PDF para as duas pessoas assinarem
+- [x] Aviso de parcela atrasada nos avisos do mês e na caixa de Mensagens
+- [x] Apagar o empréstimo mantém no Orçamento o que já foi recebido ou pago
+- [x] Tire sua dúvida: "quanto o João ainda me deve?", "quem me deve?", "quanto lucrei com empréstimos?"
+- [x] Backup completo e "Começar do zero" (área Dívidas) incluem os empréstimos
+
+Divisões
+- [x] Uma linha por pessoa, que abre e fecha: progresso das parcelas, saldo e, aberta, empréstimos, anotações e ações (Recebi a parcela, Cobrar via Pix, Acertar contas)
+- [x] Busca por nome, filtros com contagem (Todos, Com empréstimo, Atrasados, Te devem, Você deve) e "Abrir todos"
+- [x] Dois números novos no topo: Emprestado com juros (e quanto falta receber) e Lucro com juros (recebido, previsto e rendimento ao ano)
+- [x] Nova anotação com o tipo: anotação simples ou empréstimo com juros e parcelas
+
+Correções
+- [x] Horário da v1.7.6.1 nas notas da versão: 11:36
+
+Testes
+- [x] Contas dos juros (todas as formas, frequências, caminho inverso, centavos, equivalente, atraso, CDB e inflação), API, Orçamento, recebimentos, quitação, termo em PDF, avisos, bot, backup
+- [x] Auditoria pela interface: simulador, salvar, receber, cronograma, quitação, busca e filtros
