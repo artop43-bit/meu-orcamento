@@ -25,6 +25,7 @@ from app.models import (
     Loan,
     MoneyAccount,
     OtherDebt,
+    PersonalLoan,
     RecurringItem,
     SplitShare,
     SupportMessage,
@@ -381,9 +382,27 @@ def backup(db: Session, user: User) -> dict[str, Any]:
         "loans": _rows(db, Loan, user),
         "other_debts": _rows(db, OtherDebt, user),
         "splits": _rows(db, SplitShare, user),
+        "friend_loans": _friend_loans(db, user),
         "support_requests": _support(db, user),
         "ask_conversations": _ask(db, user),
     }
+
+
+def _friend_loans(db: Session, user: User) -> list[dict[str, Any]]:
+    """v1.8: empréstimos a amigos, cada um com o cronograma e o que foi recebido."""
+    from app.models import LoanInstallment
+
+    columns = [c.key for c in LoanInstallment.__table__.columns if c.key not in {"id", "loan_id"}]
+    out = []
+    for loan in _rows(db, PersonalLoan, user):
+        items = db.scalars(
+            select(LoanInstallment)
+            .where(LoanInstallment.loan_id == uuid.UUID(loan["id"]))
+            .order_by(LoanInstallment.number)
+        )
+        loan["installments"] = [{c: _serialize(getattr(i, c)) for c in columns} for i in items]
+        out.append(loan)
+    return out
 
 
 def _ask(db: Session, user: User) -> list[dict[str, Any]]:

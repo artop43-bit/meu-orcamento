@@ -108,3 +108,52 @@ class SplitShare(Base):
     direction: Mapped[str] = mapped_column(String(7))  # "owes_me" | "i_owe"
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
     settled_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+
+
+class PersonalLoan(Base):
+    """Empréstimo a um amigo com juros e parcelas (v1.8), anotado na tela Divisões.
+
+    direction "owes_me": eu emprestei e a pessoa me paga (as parcelas viram receitas previstas);
+    "i_owe": a pessoa me emprestou e eu pago (as parcelas viram despesas).
+    rate: % sobre o total no modo "total"; % ao mês em "simple", "price" e "sac".
+    """
+
+    __tablename__ = "personal_loans"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    person: Mapped[str] = mapped_column(String(60))
+    description: Mapped[str | None] = mapped_column(String(120))
+    direction: Mapped[str] = mapped_column(String(7))  # "owes_me" | "i_owe"
+    principal: Mapped[Decimal] = mapped_column(Money)
+    mode: Mapped[str] = mapped_column(String(6))  # "none" | "total" | "simple" | "price" | "sac"
+    rate: Mapped[Decimal] = mapped_column(Rate)
+    frequency: Mapped[str] = mapped_column(String(6))  # "day" | "week" | "biweek" | "month"
+    count: Mapped[int] = mapped_column(SmallInteger)
+    first_due: Mapped[date] = mapped_column(Date)
+    # Multa (%) e juros de mora (% ao mês) por atraso; vazios = não cobrar.
+    late_fee: Mapped[Decimal | None] = mapped_column(Rate)
+    late_interest: Mapped[Decimal | None] = mapped_column(Rate)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+    settled_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+
+
+class LoanInstallment(Base):
+    """Parcela de um empréstimo a amigo: o previsto e o que foi recebido (ou pago)."""
+
+    __tablename__ = "loan_installments"
+    __table_args__ = (UniqueConstraint("loan_id", "number"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    loan_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("personal_loans.id", ondelete="CASCADE"), index=True
+    )
+    number: Mapped[int] = mapped_column(SmallInteger)
+    due_date: Mapped[date] = mapped_column(Date)
+    amount: Mapped[Decimal] = mapped_column(Money)
+    interest: Mapped[Decimal] = mapped_column(Money)
+    principal_part: Mapped[Decimal] = mapped_column(Money)
+    received_at: Mapped[date | None] = mapped_column(Date)
+    received_amount: Mapped[Decimal | None] = mapped_column(Money)

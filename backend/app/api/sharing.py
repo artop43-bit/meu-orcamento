@@ -9,6 +9,7 @@ from fastapi import APIRouter, status
 from pydantic import BaseModel, Field
 
 from app.api.deps import CurrentUser, DbSession
+from app.api.personal_loans import LoanOut, LoanTotalsOut
 from app.core.months import parse_month
 from app.services import alerts, budget, splits
 
@@ -21,7 +22,7 @@ Money = Annotated[Decimal, Field(gt=0, max_digits=12, decimal_places=2)]
 
 
 class AlertOut(BaseModel):
-    kind: Literal["unusual", "new_merchant", "price_up", "renewal"]
+    kind: Literal["unusual", "new_merchant", "price_up", "renewal", "loan_late"]
     key: str
     title: str
     text: str
@@ -71,6 +72,7 @@ class PersonOut(BaseModel):
     person: str
     balance: Decimal
     items: list[ShareOut]
+    loans: list[LoanOut] = []
 
 
 class BoardOut(BaseModel):
@@ -79,6 +81,7 @@ class BoardOut(BaseModel):
     i_owe: Decimal
     names: list[str]
     history: list[ShareOut]
+    loans: LoanTotalsOut
 
 
 class SettleIn(BaseModel):
@@ -102,7 +105,10 @@ def board(user: CurrentUser, db: DbSession) -> BoardOut:
     return BoardOut(
         people=[
             PersonOut(
-                person=p["person"], balance=p["balance"], items=[_share(s) for s in p["items"]]
+                person=p["person"],
+                balance=p["balance"],
+                items=[_share(s) for s in p["items"]],
+                loans=[LoanOut(**x) for x in p["loans"]],
             )
             for p in data["people"]
         ],
@@ -110,6 +116,7 @@ def board(user: CurrentUser, db: DbSession) -> BoardOut:
         i_owe=data["i_owe"],
         names=data["names"],
         history=[_share(s) for s in data["history"]],
+        loans=LoanTotalsOut(**data["loans"]),
     )
 
 

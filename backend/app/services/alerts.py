@@ -38,7 +38,7 @@ PRICE_UP_MIN = Decimal("2")
 RENEWAL_DAYS = 7
 
 
-CODES = {"unusual": "u", "new_merchant": "n", "price_up": "p", "renewal": "r"}
+CODES = {"unusual": "u", "new_merchant": "n", "price_up": "p", "renewal": "r", "loan_late": "l"}
 
 
 def _alert(kind: str, key: str, title: str, text: str, **extra: Any) -> dict[str, Any]:
@@ -58,6 +58,7 @@ def month_alerts(
                 Expense.user_id == user.id,
                 Expense.month == month,
                 Expense.loan_id.is_(None),
+                Expense.personal_loan_id.is_(None),
             )
         )
     )
@@ -174,7 +175,36 @@ def month_alerts(
                         "antes da renovação.",
                     )
                 )
+    alerts.extend(_loan_alerts(db, user, today))
     return alerts
+
+
+def _loan_alerts(db: Session, user: User, today: date) -> list[dict[str, Any]]:
+    """v1.8: parcela de empréstimo a amigo vencida e não paga (uma vez por parcela)."""
+    from app.services import personal_loans
+
+    out = []
+    for loan in personal_loans.all_loans(db, user, today):
+        if loan["settled_at"] or not loan["late_count"]:
+            continue
+        late = [i for i in loan["installments"] if i["status"] == "late"]
+        first = late[0]
+        count = len(late)
+        what = "parcela atrasada" if count == 1 else f"{count} parcelas atrasadas"
+        if loan["direction"] == "owes_me":
+            title = f"{loan['person']} está com {what}"
+            text = (
+                f"{notify.brl(loan['late_amount'])} em aberto, desde {first['due_date']:%d/%m}. "
+                "Na tela Divisões dá para mandar a cobrança por Pix."
+            )
+        else:
+            title = f"Você está com {what} com {loan['person']}"
+            text = (
+                f"{notify.brl(loan['late_amount'])} em aberto, desde {first['due_date']:%d/%m}. "
+                "Quando pagar, marque na tela Divisões."
+            )
+        out.append(_alert("loan_late", f"{loan['id'].hex[:24]}:{first['number']}", title, text))
+    return out
 
 
 def run_daily(db: Session, mail: Mailer, today: date | None = None) -> int:

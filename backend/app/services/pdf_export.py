@@ -455,3 +455,115 @@ def annual_pdf(data: dict[str, Any], rows: list[dict[str, Any]], owner: str) -> 
     if rows:
         _list_block(doc, rows, "Total do ano")
     return bytes(doc.output())
+
+
+# ---------------------------------------------------------------- termo de empréstimo (v1.8)
+
+FREQUENCY_TEXT = {"day": "diárias", "week": "semanais", "biweek": "quinzenais", "month": "mensais"}
+MODE_TEXT = {
+    "none": "sem juros",
+    "total": "com juros de {rate} sobre o valor emprestado",
+    "simple": "com juros simples de {rate} ao mês",
+    "price": "com juros compostos de {rate} ao mês (parcelas iguais, Tabela Price)",
+    "sac": "com juros compostos de {rate} ao mês (devolução constante, SAC)",
+}
+
+
+def _rate(value: Decimal | float) -> str:
+    text = f"{float(value):.2f}".rstrip("0").rstrip(".").replace(".", ",")
+    return f"{text}%"
+
+
+def loan_term_pdf(loan: dict[str, Any], owner: str) -> bytes:
+    """Termo simples de empréstimo entre pessoas, com o cronograma para as duas assinarem."""
+    lender, borrower = (owner, loan["person"])
+    if loan["direction"] == "i_owe":
+        lender, borrower = borrower, owner
+    doc = _Doc("Termo de empréstimo", f"{lender} para {borrower}", owner)
+    doc.add_page()
+    count = loan["count"]
+    plural = "parcela" if count == 1 else f"{count} parcelas {FREQUENCY_TEXT[loan['frequency']]}"
+    form = MODE_TEXT[loan["mode"]].format(rate=_rate(loan["rate"]))
+    first = loan["installments"][0]["due_date"]
+    last = loan["installments"][-1]["due_date"]
+    doc.set_font("Inter", "", 10)
+    doc.set_text_color(*INK)
+    text = (
+        f"{lender} empresta a {borrower} a quantia de {brl(loan['principal'])}, {form}. "
+        f"{borrower} se compromete a devolver {brl(loan['total'])} em {plural}, "
+        f"de {first:%d/%m/%Y} a {last:%d/%m/%Y}, conforme o cronograma abaixo."
+    )
+    if loan.get("description"):
+        text += f" Motivo: {loan['description']}."
+    if loan.get("late_fee") or loan.get("late_interest"):
+        parts = []
+        if loan.get("late_fee"):
+            parts.append(f"multa de {_rate(loan['late_fee'])}")
+        if loan.get("late_interest"):
+            parts.append(f"juros de {_rate(loan['late_interest'])} ao mês, proporcionais aos dias")
+        text += f" Em caso de atraso, incidem {' e '.join(parts)} sobre a parcela em aberto."
+    text += (
+        " O pagamento antecipado é permitido, com desconto dos juros das parcelas que ainda "
+        "não venceram."
+    )
+    doc.multi_cell(0, 5.4, text, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+    doc.ln(3)
+    doc.stats(
+        [
+            ("Valor emprestado", brl(loan["principal"]), None),
+            ("Total a devolver", brl(loan["total"]), None),
+            ("Juros", brl(loan["profit"]), None),
+            ("Equivale a", f"{_rate(loan['monthly_equivalent'])} ao mês", None),
+        ]
+    )
+    doc.section("Cronograma")
+    rows = [
+        [
+            str(i["number"]),
+            f"{i['due_date']:%d/%m/%Y}",
+            brl(i["amount"]),
+            brl(i["interest"]),
+            brl(i["principal"]),
+            "Pago" if i["status"] == "paid" else "",
+        ]
+        for i in loan["installments"]
+    ]
+    doc.table(
+        [
+            ("Nº", 0.08, "L"),
+            ("Vencimento", 0.2, "L"),
+            ("Valor", 0.2, "R"),
+            ("Juros", 0.18, "R"),
+            ("Devolução", 0.18, "R"),
+            ("Situação", 0.16, "R"),
+        ],
+        rows,
+        total=["", "Total", brl(loan["total"]), brl(loan["profit"]), brl(loan["principal"]), ""],
+    )
+    if doc.get_y() > doc.h - 60:
+        doc.add_page()
+    doc.ln(16)
+    half = (doc.width - 10) / 2
+    y = doc.get_y()
+    doc.set_draw_color(*INK)
+    doc.line(doc.l_margin, y, doc.l_margin + half, y)
+    doc.line(doc.l_margin + half + 10, y, doc.w - doc.r_margin, y)
+    doc.set_y(y + 1.5)
+    doc.set_font("Inter", "", 9)
+    doc.cell(half, 5, f"{lender} (quem empresta)")
+    doc.set_x(doc.l_margin + half + 10)
+    doc.cell(half, 5, f"{borrower} (quem recebe)", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+    doc.ln(8)
+    doc.set_font("Inter", "", 8)
+    doc.set_text_color(*MUTED)
+    doc.multi_cell(
+        0,
+        4,
+        "Local e data: ______________________________________________\n\n"
+        "Modelo simples para registrar um acordo entre pessoas. Não substitui orientação "
+        "jurídica. Entre particulares, a Lei da Usura (Decreto 22.626/33) limita os juros a "
+        "1% ao mês.",
+        new_x=XPos.LMARGIN,
+        new_y=YPos.NEXT,
+    )
+    return bytes(doc.output())

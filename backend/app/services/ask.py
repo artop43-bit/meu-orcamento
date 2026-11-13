@@ -1020,6 +1020,110 @@ def _loans(db: Session, user: User) -> dict[str, Any]:
     )
 
 
+FRIEND_LOANS = (
+    r"\bme dev(e|em|endo|ia)\b|\bquem (me )?deve\b|\bemprestei\b|\bdevo (pr[oa]|ao)\b"
+    r"|\blucr\w* com (os |meus )?emprestimo|\bjuros (que )?(ja )?(recebi|ganhei)\b"
+    r"|\b(rendeu|rendem|rende) (o|os|meu|meus) emprestimo|\bemprestimos? (a|aos|pr[oa]s?|para) "
+)
+
+
+def _friend_loans(db: Session, user: User, text: str) -> dict[str, Any]:
+    """v1.8: quem me deve, quanto o João ainda me deve e quanto lucrei com empréstimos."""
+    from app.services import splits
+
+    board = splits.board(db, user)
+    links = [{"label": "Abrir divisões", "to": "/divisoes"}]
+    words = set(text.split())
+    person = next(
+        (
+            p
+            for p in board["people"]
+            if set(_plain(p["person"]).split()) & words - {"me", "eu", "o", "a", "de", "da", "do"}
+        ),
+        None,
+    )
+    totals = board["loans"]
+    if person is None and re.search(r"\blucr|\bjuros|\brend", text):
+        if not totals["lent_count"] and not totals["profit_received"]:
+            return _answer(
+                "friend_loans",
+                "Você não tem empréstimos com juros anotados. Dá para anotar na tela Divisões.",
+                links=links,
+            )
+        answer = f"Você já recebeu {brl(totals['profit_received'])} de juros com empréstimos."
+        if totals["lent_count"]:
+            answer += (
+                f" Nos {_plural(totals['lent_count'], 'empréstimo', 'empréstimos')} em andamento, "
+                f"o lucro previsto é de {brl(totals['profit_expected'])}"
+            )
+            if totals["yearly"]:
+                answer += f" (rendem cerca de {str(totals['yearly']).replace('.', ',')}% ao ano)"
+            answer += "."
+        return _answer("friend_loans", answer, links=links)
+    if person is None:
+        if not board["people"]:
+            return _answer(
+                "friend_loans",
+                "Ninguém te deve e você não deve a ninguém nas Divisões.",
+                links=links,
+            )
+        items = [
+            {
+                "label": p["person"],
+                "detail": "te deve"
+                if p["balance"] > 0
+                else "você deve"
+                if p["balance"] < 0
+                else "quites",
+                "value": brl(abs(p["balance"])),
+                "link": "/divisoes",
+            }
+            for p in board["people"][:6]
+        ]
+        return _answer(
+            "friend_loans",
+            f"Te devem {brl(board['owed_to_me'])} no total; você deve {brl(board['i_owe'])}.",
+            items=items,
+            links=links,
+        )
+    name, balance = person["person"], person["balance"]
+    items = []
+    for loan in person["loans"]:
+        if loan["settled_at"]:
+            continue
+        detail = f"{loan['paid_count']}/{loan['count']} pagas"
+        if loan["next"]:
+            detail += (
+                f" · próxima {brl(loan['next']['open'])} em {_short_date(loan['next']['due_date'])}"
+            )
+        if loan["late_count"]:
+            detail += f" · {_plural(loan['late_count'], 'atrasada', 'atrasadas')}"
+        items.append(
+            {
+                "label": f"Empréstimo de {brl(loan['principal'])}",
+                "detail": detail,
+                "value": brl(loan["remaining"]),
+                "link": "/divisoes",
+            }
+        )
+    for share in person["items"]:
+        items.append(
+            {
+                "label": share.description,
+                "detail": "te deve" if share.direction == "owes_me" else "você deve",
+                "value": brl(share.amount),
+                "link": "/divisoes",
+            }
+        )
+    if balance > 0:
+        answer = f"{name} ainda te deve {brl(balance)}."
+    elif balance < 0:
+        answer = f"Você ainda deve {brl(-balance)} a {name}."
+    else:
+        answer = f"Você e {name} estão quites."
+    return _answer("friend_loans", answer, items=items[:6], links=links)
+
+
 def _recurring(db: Session, user: User, current: date, only_subscriptions: bool) -> dict[str, Any]:
     names = _category_names(db, user)
     rows = [
@@ -1878,6 +1982,8 @@ def _classify(text: str, rest: str, two_periods: bool) -> str | None:
         spends or "mais car" in text
     ):
         return "month_max"
+    if re.search(FRIEND_LOANS, text):
+        return "friend_loans"
     if re.search(r"\bmeta|\bobjetivo|\bfalta\w* (para|pra)\b", text) and not re.search(
         r"\bparcela", text
     ):
@@ -2111,6 +2217,8 @@ def answer(
         return finish(_goals(db, user, today), intent)
     if intent == "loans":
         return finish(_loans(db, user), intent)
+    if intent == "friend_loans":
+        return finish(_friend_loans(db, user, text), intent)
     if intent in ("recurring", "subscriptions"):
         return finish(_recurring(db, user, current, intent == "subscriptions"), intent)
     if intent == "investments":

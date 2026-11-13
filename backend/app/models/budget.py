@@ -120,6 +120,10 @@ class Income(Base):
     import_batch_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("import_batches.id", ondelete="SET NULL"), index=True
     )
+    # v1.8: parcela de um empréstimo a amigo (Divisões).
+    personal_loan_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("personal_loans.id", ondelete="CASCADE"), index=True
+    )
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
 
 
@@ -174,6 +178,10 @@ class Expense(Base):
     # v1.0: parcela de um financiamento ou empréstimo.
     loan_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("loans.id", ondelete="SET NULL"), index=True
+    )
+    # v1.8: parcela de um empréstimo a amigo (Divisões).
+    personal_loan_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("personal_loans.id", ondelete="CASCADE"), index=True
     )
     # v1.3: compra dividida em categorias (cada parte é uma conta com o seu valor).
     split_group_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, index=True)
