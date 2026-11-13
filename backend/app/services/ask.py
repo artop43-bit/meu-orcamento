@@ -1022,6 +1022,7 @@ def _loans(db: Session, user: User) -> dict[str, Any]:
 
 FRIEND_LOANS = (
     r"\bme dev(e|em|endo|ia)\b|\bquem (me )?deve\b|\bemprestei\b|\bdevo (pr[oa]|ao)\b"
+    r"|\bme pag(ar|ou|a|ando)\b"
     r"|\blucr\w* com (os |meus )?emprestimo|\bjuros (que )?(ja )?(recebi|ganhei)\b"
     r"|\b(rendeu|rendem|rende) (o|os|meu|meus) emprestimo|\bemprestimos? (a|aos|pr[oa]s?|para) "
 )
