@@ -97,6 +97,16 @@ def idle(page: Page, ms: int = 150):
     page.wait_for_timeout(ms)
 
 
+def person_row(page: Page, name: str):
+    """Divisões (v1.8): linha da pessoa, aberta (as linhas abrem e fecham)."""
+    row = page.locator(".person-row", has=page.locator(".person-row__who strong", has_text=re.compile(f"^{name}$")))
+    head = row.locator(".person-row__head")
+    if head.get_attribute("aria-expanded") != "true":
+        head.click()
+    expect(head).to_have_attribute("aria-expanded", "true")
+    return row
+
+
 def open_month(page: Page, month: str):
     page.goto(f"{BASE}/orcamento/{month}")
     idle(page)
@@ -1918,7 +1928,7 @@ def split_expenses(page: Page):
     assert board["owed_to_me"] == "2800.00", board
     page.goto(f"{BASE}/divisoes")
     idle(page)
-    bia = page.locator(".split-person", has_text="Bia")
+    bia = person_row(page, "Bia")
     expect(bia).to_contain_text("te deve R$ 1.400,00")
     page.get_by_role("button", name="Nova anotação").click()
     d = dialog(page)
@@ -1941,7 +1951,7 @@ def split_expenses(page: Page):
     incomes = api(page, f"/months/{CURRENT}")["incomes"]
     assert len(incomes) == incomes_before + 1
     assert any(i["description"] == "Reembolso de Bia" and i["amount"] == "1200.00" for i in incomes)
-    expect(page.locator(".split-person", has_text="Bia")).to_have_count(0)
+    expect(page.locator(".person-row", has_text="Bia")).to_have_count(0)
 
 
 @step("v1.0: App e notificações (APK, instalar, notificações) e aviso de sem conexão")
@@ -2201,7 +2211,7 @@ def v14_money(page: Page):
     expect(pix.get_by_label(re.compile("^Chave Pix"))).to_have_value("12345678909")
     page.goto(f"{BASE}/divisoes")
     idle(page)
-    page.locator(".split-person", has_text="Caio").get_by_role("button", name="Cobrar via Pix").click()
+    person_row(page, "Caio").get_by_role("button", name="Cobrar via Pix").click()
     d = dialog(page)
     code = d.get_by_label("Pix copia e cola").input_value()
     assert code.startswith("000201") and "12345678909" in code and "54071400.00" in code, code
@@ -2436,6 +2446,85 @@ def two_factor(page: Page):
     idle(page)
     expect(page.get_by_role("button", name="Ativar verificação em duas etapas")).to_be_visible()
     assert api(page, "/auth/me")["totp_enabled"] is False
+
+
+@step("v1.8: empréstimo com juros nas Divisões — taxa pelo lucro, parcelas no Orçamento, receber, cronograma e bot")
+def v18_loans(page: Page):
+    page.goto(f"{BASE}/divisoes")
+    idle(page)
+    page.get_by_role("button", name="Nova anotação").click()
+    d = dialog(page)
+    d.get_by_label("Empréstimo com juros e parcelas").check()
+    d.get_by_label("Pessoa", exact=True).fill("Duda")
+    d.get_by_label("Valor emprestado").fill(money(1000))
+    # "Empresto mil e quero lucrar 200": a taxa sai sozinha.
+    d.get_by_role("button", name="O lucro").click()
+    d.get_by_label("Lucro que eu quero").fill(money(200))
+    d.get_by_label("Quantidade").fill("12")
+    result = d.locator(".loan-result")
+    expect(result).to_contain_text("20% no total", timeout=8000)
+    expect(result).to_contain_text("12x R$ 100,00")
+    expect(result).to_contain_text("R$ 1.200,00")
+    expect(result).to_contain_text("Lei da Usura")
+    # Mesmo lucro com juros compostos: parcela igual, taxa ao mês.
+    d.get_by_label("Forma dos juros").select_option("price")
+    expect(result).to_contain_text("ao mês", timeout=8000)
+    expect(result).to_contain_text("R$ 1.200,00")
+    # "Cobro 5%: quanto recebo por semana?"
+    d.get_by_label("Forma dos juros").select_option("total")
+    d.get_by_role("button", name="A taxa").click()
+    d.get_by_label("Taxa de juros (%)").fill("5")
+    d.get_by_label("Pagamentos").select_option("week")
+    d.get_by_label("Quantidade").fill("4")
+    expect(result).to_contain_text("4x R$ 262,50", timeout=8000)
+    page.screenshot(path=OUT / "v18-simulador.png")
+    d.get_by_role("button", name="Salvar empréstimo").click()
+    expect(d).to_have_count(0, timeout=8000)
+    idle(page)
+
+    row = person_row(page, "Duda")
+    expect(row).to_contain_text("te deve R$ 1.050,00")
+    expect(row).to_contain_text("0 de 4")
+    expect(page.locator(".kpi", has_text="Emprestado com juros")).to_contain_text("R$ 1.000,00")
+    loans = api(page, "/friend-loans")["loans"]
+    loan = next(x for x in loans if x["person"] == "Duda")
+    first = loan["installments"][0]
+    month = first["due_date"][:7]
+    incomes = api(page, f"/months/{month}")["incomes"]
+    assert any(i["description"].startswith("Empréstimo · Duda") for i in incomes), incomes
+
+    # Recebi a parcela.
+    row.get_by_role("button", name="Recebi a parcela").click()
+    d = dialog(page)
+    expect(d).to_contain_text("Parcela 1 de 4")
+    d.get_by_role("button", name="Recebi", exact=True).click()
+    expect(d).to_have_count(0, timeout=8000)
+    idle(page)
+    expect(row).to_contain_text("1 de 4")
+    expect(row).to_contain_text("te deve R$ 787,50")
+
+    # Cronograma, quitação com desconto e busca.
+    row.get_by_role("button", name="Ver cronograma, termo e quitação").click()
+    d = dialog(page)
+    expect(d.locator(".loan-table tbody tr")).to_have_count(4)
+    expect(d).to_contain_text("Recebida")
+    page.screenshot(path=OUT / "v18-cronograma.png")
+    d.get_by_role("button", name="Quitar antecipado").click()
+    expect(d.locator(".stat", has_text="Para quitar hoje")).to_contain_text("R$")
+    d.get_by_role("button", name="Cancelar").click()
+    page.keyboard.press("Escape")
+    expect(d).to_have_count(0)
+    page.get_by_role("searchbox", name="Buscar pessoa").fill("dud")
+    expect(page.locator(".person-row")).to_have_count(1)
+    page.get_by_role("searchbox", name="Buscar pessoa").fill("")
+    page.get_by_role("button", name=re.compile(r"^Com empréstimo \(")).click()
+    expect(page.locator(".person-row", has_text="Duda")).to_have_count(1)
+    page.screenshot(path=OUT / "v18-divisoes.png", full_page=True)
+
+    answer = page.request.post(
+        f"{BASE}/api/ask", data={"question": "quanto a Duda ainda me deve?"}, headers={"X-Requested-With": "fetch"}
+    ).json()
+    assert answer["intent"] == "friend_loans" and "R$ 787,50" in answer["answer"], answer
 
 
 @step("Faixa do 2FA: 'Não mostrar mais' fica salvo na conta")
@@ -2781,6 +2870,7 @@ def main():
         v175_panel(page)
         v175_ask(page)
         v176(page)
+        v18_loans(page)
         two_factor(page)
         banner_never(page)
         STATE["state"] = ctx.storage_state()

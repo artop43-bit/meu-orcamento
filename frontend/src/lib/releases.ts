@@ -11,8 +11,41 @@ export type Release = {
 
 export const RELEASES: Release[] = [
   {
+    version: "1.8.0",
+    date: "13/11/2026 às 23:00",
+    title: "Empréstimos com juros nas Divisões",
+    sections: [
+      {
+        title: "Simulador de empréstimo",
+        items: [
+          "Você escolhe o que definir: a taxa, o lucro, o valor da parcela ou o total; o resto é calculado na hora.",
+          "Juros sobre o total, simples ao mês, compostos (parcelas iguais) ou SAC (parcelas que diminuem), e sem juros.",
+          "Pagamentos por dia, por semana, a cada 15 dias ou por mês, com as datas de cada um.",
+          "Taxa equivalente ao mês e ao ano, o mesmo lucro em outras formas de juros e o aviso da Lei da Usura acima de 1% ao mês.",
+          "“Vale a pena?”: comparação com o CDB e a inflação, em que parcela o dinheiro volta e quanto se perde se a pessoa parar de pagar.",
+        ],
+      },
+      {
+        title: "Acompanhar e cobrar",
+        items: [
+          "Cada parcela entra no Orçamento do mês como receita prevista (ou despesa, quando é você quem deve).",
+          "Recebi a parcela, pagamento parcial ou adiantado, desfazer e quitar antes com desconto dos juros que ainda não venceram.",
+          "Cronograma completo, multa e juros por atraso (opcional), aviso de parcela atrasada, cobrança por Pix, mensagem pronta e termo de empréstimo em PDF.",
+          "O Tire sua dúvida responde “quanto o João ainda me deve?” e “quanto lucrei com empréstimos?”.",
+        ],
+      },
+      {
+        title: "Divisões",
+        items: [
+          "Uma linha por pessoa, que abre e fecha, com busca por nome, filtros (com empréstimo, atrasados, te devem, você deve) e “Abrir todos”.",
+          "Novos números no topo: emprestado com juros e lucro com juros.",
+        ],
+      },
+    ],
+  },
+  {
     version: "1.7.6.1",
-    date: "12/11/2026 às 11:45",
+    date: "12/11/2026 às 11:36",
     title: "Exportar em PDF e tela de exportar reorganizada",
     sections: [
       {
