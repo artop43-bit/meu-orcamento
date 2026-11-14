@@ -11,8 +11,22 @@ export type Release = {
 
 export const RELEASES: Release[] = [
   {
+    version: "1.8.0.2",
+    date: "14/11/2026 às 19:35",
+    title: "Cobrar só com a chave Pix",
+    sections: [
+      {
+        title: "Cobrar",
+        items: [
+          "A mensagem pronta (lembrete, cobrança do atraso ou resumo) leva só a sua chave Pix de Preferências.",
+          "Um botão só: Copiar mensagem. Saíram o código Pix copia e cola, o QR Code, o WhatsApp e o telefone.",
+        ],
+      },
+    ],
+  },
+  {
     version: "1.8.0.1",
-    date: "14/11/2026 às 17:05",
+    date: "14/11/2026 às 17:02",
     title: "Termo pronto para entregar, cobrança com mensagem e pagamento a mais",
     sections: [
       {

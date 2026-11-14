@@ -2213,15 +2213,14 @@ def v14_money(page: Page):
     idle(page)
     person_row(page, "Caio").get_by_role("button", name="Cobrar", exact=True).click()
     d = dialog(page)
-    # v1.8.0.1: mensagem pronta com a chave e o Pix copia e cola no valor exato.
-    expect(d.get_by_label("Incluir código Pix copia e cola (R$ 1.400,00)")).to_be_checked()
+    # v1.8.0.2: mensagem pronta só com a chave; sem código Pix, QR ou link de outro serviço.
     text = d.get_by_label("Mensagem", exact=True).input_value().replace("\xa0", " ")
     assert "Pix: 12345678909" in text and "R$ 1.400,00" in text, text
-    code = re.search(r"^000201.*$", text, re.M)[0]
-    assert "12345678909" in code and "54071400.00" in code, code
-    expect(d.get_by_role("link", name="Abrir no WhatsApp")).to_have_attribute("href", re.compile(r"^https://wa\.me/\?text="))
-    d.get_by_text("Mostrar QR Code do Pix").click()
-    expect(d.get_by_role("img", name=re.compile("QR Code Pix"))).to_be_visible()
+    assert "000201" not in text and "copia e cola" not in text and "http" not in text, text
+    expect(d.get_by_role("img", name=re.compile("QR"))).to_have_count(0)
+    expect(d.get_by_role("link", name=re.compile("WhatsApp"))).to_have_count(0)
+    expect(d.get_by_role("button", name="Copiar mensagem")).to_be_visible()
+    expect(d.get_by_role("button", name=re.compile("Compartilhar|WhatsApp"))).to_have_count(0)
     page.screenshot(path=OUT / "v14-pix.png")
     page.keyboard.press("Escape")
 

@@ -1,6 +1,6 @@
 MEU ORÇAMENTO · UPDATE LOG
 Versão 1.8.0.1 · Termo pronto para entregar, cobrança com mensagem e pagamento a mais (hotfix)
-Data: 14/11/2026 às 17:05 (horário de Brasília)
+Data: 14/11/2026 às 17:02 (horário de Brasília)
 
 Termo de empréstimo
 - [x] Formato de documento: "Instrumento particular de empréstimo", partes (credor e devedor), cláusulas numeradas (valor, juros e total, parcelas, forma de pagamento, atraso, pagamento antecipado, foro), cronograma, local e data, assinaturas com nome e CPF e duas testemunhas
