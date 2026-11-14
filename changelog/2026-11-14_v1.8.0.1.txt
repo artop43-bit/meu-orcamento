@@ -1,0 +1,28 @@
+MEU ORÇAMENTO · UPDATE LOG
+Versão 1.8.0.1 · Termo pronto para entregar, cobrança com mensagem e pagamento a mais (hotfix)
+Data: 14/11/2026 às 13:00 (horário de Brasília)
+
+Termo de empréstimo
+- [x] Formato de documento: "Instrumento particular de empréstimo", partes (credor e devedor), cláusulas numeradas (valor, juros e total, parcelas, forma de pagamento, atraso, pagamento antecipado, foro), cronograma, local e data, assinaturas com nome e CPF e duas testemunhas
+- [x] Janela antes de baixar com nome, CPF e endereço das partes, cidade e chave Pix; tudo opcional, só entra no termo o que for preenchido, e nada fica salvo
+- [x] Saíram a marca do app, a data de geração com e-mail, a taxa equivalente ao mês, a coluna de situação e a nota da Lei da Usura (o aviso continua no simulador)
+
+Cobrar
+- [x] "Cobrar via Pix" e "Mensagem para..." viraram um botão só, "Cobrar", na linha da pessoa e no cronograma
+- [x] Mensagem pronta e editável: lembrete da próxima parcela, cobrança do atraso (com multa e juros) ou resumo do empréstimo; para anotações simples, o saldo em aberto
+- [x] Chave Pix de Preferências na mensagem; opção de incluir o Pix copia e cola no valor exato; QR Code recolhido
+- [x] Abrir no WhatsApp (direto no contato quando o telefone é informado; o telefone fica salvo no empréstimo), Copiar com confirmação na tela e Compartilhar no celular
+
+Pagamentos
+- [x] Pagou a mais: "Abater do fim (termina antes)" ou "Adiantar a próxima parcela", com prévia (última data e quantos faltam, ou o novo valor da próxima)
+- [x] Desconto opcional dos juros das parcelas adiantadas
+- [x] "Mudar valor das parcelas": o que falta é redividido no novo valor, na mesma frequência, com prévia; o que já foi pago não muda
+- [x] Histórico dos pagamentos no cronograma (data, valor, parcelas e desconto), com desfazer em cada um
+- [x] Pagamentos já registrados na v1.8.0 entram no histórico
+
+Correções
+- [x] Horário da v1.8.0 nas notas da versão: 19:33
+
+Testes
+- [x] Termo com e sem dados das partes; pagamento a mais (abater do fim, adiantar, desconto e desfazer); novo valor das parcelas; telefone
+- [x] Auditoria pela interface: cobrança com Pix copia e cola e WhatsApp, pagamento a mais com prévia, histórico e download do termo

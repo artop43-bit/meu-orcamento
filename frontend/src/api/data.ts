@@ -171,8 +171,19 @@ export async function readTextFile(file: File): Promise<string> {
 }
 
 /** Baixa um arquivo da API (usa o cookie de sessão) e salva com o nome sugerido pelo servidor. */
-export async function download(path: string, fallbackName: string): Promise<void> {
-  const response = await fetch(`/api${path}`, { credentials: "include" });
+export async function download(path: string, fallbackName: string, body?: unknown): Promise<void> {
+  // Com `body`, o arquivo é gerado a partir dos dados enviados (POST), ex.: o termo de empréstimo.
+  const response = await fetch(
+    `/api${path}`,
+    body === undefined
+      ? { credentials: "include" }
+      : {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json", "X-Requested-With": "fetch" },
+          body: JSON.stringify(body),
+        },
+  );
   if (!response.ok) {
     const data = await response.json().catch(() => null);
     throw new ApiError(response.status, data?.error ?? "error", data?.message ?? "Não foi possível exportar.");

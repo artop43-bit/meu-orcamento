@@ -10,7 +10,7 @@ import {
   Handshake,
   MessageCircle,
   Plus,
-  QrCode,
+  Repeat,
   Search,
   Trash2,
   TrendingUp,
@@ -28,15 +28,18 @@ import {
   type FriendLoan,
   type LoanFrequency,
   type LoanInstallment,
+  type LoanPayment,
   type LoanMode,
   type LoanTarget,
   type SimulateInput,
   type SplitBoard,
   type SplitPersonRow,
+  type TermInput,
 } from "../api/sharing";
 import { MoneyInput, requireMoney } from "../components/budget";
 import { EmptyGuide } from "../components/help";
-import { PixCharge } from "../components/PixCharge";
+import { ChargeMessage } from "../components/ChargeMessage";
+import { useMe } from "../api/auth";
 import { Alert, Button, Kpi, LoadingRegion, PageHeader, Sheet, Skeleton } from "../components/ui";
 import { announce } from "../lib/announce";
 import { money, parseMoney, shortDate, todayISO } from "../lib/format";
@@ -546,16 +549,28 @@ function ReceiveForm({ loan, onDone }: { loan: FriendLoan; onDone: () => void })
   const next = loan.next!;
   const [amount, setAmount] = useState(Number(next.open).toFixed(2).replace(".", ","));
   const [on, setOn] = useState(todayISO());
+  const [mode, setMode] = useState<"end" | "next">("end");
+  const [discount, setDiscount] = useState(false);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const receiving = loan.direction === "owes_me";
+  const parsed = parseMoney(amount);
+  const extra = parsed ? Number(parsed) - Number(next.open) : 0;
+  const hasExtra = extra > 0.004 && next.number < loan.count;
+  const previewInput = useDebounced(hasExtra ? { amount: parsed!, on, mode, discount } : null);
+  const preview = useQuery({
+    queryKey: ["friend-loans", "receive-preview", loan.id, next.number, previewInput],
+    queryFn: () => sharingApi.receive(loan.id, { number: next.number, ...previewInput!, preview: true }),
+    enabled: previewInput !== null,
+    retry: false,
+  });
 
   async function submit(event: FormEvent) {
     event.preventDefault();
     setError("");
     setBusy(true);
     try {
-      await sharingApi.receive(loan.id, { number: next.number, amount: requireMoney(amount), on });
+      await sharingApi.receive(loan.id, { number: next.number, amount: requireMoney(amount), on, mode, discount: mode === "end" && discount });
       announce(receiving ? "Pagamento recebido" : "Pagamento registrado");
       await refresh(queryClient);
       onDone();
@@ -566,6 +581,10 @@ function ReceiveForm({ loan, onDone }: { loan: FriendLoan; onDone: () => void })
     }
   }
 
+  const after = preview.data;
+  const openLeft = after?.installments.filter((i) => i.status !== "paid") ?? [];
+  const lastOpen = openLeft[openLeft.length - 1];
+  const nextAfter = after?.installments.find((i) => i.number === next.number + 1);
   return (
     <form className="inline-form" onSubmit={submit}>
       <Alert tone="error">{error}</Alert>
@@ -589,9 +608,45 @@ function ReceiveForm({ loan, onDone }: { loan: FriendLoan; onDone: () => void })
           <input type="date" value={on} onChange={(e) => setOn(e.target.value)} required />
         </label>
       </div>
-      <p className="muted small" style={{ margin: 0 }}>
-        Menos que a parcela deixa o resto em aberto; mais que ela adianta as próximas.
-      </p>
+      {hasExtra ? (
+        <fieldset className="radios loan-extra">
+          <legend className="field-label">{money(extra)} a mais. O que fazer com a diferença?</legend>
+          <div className="segmented">
+            <label>
+              <input type="radio" name="extra-mode" checked={mode === "end"} onChange={() => setMode("end")} />
+              Abater do fim (termina antes)
+            </label>
+            <label>
+              <input type="radio" name="extra-mode" checked={mode === "next"} onChange={() => setMode("next")} />
+              Adiantar a próxima parcela
+            </label>
+          </div>
+          {mode === "end" && loan.mode !== "none" && (
+            <label className="check">
+              <input type="checkbox" checked={discount} onChange={(e) => setDiscount(e.target.checked)} />
+              Descontar os juros das parcelas adiantadas
+            </label>
+          )}
+          {after && (
+            <p className="loan-extra__preview small" role="status">
+              {mode === "end"
+                ? lastOpen
+                  ? `As próximas continuam de ${money(nextAfter?.amount ?? next.amount)}. A última passa a ser em ${fullDate(lastOpen.due_date)}${
+                      loan.last_due && lastOpen.due_date < loan.last_due ? ` (antes: ${fullDate(loan.last_due)})` : ""
+                    }; faltam ${openLeft.length} ${openLeft.length === 1 ? "pagamento" : "pagamentos"}.`
+                  : "Com esse valor, o empréstimo fica quitado."
+                : nextAfter
+                  ? `A parcela ${nextAfter.number} fica em ${money(nextAfter.open)}.`
+                  : ""}
+              {Number(after.total) < Number(loan.total) && ` Desconto de juros: ${money(Number(loan.total) - Number(after.total))}.`}
+            </p>
+          )}
+        </fieldset>
+      ) : (
+        <p className="muted small" style={{ margin: 0 }}>
+          Menos que a parcela deixa o resto em aberto. Mais que ela: você escolhe se termina antes ou se adianta a próxima.
+        </p>
+      )}
       <div className="form-actions">
         <Button type="button" variant="secondary" onClick={onDone}>
           Cancelar
@@ -661,21 +716,150 @@ function PayoffForm({ loan, onDone }: { loan: FriendLoan; onDone: () => void }) 
   );
 }
 
-function reminder(loan: FriendLoan): string {
-  const next = loan.next;
-  if (!next) return `Oi, ${loan.person}! O empréstimo está quitado. Obrigado!`;
-  const late = Number(next.late_charge) > 0;
-  const total = Number(next.open) + Number(next.late_charge);
+function RescheduleForm({ loan, onDone }: { loan: FriendLoan; onDone: () => void }) {
+  const queryClient = useQueryClient();
+  const [amount, setAmount] = useState("");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const parsed = parseMoney(amount);
+  const wanted = useDebounced(parsed && Number(parsed) > 0 ? parsed : null);
+  const preview = useQuery({
+    queryKey: ["friend-loans", "reschedule-preview", loan.id, wanted],
+    queryFn: () => sharingApi.reschedule(loan.id, wanted!, true),
+    enabled: wanted !== null,
+    retry: false,
+  });
+  const open = loan.installments.filter((i) => i.status !== "paid");
+  const after = preview.data?.installments.filter((i) => i.status !== "paid") ?? [];
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    setError("");
+    setBusy(true);
+    try {
+      await sharingApi.reschedule(loan.id, requireMoney(amount));
+      announce("Parcelas refeitas");
+      await refresh(queryClient);
+      onDone();
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const describe = (rows: LoanInstallment[]) => {
+    if (!rows.length) return "nada em aberto";
+    const first = rows[0]!.open;
+    const same = rows.slice(0, -1).every((r) => r.open === first);
+    const tail = rows.length > 1 && rows[rows.length - 1]!.open !== first ? ` + 1 de ${money(rows[rows.length - 1]!.open)}` : "";
+    const body = same ? `${rows.length - (tail ? 1 : 0)} de ${money(first)}${tail}` : `${rows.length} pagamentos`;
+    return `${body}, até ${fullDate(rows[rows.length - 1]!.due_date)}`;
+  };
+
   return (
-    `Oi, ${loan.person}! Passando para lembrar da parcela ${next.number}/${loan.count} do empréstimo: ` +
-    `${money(late ? total : next.open)}, ${late ? `venceu em ${fullDate(next.due_date)} (com multa e juros)` : `vence em ${fullDate(next.due_date)}`}. ` +
-    `Faltam ${money(loan.remaining)} no total.`
+    <form className="inline-form" onSubmit={submit}>
+      <Alert tone="error">{error}</Alert>
+      <p style={{ margin: 0 }}>
+        Faltam <strong>{money(loan.remaining)}</strong>: {describe(open)}. Informe o novo valor de cada pagamento ({EACH[loan.frequency]}); o que
+        falta é redividido nesse valor. O que já foi pago não muda.
+      </p>
+      <label>
+        Novo valor por pagamento
+        <MoneyInput value={amount} onChange={setAmount} />
+      </label>
+      {preview.isError && <Alert tone="error">{errorMessage(preview.error)}</Alert>}
+      {preview.data && wanted && (
+        <p className="loan-extra__preview small" role="status">
+          Fica: {describe(after)}.
+        </p>
+      )}
+      <div className="form-actions">
+        <Button type="button" variant="secondary" onClick={onDone}>
+          Cancelar
+        </Button>
+        <Button type="submit" loading={busy}>
+          Refazer parcelas
+        </Button>
+      </div>
+    </form>
   );
 }
 
-function LoanSheet({ loan, onClose }: { loan: FriendLoan; onClose: () => void }) {
+const TERM_FIELDS: { key: keyof TermInput; label: string; placeholder?: string }[] = [
+  { key: "my_name", label: "Seu nome completo" },
+  { key: "my_cpf", label: "Seu CPF", placeholder: "Opcional" },
+  { key: "my_address", label: "Seu endereço", placeholder: "Opcional" },
+  { key: "person_name", label: "Nome completo da pessoa" },
+  { key: "person_cpf", label: "CPF da pessoa", placeholder: "Opcional" },
+  { key: "person_address", label: "Endereço da pessoa", placeholder: "Opcional" },
+  { key: "city", label: "Cidade", placeholder: "Para o local e a data" },
+  { key: "pix_key", label: "Chave Pix para pagamento", placeholder: "Opcional" },
+];
+
+function TermForm({ loan, onDone }: { loan: FriendLoan; onDone: () => void }) {
+  const me = useMe();
+  const user = me.data;
+  const [values, setValues] = useState<TermInput>(() => ({
+    my_name: user?.pix_name || user?.display_name || "",
+    person_name: loan.person,
+    pix_key: user?.pix_key || "",
+  }));
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    setError("");
+    setBusy(true);
+    try {
+      const body = Object.fromEntries(Object.entries(values).map(([k, v]) => [k, (v ?? "").trim() || null]));
+      await download(`/friend-loans/${loan.id}/term.pdf`, "termo-emprestimo.pdf", body);
+      announce("Download iniciado.");
+      onDone();
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <form className="inline-form" onSubmit={submit}>
+      <Alert tone="error">{error}</Alert>
+      <p className="muted small" style={{ margin: 0 }}>
+        Tudo é opcional: só entra no termo o que você preencher. Esses dados servem só para gerar o PDF e não ficam salvos.
+      </p>
+      <div className="grid-2">
+        {TERM_FIELDS.map((f) => (
+          <label key={f.key}>
+            {f.label}
+            <input
+              value={values[f.key] ?? ""}
+              placeholder={f.placeholder}
+              maxLength={f.key.endsWith("address") ? 200 : 120}
+              onChange={(e) => setValues((v) => ({ ...v, [f.key]: e.target.value }))}
+            />
+          </label>
+        ))}
+      </div>
+      <div className="form-actions">
+        <Button type="button" variant="secondary" onClick={onDone}>
+          Voltar
+        </Button>
+        <Button type="submit" loading={busy}>
+          <FileText size={16} aria-hidden /> Baixar termo em PDF
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+const PAYMENT_MODE: Record<LoanPayment["mode"], string> = { next: "", end: "a mais abatido do fim", payoff: "quitação" };
+
+function LoanSheet({ loan, onClose, onCharge }: { loan: FriendLoan; onClose: () => void; onCharge: () => void }) {
   const queryClient = useQueryClient();
-  const [step, setStep] = useState<"view" | "payoff" | "delete">("view");
+  const [step, setStep] = useState<"view" | "payoff" | "delete" | "term" | "reschedule">("view");
   const [error, setError] = useState("");
   const receiving = loan.direction === "owes_me";
 
@@ -690,17 +874,9 @@ function LoanSheet({ loan, onClose }: { loan: FriendLoan; onClose: () => void })
     }
   }
 
-  async function share() {
-    const text = reminder(loan);
-    if (navigator.share) {
-      await navigator.share({ text }).catch(() => undefined);
-    } else {
-      await navigator.clipboard.writeText(text).catch(() => undefined);
-      announce("Mensagem copiada");
-    }
-  }
-
   if (step === "payoff") return <PayoffForm loan={loan} onDone={() => setStep("view")} />;
+  if (step === "term") return <TermForm loan={loan} onDone={() => setStep("view")} />;
+  if (step === "reschedule") return <RescheduleForm loan={loan} onDone={() => setStep("view")} />;
   if (step === "delete") {
     return (
       <div className="stack">
@@ -771,18 +947,7 @@ function LoanSheet({ loan, onClose }: { loan: FriendLoan; onClose: () => void })
         }))}
         actions={(number) => {
           const item = loan.installments.find((i) => i.number === number)!;
-          if (item.received_amount && Number(item.open) <= 0)
-            return (
-              <button
-                type="button"
-                className="icon-btn"
-                aria-label={`Desfazer o pagamento da parcela ${number}`}
-                onClick={() => void act(() => sharingApi.undoReceive(loan.id, number), "Pagamento desfeito")}
-              >
-                <Undo2 size={16} />
-              </button>
-            );
-          if (loan.settled_at) return null;
+          if (loan.settled_at || Number(item.open) <= 0) return null;
           return (
             <button
               type="button"
@@ -795,22 +960,49 @@ function LoanSheet({ loan, onClose }: { loan: FriendLoan; onClose: () => void })
           );
         }}
       />
+      {loan.payments.length > 0 && (
+        <details className="details" open>
+          <summary>Pagamentos registrados ({loan.payments.length})</summary>
+          <ul className="items loan-payments">
+            {loan.payments.map((p) => (
+              <li key={p.id} className="item">
+                <span className="item__main">
+                  <span className="item__title">
+                    {fullDate(p.paid_on)} · {money(p.amount)}
+                  </span>
+                  <span className="item__meta">
+                    {p.numbers.length === 1 ? `Parcela ${p.numbers[0]}` : `Parcelas ${p.numbers.join(", ")}`}
+                    {PAYMENT_MODE[p.mode] && ` · ${PAYMENT_MODE[p.mode]}`}
+                    {Number(p.discount) > 0 && ` · desconto de juros ${money(p.discount)}`}
+                  </span>
+                </span>
+                {p.can_undo && (
+                  <button
+                    type="button"
+                    className="icon-btn"
+                    aria-label={`Desfazer o pagamento de ${money(p.amount)} em ${fullDate(p.paid_on)}`}
+                    onClick={() => void act(() => sharingApi.undoPayment(loan.id, p.id), "Pagamento desfeito")}
+                  >
+                    <Undo2 size={16} />
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
       <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>
-        <Button
-          type="button"
-          variant="secondary"
-          onClick={() =>
-            void act(
-              () => download(`/friend-loans/${loan.id}/term.pdf`, `termo-emprestimo.pdf`),
-              "Download iniciado.",
-            )
-          }
-        >
+        <Button type="button" variant="secondary" onClick={() => setStep("term")}>
           <FileText size={16} aria-hidden /> Termo em PDF
         </Button>
         {receiving && !loan.settled_at && (
-          <Button type="button" variant="secondary" onClick={() => void share()}>
-            <MessageCircle size={16} aria-hidden /> Mensagem para {loan.person.split(" ")[0]}
+          <Button type="button" variant="secondary" onClick={onCharge}>
+            <MessageCircle size={16} aria-hidden /> Cobrar
+          </Button>
+        )}
+        {!loan.settled_at && (
+          <Button type="button" variant="secondary" onClick={() => setStep("reschedule")}>
+            <Repeat size={16} aria-hidden /> Mudar valor das parcelas
           </Button>
         )}
         {!loan.settled_at && (
@@ -894,7 +1086,7 @@ function PersonRow({
   open: boolean;
   onToggle: () => void;
   onSettle: () => void;
-  onCharge: (amount: number) => void;
+  onCharge: () => void;
   onReceive: (loan: FriendLoan) => void;
   onLoan: (loan: FriendLoan) => void;
 }) {
@@ -985,8 +1177,8 @@ function PersonRow({
               </Button>
             )}
             {balance > 0 && charge > 0 && (
-              <Button type="button" variant={main ? "secondary" : "primary"} onClick={() => onCharge(charge)}>
-                <QrCode size={16} aria-hidden /> Cobrar via Pix
+              <Button type="button" variant={main ? "secondary" : "primary"} onClick={onCharge}>
+                <MessageCircle size={16} aria-hidden /> Cobrar
               </Button>
             )}
             {entry.items.length > 0 && (
@@ -1102,7 +1294,7 @@ export default function SplitsPage() {
   const board = useQuery({ queryKey: SPLITS_KEY, queryFn: sharingApi.board });
   const [adding, setAdding] = useState(false);
   const [settling, setSettling] = useState<{ person: string; balance: number } | null>(null);
-  const [charging, setCharging] = useState<{ person: string; balance: number } | null>(null);
+  const [charging, setCharging] = useState<string | null>(null);
   const [receivingId, setReceivingId] = useState<string | null>(null);
   const [loanId, setLoanId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
@@ -1113,6 +1305,7 @@ export default function SplitsPage() {
   const allLoans = people.flatMap((p) => p.loans);
   const receivingLoan = allLoans.find((l) => l.id === receivingId) ?? null;
   const sheetLoan = allLoans.find((l) => l.id === loanId) ?? null;
+  const chargingRow = people.find((p) => p.person === charging) ?? null;
   // Começa com a primeira pessoa aberta; depois vale o que a pessoa abrir ou fechar.
   const open = opened ?? new Set(people.slice(0, 1).map((p) => p.person));
   const needle = plain(query.trim());
@@ -1211,7 +1404,7 @@ export default function SplitsPage() {
                   open={open.has(entry.person)}
                   onToggle={() => toggle(entry.person)}
                   onSettle={() => setSettling({ person: entry.person, balance: Number(entry.balance) })}
-                  onCharge={(amount) => setCharging({ person: entry.person, balance: amount })}
+                  onCharge={() => setCharging(entry.person)}
                   onReceive={(loan) => setReceivingId(loan.id)}
                   onLoan={(loan) => setLoanId(loan.id)}
                 />
@@ -1241,8 +1434,16 @@ export default function SplitsPage() {
       <Sheet open={adding} title="Nova anotação" onClose={() => setAdding(false)}>
         {adding && <NewEntry names={data?.names ?? []} onDone={() => setAdding(false)} />}
       </Sheet>
-      <Sheet open={charging !== null} title={`Cobrar ${charging?.person ?? ""} via Pix`} onClose={() => setCharging(null)}>
-        {charging && <PixCharge person={charging.person} amount={charging.balance} />}
+      <Sheet open={chargingRow !== null} title={`Cobrar ${chargingRow?.person ?? ""}`} onClose={() => setCharging(null)}>
+        {chargingRow && (
+          <ChargeMessage
+            key={chargingRow.person}
+            person={chargingRow.person}
+            loan={activeLoans(chargingRow).find((l) => l.direction === "owes_me" && l.next) ?? null}
+            items={chargingRow.items.filter((i) => i.direction === "owes_me")}
+            balance={Number(chargingRow.balance)}
+          />
+        )}
       </Sheet>
       <Sheet open={settling !== null} title={`Acertar contas${settling ? ` com ${settling.person}` : ""}`} onClose={() => setSettling(null)}>
         {settling && <SettleForm person={settling.person} balance={settling.balance} onDone={() => setSettling(null)} />}
@@ -1255,7 +1456,17 @@ export default function SplitsPage() {
         {receivingLoan?.next && <ReceiveForm loan={receivingLoan} onDone={() => setReceivingId(null)} />}
       </Sheet>
       <Sheet open={sheetLoan !== null} wide title={`Empréstimo · ${sheetLoan?.person ?? ""}`} onClose={() => setLoanId(null)}>
-        {sheetLoan && <LoanSheet key={sheetLoan.id} loan={sheetLoan} onClose={() => setLoanId(null)} />}
+        {sheetLoan && (
+          <LoanSheet
+            key={sheetLoan.id}
+            loan={sheetLoan}
+            onClose={() => setLoanId(null)}
+            onCharge={() => {
+              setLoanId(null);
+              setCharging(sheetLoan.person);
+            }}
+          />
+        )}
       </Sheet>
     </>
   );

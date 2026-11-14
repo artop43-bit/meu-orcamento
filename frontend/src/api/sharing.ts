@@ -65,7 +65,26 @@ export type FriendLoan = {
   yearly_equivalent: number;
   payback: number | null;
   installments: LoanInstallment[];
+  phone: string | null;
+  payments: LoanPayment[];
+  last_due: string | null;
 };
+
+export type LoanPayment = {
+  id: string;
+  paid_on: string;
+  amount: string;
+  mode: "next" | "end" | "payoff";
+  discount: string;
+  numbers: number[];
+  can_undo: boolean;
+};
+
+export type ReceiveInput = { number: number; amount?: string; on?: string; mode?: "next" | "end"; discount?: boolean; preview?: boolean };
+
+export type TermInput = Partial<
+  Record<"my_name" | "my_cpf" | "my_address" | "person_name" | "person_cpf" | "person_address" | "city" | "pix_key", string>
+>;
 
 export type LoanTotals = {
   lent: string;
@@ -147,8 +166,10 @@ export const sharingApi = {
   simulate: (data: SimulateInput) => api.post<Simulation>("/friend-loans/simulate", data),
   createLoan: (data: LoanInput) => api.post<FriendLoan>("/friend-loans", data),
   removeLoan: (id: string) => api.delete(`/friend-loans/${id}`),
-  receive: (id: string, data: { number: number; amount?: string; on?: string }) => api.post<FriendLoan>(`/friend-loans/${id}/receive`, data),
-  undoReceive: (id: string, number: number) => api.remove<FriendLoan>(`/friend-loans/${id}/receive/${number}`),
+  receive: (id: string, data: ReceiveInput) => api.post<FriendLoan>(`/friend-loans/${id}/receive`, data),
+  undoPayment: (id: string, paymentId: string) => api.remove<FriendLoan>(`/friend-loans/${id}/payments/${paymentId}`),
+  reschedule: (id: string, amount: string, preview = false) => api.post<FriendLoan>(`/friend-loans/${id}/reschedule`, { amount, preview }),
+  setPhone: (id: string, phone: string) => api.put<FriendLoan>(`/friend-loans/${id}/phone`, { phone }),
   payoffQuote: (id: string, discount: boolean) =>
     api.get<{ remaining: string; discount: string; value: string }>(`/friend-loans/${id}/payoff?discount=${discount}`),
   payoff: (id: string, discount: boolean) => api.post<FriendLoan>(`/friend-loans/${id}/payoff`, { discount }),
