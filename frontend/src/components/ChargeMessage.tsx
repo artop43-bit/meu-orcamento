@@ -1,14 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
-import { QRCodeSVG } from "qrcode.react";
-import { Copy, MessageCircle, Share2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Copy } from "lucide-react";
 import { Link } from "react-router";
 
 import { useMe } from "../api/auth";
-import { SPLITS_KEY, sharingApi, type FriendLoan, type Share } from "../api/sharing";
+import type { FriendLoan, Share } from "../api/sharing";
 import { announce } from "../lib/announce";
 import { money } from "../lib/format";
-import { pixCode } from "../lib/pix";
 import { Button } from "./ui";
 
 type Kind = "reminder" | "late" | "summary" | "balance";
@@ -23,14 +20,6 @@ function date(iso: string): string {
 function short(iso: string): string {
   const [, m, d] = iso.slice(0, 10).split("-");
   return `${d}/${m}`;
-}
-
-/** Valor que a mensagem cobra (também vai no Pix copia e cola). */
-function amountFor(kind: Kind, loan: FriendLoan | null, balance: number): number {
-  if (!loan) return balance;
-  if (kind === "late") return Number(loan.late_amount);
-  if (kind === "summary") return Number(loan.remaining);
-  return loan.next ? Number(loan.next.open) + Number(loan.next.late_charge) : Number(loan.remaining);
 }
 
 function buildText(kind: Kind, person: string, loan: FriendLoan | null, items: Share[], balance: number, pixLine: string): string {
@@ -71,50 +60,21 @@ function buildText(kind: Kind, person: string, loan: FriendLoan | null, items: S
 }
 
 /**
- * Cobrar (v1.8.0.1): mensagem pronta com a chave Pix de Preferências, para mandar pelo WhatsApp,
- * copiar ou compartilhar. Opcionalmente com o Pix "copia e cola" no valor exato (sem banco: o código
- * é gerado no aparelho e qualquer app de banco lê).
+ * Cobrar (v1.8.0.2): mensagem pronta com a chave Pix de Preferências, para copiar e colar na
+ * conversa. Só texto: nada de código Pix, QR ou link para outros serviços.
  */
 export function ChargeMessage({ person, loan, items, balance }: { person: string; loan: FriendLoan | null; items: Share[]; balance: number }) {
   const me = useMe();
   const user = me.data;
-  const queryClient = useQueryClient();
   const suggested: Kind = !loan ? "balance" : loan.late_count > 0 ? "late" : "reminder";
   const [kind, setKind] = useState<Kind>(suggested);
-  const [withCode, setWithCode] = useState(true);
-  const [phone, setPhone] = useState(loan?.phone ?? "");
   const [copied, setCopied] = useState(false);
-  const value = amountFor(kind, loan, balance);
   const key = user?.pix_key ?? "";
-  const code = useMemo(
-    () =>
-      key
-        ? pixCode({
-            key,
-            name: user?.pix_name || user?.display_name || "Recebedor",
-            city: user?.pix_city || "Brasil",
-            amount: value,
-            message: "Meu Orcamento",
-          })
-        : "",
-    [key, user?.pix_name, user?.display_name, user?.pix_city, value],
-  );
-  const pixLine = key
-    ? `Pix: ${key}${user?.pix_name ? ` (${user.pix_name})` : ""}` + (withCode && code ? `\n\nPix copia e cola (${money(value)}):\n${code}` : "")
-    : "";
+  const pixLine = key ? `Pix: ${key}${user?.pix_name ? ` (${user.pix_name})` : ""}` : "";
   const generated = buildText(kind, person, loan, items, balance, pixLine);
   const [text, setText] = useState(generated);
-  // Trocar o tipo ou o copia e cola refaz o texto (o que foi editado à mão é substituído).
+  // Trocar o tipo refaz o texto (o que foi editado à mão é substituído).
   useEffect(() => setText(generated), [generated]);
-
-  const digits = phone.replace(/\D/g, "");
-  const waNumber = digits.length >= 10 ? (digits.length <= 11 ? `55${digits}` : digits) : "";
-
-  async function savePhone() {
-    if (!loan || (loan.phone ?? "") === digits) return;
-    await sharingApi.setPhone(loan.id, digits).catch(() => undefined);
-    await queryClient.invalidateQueries({ queryKey: SPLITS_KEY });
-  }
 
   async function copy() {
     try {
@@ -127,7 +87,6 @@ export function ChargeMessage({ person, loan, items, balance }: { person: string
     }
   }
 
-  const canShare = typeof navigator.share === "function" && window.matchMedia("(pointer: coarse)").matches;
   const kinds: { value: Kind; label: string }[] = loan
     ? [
         { value: "reminder", label: "Lembrete" },
@@ -156,52 +115,18 @@ export function ChargeMessage({ person, loan, items, balance }: { person: string
         <label htmlFor="charge-text">Mensagem</label>
         <textarea id="charge-text" className="charge__text" rows={9} value={text} onChange={(e) => setText(e.target.value)} />
       </div>
-      {key && (
-        <label className="check">
-          <input type="checkbox" checked={withCode} onChange={(e) => setWithCode(e.target.checked)} />
-          Incluir código Pix copia e cola ({money(value)})
-        </label>
-      )}
-      {loan && (
-        <label>
-          Telefone de {person.split(" ")[0]} (opcional, para abrir direto no WhatsApp)
-          <input inputMode="tel" value={phone} onChange={(e) => setPhone(e.target.value)} onBlur={() => void savePhone()} placeholder="(62) 99999-0000" />
-        </label>
-      )}
-      <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>
-        <a
-          className="btn btn--primary"
-          href={`https://wa.me/${waNumber}?text=${encodeURIComponent(text)}`}
-          target="_blank"
-          rel="noreferrer"
-          onClick={() => void savePhone()}
-        >
-          <MessageCircle size={16} aria-hidden /> Abrir no WhatsApp
-        </a>
-        <Button type="button" variant="secondary" onClick={() => void copy()}>
-          <Copy size={16} aria-hidden /> {copied ? "Mensagem copiada" : "Copiar"}
+      <div className="row" style={{ gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+        <Button type="button" onClick={() => void copy()}>
+          <Copy size={16} aria-hidden /> {copied ? "Mensagem copiada" : "Copiar mensagem"}
         </Button>
-        {canShare && (
-          <Button type="button" variant="secondary" onClick={() => void navigator.share({ text }).catch(() => undefined)}>
-            <Share2 size={16} aria-hidden /> Compartilhar
-          </Button>
+        {copied && (
+          <span className="tone--ok small" role="status">
+            É só colar na conversa.
+          </span>
         )}
       </div>
-      {copied && (
-        <p className="tone--ok small" role="status" style={{ margin: 0 }}>
-          Mensagem copiada. É só colar na conversa.
-        </p>
-      )}
-      {code && (
-        <details className="details">
-          <summary>Mostrar QR Code do Pix</summary>
-          <div className="pix-charge__qr">
-            <QRCodeSVG value={code} size={196} marginSize={2} title={`QR Code Pix de ${money(value)}`} />
-          </div>
-        </details>
-      )}
       <p className="muted small" style={{ margin: 0 }}>
-        O Pix cai direto na sua conta; o site não confirma sozinho. Quando receber, use “Recebi a parcela”.
+        A pessoa paga pelo app do banco dela usando a sua chave. Quando receber, marque em “Recebi a parcela”.
       </p>
     </div>
   );

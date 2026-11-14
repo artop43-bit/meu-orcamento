@@ -1,0 +1,16 @@
+MEU ORÇAMENTO · UPDATE LOG
+Versão 1.8.0.2 · Cobrar só com a chave Pix (hotfix)
+Data: 14/11/2026 às 19:35 (horário de Brasília)
+
+Cobrar
+- [x] A mensagem pronta (lembrete, cobrança do atraso, resumo ou saldo das anotações) leva só a chave Pix cadastrada em Preferências
+- [x] Um único botão: "Copiar mensagem", com a confirmação "Mensagem copiada"
+- [x] Saíram o código Pix copia e cola, o QR Code, o botão do WhatsApp, o campo de telefone e o "Compartilhar"
+- [x] Rodapé: "A pessoa paga pelo app do banco dela usando a sua chave. Quando receber, marque em 'Recebi a parcela'."
+- [x] Removida do código a tela antiga que gerava QR Code e copia e cola
+
+Correções
+- [x] Horário da v1.8.0.1 nas notas da versão: 17:02
+
+Testes
+- [x] Auditoria pela interface: a mensagem tem a chave e o valor, e não tem código Pix, QR Code nem link; só o botão "Copiar mensagem"

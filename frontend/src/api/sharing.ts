@@ -169,7 +169,6 @@ export const sharingApi = {
   receive: (id: string, data: ReceiveInput) => api.post<FriendLoan>(`/friend-loans/${id}/receive`, data),
   undoPayment: (id: string, paymentId: string) => api.remove<FriendLoan>(`/friend-loans/${id}/payments/${paymentId}`),
   reschedule: (id: string, amount: string, preview = false) => api.post<FriendLoan>(`/friend-loans/${id}/reschedule`, { amount, preview }),
-  setPhone: (id: string, phone: string) => api.put<FriendLoan>(`/friend-loans/${id}/phone`, { phone }),
   payoffQuote: (id: string, discount: boolean) =>
     api.get<{ remaining: string; discount: string; value: string }>(`/friend-loans/${id}/payoff?discount=${discount}`),
   payoff: (id: string, discount: boolean) => api.post<FriendLoan>(`/friend-loans/${id}/payoff`, { discount }),
