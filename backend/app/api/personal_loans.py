@@ -96,6 +96,16 @@ class SimulateOut(BaseModel):
     market: MarketOut | None
 
 
+class PaymentOut(BaseModel):
+    id: uuid.UUID
+    paid_on: date
+    amount: Decimal
+    mode: str
+    discount: Decimal
+    numbers: list[int]
+    can_undo: bool
+
+
 class InstallmentOut(BaseModel):
     number: int
     due_date: date
@@ -137,6 +147,9 @@ class LoanOut(BaseModel):
     yearly_equivalent: float
     payback: int | None
     installments: list[InstallmentOut]
+    phone: str | None = None
+    payments: list[PaymentOut] = []
+    last_due: date | None = None
 
 
 class LoanTotalsOut(BaseModel):
@@ -158,6 +171,19 @@ class ReceiveIn(BaseModel):
     number: Annotated[int, Field(ge=1)]
     amount: Money | None = None
     on: date | None = None
+    # O que fazer com o valor a mais: "end" abate das últimas (termina antes); "next" adianta.
+    mode: Literal["next", "end"] = "next"
+    discount: bool = False
+    preview: bool = False
+
+
+class RescheduleIn(BaseModel):
+    amount: Money
+    preview: bool = False
+
+
+class PhoneIn(BaseModel):
+    phone: str | None = Field(default=None, max_length=30)
 
 
 class PayoffIn(BaseModel):
@@ -205,13 +231,26 @@ def remove(loan_id: uuid.UUID, user: CurrentUser, db: DbSession) -> None:
 
 @router.post("/friend-loans/{loan_id}/receive")
 def receive(loan_id: uuid.UUID, body: ReceiveIn, user: CurrentUser, db: DbSession) -> LoanOut:
-    loan = personal_loans.receive(db, user, loan_id, body.number, body.amount, body.on)
-    return _out(db, loan)
+    out = personal_loans.receive(
+        db, user, loan_id, body.number, body.amount, body.on, body.mode, body.discount, body.preview
+    )
+    return LoanOut(**out) if isinstance(out, dict) else _out(db, out)
 
 
-@router.delete("/friend-loans/{loan_id}/receive/{number}")
-def undo(loan_id: uuid.UUID, number: int, user: CurrentUser, db: DbSession) -> LoanOut:
-    return _out(db, personal_loans.undo(db, user, loan_id, number))
+@router.delete("/friend-loans/{loan_id}/payments/{payment_id}")
+def undo(loan_id: uuid.UUID, payment_id: uuid.UUID, user: CurrentUser, db: DbSession) -> LoanOut:
+    return _out(db, personal_loans.undo(db, user, loan_id, payment_id))
+
+
+@router.post("/friend-loans/{loan_id}/reschedule")
+def reschedule(loan_id: uuid.UUID, body: RescheduleIn, user: CurrentUser, db: DbSession) -> LoanOut:
+    out = personal_loans.reschedule(db, user, loan_id, body.amount, body.preview)
+    return LoanOut(**out) if isinstance(out, dict) else _out(db, out)
+
+
+@router.put("/friend-loans/{loan_id}/phone")
+def set_phone(loan_id: uuid.UUID, body: PhoneIn, user: CurrentUser, db: DbSession) -> LoanOut:
+    return _out(db, personal_loans.set_phone(db, user, loan_id, body.phone))
 
 
 @router.get("/friend-loans/{loan_id}/payoff")
@@ -233,13 +272,30 @@ def payoff(loan_id: uuid.UUID, body: PayoffIn, user: CurrentUser, db: DbSession)
     return _out(db, personal_loans.payoff(db, user, loan_id, body.on, body.discount))
 
 
-@router.get("/friend-loans/{loan_id}/term.pdf")
-def term_pdf(loan_id: uuid.UUID, user: CurrentUser, db: DbSession) -> Response:
+class TermIn(BaseModel):
+    """Dados opcionais das partes para o termo; não ficam salvos."""
+
+    my_name: str | None = Field(default=None, max_length=120)
+    my_cpf: str | None = Field(default=None, max_length=20)
+    my_address: str | None = Field(default=None, max_length=200)
+    person_name: str | None = Field(default=None, max_length=120)
+    person_cpf: str | None = Field(default=None, max_length=20)
+    person_address: str | None = Field(default=None, max_length=200)
+    city: str | None = Field(default=None, max_length=80)
+    pix_key: str | None = Field(default=None, max_length=80)
+
+
+@router.post("/friend-loans/{loan_id}/term.pdf")
+def term_pdf(loan_id: uuid.UUID, body: TermIn, user: CurrentUser, db: DbSession) -> Response:
+    from app.core.months import today_local
     from app.services import pdf_export
 
     loan = personal_loans._own(db, user, loan_id)
     data = personal_loans.detail(db, loan)
-    content = pdf_export.loan_term_pdf(data, user.display_name or user.email)
+    parties = body.model_dump()
+    if not parties.get("my_name"):
+        parties["my_name"] = user.pix_name or user.display_name
+    content = pdf_export.loan_term_pdf(data, parties, today_local())
     plain = unicodedata.normalize("NFKD", loan.person).encode("ascii", "ignore").decode()
     slug = "".join(c for c in plain.lower() if c.isalnum()) or "pessoa"
     return Response(

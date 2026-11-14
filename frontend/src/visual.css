@@ -3750,3 +3750,23 @@ button.card-stack__card:disabled {
     grid-template-columns: 1fr;
   }
 }
+
+/* v1.8.0.1: pagamento a mais, prévia das parcelas e mensagem de cobrança. */
+.loan-extra {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.loan-extra__preview {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: var(--control-radius);
+  background: var(--accent-soft);
+  color: var(--fg);
+}
+.charge__text {
+  font: inherit;
+  line-height: 1.45;
+  resize: vertical;
+  min-height: 160px;
+}

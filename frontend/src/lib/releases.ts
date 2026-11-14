@@ -11,8 +11,38 @@ export type Release = {
 
 export const RELEASES: Release[] = [
   {
+    version: "1.8.0.1",
+    date: "14/11/2026 às 17:05",
+    title: "Termo pronto para entregar, cobrança com mensagem e pagamento a mais",
+    sections: [
+      {
+        title: "Termo de empréstimo",
+        items: [
+          "Formato de documento para entregar: cláusulas numeradas, cronograma, local e data, assinaturas e duas testemunhas.",
+          "Nome, CPF e endereço das partes, cidade e chave Pix são opcionais: só entra no termo o que você preencher, e nada fica salvo.",
+          "Saíram a marca do app, o e-mail e a taxa equivalente.",
+        ],
+      },
+      {
+        title: "Cobrar",
+        items: [
+          "“Cobrar” abre a mensagem pronta (lembrete, cobrança do atraso ou resumo) com a chave Pix de Preferências, para editar e mandar.",
+          "Abrir no WhatsApp (direto no contato, se você informar o telefone), copiar ou compartilhar; Pix copia e cola no valor exato e QR Code opcionais.",
+        ],
+      },
+      {
+        title: "Pagamentos",
+        items: [
+          "Pagou a mais: abater do fim (as próximas continuam iguais e termina antes) ou adiantar a próxima, com prévia antes de confirmar e desconto de juros opcional.",
+          "Mudar valor das parcelas: o que falta é redividido no novo valor (ex.: R$ 700 por semana), com prévia.",
+          "Histórico dos pagamentos no cronograma, com desfazer em cada um.",
+        ],
+      },
+    ],
+  },
+  {
     version: "1.8.0",
-    date: "13/11/2026 às 19:15",
+    date: "13/11/2026 às 19:33",
     title: "Empréstimos com juros nas Divisões",
     sections: [
       {

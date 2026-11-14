@@ -2211,10 +2211,16 @@ def v14_money(page: Page):
     expect(pix.get_by_label(re.compile("^Chave Pix"))).to_have_value("12345678909")
     page.goto(f"{BASE}/divisoes")
     idle(page)
-    person_row(page, "Caio").get_by_role("button", name="Cobrar via Pix").click()
+    person_row(page, "Caio").get_by_role("button", name="Cobrar", exact=True).click()
     d = dialog(page)
-    code = d.get_by_label("Pix copia e cola").input_value()
-    assert code.startswith("000201") and "12345678909" in code and "54071400.00" in code, code
+    # v1.8.0.1: mensagem pronta com a chave e o Pix copia e cola no valor exato.
+    expect(d.get_by_label("Incluir código Pix copia e cola (R$ 1.400,00)")).to_be_checked()
+    text = d.get_by_label("Mensagem", exact=True).input_value().replace("\xa0", " ")
+    assert "Pix: 12345678909" in text and "R$ 1.400,00" in text, text
+    code = re.search(r"^000201.*$", text, re.M)[0]
+    assert "12345678909" in code and "54071400.00" in code, code
+    expect(d.get_by_role("link", name="Abrir no WhatsApp")).to_have_attribute("href", re.compile(r"^https://wa\.me/\?text="))
+    d.get_by_text("Mostrar QR Code do Pix").click()
     expect(d.get_by_role("img", name=re.compile("QR Code Pix"))).to_be_visible()
     page.screenshot(path=OUT / "v14-pix.png")
     page.keyboard.press("Escape")
@@ -2503,11 +2509,39 @@ def v18_loans(page: Page):
     expect(row).to_contain_text("1 de 4")
     expect(row).to_contain_text("te deve R$ 787,50")
 
+    # Pagou a mais (R$ 362,50 numa parcela de R$ 262,50): abate do fim e termina antes.
+    row.get_by_role("button", name="Recebi a parcela").click()
+    d = dialog(page)
+    d.get_by_label("Valor recebido").fill(money(362.50))
+    expect(d.get_by_text("R$ 100,00 a mais. O que fazer com a diferença?")).to_be_visible()
+    expect(d.get_by_label("Abater do fim (termina antes)")).to_be_checked()
+    expect(d.locator(".loan-extra__preview")).to_contain_text("As próximas continuam de R$ 262,50", timeout=8000)
+    d.get_by_role("button", name="Recebi", exact=True).click()
+    expect(d).to_have_count(0, timeout=8000)
+    idle(page)
+    expect(row).to_contain_text("te deve R$ 425,00")
+
+    # Cobrar: mensagem pronta (lembrete da próxima parcela).
+    row.get_by_role("button", name="Cobrar", exact=True).click()
+    d = dialog(page)
+    expect(d.get_by_label("Mensagem", exact=True)).to_have_value(re.compile(r"parcela 3/4 do empréstimo: R\$\s262,50"))
+    page.keyboard.press("Escape")
+    expect(d).to_have_count(0)
+
     # Cronograma, quitação com desconto e busca.
     row.get_by_role("button", name="Ver cronograma, termo e quitação").click()
     d = dialog(page)
     expect(d.locator(".loan-table tbody tr")).to_have_count(4)
     expect(d).to_contain_text("Recebida")
+    expect(d.locator(".loan-payments .item")).to_have_count(2)
+    # Termo: dados das partes opcionais, baixa o PDF.
+    d.get_by_role("button", name="Termo em PDF").click()
+    expect(d.get_by_label("Nome completo da pessoa")).to_have_value("Duda")
+    d.get_by_label("Cidade").fill("Goiânia")
+    with page.expect_download() as info:
+        d.get_by_role("button", name="Baixar termo em PDF").click()
+    assert info.value.suggested_filename == "termo-emprestimo_duda.pdf"
+    expect(d.get_by_role("button", name="Quitar antecipado")).to_be_visible(timeout=8000)
     page.screenshot(path=OUT / "v18-cronograma.png")
     d.get_by_role("button", name="Quitar antecipado").click()
     expect(d.locator(".stat", has_text="Para quitar hoje")).to_contain_text("R$")
@@ -2524,7 +2558,7 @@ def v18_loans(page: Page):
     answer = page.request.post(
         f"{BASE}/api/ask", data={"question": "quanto a Duda ainda me deve?"}, headers={"X-Requested-With": "fetch"}
     ).json()
-    assert answer["intent"] == "friend_loans" and "R$ 787,50" in answer["answer"], answer
+    assert answer["intent"] == "friend_loans" and "R$ 425,00" in answer["answer"], answer
 
 
 @step("Faixa do 2FA: 'Não mostrar mais' fica salvo na conta")

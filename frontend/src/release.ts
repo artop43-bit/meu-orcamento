@@ -3,18 +3,16 @@
  * do changelog (pasta changelog/), que tem a mesma versão, data e hora.
  */
 export const RELEASE = {
-  version: "1.8.0",
+  version: "1.8.0.1",
   // Data e hora (Brasília) em que o update foi publicado.
-  releasedAt: "2026-11-13T19:15:00-03:00",
+  releasedAt: "2026-11-14T17:05:00-03:00",
 };
 
 /** Mostrado uma vez em "Novidades" depois do update (curto: o detalhe fica no changelog). */
 export const RELEASE_NOTES: { title: string; text: string }[] = [
-  {
-    title: "Empréstimos com juros nas Divisões.",
-    text: "Empreste com juros e parcelas (por dia, semana, 15 dias ou mês): a taxa sai do lucro que você quer, e cada parcela entra no Orçamento como receita prevista.",
-  },
-  { title: "Divisões em linhas.", text: "Uma linha por pessoa, que abre e fecha, com busca por nome e filtros." },
+  { title: "Termo pronto para entregar.", text: "Com cláusulas, assinaturas e testemunhas; nome, CPF e endereço das partes são opcionais." },
+  { title: "Cobrar com mensagem pronta.", text: "Lembrete, cobrança ou resumo com a sua chave Pix, para mandar no WhatsApp ou copiar." },
+  { title: "Pagou a mais?", text: "Escolha abater do fim (termina antes) ou adiantar a próxima, ou mude o valor das parcelas." },
 ];
 
 export function releaseLabel(): string {

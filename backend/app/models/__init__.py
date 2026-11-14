@@ -22,6 +22,7 @@ from app.models.budget import (
 from app.models.debts import (
     Loan,
     LoanInstallment,
+    LoanPayment,
     NetWorthSnapshot,
     OtherDebt,
     PersonalLoan,
@@ -54,6 +55,7 @@ from app.models.user import (
 
 __all__ = [
     "LoanInstallment",
+    "LoanPayment",
     "PersonalLoan",
     "Project",
     "AnnouncementReply",
