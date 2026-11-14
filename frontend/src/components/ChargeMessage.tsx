@@ -152,10 +152,10 @@ export function ChargeMessage({ person, loan, items, balance }: { person: string
           ))}
         </div>
       )}
-      <label>
-        Mensagem
-        <textarea className="charge__text" rows={9} value={text} onChange={(e) => setText(e.target.value)} />
-      </label>
+      <div className="field">
+        <label htmlFor="charge-text">Mensagem</label>
+        <textarea id="charge-text" className="charge__text" rows={9} value={text} onChange={(e) => setText(e.target.value)} />
+      </div>
       {key && (
         <label className="check">
           <input type="checkbox" checked={withCode} onChange={(e) => setWithCode(e.target.checked)} />
