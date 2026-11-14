@@ -208,8 +208,7 @@ def test_payoff_with_discount_and_term(user: TestClient) -> None:  # noqa: F811
     assert "CREDOR (quem empresta): Ana Paula Souza, CPF 123.456.789-09." in text
     assert (
         "DEVEDOR (quem recebe o empréstimo): João Silva, CPF 987.654.321-00, "
-        "residente em Rua das Flores, 10, Goiânia."
-        in text
+        "residente em Rua das Flores, 10, Goiânia." in text
     )
     assert "para a chave ana@pix.com" in text and "comarca de Goiânia" in text
     assert re.search(r"Goiânia, \d+ de \w+ de \d{4}", text)
