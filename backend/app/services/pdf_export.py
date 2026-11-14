@@ -505,6 +505,8 @@ class _Term(_Doc):
 
 
 def _party(role: str, name: str, cpf: str | None, address: str | None) -> str:
+    if name.startswith("_"):
+        return f"{role}: {name}"  # em branco, para preencher à mão
     text = f"{role}: {name}"
     if cpf:
         text += f", CPF {cpf}"
@@ -591,18 +593,13 @@ def loan_term_pdf(loan: dict[str, Any], parties: dict[str, Any], today: date) ->
             f"Fica eleito o foro da comarca de {city} para resolver questões deste instrumento."
         )
     for index, text in enumerate(clauses, start=1):
+        # Rótulo em negrito e o texto normal, na mesma linha.
         doc.set_font("Inter", "B", 10)
-        label = f"Cláusula {index}ª. "
-        doc.multi_cell(
-            0,
-            5.4,
-            f"**{label}**{text}",
-            align="J",
-            markdown=True,
-            new_x=XPos.LMARGIN,
-            new_y=YPos.NEXT,
-        )
-        doc.ln(2)
+        doc.write(5.2, f"Cláusula {index}ª. ")
+        doc.set_font("Inter", "", 10)
+        doc.write(5.2, text)
+        doc.ln(5.2)
+        doc.ln(1.8)
     doc.section("Cronograma de pagamento")
     rows = [
         [
@@ -626,6 +623,9 @@ def loan_term_pdf(loan: dict[str, Any], parties: dict[str, Any], today: date) ->
         total=["", "Total", brl(loan["total"]), brl(loan["profit"]), brl(loan["principal"])],
     )
     doc.ln(4)
+    # Fechamento, assinaturas e testemunhas ficam juntos na mesma página.
+    if doc.get_y() > doc.h - doc.b_margin - 60:
+        doc.add_page()
     para("E, por estarem de acordo, as partes assinam este instrumento, com duas testemunhas.")
     when = f"{today.day} de {MONTHS_FULL[today.month - 1]} de {today.year}"
     doc.set_font("Inter", "", 10)
@@ -634,9 +634,7 @@ def loan_term_pdf(loan: dict[str, Any], parties: dict[str, Any], today: date) ->
 
     def signatures(pairs: list[tuple[str, str | None, str]]) -> None:
         half = (doc.width - 12) / 2
-        if doc.get_y() > doc.h - 50:
-            doc.add_page()
-        doc.ln(16)
+        doc.ln(10)
         y = doc.get_y()
         doc.set_draw_color(*INK)
         for col, (name, cpf, role) in enumerate(pairs):
@@ -644,13 +642,13 @@ def loan_term_pdf(loan: dict[str, Any], parties: dict[str, Any], today: date) ->
             doc.line(x, y, x + half, y)
             doc.set_xy(x, y + 1.5)
             doc.set_font("Inter", "B", 9)
-            doc.cell(half, 4.5, name)
+            doc.cell(half, 4.5, "" if name.startswith("_") else name)
             doc.set_xy(x, y + 6)
             doc.set_font("Inter", "", 8.5)
             doc.set_text_color(*MUTED)
             doc.cell(half, 4.5, f"{role}" + (f" · CPF {cpf}" if cpf else ""))
             doc.set_text_color(*INK)
-        doc.set_y(y + 12)
+        doc.set_y(y + 11)
 
     signatures([(lender[0], lender[1], "Credor"), (borrower[0], borrower[1], "Devedor")])
     signatures(
