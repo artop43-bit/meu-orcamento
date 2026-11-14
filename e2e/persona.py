@@ -2217,7 +2217,7 @@ def v14_money(page: Page):
     expect(d.get_by_label("Incluir código Pix copia e cola (R$ 1.400,00)")).to_be_checked()
     text = d.get_by_label("Mensagem").input_value().replace("\xa0", " ")
     assert "Pix: 12345678909" in text and "R$ 1.400,00" in text, text
-    code = re.search(r"000201\S+", text)[0]
+    code = re.search(r"^000201.*$", text, re.M)[0]
     assert "12345678909" in code and "54071400.00" in code, code
     expect(d.get_by_role("link", name="Abrir no WhatsApp")).to_have_attribute("href", re.compile(r"^https://wa\.me/\?text="))
     d.get_by_text("Mostrar QR Code do Pix").click()
