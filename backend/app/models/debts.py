@@ -4,7 +4,7 @@ import uuid
 from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import Date, ForeignKey, Numeric, SmallInteger, String, UniqueConstraint, Uuid
+from sqlalchemy import JSON, Date, ForeignKey, Numeric, SmallInteger, String, UniqueConstraint, Uuid
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -136,6 +136,10 @@ class PersonalLoan(Base):
     # Multa (%) e juros de mora (% ao mês) por atraso; vazios = não cobrar.
     late_fee: Mapped[Decimal | None] = mapped_column(Rate)
     late_interest: Mapped[Decimal | None] = mapped_column(Rate)
+    # v1.8.0.1: telefone para abrir a conversa no WhatsApp com a cobrança pronta.
+    phone: Mapped[str | None] = mapped_column(String(20))
+    # v1.8.0.1: quando as parcelas foram refeitas (novo valor); pagamentos de antes não se desfazem.
+    rescheduled_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
     settled_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
 
@@ -157,3 +161,25 @@ class LoanInstallment(Base):
     principal_part: Mapped[Decimal] = mapped_column(Money)
     received_at: Mapped[date | None] = mapped_column(Date)
     received_amount: Mapped[Decimal | None] = mapped_column(Money)
+
+
+class LoanPayment(Base):
+    """Pagamento registrado num empréstimo a amigo (v1.8.0.1): o histórico e como foi distribuído.
+
+    mode "next": a partir da parcela escolhida, em ordem (o que sobra adianta as próximas);
+    "end": completa a parcela escolhida e o que sobra paga as últimas (termina antes);
+    "payoff": quitação. allocation: [[parcela, valor, juros descontados], ...], para desfazer.
+    """
+
+    __tablename__ = "loan_payments"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    loan_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("personal_loans.id", ondelete="CASCADE"), index=True
+    )
+    paid_on: Mapped[date] = mapped_column(Date)
+    amount: Mapped[Decimal] = mapped_column(Money)
+    mode: Mapped[str] = mapped_column(String(7))
+    discount: Mapped[Decimal] = mapped_column(Money, default=Decimal("0"))
+    allocation: Mapped[list] = mapped_column(JSON, default=list)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)

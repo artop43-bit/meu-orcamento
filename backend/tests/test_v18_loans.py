@@ -160,8 +160,13 @@ def test_receive_partial_early_and_undo(user: TestClient) -> None:  # noqa: F811
     assert ahead["paid_count"] == 4 and ahead["remaining"] == "800.00"
     too_much = user.post(f"/api/friend-loans/{lid}/receive", json={"number": 5, "amount": "5000"})
     assert too_much.status_code == 400
-    undone = user.delete(f"/api/friend-loans/{lid}/receive/4").json()
-    assert undone["paid_count"] == 3 and undone["remaining"] == "900.00"
+    # Desfazer o último pagamento (R$ 260): volta a ficar só a 1 paga e R$ 40 da 2.
+    history = ahead["payments"]
+    assert [x["amount"] for x in history] == ["260.00", "40.00", "100.00"]
+    undone = user.delete(f"/api/friend-loans/{lid}/payments/{history[0]['id']}").json()
+    assert undone["paid_count"] == 1 and undone["remaining"] == "1060.00"
+    assert undone["installments"][1]["status"] == "partial"
+    assert len(undone["payments"]) == 2
 
 
 def test_payoff_with_discount_and_term(user: TestClient) -> None:  # noqa: F811
@@ -171,14 +176,43 @@ def test_payoff_with_discount_and_term(user: TestClient) -> None:  # noqa: F811
     assert quote["remaining"] == "1200.00"
     assert D(quote["discount"]) == D("200.00")  # nenhuma venceu: sai todo o juro
     assert quote["value"] == "1000.00"
-    pdf = user.get(f"/api/friend-loans/{lid}/term.pdf")
+    pdf = user.post(f"/api/friend-loans/{lid}/term.pdf", json={})
     assert pdf.headers["content-type"] == "application/pdf"
     assert 'filename="termo-emprestimo_joaosilva.pdf"' in pdf.headers["content-disposition"]
     text = "\n".join(p.extract_text() for p in PdfReader(io.BytesIO(pdf.content)).pages)
     text = re.sub(r"\s+", " ", text)
-    assert "Termo de empréstimo" in text and "João Silva" in text
+    assert "INSTRUMENTO PARTICULAR DE EMPRÉSTIMO" in text and "João Silva" in text
     assert "R$ 1.000,00" in text and "R$ 1.200,00" in text
     assert "multa de 2%" in text and "Conserto do carro" in text
+    # Documento para entregar: sem e-mail, sem marca do app e sem a taxa equivalente.
+    assert "@" not in text and "Meu Orçamento" not in text and "Equivale" not in text
+    assert (
+        "Testemunha 1" in text
+        and "Testemunha 2" in text
+        and "CPF" not in text.split("Testemunha")[0]
+    )
+    full = user.post(
+        f"/api/friend-loans/{lid}/term.pdf",
+        json={
+            "my_name": "Ana Paula Souza",
+            "my_cpf": "12345678909",
+            "person_cpf": "98765432100",
+            "person_address": "Rua das Flores, 10, Goiânia",
+            "city": "Goiânia",
+            "pix_key": "ana@pix.com",
+        },
+    )
+    text = re.sub(
+        r"\s+", " ", "\n".join(p.extract_text() for p in PdfReader(io.BytesIO(full.content)).pages)
+    )
+    assert "CREDOR (quem empresta): Ana Paula Souza, CPF 123.456.789-09." in text
+    assert (
+        "DEVEDOR (quem recebe o empréstimo): João Silva, CPF 987.654.321-00, "
+        "residente em Rua das Flores, 10, Goiânia."
+        in text
+    )
+    assert "para a chave ana@pix.com" in text and "comarca de Goiânia" in text
+    assert re.search(r"Goiânia, \d+ de \w+ de \d{4}", text)
     done = user.post(
         f"/api/friend-loans/{lid}/payoff", json={"on": "2030-01-20", "discount": True}
     ).json()
@@ -245,3 +279,109 @@ def test_backup_and_reset_include_loans(user: TestClient) -> None:  # noqa: F811
 def test_loans_need_login(client: TestClient) -> None:
     assert client.get("/api/friend-loans").status_code == 401
     assert client.post("/api/friend-loans/simulate", json=BASE).status_code == 401
+
+
+def test_extra_payment_ends_earlier_or_advances_next(user: TestClient) -> None:  # noqa: F811
+    """Deve R$ 500 por semana e paga R$ 700 para quitar mais rápido."""
+    body = {**BASE, "mode": "total", "rate": "0", "count": 4, "frequency": "week"}
+    body["principal"] = "2000"
+    loan = user.post("/api/friend-loans", json=body).json()
+    lid = loan["id"]
+    # Prévia: abater do fim não salva nada.
+    preview = user.post(
+        f"/api/friend-loans/{lid}/receive",
+        json={"number": 1, "amount": "700", "mode": "end", "preview": True},
+    ).json()
+    assert preview["installments"][3]["open"] == "300.00"
+    assert user.get(f"/api/friend-loans/{lid}").json()["payments"] == []
+    end = user.post(
+        f"/api/friend-loans/{lid}/receive", json={"number": 1, "amount": "700", "mode": "end"}
+    ).json()
+    assert [i["open"] for i in end["installments"]] == ["0.00", "500.00", "500.00", "300.00"]
+    assert end["installments"][1]["amount"] == "500.00"  # a próxima continua igual
+    # Mais duas semanas de R$ 700: a última some antes do prazo.
+    user.post(
+        f"/api/friend-loans/{lid}/receive", json={"number": 2, "amount": "700", "mode": "end"}
+    )
+    done = user.post(
+        f"/api/friend-loans/{lid}/receive", json={"number": 3, "amount": "600", "mode": "end"}
+    ).json()
+    assert done["settled_at"] and done["remaining"] == "0.00"
+    # "Adiantar a próxima": a diferença desconta da semana seguinte.
+    other = user.post("/api/friend-loans", json={**body, "person": "Bia"}).json()
+    nxt = user.post(
+        f"/api/friend-loans/{other['id']}/receive",
+        json={"number": 1, "amount": "700", "mode": "next"},
+    ).json()
+    assert nxt["installments"][1]["open"] == "300.00"
+
+
+def test_extra_payment_with_interest_discount(user: TestClient) -> None:  # noqa: F811
+    loan = user.post(
+        "/api/friend-loans",
+        json={**BASE, "mode": "total", "rate": "20", "count": 4, "frequency": "month"},
+    ).json()
+    # Parcelas de R$ 300 (R$ 50 de juros cada). Paga R$ 550 na 1ª: R$ 250 a mais, do fim, sem
+    # os juros da última (R$ 250 quita os R$ 250 de devolução dela).
+    out = user.post(
+        f"/api/friend-loans/{loan['id']}/receive",
+        json={"number": 1, "amount": "550", "mode": "end", "discount": True, "on": "2030-02-01"},
+    ).json()
+    last = out["installments"][3]
+    assert last["status"] == "paid" and last["amount"] == "250.00" and last["interest"] == "0.00"
+    assert out["payments"][0]["discount"] == "50.00"
+    # Desfazer devolve os juros descontados.
+    back = user.delete(f"/api/friend-loans/{loan['id']}/payments/{out['payments'][0]['id']}").json()
+    assert back["installments"][3]["amount"] == "300.00" and back["total"] == "1200.00"
+
+
+def test_reschedule_to_a_new_amount(user: TestClient) -> None:  # noqa: F811
+    body = {
+        **BASE,
+        "mode": "total",
+        "rate": "10",
+        "count": 4,
+        "frequency": "week",
+        "principal": "2000",
+    }
+    loan = user.post("/api/friend-loans", json=body).json()  # 4 de R$ 550
+    lid = loan["id"]
+    user.post(f"/api/friend-loans/{lid}/receive", json={"number": 1, "on": "2030-02-10"})
+    preview = user.post(
+        f"/api/friend-loans/{lid}/reschedule", json={"amount": "700", "preview": True}
+    ).json()
+    assert [i["amount"] for i in preview["installments"]] == [
+        "550.00",
+        "700.00",
+        "700.00",
+        "250.00",
+    ]
+    assert user.get(f"/api/friend-loans/{lid}").json()["count"] == 4
+    out = user.post(f"/api/friend-loans/{lid}/reschedule", json={"amount": "700"}).json()
+    assert [i["amount"] for i in out["installments"]] == ["550.00", "700.00", "700.00", "250.00"]
+    assert out["total"] == "2200.00" and out["profit"] == "200.00"
+    assert [i["due_date"] for i in out["installments"]] == [
+        "2030-02-10",
+        "2030-02-17",
+        "2030-02-24",
+        "2030-03-03",
+    ]
+    assert out["payments"][0]["can_undo"] is False
+    # Bem maior: termina em menos parcelas.
+    out = user.post(f"/api/friend-loans/{lid}/reschedule", json={"amount": "1000"}).json()
+    assert [i["amount"] for i in out["installments"]] == ["550.00", "1000.00", "650.00"]
+    assert out["count"] == 3
+    feb = [i for i in _month(user, "2030-02")["incomes"] if "Empréstimo" in i["description"]]
+    assert sum(D(i["amount"]) for i in feb) == D("2200.00")  # as três datas caem em fevereiro
+
+
+def test_phone(user: TestClient) -> None:  # noqa: F811
+    loan = _create(user)
+    out = user.put(
+        f"/api/friend-loans/{loan['id']}/phone", json={"phone": "(62) 99999-1234"}
+    ).json()
+    assert out["phone"] == "62999991234"
+    assert (
+        user.put(f"/api/friend-loans/{loan['id']}/phone", json={"phone": ""}).json()["phone"]
+        is None
+    )

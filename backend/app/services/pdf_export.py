@@ -461,12 +461,16 @@ def annual_pdf(data: dict[str, Any], rows: list[dict[str, Any]], owner: str) -> 
 
 FREQUENCY_TEXT = {"day": "diárias", "week": "semanais", "biweek": "quinzenais", "month": "mensais"}
 MODE_TEXT = {
-    "none": "sem juros",
+    "none": "sem cobrança de juros",
     "total": "com juros de {rate} sobre o valor emprestado",
     "simple": "com juros simples de {rate} ao mês",
-    "price": "com juros compostos de {rate} ao mês (parcelas iguais, Tabela Price)",
-    "sac": "com juros compostos de {rate} ao mês (devolução constante, SAC)",
+    "price": "com juros compostos de {rate} ao mês, em parcelas iguais (Tabela Price)",
+    "sac": "com juros compostos de {rate} ao mês, com devolução constante do valor (SAC)",
 }
+MONTHS_FULL = [
+    "janeiro", "fevereiro", "março", "abril", "maio", "junho",
+    "julho", "agosto", "setembro", "outubro", "novembro", "dezembro",
+]  # fmt: skip
 
 
 def _rate(value: Decimal | float) -> str:
@@ -474,49 +478,132 @@ def _rate(value: Decimal | float) -> str:
     return f"{text}%"
 
 
-def loan_term_pdf(loan: dict[str, Any], owner: str) -> bytes:
-    """Termo simples de empréstimo entre pessoas, com o cronograma para as duas assinarem."""
-    lender, borrower = (owner, loan["person"])
+def _cpf(value: str | None) -> str | None:
+    digits = "".join(c for c in (value or "") if c.isdigit())
+    if len(digits) == 11:
+        return f"{digits[:3]}.{digits[3:6]}.{digits[6:9]}-{digits[9:]}"
+    return (value or "").strip() or None
+
+
+class _Term(_Doc):
+    """Documento para entregar: sem a marca do app, sem data de geração; só o número da página."""
+
+    def header(self) -> None:
+        if self.page_no() == 1:
+            self.set_text_color(*INK)
+            self.set_font("Inter", "B", 15)
+            self.cell(0, 9, self.title_text.upper(), align="C", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+            self.ln(3)
+        else:
+            self.ln(4)
+
+    def footer(self) -> None:
+        self.set_y(-12)
+        self.set_font("Inter", "", 7.5)
+        self.set_text_color(*MUTED)
+        self.cell(0, 4, f"Página {self.page_no()} de {{nb}}", align="C")
+
+
+def _party(role: str, name: str, cpf: str | None, address: str | None) -> str:
+    text = f"{role}: {name}"
+    if cpf:
+        text += f", CPF {cpf}"
+    if address:
+        text += f", residente em {address}"
+    return text + "."
+
+
+def loan_term_pdf(loan: dict[str, Any], parties: dict[str, Any], today: date) -> bytes:
+    """Instrumento particular de empréstimo, pronto para as partes assinarem. Os dados das partes
+    são opcionais: só entra no documento o que foi informado."""
+    me = parties.get("my_name") or "_" * 40
+    other = parties.get("person_name") or loan["person"]
+    my_cpf, other_cpf = _cpf(parties.get("my_cpf")), _cpf(parties.get("person_cpf"))
+    my_addr = (parties.get("my_address") or "").strip() or None
+    other_addr = (parties.get("person_address") or "").strip() or None
+    lender = (me, my_cpf, my_addr)
+    borrower = (other, other_cpf, other_addr)
     if loan["direction"] == "i_owe":
-        lender, borrower = borrower, owner
-    doc = _Doc("Termo de empréstimo", f"{lender} para {borrower}", owner)
+        lender, borrower = borrower, lender
+    city = (parties.get("city") or "").strip() or None
+    pix = (parties.get("pix_key") or "").strip() or None
+
+    doc = _Term("Instrumento particular de empréstimo", "", "")
     doc.add_page()
-    count = loan["count"]
-    plural = "parcela" if count == 1 else f"{count} parcelas {FREQUENCY_TEXT[loan['frequency']]}"
-    form = MODE_TEXT[loan["mode"]].format(rate=_rate(loan["rate"]))
-    first = loan["installments"][0]["due_date"]
-    last = loan["installments"][-1]["due_date"]
-    doc.set_font("Inter", "", 10)
     doc.set_text_color(*INK)
-    text = (
-        f"{lender} empresta a {borrower} a quantia de {brl(loan['principal'])}, {form}. "
-        f"{borrower} se compromete a devolver {brl(loan['total'])} em {plural}, "
-        f"de {first:%d/%m/%Y} a {last:%d/%m/%Y}, conforme o cronograma abaixo."
+
+    def para(text: str, bold: bool = False, gap: float = 2.5) -> None:
+        doc.set_font("Inter", "B" if bold else "", 10)
+        doc.multi_cell(0, 5.4, text, align="J", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        doc.ln(gap)
+
+    para(_party("CREDOR (quem empresta)", *lender), gap=1)
+    para(_party("DEVEDOR (quem recebe o empréstimo)", *borrower))
+    para(
+        "As partes acima ajustam o presente empréstimo de dinheiro, que se rege pelas cláusulas "
+        "a seguir."
     )
-    if loan.get("description"):
-        text += f" Motivo: {loan['description']}."
+    count = loan["count"]
+    items = loan["installments"]
+    first, last = items[0]["due_date"], items[-1]["due_date"]
+    equal = len({i["amount"] for i in items[:-1]}) <= 1
+    each = (
+        f"de {brl(items[0]['amount'])}"
+        + (
+            f" (a última de {brl(items[-1]['amount'])})"
+            if items[-1]["amount"] != items[0]["amount"]
+            else ""
+        )
+        if equal
+        else "nos valores do cronograma abaixo"
+    )
+    clauses = [
+        f"O CREDOR empresta ao DEVEDOR a quantia de {brl(loan['principal'])}"
+        + (f", destinada a: {loan['description']}" if loan.get("description") else "")
+        + ".",
+        f"O empréstimo é feito {MODE_TEXT[loan['mode']].format(rate=_rate(loan['rate']))}. "
+        f"O DEVEDOR devolverá ao CREDOR o total de {brl(loan['total'])}, sendo "
+        f"{brl(loan['principal'])} do valor emprestado e {brl(loan['profit'])} de juros.",
+        (
+            f"O pagamento será feito em {count} parcela{'s' if count > 1 else ''} "
+            f"{FREQUENCY_TEXT[loan['frequency']] if count > 1 else ''} {each}, "
+            f"de {first:%d/%m/%Y} a {last:%d/%m/%Y}, conforme o cronograma abaixo."
+        ).replace("  ", " "),
+        "Os pagamentos serão feitos por Pix"
+        + (f" para a chave {pix}" if pix else "")
+        + ", ou de outra forma combinada entre as partes, valendo o comprovante como recibo.",
+    ]
     if loan.get("late_fee") or loan.get("late_interest"):
         parts = []
         if loan.get("late_fee"):
             parts.append(f"multa de {_rate(loan['late_fee'])}")
         if loan.get("late_interest"):
-            parts.append(f"juros de {_rate(loan['late_interest'])} ao mês, proporcionais aos dias")
-        text += f" Em caso de atraso, incidem {' e '.join(parts)} sobre a parcela em aberto."
-    text += (
-        " O pagamento antecipado é permitido, com desconto dos juros das parcelas que ainda "
-        "não venceram."
+            parts.append(
+                f"juros de {_rate(loan['late_interest'])} ao mês, proporcionais aos dias de atraso"
+            )
+        clauses.append(f"Em caso de atraso, incidem sobre a parcela em aberto {' e '.join(parts)}.")
+    clauses.append(
+        "O DEVEDOR pode antecipar o pagamento de parcelas ou quitar o saldo a qualquer momento, "
+        "com desconto dos juros das parcelas que ainda não venceram."
     )
-    doc.multi_cell(0, 5.4, text, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-    doc.ln(3)
-    doc.stats(
-        [
-            ("Valor emprestado", brl(loan["principal"]), None),
-            ("Total a devolver", brl(loan["total"]), None),
-            ("Juros", brl(loan["profit"]), None),
-            ("Equivale a", f"{_rate(loan['monthly_equivalent'])} ao mês", None),
-        ]
-    )
-    doc.section("Cronograma")
+    if city:
+        clauses.append(
+            f"Fica eleito o foro da comarca de {city} para resolver questões deste instrumento."
+        )
+    for index, text in enumerate(clauses, start=1):
+        doc.set_font("Inter", "B", 10)
+        label = f"Cláusula {index}ª. "
+        doc.multi_cell(
+            0,
+            5.4,
+            f"**{label}**{text}",
+            align="J",
+            markdown=True,
+            new_x=XPos.LMARGIN,
+            new_y=YPos.NEXT,
+        )
+        doc.ln(2)
+    doc.section("Cronograma de pagamento")
     rows = [
         [
             str(i["number"]),
@@ -524,46 +611,52 @@ def loan_term_pdf(loan: dict[str, Any], owner: str) -> bytes:
             brl(i["amount"]),
             brl(i["interest"]),
             brl(i["principal"]),
-            "Pago" if i["status"] == "paid" else "",
         ]
-        for i in loan["installments"]
+        for i in items
     ]
     doc.table(
         [
-            ("Nº", 0.08, "L"),
-            ("Vencimento", 0.2, "L"),
-            ("Valor", 0.2, "R"),
-            ("Juros", 0.18, "R"),
-            ("Devolução", 0.18, "R"),
-            ("Situação", 0.16, "R"),
+            ("Parcela", 0.14, "L"),
+            ("Vencimento", 0.24, "L"),
+            ("Valor", 0.22, "R"),
+            ("Juros", 0.2, "R"),
+            ("Devolução", 0.2, "R"),
         ],
         rows,
-        total=["", "Total", brl(loan["total"]), brl(loan["profit"]), brl(loan["principal"]), ""],
+        total=["", "Total", brl(loan["total"]), brl(loan["profit"]), brl(loan["principal"])],
     )
-    if doc.get_y() > doc.h - 60:
-        doc.add_page()
-    doc.ln(16)
-    half = (doc.width - 10) / 2
-    y = doc.get_y()
-    doc.set_draw_color(*INK)
-    doc.line(doc.l_margin, y, doc.l_margin + half, y)
-    doc.line(doc.l_margin + half + 10, y, doc.w - doc.r_margin, y)
-    doc.set_y(y + 1.5)
-    doc.set_font("Inter", "", 9)
-    doc.cell(half, 5, f"{lender} (quem empresta)")
-    doc.set_x(doc.l_margin + half + 10)
-    doc.cell(half, 5, f"{borrower} (quem recebe)", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-    doc.ln(8)
-    doc.set_font("Inter", "", 8)
-    doc.set_text_color(*MUTED)
-    doc.multi_cell(
-        0,
-        4,
-        "Local e data: ______________________________________________\n\n"
-        "Modelo simples para registrar um acordo entre pessoas. Não substitui orientação "
-        "jurídica. Entre particulares, a Lei da Usura (Decreto 22.626/33) limita os juros a "
-        "1% ao mês.",
-        new_x=XPos.LMARGIN,
-        new_y=YPos.NEXT,
+    doc.ln(4)
+    para("E, por estarem de acordo, as partes assinam este instrumento, com duas testemunhas.")
+    when = f"{today.day} de {MONTHS_FULL[today.month - 1]} de {today.year}"
+    doc.set_font("Inter", "", 10)
+    place = f"{city}, {when}." if city else f"______________________________, {when}."
+    doc.cell(0, 6, place, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+
+    def signatures(pairs: list[tuple[str, str | None, str]]) -> None:
+        half = (doc.width - 12) / 2
+        if doc.get_y() > doc.h - 50:
+            doc.add_page()
+        doc.ln(16)
+        y = doc.get_y()
+        doc.set_draw_color(*INK)
+        for col, (name, cpf, role) in enumerate(pairs):
+            x = doc.l_margin + col * (half + 12)
+            doc.line(x, y, x + half, y)
+            doc.set_xy(x, y + 1.5)
+            doc.set_font("Inter", "B", 9)
+            doc.cell(half, 4.5, name)
+            doc.set_xy(x, y + 6)
+            doc.set_font("Inter", "", 8.5)
+            doc.set_text_color(*MUTED)
+            doc.cell(half, 4.5, f"{role}" + (f" · CPF {cpf}" if cpf else ""))
+            doc.set_text_color(*INK)
+        doc.set_y(y + 12)
+
+    signatures([(lender[0], lender[1], "Credor"), (borrower[0], borrower[1], "Devedor")])
+    signatures(
+        [
+            ("Testemunha 1", None, "Nome e CPF: ______________________"),
+            ("Testemunha 2", None, "Nome e CPF: ______________________"),
+        ]
     )
     return bytes(doc.output())

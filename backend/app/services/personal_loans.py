@@ -11,6 +11,7 @@ adiantado). Pagar menos deixa a parcela "parcial", com o que falta em aberto.
 
 from __future__ import annotations
 
+import math
 import uuid
 from collections import defaultdict
 from datetime import date
@@ -23,7 +24,7 @@ from sqlalchemy.orm import Session
 from app.core.errors import AppError
 from app.core.months import month_of, today_local
 from app.db.types import utcnow
-from app.models import Expense, Income, LoanInstallment, PersonalLoan, User
+from app.models import Expense, Income, LoanInstallment, LoanPayment, PersonalLoan, User
 from app.services import loans_calc as calc
 
 ZERO = Decimal("0")
@@ -175,6 +176,7 @@ def remove(db: Session, user: User, loan_id: uuid.UUID, *, commit: bool = True) 
                 item.personal_loan_id = None
             else:
                 db.delete(item)
+    db.execute(delete(LoanPayment).where(LoanPayment.loan_id == loan.id))
     db.execute(delete(LoanInstallment).where(LoanInstallment.loan_id == loan.id))
     db.delete(loan)
     if commit:
@@ -192,6 +194,55 @@ def _is_received_line(item: Income | Expense) -> bool:
 # ---------------------------------------------------------------- receber, desfazer, quitar
 
 
+def _apply(
+    items: list[LoanInstallment],
+    number: int,
+    amount: Decimal,
+    on: date,
+    mode: str,
+    discount: bool,
+) -> tuple[list[list[str]], Decimal]:
+    """Distribui um pagamento nas parcelas. Devolve [[parcela, valor, juros descontados]] e o
+    desconto total. "next": em ordem a partir de `number`; "end": completa `number` e o resto
+    paga as últimas (de trás para frente), com desconto opcional dos juros dessas."""
+    left = amount
+    allocation: dict[int, list[Decimal]] = {}
+    saved = ZERO
+
+    def pay(item: LoanInstallment, cut_interest: bool) -> None:
+        nonlocal left, saved
+        if left <= 0 or _open(item) <= 0:
+            return
+        cut = ZERO
+        if cut_interest and item.due_date > on and item.amount:
+            # Juros proporcionais ao que falta, só quando o valor cobre a parcela inteira.
+            cut = calc.cents(item.interest * _open(item) / item.amount)
+            if _open(item) - cut > left:
+                cut = ZERO
+            item.amount -= cut
+            item.interest -= cut
+            saved += cut
+        part = min(left, _open(item))
+        item.received_amount = _received(item) + part
+        item.received_at = on
+        left -= part
+        entry = allocation.setdefault(item.number, [ZERO, ZERO])
+        entry[0] += part
+        entry[1] += cut
+
+    ordered = [i for i in items if i.number >= number]
+    if mode == "end":
+        first = next(i for i in ordered if i.number == number)
+        pay(first, False)
+        for item in reversed(ordered):
+            if item.number != number:
+                pay(item, discount)
+    else:
+        for item in ordered:
+            pay(item, mode == "payoff" and discount)
+    return [[n, str(v), str(c)] for n, (v, c) in sorted(allocation.items())], saved
+
+
 def receive(
     db: Session,
     user: User,
@@ -199,8 +250,12 @@ def receive(
     number: int,
     amount: Decimal | None,
     on: date | None,
-) -> PersonalLoan:
-    """Registra um pagamento a partir da parcela `number`. Sem valor = a parcela inteira."""
+    mode: str = "next",
+    discount: bool = False,
+    preview: bool = False,
+) -> PersonalLoan | dict[str, Any]:
+    """Registra um pagamento a partir da parcela `number`. Sem valor = a parcela inteira.
+    Com `preview`, devolve como ficaria (sem salvar)."""
     loan = _own(db, user, loan_id)
     if loan.settled_at:
         raise AppError(400, "settled", "Este empréstimo já foi quitado.")
@@ -211,38 +266,80 @@ def receive(
     if _open(start) <= 0:
         raise AppError(400, "already_paid", "Essa parcela já foi paga.")
     on = on or today_local()
-    left = calc.cents(amount) if amount is not None else _open(start)
-    open_total = sum((_open(i) for i in items), ZERO)
-    if left <= 0:
+    value = calc.cents(amount) if amount is not None else _open(start)
+    open_total = sum((_open(i) for i in items if i.number >= number), ZERO)
+    if value <= 0:
         raise AppError(400, "invalid_amount", "Informe um valor maior que zero.")
-    if left > open_total:
+    if value > open_total:
         raise AppError(
-            400, "too_much", "O valor passa do que falta pagar. Use “Quitar” para encerrar."
+            400,
+            "too_much",
+            "O valor passa do que falta pagar. Use “Quitar antecipado” para encerrar.",
         )
-    for item in items:
-        if item.number < number or _open(item) <= 0:
-            continue
-        part = min(left, _open(item))
-        item.received_amount = _received(item) + part
-        item.received_at = on
-        left -= part
-        if left <= 0:
-            break
+    allocation, saved = _apply(items, number, value, on, mode, discount)
     if all(_open(i) <= 0 for i in items):
         loan.settled_at = utcnow()
+    if preview:
+        db.flush()
+        out = detail(db, loan)
+        db.rollback()
+        return out
+    db.add(
+        LoanPayment(
+            loan_id=loan.id,
+            paid_on=on,
+            amount=value,
+            mode=mode,
+            discount=saved,
+            allocation=allocation,
+        )
+    )
     sync(db, user, loan)
     db.commit()
     return loan
 
 
-def undo(db: Session, user: User, loan_id: uuid.UUID, number: int) -> PersonalLoan:
+def payments(db: Session, loan: PersonalLoan) -> list[LoanPayment]:
+    return list(
+        db.scalars(
+            select(LoanPayment)
+            .where(LoanPayment.loan_id == loan.id)
+            .order_by(LoanPayment.paid_on.desc(), LoanPayment.created_at.desc())
+        )
+    )
+
+
+def undo(db: Session, user: User, loan_id: uuid.UUID, payment_id: uuid.UUID) -> PersonalLoan:
+    """Desfaz um pagamento: tira o valor das parcelas e devolve os juros descontados."""
     loan = _own(db, user, loan_id)
-    item = next((i for i in installments(db, loan) if i.number == number), None)
-    if item is None:
-        raise AppError(404, "not_found", "Parcela não encontrada.")
-    item.received_amount = None
-    item.received_at = None
-    loan.settled_at = None
+    payment = db.get(LoanPayment, payment_id)
+    if payment is None or payment.loan_id != loan.id:
+        raise AppError(404, "not_found", "Pagamento não encontrado.")
+    if loan.rescheduled_at and payment.created_at <= loan.rescheduled_at:
+        raise AppError(
+            400,
+            "locked",
+            "Esse pagamento é de antes das parcelas serem refeitas e não pode ser desfeito.",
+        )
+    items = {i.number: i for i in installments(db, loan)}
+    for number, value, cut in payment.allocation:
+        item = items.get(int(number))
+        if item is None:
+            continue
+        got = _received(item) - Decimal(value)
+        item.received_amount = got if got > 0 else None
+        item.amount += Decimal(cut)
+        item.interest += Decimal(cut)
+    db.delete(payment)
+    db.flush()
+    # A data de recebimento de cada parcela volta a ser a do último pagamento que a tocou.
+    last: dict[int, date] = {}
+    for other in sorted(payments(db, loan), key=lambda x: (x.paid_on, x.created_at)):
+        for number, _, _ in other.allocation:
+            last[int(number)] = other.paid_on
+    for item in items.values():
+        item.received_at = last.get(item.number) if item.received_amount else None
+    loan.settled_at = None if any(_open(i) > 0 for i in items.values()) else loan.settled_at
     sync(db, user, loan)
     db.commit()
     return loan
@@ -269,17 +366,112 @@ def payoff(
     if loan.settled_at:
         raise AppError(400, "settled", "Este empréstimo já foi quitado.")
     on = on or today_local()
-    for i in installments(db, loan):
-        if _open(i) <= 0:
-            continue
-        if discount and i.due_date > on and i.amount:
-            cut = calc.cents(i.interest * _open(i) / i.amount)
-            i.amount -= cut
-            i.interest -= cut
-        i.received_amount = i.amount
-        i.received_at = on
+    items = installments(db, loan)
+    first = next((i for i in items if _open(i) > 0), None)
+    if first is None:
+        raise AppError(400, "settled", "Este empréstimo já foi quitado.")
+    value = payoff_quote(db, loan, on, discount)["value"]
+    allocation, saved = _apply(items, first.number, value + ZERO, on, "payoff", discount)
+    # Centavos de arredondamento: o que ainda restar fica quitado junto.
+    for item in items:
+        if _open(item) > 0:
+            extra = _open(item)
+            item.received_amount = _received(item) + extra
+            item.received_at = on
+            value += extra
+            allocation.append([item.number, str(extra), "0"])
+    db.add(
+        LoanPayment(
+            loan_id=loan.id,
+            paid_on=on,
+            amount=value,
+            mode="payoff",
+            discount=saved,
+            allocation=allocation,
+        )
+    )
     loan.settled_at = utcnow()
     sync(db, user, loan)
+    db.commit()
+    return loan
+
+
+def reschedule(
+    db: Session, user: User, loan_id: uuid.UUID, amount: Decimal, preview: bool = False
+) -> PersonalLoan | dict[str, Any]:
+    """Novo valor por pagamento: o que falta é redividido nesse valor, na mesma frequência, a
+    partir da próxima parcela em aberto. O que já foi pago não muda."""
+    loan = _own(db, user, loan_id)
+    if loan.settled_at:
+        raise AppError(400, "settled", "Este empréstimo já foi quitado.")
+    amount = calc.cents(amount)
+    if amount <= 0:
+        raise AppError(400, "invalid_amount", "Informe um valor maior que zero.")
+    items = installments(db, loan)
+    pending = [i for i in items if _open(i) > 0]
+    if not pending:
+        raise AppError(400, "settled", "Não há parcelas em aberto.")
+    total = sum((_open(i) for i in pending), ZERO)
+    interest = sum(
+        (calc.cents(i.interest * _open(i) / i.amount) if i.amount else ZERO for i in pending), ZERO
+    )
+    first = pending[0]
+    start_due = first.due_date
+    skip_first = _received(first) > 0
+    # Parcelas pagas em parte ficam fechadas com o que já receberam; o resto entra na divisão.
+    for item in pending:
+        if _received(item) > 0:
+            paid_share = _received(item) / item.amount if item.amount else ZERO
+            item.interest = calc.cents(item.interest * paid_share)
+            item.amount = _received(item)
+            item.principal_part = item.amount - item.interest
+        else:
+            db.delete(item)
+    db.flush()
+    count = math.ceil(total / amount)
+    dates = calc.due_dates(start_due, count + (1 if skip_first else 0), loan.frequency)  # type: ignore[arg-type]
+    if skip_first:
+        dates = dates[1:]
+    top = max((i.number for i in items), default=0)
+    rest_interest = interest
+    for index in range(count):
+        value = amount if index < count - 1 else total - amount * (count - 1)
+        share = calc.cents(interest * value / total) if index < count - 1 else rest_interest
+        rest_interest -= share
+        db.add(
+            LoanInstallment(
+                loan_id=loan.id,
+                number=top + 1000 + index,
+                due_date=dates[index],
+                amount=value,
+                interest=share,
+                principal_part=value - share,
+            )
+        )
+    db.flush()
+    # Numera de novo pela data (as fechadas mantêm a posição delas).
+    final = sorted(installments(db, loan), key=lambda i: (i.due_date, i.number))
+    for index, item in enumerate(final):
+        item.number = 10000 + index
+    db.flush()
+    for index, item in enumerate(final, start=1):
+        item.number = index
+    loan.count = len(final)
+    loan.rescheduled_at = utcnow()
+    db.flush()
+    if preview:
+        out = detail(db, loan)
+        db.rollback()
+        return out
+    sync(db, user, loan)
+    db.commit()
+    return loan
+
+
+def set_phone(db: Session, user: User, loan_id: uuid.UUID, phone: str | None) -> PersonalLoan:
+    loan = _own(db, user, loan_id)
+    digits = "".join(c for c in (phone or "") if c.isdigit())
+    loan.phone = digits[:20] or None
     db.commit()
     return loan
 
@@ -430,6 +622,20 @@ def detail(db: Session, loan: PersonalLoan, today: date | None = None) -> dict[s
         "yearly_equivalent": round(((1 + monthly / 100) ** 12 - 1) * 100, 2),
         "payback": calc.payback(sched, loan.principal),
         "installments": rows,
+        "phone": loan.phone,
+        "payments": [
+            {
+                "id": p.id,
+                "paid_on": p.paid_on,
+                "amount": p.amount,
+                "mode": p.mode,
+                "discount": p.discount,
+                "numbers": [int(n) for n, _, _ in p.allocation],
+                "can_undo": not (loan.rescheduled_at and p.created_at <= loan.rescheduled_at),
+            }
+            for p in payments(db, loan)
+        ],
+        "last_due": items[-1].due_date if items else None,
     }
 
 

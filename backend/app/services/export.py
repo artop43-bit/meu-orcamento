@@ -390,8 +390,9 @@ def backup(db: Session, user: User) -> dict[str, Any]:
 
 def _friend_loans(db: Session, user: User) -> list[dict[str, Any]]:
     """v1.8: empréstimos a amigos, cada um com o cronograma e o que foi recebido."""
-    from app.models import LoanInstallment
+    from app.models import LoanInstallment, LoanPayment
 
+    paid_columns = [c.key for c in LoanPayment.__table__.columns if c.key not in {"id", "loan_id"}]
     columns = [c.key for c in LoanInstallment.__table__.columns if c.key not in {"id", "loan_id"}]
     out = []
     for loan in _rows(db, PersonalLoan, user):
@@ -401,6 +402,12 @@ def _friend_loans(db: Session, user: User) -> list[dict[str, Any]]:
             .order_by(LoanInstallment.number)
         )
         loan["installments"] = [{c: _serialize(getattr(i, c)) for c in columns} for i in items]
+        paid = db.scalars(
+            select(LoanPayment)
+            .where(LoanPayment.loan_id == uuid.UUID(loan["id"]))
+            .order_by(LoanPayment.paid_on)
+        )
+        loan["payments"] = [{c: _serialize(getattr(x, c)) for c in paid_columns} for x in paid]
         out.append(loan)
     return out
 
