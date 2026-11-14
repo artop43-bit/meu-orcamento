@@ -2215,7 +2215,7 @@ def v14_money(page: Page):
     d = dialog(page)
     # v1.8.0.1: mensagem pronta com a chave e o Pix copia e cola no valor exato.
     expect(d.get_by_label("Incluir código Pix copia e cola (R$ 1.400,00)")).to_be_checked()
-    text = d.get_by_label("Mensagem").input_value()
+    text = d.get_by_label("Mensagem").input_value().replace("\xa0", " ")
     assert "Pix: 12345678909" in text and "R$ 1.400,00" in text, text
     code = re.search(r"000201\S+", text)[0]
     assert "12345678909" in code and "54071400.00" in code, code
@@ -2524,7 +2524,7 @@ def v18_loans(page: Page):
     # Cobrar: mensagem pronta (lembrete da próxima parcela).
     row.get_by_role("button", name="Cobrar", exact=True).click()
     d = dialog(page)
-    expect(d.get_by_label("Mensagem")).to_have_value(re.compile(r"parcela 3/4 do empréstimo: R\$ 262,50"))
+    expect(d.get_by_label("Mensagem")).to_have_value(re.compile(r"parcela 3/4 do empréstimo: R\$\s262,50"))
     page.keyboard.press("Escape")
     expect(d).to_have_count(0)
 
