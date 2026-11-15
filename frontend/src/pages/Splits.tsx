@@ -1308,6 +1308,12 @@ export default function SplitsPage() {
   const chargingRow = people.find((p) => p.person === charging) ?? null;
   // Começa com a primeira pessoa aberta; depois vale o que a pessoa abrir ou fechar.
   const open = opened ?? new Set(people.slice(0, 1).map((p) => p.person));
+  // v1.9.0: a escolha inicial fica gravada. Antes, lançar uma anotação mudava a ordem da lista
+  // e a linha que estava aberta fechava sozinha (abria a nova primeira pessoa).
+  const firstPerson = people[0]?.person;
+  useEffect(() => {
+    if (opened === null && firstPerson) setOpened(new Set([firstPerson]));
+  }, [opened, firstPerson]);
   const needle = plain(query.trim());
   const rule = FILTERS.find((f) => f.value === filter)!;
   const shown = people.filter((p) => rule.test(p) && (!needle || plain(p.person).includes(needle)));
