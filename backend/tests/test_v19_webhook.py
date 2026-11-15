@@ -26,6 +26,8 @@ GENERIC = "https://n8n.meu.dev/webhook/abc"
 @pytest.fixture(autouse=True)
 def public_dns(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(webhook, "_resolve", lambda host: PUBLIC)
+    # Nos testes o envio "em segundo plano" acontece na hora (para conferir o que saiu).
+    monkeypatch.setattr(webhook, "_dispatch", lambda job: job(), raising=False)
 
 
 @pytest.fixture
@@ -183,7 +185,8 @@ def test_send_conta_falhas_e_pausa(
     monkeypatch.setattr(webhook, "_post", lambda url, payload: calls.append(url) or False)
     ana = _connect(db)
     for _ in range(webhook.MAX_FAILURES):
-        assert webhook.send(db, ana, "due", "t", "b") is False
+        assert webhook.send(db, ana, "due", "t", "b", wait=True) is False
+    db.refresh(ana)
     assert webhook.paused(ana) and not webhook.wants(ana, "due")
     notes = db.scalars(select(InboxItem).where(InboxItem.title == "Webhook pausado")).all()
     assert len(notes) == 1
@@ -195,7 +198,8 @@ def test_send_sucesso_zera_falhas(user: TestClient, db: Session, posts: list) ->
     ana = _connect(db)
     ana.webhook_failures = 3
     db.commit()
-    assert webhook.send(db, ana, "due", "t", "b") is True
+    assert webhook.send(db, ana, "due", "t", "b", wait=True) is True
+    db.refresh(ana)
     assert ana.webhook_failures == 0
 
 
@@ -204,8 +208,61 @@ def test_send_revalida_ip(
 ) -> None:
     ana = _connect(db)
     monkeypatch.setattr(webhook, "_resolve", lambda host: ["127.0.0.1"])
-    assert webhook.send(db, ana, "due", "t", "b") is False
+    assert webhook.send(db, ana, "due", "t", "b", wait=True) is False
     assert posts == []
+
+
+def test_send_tem_prazo_total(
+    user: TestClient, db: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import time
+
+    def slow(url: str, payload: dict[str, Any]) -> bool:
+        time.sleep(2)  # servidor que responde aos pouquinhos
+        return True
+
+    monkeypatch.setattr(webhook, "_post", slow)
+    monkeypatch.setattr(webhook, "DEADLINE", 0.2)
+    ana = _connect(db)
+    started = time.monotonic()
+    assert webhook.send(db, ana, "due", "t", "b", wait=True) is False
+    assert time.monotonic() - started < 1.5
+
+
+def test_send_nao_grava_nem_desfaz_o_trabalho_de_quem_chamou(
+    user: TestClient, db: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(webhook, "_post", lambda url, payload: False)
+    ana = _connect(db)
+    db.add(InboxItem(user_id=ana.id, kind="reply", title="Rascunho", body="ainda não salvo"))
+    webhook.send(db, ana, "messages", "t", "b")
+    db.rollback()
+    assert db.scalars(select(InboxItem).where(InboxItem.title == "Rascunho")).all() == []
+
+
+def test_alertas_e_mei_escondem_valores(
+    user: TestClient, db: Session, posts: list, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.services import alerts, mei
+
+    ana = _connect(db, kinds=["alerts"])
+    ana.notify_hide_values = True
+    ana.mei = True
+    db.commit()
+    fake = alerts._alert("unusual", "k1", "Gasto fora do padrão", "R$ 900,00 em Mercado.")
+    monkeypatch.setattr(alerts, "month_alerts", lambda *args, **kwargs: [fake])
+    alerts.run_daily(db, lambda *args, **kwargs: None, date(2030, 1, 10))
+    monkeypatch.setattr(
+        mei,
+        "summary",
+        lambda *a, **k: {"year": 2030, "total": 70000, "limit": mei.LIMIT, "pct": 86.4},
+    )
+    assert mei.check_threshold(db, ana, 2030)
+    assert sorted(p["title"] for _, p in posts) == [
+        "Gasto fora do padrão",
+        "MEI: 86% do teto anual",
+    ]
+    assert all("R$" not in json.dumps(p, ensure_ascii=False) for _, p in posts)
 
 
 # ---------------------------------------------------------------- avisos do dia (Task 2)

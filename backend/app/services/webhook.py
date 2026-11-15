@@ -12,6 +12,10 @@ import ipaddress
 import json
 import logging
 import socket
+import threading
+import uuid
+from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, Literal
 from urllib.parse import urlsplit
@@ -31,7 +35,9 @@ logger = logging.getLogger(__name__)
 KINDS: tuple[str, ...] = ("due", "monthly", "weekly", "daily", "messages", "alerts")
 MAX_FAILURES = 5
 TIMEOUT = 5
+DEADLINE = 12  # prazo total de um envio (DNS + conexão + resposta)
 MAX_URL = 500
+_POOL = ThreadPoolExecutor(max_workers=4, thread_name_prefix="webhook")
 DISCORD_COLOR = 0x3FB994
 
 Service = Literal["discord", "slack", "generic"]
@@ -225,6 +231,62 @@ def _post(url: str, payload: dict[str, Any]) -> bool:
         return False
 
 
+def _attempt(url: str, payload: dict[str, Any]) -> bool:
+    try:
+        return _post(validate_url(url), payload)
+    except AppError:
+        return False
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Webhook falhou: %s", type(exc).__name__)
+        return False
+
+
+def _with_deadline(url: str, payload: dict[str, Any]) -> bool:
+    """Prazo total: o tempo limite do urllib vale por operação (um servidor que responde aos
+    pouquinhos ou um DNS travado prenderiam o envio para sempre)."""
+    result: list[bool] = []
+    worker = threading.Thread(
+        target=lambda: result.append(_attempt(url, payload)), daemon=True, name="webhook-post"
+    )
+    worker.start()
+    worker.join(DEADLINE)
+    return bool(result and result[0])
+
+
+def _record(bind: Any, user_id: uuid.UUID, ok: bool) -> None:
+    """Conta sucesso/falha numa sessão própria: nunca grava nem desfaz o trabalho de quem chamou."""
+    try:
+        with Session(bind) as session:
+            user = session.get(User, user_id)
+            if user is None:
+                return
+            if ok:
+                user.webhook_failures = 0
+            else:
+                user.webhook_failures = (user.webhook_failures or 0) + 1
+                if user.webhook_failures == MAX_FAILURES:
+                    session.add(
+                        InboxItem(
+                            user_id=user.id,
+                            kind="alert",
+                            title="Webhook pausado",
+                            body=(
+                                "Os avisos pararam de chegar ao seu webhook depois de "
+                                f"{MAX_FAILURES} tentativas sem resposta. Confira o endereço em "
+                                "Ajustes › Preferências."
+                            ),
+                        )
+                    )
+            session.commit()
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Contagem de falhas do webhook não salva para %s: %s", user_id, exc)
+
+
+def _dispatch(job: Callable[[], object]) -> None:
+    """Envio fora da requisição e do agendador: quem chama não espera a rede."""
+    _POOL.submit(job)
+
+
 def send(
     db: Session,
     user: User,
@@ -234,40 +296,26 @@ def send(
     link: str = "/",
     sections: "list[Section] | None" = None,
     force: bool = False,
+    wait: bool = False,
 ) -> bool:
-    """Envia o aviso se o tipo estiver ligado. Nunca levanta erro (o aviso segue por e-mail)."""
+    """Envia o aviso se o tipo estiver ligado. Nunca levanta erro (o aviso segue por e-mail).
+
+    Por padrão o envio vai para uma fila em segundo plano e devolve True (aviso na fila).
+    wait=True envia agora e devolve se o endereço respondeu (botão "Enviar teste").
+    """
     if not user.webhook_url or not (force or wants(user, kind)):
         return False
     url = user.webhook_url
-    try:
-        ok = _post(
-            validate_url(url), build_payload(service_of(url), kind, title, body, link, sections)
-        )
-    except AppError:
-        ok = False
-    except Exception as exc:  # noqa: BLE001 — o aviso por e-mail/aparelho não pode depender disto
-        logger.warning("Webhook falhou para %s: %s", user.id, exc)
-        ok = False
-    try:
-        if ok:
-            user.webhook_failures = 0
-        else:
-            user.webhook_failures = (user.webhook_failures or 0) + 1
-            if user.webhook_failures == MAX_FAILURES:
-                db.add(
-                    InboxItem(
-                        user_id=user.id,
-                        kind="alert",
-                        title="Webhook pausado",
-                        body=(
-                            "Os avisos pararam de chegar ao seu webhook depois de "
-                            f"{MAX_FAILURES} tentativas sem resposta. Confira o endereço em "
-                            "Ajustes › Preferências."
-                        ),
-                    )
-                )
-        db.commit()
-    except Exception as exc:  # noqa: BLE001
-        db.rollback()
-        logger.warning("Contagem de falhas do webhook não salva para %s: %s", user.id, exc)
-    return ok
+    payload = build_payload(service_of(url), kind, title, body, link, sections)
+    bind = db.get_bind()
+    user_id = user.id
+
+    def job() -> bool:
+        ok = _with_deadline(url, payload)
+        _record(bind, user_id, ok)
+        return ok
+
+    if wait:
+        return job()
+    _dispatch(job)
+    return True

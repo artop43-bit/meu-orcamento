@@ -51,5 +51,12 @@ def check_threshold(db: Session, user: User, year: int | None = None) -> bool:
     )
     db.add(InboxItem(user_id=user.id, kind="alert", title=title, body=body))
     db.commit()
-    push.send(db, user, "alerts", title, body[:200], "/ajustes/preferencias#mei")
+    # v1.9.0: "Ocultar valores" vale fora do app (aparelho e webhook).
+    outside = (
+        f"O faturamento de {data['year']} passou de {WARN_PCT:.0f}% do teto do MEI. Acima do "
+        "teto, o MEI pode ser desenquadrado; vale conversar com um contador."
+        if user.notify_hide_values
+        else body
+    )
+    push.send(db, user, "alerts", title, outside[:200], "/ajustes/preferencias#mei")
     return True

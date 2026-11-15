@@ -232,12 +232,18 @@ def run_daily(db: Session, mail: Mailer, today: date | None = None) -> int:
             from app.services import push
 
             first = fresh[0]
+            # v1.9.0: "Ocultar valores" vale fora do app (aparelho e webhook): o texto dos
+            # alertas traz os valores em reais; os títulos não.
+            if user.notify_hide_values:
+                detail = "Toque para ver os detalhes em Mensagens."
+            else:
+                detail = first["text"] if len(fresh) == 1 else first["title"]
             push.send(
                 db,
                 user,
                 "alerts",
                 first["title"] if len(fresh) == 1 else f"{len(fresh)} alertas no seu orçamento",
-                first["text"] if len(fresh) == 1 else first["title"],
+                detail,
                 "/mensagens",
             )
             if user.notify_alerts:

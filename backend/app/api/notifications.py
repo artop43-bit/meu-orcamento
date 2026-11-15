@@ -170,6 +170,7 @@ def test_webhook(user: CurrentUser, db: DbSession) -> WebhookTestOut:
         "A partir de agora os avisos que você escolher chegam aqui.",
         "/ajustes/preferencias",
         force=True,
+        wait=True,
     )
     return WebhookTestOut(ok=ok)
 
