@@ -365,3 +365,71 @@ def test_teste_do_aparelho_nao_vai_ao_webhook(
     _connect(db)
     user.post("/api/push/test")
     assert posts == []
+
+
+# ---------------------------------------------------------------- API (Task 3)
+
+
+def test_api_fluxo_completo(user: TestClient, posts: list) -> None:
+    empty = user.get("/api/notifications/webhook").json()
+    assert empty == {
+        "configured": False,
+        "hint": None,
+        "service": None,
+        "kinds": [],
+        "paused": False,
+    }
+    saved = user.put("/api/notifications/webhook", json={"url": DISCORD}).json()
+    assert saved["configured"] is True and saved["hint"] == "discord.com/…a8F2"
+    assert saved["service"] == "discord" and saved["kinds"] == []
+    kinds = user.patch("/api/notifications/webhook", json={"kinds": ["weekly", "due"]}).json()
+    assert kinds["kinds"] == ["due", "weekly"]
+    assert user.post("/api/notifications/webhook/test").json() == {"ok": True}
+    [(url, payload)] = posts
+    assert url == DISCORD and payload["embeds"][0]["title"] == "Webhook conectado"
+    gone = user.delete("/api/notifications/webhook").json()
+    assert gone["configured"] is False and gone["kinds"] == []
+
+
+def test_api_nunca_devolve_url_inteira(user: TestClient) -> None:
+    responses = [
+        user.put("/api/notifications/webhook", json={"url": DISCORD}),
+        user.get("/api/notifications/webhook"),
+        user.patch("/api/notifications/webhook", json={"kinds": ["due"]}),
+    ]
+    assert all("xyza8F2" not in r.text for r in responses)
+
+
+def test_api_url_invalida_400(user: TestClient) -> None:
+    response = user.put("/api/notifications/webhook", json={"url": "http://exemplo.com/a"})
+    assert response.status_code == 400 and response.json()["error"] == "webhook_invalido"
+
+
+def test_api_kind_desconhecido_422(user: TestClient) -> None:
+    user.put("/api/notifications/webhook", json={"url": GENERIC})
+    response = user.patch("/api/notifications/webhook", json={"kinds": ["spam"]})
+    assert response.status_code == 422
+
+
+def test_api_teste_sem_endereco_400(user: TestClient) -> None:
+    assert user.post("/api/notifications/webhook/test").status_code == 400
+
+
+def test_api_teste_tira_pausa(user: TestClient, db: Session, posts: list) -> None:
+    ana = _connect(db)
+    ana.webhook_failures = webhook.MAX_FAILURES
+    db.commit()
+    assert user.get("/api/notifications/webhook").json()["paused"] is True
+    assert user.post("/api/notifications/webhook/test").json() == {"ok": True}
+    assert user.get("/api/notifications/webhook").json()["paused"] is False
+
+
+def test_api_salvar_de_novo_tira_pausa(user: TestClient, db: Session) -> None:
+    ana = _connect(db)
+    ana.webhook_failures = webhook.MAX_FAILURES
+    db.commit()
+    assert user.put("/api/notifications/webhook", json={"url": SLACK}).json()["paused"] is False
+
+
+def test_api_exige_login(client: TestClient) -> None:
+    assert client.get("/api/notifications/webhook").status_code == 401
