@@ -115,7 +115,8 @@ def test_receipt_text_finds_total_date_and_store() -> None:
 
 def test_boleto_line_gives_exact_amount_and_due_date() -> None:
     # Fator 1000 (nova base, 22/02/2025) + 245 dias = 25/10/2025; valor R$ 1.234,56.
-    line = "23790.12345 60000.123456 78901.234567 8 12450000123456"
+    # v1.9.0.1: linha com dígitos verificadores válidos (a antiga era inventada e não passaria).
+    line = "23791.23454 67890.123457 67890.123457 3 12450000123456"
     reading = ocr.parse(f"Banco\nLinha digitável\n{line}\n", today=date(2025, 10, 1))
     assert reading.kind == "boleto"
     assert reading.amount == Decimal("1234.56")

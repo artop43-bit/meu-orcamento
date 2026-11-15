@@ -233,6 +233,8 @@ export type ReceiptReading = {
   date: string | null;
   description: string | null;
   items?: ReceiptItem[];
+  /** v1.9.0.1: forma de pagamento lida do comprovante (só quando é uma só). */
+  payment_method?: PaymentMethod | null;
 };
 
 export type IncomeInput = {

@@ -2094,7 +2094,13 @@ def v13_entries(page: Page):
     page.route(
         "**/api/receipts/read",
         lambda route: route.fulfill(
-            json={"kind": "cupom", "amount": "44.88", "date": f"{month}-03", "description": "Supermercado Bom Preco"}
+            json={
+                "kind": "cupom",
+                "amount": "44.88",
+                "date": f"{month}-03",
+                "description": "Supermercado Bom Preco",
+                "payment_method": "cash",  # v1.9.0.1
+            }
         ),
     )
     page.get_by_role("button", name="Nova despesa", exact=True).click()
@@ -2105,6 +2111,7 @@ def v13_entries(page: Page):
     expect(d.get_by_text(re.compile("Lido do comprovante"))).to_be_visible()
     expect(d.get_by_label("Descrição")).to_have_value("Supermercado Bom Preco")
     expect(d.get_by_role("textbox", name=re.compile(r"^Valor"))).to_have_value("44,88")
+    expect(d.get_by_role("radio", name="Dinheiro")).to_be_checked()
     page.screenshot(path=OUT / "v13-comprovante.png")
     d.get_by_label("Categoria").select_option(label="Alimentação")
     d.get_by_role("button", name="Adicionar despesa").click()
@@ -2113,6 +2120,7 @@ def v13_entries(page: Page):
     idle(page, 300)
     [read] = [e for e in api(page, f"/months/{month}")["expenses"] if e["description"] == "Supermercado Bom Preco"]
     assert read["amount"] == "44.88" and len(read["receipt_ids"]) == 1, read
+    assert read["payment_method"] == "cash", read
 
     # Sem internet: o lançamento fica no aparelho e sobe sozinho quando a conexão volta.
     quick = page.get_by_role("search", name="Lançamento rápido")
