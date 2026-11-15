@@ -518,24 +518,47 @@ def run_daily(db: Session, now: datetime | None = None) -> dict[str, int]:
         if not _eligible(user):
             continue
         try:
-            if user.notify_due or user.push_due:
+            # v1.9.0: o webhook conta como mais um meio (cada tipo ligado à parte).
+            from app.services import push, webhook
+
+            if user.notify_due or user.push_due or webhook.wants(user, "due"):
                 message = due_message(db, user, today)
                 if message and _claim(db, user, "due", today.isoformat()):
                     if user.notify_due:
                         deliver(db, user, message)
-                    from app.services import push
-
-                    push.send(db, user, "due", message.heading, message.intro, "/calendario")
+                    push.send(
+                        db,
+                        user,
+                        "due",
+                        message.heading,
+                        message.intro,
+                        "/calendario",
+                        sections=message.sections,
+                    )
                     sent["due"] += 1
             # Resumo no 1º dia do mês financeiro (dia 1 ou o dia escolhido pela pessoa).
-            if user.notify_monthly and today.day == user.month_start_day:
+            if (
+                user.notify_monthly or webhook.wants(user, "monthly")
+            ) and today.day == user.month_start_day:
                 previous = add_months(month_of(today, user.month_start_day), -1)
                 message = monthly_message(db, user, previous)
                 if message and _claim(db, user, "monthly", f"{previous:%Y-%m}"):
-                    deliver(db, user, message)
+                    if user.notify_monthly:
+                        deliver(db, user, message)
+                    webhook.send(
+                        db,
+                        user,
+                        "monthly",
+                        message.heading,
+                        message.intro,
+                        "/orcamento",
+                        message.sections,
+                    )
                     sent["monthly"] += 1
             # v1.4: "Disponível hoje" no aparelho, todo dia (só para quem ligou).
-            if user.push_daily and _claim(db, user, "daily", today.isoformat()):
+            if (user.push_daily or webhook.wants(user, "daily")) and _claim(
+                db, user, "daily", today.isoformat()
+            ):
                 from app.services import daily, push
 
                 month = month_of(today, user.month_start_day)
@@ -552,14 +575,22 @@ def run_daily(db: Session, now: datetime | None = None) -> dict[str, int]:
                     )
                     sent["daily"] = sent.get("daily", 0) + 1
             # Resumo da semana às segundas (e-mail e aparelho, cada um com a sua opção).
-            if today.weekday() == 0 and (user.notify_weekly or user.push_weekly):
+            if today.weekday() == 0 and (
+                user.notify_weekly or user.push_weekly or webhook.wants(user, "weekly")
+            ):
                 message = weekly_message(db, user, today)
                 if message and _claim(db, user, "weekly", today.isoformat()):
                     if user.notify_weekly:
                         deliver(db, user, message)
-                    from app.services import push
-
-                    push.send(db, user, "weekly", message.heading, message.intro, "/orcamento")
+                    push.send(
+                        db,
+                        user,
+                        "weekly",
+                        message.heading,
+                        message.intro,
+                        "/orcamento",
+                        sections=message.sections,
+                    )
                     sent["weekly"] += 1
         except Exception as exc:  # um usuário com problema não impede os outros
             db.rollback()

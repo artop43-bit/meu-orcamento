@@ -98,5 +98,6 @@ def test(user: CurrentUser, db: DbSession) -> TestOut:
         "Você vai receber aqui os avisos do Meu Orçamento.",
         "/ajustes/app",
         force=True,
+        webhook=False,
     )
     return TestOut(sent=sent)

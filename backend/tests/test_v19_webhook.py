@@ -1,6 +1,9 @@
 """v1.9.0: avisos por webhook (Discord, Slack ou qualquer endereço https)."""
 
+import json
+from datetime import date, datetime
 from typing import Any
+from zoneinfo import ZoneInfo
 
 import pytest
 from fastapi.testclient import TestClient
@@ -10,7 +13,7 @@ from sqlalchemy.orm import Session
 from app.core.email import OutgoingEmail
 from app.core.errors import AppError
 from app.models import InboxItem, User
-from app.services import webhook
+from app.services import notify, webhook
 from app.services.notify import Section
 from tests.conftest import create_verified_user, login
 
@@ -202,4 +205,163 @@ def test_send_revalida_ip(
     ana = _connect(db)
     monkeypatch.setattr(webhook, "_resolve", lambda host: ["127.0.0.1"])
     assert webhook.send(db, ana, "due", "t", "b") is False
+    assert posts == []
+
+
+# ---------------------------------------------------------------- avisos do dia (Task 2)
+
+TZ = ZoneInfo("America/Sao_Paulo")
+
+
+@pytest.fixture
+def fixed_month(monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.services import budget as budget_service
+
+    monkeypatch.setattr(budget_service, "current_month", lambda *_: date(2030, 1, 1))
+
+
+def _quiet(user: TestClient) -> None:
+    """E-mail e aparelho desligados: só o webhook pode receber."""
+    user.patch(
+        "/api/notifications/prefs",
+        json={"notify_due": False, "notify_monthly": False, "notify_weekly": False},
+    )
+
+
+def _events(posts: list) -> list[str]:
+    return [payload["event"] for _, payload in posts]
+
+
+def test_vencimento_vai_ao_webhook_sem_aparelho(
+    user: TestClient, db: Session, posts: list, fixed_month: None
+) -> None:
+    _quiet(user)
+    _connect(db, kinds=["due"])
+    user.post(
+        "/api/months/2030-01/expenses",
+        json={"description": "Aluguel", "amount": "1500.00", "due_date": "2030-01-13"},
+    )
+    notify.run_daily(db, datetime(2030, 1, 10, 9, tzinfo=TZ))
+    assert _events(posts) == ["due"]
+    rows = [row["description"] for s in posts[0][1]["sections"] for row in s["rows"]]
+    assert "Aluguel" in rows
+    notify.run_daily(db, datetime(2030, 1, 10, 10, tzinfo=TZ))
+    assert len(posts) == 1  # não repete no mesmo dia
+
+
+def test_resumo_do_mes_e_disponivel_hoje(
+    user: TestClient, db: Session, posts: list, fixed_month: None
+) -> None:
+    _quiet(user)
+    _connect(db, kinds=["monthly", "daily"])
+    user.post("/api/months/2030-01/incomes", json={"description": "Salário", "amount": "3000.00"})
+    user.post("/api/months/2030-02/incomes", json={"description": "Salário", "amount": "3000.00"})
+    user.post(
+        "/api/months/2030-01/expenses",
+        json={"description": "Mercado", "amount": "200.00", "due_date": "2030-01-05", "paid": True},
+    )
+    notify.run_daily(db, datetime(2030, 2, 1, 9, tzinfo=TZ))
+    assert sorted(_events(posts)) == ["daily", "monthly"]
+
+
+def test_resumo_semana_segunda(
+    user: TestClient, db: Session, posts: list, fixed_month: None
+) -> None:
+    _quiet(user)
+    _connect(db, kinds=["weekly"])
+    user.post(
+        "/api/months/2030-01/expenses",
+        json={"description": "Internet", "amount": "99.90", "due_date": "2030-01-16"},
+    )
+    notify.run_daily(db, datetime(2030, 1, 14, 8, 30, tzinfo=TZ))
+    assert _events(posts) == ["weekly"]
+
+
+def test_tipo_desligado_nao_envia(
+    user: TestClient, db: Session, posts: list, fixed_month: None
+) -> None:
+    _quiet(user)
+    _connect(db, kinds=["weekly"])
+    user.post(
+        "/api/months/2030-01/expenses",
+        json={"description": "Aluguel", "amount": "1500.00", "due_date": "2030-01-13"},
+    )
+    notify.run_daily(db, datetime(2030, 1, 10, 9, tzinfo=TZ))
+    assert posts == []
+
+
+def test_esconder_valores(user: TestClient, db: Session, posts: list, fixed_month: None) -> None:
+    _quiet(user)
+    user.patch("/api/notifications/prefs", json={"notify_hide_values": True})
+    _connect(db, kinds=["due", "weekly"])
+    user.post(
+        "/api/months/2030-01/expenses",
+        json={"description": "Aluguel", "amount": "1500.00", "due_date": "2030-01-15"},
+    )
+    notify.run_daily(db, datetime(2030, 1, 14, 9, tzinfo=TZ))
+    assert posts and all("R$" not in json.dumps(p, ensure_ascii=False) for _, p in posts)
+
+
+def test_webhook_fora_do_ar_nao_quebra(
+    client: TestClient,
+    db: Session,
+    outbox: list[OutgoingEmail],
+    monkeypatch: pytest.MonkeyPatch,
+    fixed_month: None,
+) -> None:
+    def broken(url: str, payload: dict[str, Any]) -> bool:
+        raise RuntimeError("caiu")
+
+    monkeypatch.setattr(webhook, "_post", broken)
+    for address in ("ana@example.com", "bia@example.com"):
+        create_verified_user(client, outbox, address)
+        login(client, address)
+        client.post(
+            "/api/months/2030-01/expenses",
+            json={"description": "Aluguel", "amount": "1500.00", "due_date": "2030-01-13"},
+        )
+        client.post("/api/auth/logout")
+    _connect(db, kinds=["due"])
+    outbox.clear()
+    assert notify.run_daily(db, datetime(2030, 1, 10, 9, tzinfo=TZ))["due"] == 2
+    assert {m.to for m in outbox} == {"ana@example.com", "bia@example.com"}
+
+
+def test_mensagens_da_caixa(
+    client: TestClient,
+    db: Session,
+    outbox: list[OutgoingEmail],
+    posts: list,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app.core.config import get_settings
+
+    create_verified_user(client, outbox, "ana@example.com")
+    client.post("/api/auth/logout")
+    _connect(db, kinds=["messages"])
+    monkeypatch.setattr(get_settings(), "admin_emails", "chefe@example.com")
+    create_verified_user(client, outbox, "chefe@example.com")
+    login(client, "chefe@example.com")
+    client.post("/api/admin/announcements", json={"title": "Novidade", "body": "Recado."})
+    assert [p["title"] for _, p in posts] == ["Novidade"]
+
+
+def test_alertas_passam_pelo_push_send(user: TestClient, db: Session, posts: list) -> None:
+    from app.services import push
+
+    ana = _connect(db, kinds=["alerts"])
+    push.send(db, ana, "alerts", "Gasto fora do padrão", "Mercado subiu.", "/analises")
+    push.send(db, ana, "messages", "Outro", "x")
+    assert _events(posts) == ["alerts"]
+
+
+def test_teste_do_aparelho_nao_vai_ao_webhook(
+    user: TestClient, db: Session, posts: list, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.core.config import get_settings
+
+    monkeypatch.setattr(get_settings(), "vapid_public_key", "BPUBLICA_DE_TESTE")
+    monkeypatch.setattr(get_settings(), "vapid_private_key", "privada-de-teste")
+    _connect(db)
+    user.post("/api/push/test")
     assert posts == []
