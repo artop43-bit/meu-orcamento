@@ -2553,6 +2553,76 @@ select option:checked {
   }
 }
 
+/* v1.9.0: janela baixa. O menu recolhido não rola (as etiquetas saem à direita), então os ícones
+   ficam mais juntos para tudo caber a partir de ~640 px de altura. */
+@media (min-width: 1024px) and (max-height: 820px) {
+  .shell[data-menu="collapsed"] .sidebar {
+    padding-block: 12px;
+    gap: 2px;
+  }
+
+  .shell[data-menu="collapsed"] .sidebar__head {
+    gap: 6px;
+  }
+
+  .shell[data-menu="collapsed"] .sidebar__link {
+    height: 38px;
+  }
+
+  .shell[data-menu="collapsed"] .sidebar__tools {
+    gap: 4px;
+    margin-top: 6px;
+    padding-top: 6px;
+  }
+
+  .shell[data-menu="collapsed"] .sidebar__tool {
+    height: 32px;
+  }
+
+  .shell[data-menu="collapsed"] .sidebar__footer {
+    padding-top: 8px;
+    gap: 4px;
+  }
+
+  .shell[data-menu="collapsed"] .sidebar__profile {
+    padding-block: 2px;
+  }
+}
+
+/* Último recurso (janela muito baixa): o menu recolhido volta a rolar por dentro. Etiquetas e
+   painéis flutuantes seriam cortados pela rolagem, então os subitens abrem logo abaixo do ícone. */
+@media (min-width: 1024px) and (max-height: 639px) {
+  .shell[data-menu="collapsed"] .sidebar {
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
+  .shell[data-menu="collapsed"] .sidebar__link[data-label]:is(:hover, :focus-visible)::after {
+    content: none;
+  }
+
+  .shell[data-menu="collapsed"] .nav-group__items {
+    position: static;
+    min-width: 0;
+    margin: 2px 0 4px;
+    padding: 2px;
+    box-shadow: none;
+    animation: none;
+  }
+
+  .shell[data-menu="collapsed"] .nav-group__flyout-title {
+    display: none;
+  }
+
+  .shell[data-menu="collapsed"] .nav-group__items .sidebar__link {
+    min-height: 34px;
+    padding: 0;
+    font-size: 0;
+    gap: 0;
+    justify-content: center;
+  }
+}
+
 @media (max-width: 1023px) {
   .sidebar__collapse {
     display: none;

@@ -324,9 +324,53 @@ def dialogs(page: Page, device: str):
     check(page, device, "importar-colunas")
 
 
+# v1.9.0: menu recolhido em janelas baixas. O menu recolhido não rolava (para as etiquetas saírem
+# à direita) e, sem altura, os últimos botões (sair) vazavam para fora da moldura.
+SIDEBAR_SIZES = [(1366, 690), (1280, 640), (1440, 560)]
+SIDEBAR_FIT = """() => {
+  const bar = document.querySelector('.sidebar');
+  const last = document.querySelector('.sidebar__footer-row > :last-child');
+  if (!bar || !last) return 'menu não encontrado';
+  const box = bar.getBoundingClientRect();
+  const item = last.getBoundingClientRect();
+  if (item.bottom <= box.bottom + 1 && item.top >= box.top - 1) return null;
+  const scrolls = getComputedStyle(bar).overflowY === 'auto' && bar.scrollHeight > bar.clientHeight;
+  return scrolls ? null : `último botão em ${Math.round(item.bottom)}px, menu termina em ${Math.round(box.bottom)}px`;
+}"""
+
+
+def sidebar_fit(browser) -> None:  # type: ignore[no-untyped-def]
+    for width, height in SIDEBAR_SIZES:
+        ctx = browser.new_context(locale="pt-BR", viewport={"width": width, "height": height}, color_scheme="dark")
+        page = ctx.new_page()
+        page.goto(f"{BASE}/entrar")
+        page.evaluate("() => localStorage.setItem('menu-recolhido', '1')")
+        login(page)
+        for style in ("padrao", "glass"):
+            page.goto(BASE + "/ajustes")
+            settle(page, 500)
+            later = page.get_by_role("button", name="Configurar depois")
+            if later.count():
+                later.click()
+            page.evaluate("s => { document.documentElement.dataset.style = s; }", style)
+            page.wait_for_timeout(300)
+            device = f"menu-recolhido-{width}x{height}-{style}"
+            page.screenshot(path=OUT / f"{device}.png")
+            problem = page.evaluate(SIDEBAR_FIT)
+            if problem:
+                results.append({"device": device, "screen": "ajustes", "kind": "menu", "text": problem, "where": ".sidebar"})
+        ctx.close()
+
+
 def main() -> int:
     with sync_playwright() as p:
         browser = getattr(p, "chromium").launch(**({"channel": BROWSER} if BROWSER != "chromium" else {}))
+        sidebar_fit(browser)
+        if os.environ.get("QA_ONLY") == "menu":
+            browser.close()
+            for r in results:
+                print(f"PROBLEMA  [{r['device']}] {r['text']}")
+            return 1 if results else 0
         for device, opts in VIEWPORTS.items():
             ctx = browser.new_context(locale="pt-BR", **opts)
             page = ctx.new_page()
