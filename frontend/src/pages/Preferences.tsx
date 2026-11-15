@@ -13,6 +13,7 @@ import { originOf, setAppearance } from "../lib/appearance";
 import { cycleLabel, setCycleStart, thisMonth } from "../lib/format";
 import { setPrefs, usePrefs, type Prefs } from "../lib/prefs";
 import { PixMeiSettings } from "../components/PixMeiSettings";
+import { WebhookSettings } from "../components/WebhookSettings";
 import { STYLES, type StyleName } from "../theme/styles";
 import { ACCENTS, type AccentName } from "../theme/tokens";
 
@@ -318,6 +319,7 @@ export default function Preferences() {
           <FinancialMonth />
           <PixMeiSettings />
           <EmailNotices />
+          <WebhookSettings />
           <section className="card stack" id="privacidade">
             <h2>Privacidade</h2>
             <AskHistoryToggle />
