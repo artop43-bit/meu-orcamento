@@ -12,7 +12,7 @@ export type Release = {
 export const RELEASES: Release[] = [
   {
     version: "1.9.0",
-    date: "15/11/2026 às 15:20",
+    date: "15/11/2026 às 15:00",
     title: "Avisos por webhook",
     sections: [
       {
