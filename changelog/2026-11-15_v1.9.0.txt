@@ -1,0 +1,27 @@
+MEU ORÇAMENTO · UPDATE LOG
+Versão 1.9.0 · Avisos por webhook
+Data: 15/11/2026 às 15:20 (horário de Brasília)
+
+Avisos por webhook (Ajustes › Preferências)
+- [x] Novo cartão "Avisos por webhook": cole o endereço de um webhook do Discord, do Slack ou de qualquer serviço que aceite webhook
+- [x] Seis avisos para escolher, todos desligados no começo: lembrete de vencimentos, resumo do mês, resumo da semana, Disponível hoje, mensagens da caixa e alertas de gastos fora do padrão
+- [x] Discord recebe um cartão com título, linhas e valores; Slack recebe a mensagem no formato dele; os demais recebem os dados completos (com o texto pronto)
+- [x] O webhook funciona mesmo com o e-mail e as notificações do aparelho desligados
+- [x] Botões "Enviar teste" e "Remover"; depois de salvo, o endereço aparece só em parte
+- [x] "Ocultar valores nos e-mails" também vale para o webhook
+- [x] Se o endereço não responder 5 vezes seguidas, os envios pausam e chega um aviso na caixa de mensagens; um teste que funciona retoma os envios
+- [x] Segurança: só endereços https, nunca para a rede interna do servidor, sem seguir redirecionamentos e com prazo máximo por envio
+- [x] Os envios saem em segundo plano: um webhook lento não atrasa os avisos de ninguém
+
+Menu lateral
+- [x] Menu recolhido em janelas baixas: os ícones ficam mais juntos e tudo cabe a partir de ~640 px de altura; abaixo disso o menu rola por dentro e os subitens abrem logo abaixo do ícone
+
+Correções
+- [x] Com "Ocultar valores" ligado, os alertas de gasto e o aviso do MEI no aparelho não mostram mais valores em reais
+- [x] Divisões: a pessoa aberta continua aberta depois de lançar uma anotação (antes a lista mudava de ordem e a linha fechava)
+
+Testes
+- [x] 45 testes novos do webhook no servidor (endereços internos bloqueados, formatos, pausa, ocultar valores, prazo, endereço nunca devolvido inteiro)
+- [x] Auditoria pela interface: salvar, escolher avisos e remover o webhook
+- [x] Checagem do menu recolhido em 3 alturas de janela, nos estilos Padrão e Liquid glass
+- [x] Layout (215 telas), acessibilidade, cores (1.840 combinações) e persona (66 passos) sem problemas
