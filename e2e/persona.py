@@ -97,6 +97,14 @@ def idle(page: Page, ms: int = 150):
     page.wait_for_timeout(ms)
 
 
+def mark(box, on: bool = True) -> None:
+    """Clica e espera o estado (v1.9.0). check()/uncheck() conferem no mesmo instante do clique, mas
+    as opções salvas no servidor mudam na tela um instante depois (a lista de dados avisa a tela no
+    próximo ciclo): às vezes o check() via "desmarcado" e reprovava sem defeito nenhum."""
+    box.click()
+    (expect(box).to_be_checked() if on else expect(box).not_to_be_checked())
+
+
 def person_row(page: Page, name: str):
     """Divisões (v1.8): linha da pessoa, aberta (as linhas abrem e fecham)."""
     row = page.locator(".person-row", has=page.locator(".person-row__who strong", has_text=re.compile(f"^{name}$")))
@@ -1529,17 +1537,17 @@ def email_notices(page: Page):
     page.goto(f"{BASE}/ajustes/preferencias")
     idle(page)
     expect(page.get_by_role("heading", name="Avisos por e-mail")).to_be_visible()
-    page.get_by_label("7 dias").check()
-    page.get_by_label("Ocultar valores nos e-mails").check()
+    mark(page.get_by_label("7 dias"))
+    mark(page.get_by_label("Ocultar valores nos e-mails"))
     idle(page, 400)
     prefs = api(page, "/notifications/prefs")
     assert prefs["notify_due_days"] == 7 and prefs["notify_hide_values"] is True, prefs
-    page.get_by_label(re.compile("^Lembrete de vencimentos")).uncheck()
+    mark(page.get_by_label(re.compile("^Lembrete de vencimentos")), on=False)
     idle(page, 400)
     expect(page.get_by_label("7 dias")).to_have_count(0)
     assert api(page, "/notifications/prefs")["notify_due"] is False
-    page.get_by_label(re.compile("^Lembrete de vencimentos")).check()
-    page.get_by_label("Ocultar valores nos e-mails").uncheck()
+    mark(page.get_by_label(re.compile("^Lembrete de vencimentos")))
+    mark(page.get_by_label("Ocultar valores nos e-mails"), on=False)
     idle(page, 400)
     assert api(page, "/notifications/prefs")["notify_due"] is True
 
@@ -1557,7 +1565,7 @@ def webhook_notices(page: Page):
     card.get_by_label("Endereço do webhook").fill("https://hooks.slack.com/services/T000/B000/XXXX")
     card.get_by_role("button", name="Salvar").click()
     expect(card.get_by_text("Conectado a")).to_contain_text("Slack")
-    card.get_by_label("Resumo da semana (segundas)").check()
+    mark(card.get_by_label("Resumo da semana (segundas)"))
     idle(page, 400)
     assert api(page, "/notifications/webhook")["kinds"] == ["weekly"]
     assert "XXXX" not in str(api(page, "/notifications/webhook")["hint"])[:-4]

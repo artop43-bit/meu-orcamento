@@ -1,6 +1,6 @@
 MEU ORÇAMENTO · UPDATE LOG
 Versão 1.9.0 · Avisos por webhook
-Data: 15/11/2026 às 15:00 (horário de Brasília)
+Data: 15/11/2026 às 19:20 (horário de Brasília)
 
 Avisos por webhook (Ajustes › Preferências)
 - [x] Novo cartão "Avisos por webhook": cole o endereço de um webhook do Discord, do Slack ou de qualquer serviço que aceite webhook
@@ -25,3 +25,4 @@ Testes
 - [x] Auditoria pela interface: salvar, escolher avisos e remover o webhook
 - [x] Checagem do menu recolhido em 3 alturas de janela, nos estilos Padrão e Liquid glass
 - [x] Layout (215 telas), acessibilidade, cores (1.840 combinações) e persona (66 passos) sem problemas
+- [x] Auditoria pela interface: os cliques em opções salvas no servidor esperam a tela atualizar (antes o teste às vezes reprovava "7 dias" sem defeito no app)
