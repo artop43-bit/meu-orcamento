@@ -79,6 +79,11 @@ class User(Base):
     mei: Mapped[bool] = mapped_column(default=False, server_default="0")
     # v1.4: notificação diária "Disponível hoje" (desligada por padrão).
     push_daily: Mapped[bool] = mapped_column(default=False, server_default="0")
+    # v1.9.0: avisos por webhook (Discord, Slack ou qualquer endereço https). Os tipos ligados
+    # ficam em JSON (["due", "weekly", ...]); 5 falhas seguidas pausam os envios.
+    webhook_url: Mapped[str | None] = mapped_column(String(500))
+    webhook_kinds: Mapped[str | None] = mapped_column(Text)
+    webhook_failures: Mapped[int] = mapped_column(SmallInteger, default=0, server_default="0")
     # v1.4: código secreto do link de calendário (vencimentos na agenda do celular).
     calendar_token: Mapped[str | None] = mapped_column(String(64), unique=True)
     # v1.4: meta de alocação da carteira por classe (JSON: {"renda_fixa": 60, ...}).
