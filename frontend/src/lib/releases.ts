@@ -11,6 +11,29 @@ export type Release = {
 
 export const RELEASES: Release[] = [
   {
+    version: "1.9.0",
+    date: "15/11/2026 às 15:00",
+    title: "Avisos por webhook",
+    sections: [
+      {
+        title: "Avisos por webhook",
+        items: [
+          "Em Ajustes › Preferências, cole o endereço de um webhook do Discord, do Slack ou de outro serviço e escolha quais avisos chegam lá.",
+          "Seis avisos para escolher: vencimentos, resumo do mês, resumo da semana, Disponível hoje, mensagens e alertas de gastos.",
+          "Botão Enviar teste. Se o endereço parar de responder, os envios pausam e você recebe um aviso.",
+        ],
+      },
+      {
+        title: "Ajustes e correções",
+        items: [
+          "Menu recolhido em janelas baixas: tudo cabe dentro do menu.",
+          "Com Ocultar valores ligado, os alertas e o aviso do MEI no celular não mostram valores.",
+          "Divisões: a pessoa aberta continua aberta depois de lançar uma anotação.",
+        ],
+      },
+    ],
+  },
+  {
     version: "1.8.0.2",
     date: "14/11/2026 às 19:35",
     title: "Cobrar só com a chave Pix",

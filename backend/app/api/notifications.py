@@ -8,7 +8,7 @@ from pydantic import BaseModel
 from app.api.deps import CurrentUser, DbSession
 from app.core.errors import AppError
 from app.db.types import utcnow
-from app.services import notify
+from app.services import notify, webhook
 
 router = APIRouter(tags=["avisos e boas-vindas"])
 
@@ -96,3 +96,89 @@ def onboarding_done(user: CurrentUser, db: DbSession) -> OnboardingOut:
         user.onboarded_at = utcnow()
         db.commit()
     return OnboardingOut(done=True)
+
+
+# ---------------------------------------------------------------- webhook (v1.9.0)
+
+WebhookKind = Literal["due", "monthly", "weekly", "daily", "messages", "alerts"]
+
+
+class WebhookOut(BaseModel):
+    """O endereço inteiro nunca volta: quem tem o endereço consegue postar no canal."""
+
+    configured: bool
+    hint: str | None
+    service: Literal["discord", "slack", "generic"] | None
+    kinds: list[str]
+    paused: bool
+
+
+class WebhookUrlIn(BaseModel):
+    url: str
+
+
+class WebhookKindsIn(BaseModel):
+    kinds: list[WebhookKind]
+
+
+class WebhookTestOut(BaseModel):
+    ok: bool
+
+
+def _webhook(user) -> WebhookOut:  # type: ignore[no-untyped-def]
+    url = user.webhook_url
+    return WebhookOut(
+        configured=bool(url),
+        hint=webhook.url_hint(url) if url else None,
+        service=webhook.service_of(url) if url else None,
+        kinds=webhook.kinds_of(user) if url else [],
+        paused=bool(url) and webhook.paused(user),
+    )
+
+
+@router.get("/notifications/webhook")
+def get_webhook(user: CurrentUser) -> WebhookOut:
+    return _webhook(user)
+
+
+@router.put("/notifications/webhook")
+def save_webhook(body: WebhookUrlIn, user: CurrentUser, db: DbSession) -> WebhookOut:
+    user.webhook_url = webhook.validate_url(body.url)
+    user.webhook_failures = 0
+    db.commit()
+    return _webhook(user)
+
+
+@router.patch("/notifications/webhook")
+def webhook_kinds(body: WebhookKindsIn, user: CurrentUser, db: DbSession) -> WebhookOut:
+    if not user.webhook_url:
+        raise AppError(400, "webhook_invalido", "Salve o endereço do webhook primeiro.")
+    user.webhook_kinds = webhook.dump_kinds(list(body.kinds))
+    db.commit()
+    return _webhook(user)
+
+
+@router.post("/notifications/webhook/test")
+def test_webhook(user: CurrentUser, db: DbSession) -> WebhookTestOut:
+    if not user.webhook_url:
+        raise AppError(400, "webhook_invalido", "Salve o endereço do webhook primeiro.")
+    ok = webhook.send(
+        db,
+        user,
+        "messages",
+        "Webhook conectado",
+        "A partir de agora os avisos que você escolher chegam aqui.",
+        "/ajustes/preferencias",
+        force=True,
+        wait=True,
+    )
+    return WebhookTestOut(ok=ok)
+
+
+@router.delete("/notifications/webhook")
+def delete_webhook(user: CurrentUser, db: DbSession) -> WebhookOut:
+    user.webhook_url = None
+    user.webhook_kinds = None
+    user.webhook_failures = 0
+    db.commit()
+    return _webhook(user)

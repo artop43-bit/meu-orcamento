@@ -7,7 +7,7 @@ Inscrições que o serviço de push dá como expiradas (404/410) são removidas.
 
 import json
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -15,6 +15,10 @@ from sqlalchemy.orm import Session
 from app.core.config import get_settings
 from app.core.errors import AppError
 from app.models import PushSubscription, User
+from app.services import webhook as webhook_service
+
+if TYPE_CHECKING:
+    from app.services.notify import Section
 
 logger = logging.getLogger(__name__)
 
@@ -96,9 +100,23 @@ def _webpush(item: PushSubscription, payload: dict[str, Any]) -> bool:
 
 
 def send(
-    db: Session, user: User, kind: str, title: str, body: str, url: str = "/", force: bool = False
+    db: Session,
+    user: User,
+    kind: str,
+    title: str,
+    body: str,
+    url: str = "/",
+    force: bool = False,
+    sections: "list[Section] | None" = None,
+    webhook: bool = True,
 ) -> int:
-    """Notifica os aparelhos da pessoa se o tipo estiver ligado. Devolve quantos receberam."""
+    """Notifica os aparelhos da pessoa se o tipo estiver ligado. Devolve quantos receberam.
+
+    v1.9.0: todo aviso que passa por aqui também vai ao webhook, se a pessoa ligou esse tipo lá
+    (independe do aparelho). webhook=False só no teste do aparelho.
+    """
+    if webhook:
+        webhook_service.send(db, user, kind, title, body, url, sections)
     if not enabled() or not (force or getattr(user, KINDS.get(kind, ""), False)):
         return 0
     payload = {"title": title[:120], "body": body[:240], "url": url, "tag": kind}

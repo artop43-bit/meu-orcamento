@@ -40,3 +40,4 @@ backend/codespace.db
 backend/local-dev*
 backend/e2e-local.db
 e2e/saida-*/
+.superpowers/

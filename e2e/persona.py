@@ -1544,6 +1544,28 @@ def email_notices(page: Page):
     assert api(page, "/notifications/prefs")["notify_due"] is True
 
 
+@step("v1.9.0: avisos por webhook: salvar, escolher os avisos e remover")
+def webhook_notices(page: Page):
+    # Sem "Enviar teste": o e2e não posta em endereço de fora.
+    page.goto(f"{BASE}/ajustes/preferencias")
+    idle(page)
+    card = page.locator("#webhook")
+    expect(card.get_by_role("heading", name="Avisos por webhook")).to_be_visible()
+    card.get_by_label("Endereço do webhook").fill("http://inseguro.example.com/x")
+    card.get_by_role("button", name="Salvar").click()
+    expect(card.get_by_role("alert")).to_contain_text("https://")
+    card.get_by_label("Endereço do webhook").fill("https://hooks.slack.com/services/T000/B000/XXXX")
+    card.get_by_role("button", name="Salvar").click()
+    expect(card.get_by_text("Conectado a")).to_contain_text("Slack")
+    card.get_by_label("Resumo da semana (segundas)").check()
+    idle(page, 400)
+    assert api(page, "/notifications/webhook")["kinds"] == ["weekly"]
+    assert "XXXX" not in str(api(page, "/notifications/webhook")["hint"])[:-4]
+    card.get_by_role("button", name="Remover").click()
+    expect(card.get_by_label("Endereço do webhook")).to_be_visible()
+    assert api(page, "/notifications/webhook")["configured"] is False
+
+
 @step("Notas da versão em Ajustes, com atalho para enviar sugestão")
 def release_notes(page: Page):
     page.goto(f"{BASE}/ajustes")
@@ -2881,6 +2903,7 @@ def main():
         import_csv(page)
         import_ofx(page)
         email_notices(page)
+        webhook_notices(page)
         release_notes(page)
         inbox_and_announcement(page)
         theme_on_account(page)

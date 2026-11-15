@@ -3,14 +3,16 @@
  * do changelog (pasta changelog/), que tem a mesma versão, data e hora.
  */
 export const RELEASE = {
-  version: "1.8.0.2",
+  version: "1.9.0",
   // Data e hora (Brasília) em que o update foi publicado.
-  releasedAt: "2026-11-14T19:35:00-03:00",
+  releasedAt: "2026-11-15T15:00:00-03:00",
 };
 
 /** Mostrado uma vez em "Novidades" depois do update (curto: o detalhe fica no changelog). */
 export const RELEASE_NOTES: { title: string; text: string }[] = [
-  { title: "Cobrar mais simples.", text: "A mensagem pronta leva só a sua chave Pix; é só copiar e colar na conversa." },
+  { title: "Avisos por webhook.", text: "Receba os avisos no Discord, no Slack ou em outro serviço. Escolha quais em Ajustes › Preferências." },
+  { title: "Menu recolhido em janelas baixas.", text: "Agora tudo cabe dentro do menu, sem botões saindo para fora." },
+  { title: "Divisões.", text: "A pessoa aberta continua aberta depois de lançar uma anotação." },
 ];
 
 export function releaseLabel(): string {
