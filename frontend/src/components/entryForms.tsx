@@ -367,13 +367,17 @@ export function ExpenseForm({
   function applyReading(reading: ReceiptReading, file: File) {
     if (reading.description && !description.trim()) setDescription(reading.description);
     if (reading.amount) setAmount(moneyInput(reading.amount));
+    // v1.9.0.1: a forma de pagamento lida (Dinheiro, Pix, Crédito, Débito ou Boleto) só entra
+    // se a pessoa ainda não escolheu; com Crédito e cartão cadastrado, a data é a da compra.
+    const method = payment || reading.payment_method || "";
+    if (!payment && reading.payment_method) setPayment(reading.payment_method);
+    const cardFlow = !expense && kind !== "recurring" && method === "credit" && creditCards.length > 0;
     if (reading.date) {
-      if (usesCard) setPurchase(reading.date);
+      if (cardFlow) setPurchase(reading.date);
       else setDueDate(reading.date);
       // Boleto: a data é o vencimento (ainda a pagar). Cupom: a compra já foi paga.
       if (reading.kind === "boleto") setPaidChoice(false);
     }
-    if (reading.kind === "boleto" && !payment) setPayment("boleto");
     setPendingReceipts((list) => [...list, file].slice(0, 3));
     const items = reading.items ?? [];
     if (items.length >= 2) {

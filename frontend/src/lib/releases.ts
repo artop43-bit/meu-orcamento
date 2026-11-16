@@ -11,8 +11,27 @@ export type Release = {
 
 export const RELEASES: Release[] = [
   {
+    version: "1.9.0.1",
+    date: "15/11/2026 às 22:55",
+    title: "Leitura de comprovante corrigida",
+    sections: [
+      {
+        title: "Ler comprovante (foto)",
+        items: [
+          "Cupom fiscal não é mais confundido com boleto (o boleto só vale com os dígitos verificadores certos).",
+          "O valor a pagar (depois do desconto), a data e a forma de pagamento vêm certos.",
+          "Na dúvida, o campo fica em branco para você preencher, em vez de um valor inventado.",
+        ],
+      },
+      {
+        title: "Correções",
+        items: ["Resumo da semana: compras no cartão aparecem pela fatura, como no lembrete de vencimentos."],
+      },
+    ],
+  },
+  {
     version: "1.9.0",
-    date: "15/11/2026 às 19:20",
+    date: "15/11/2026 às 18:47",
     title: "Avisos por webhook",
     sections: [
       {

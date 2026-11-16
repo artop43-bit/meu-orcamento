@@ -1,6 +1,6 @@
 MEU ORÇAMENTO · UPDATE LOG
 Versão 1.9.0 · Avisos por webhook
-Data: 15/11/2026 às 19:20 (horário de Brasília)
+Data: 15/11/2026 às 18:47 (horário de Brasília)
 
 Avisos por webhook (Ajustes › Preferências)
 - [x] Novo cartão "Avisos por webhook": cole o endereço de um webhook do Discord, do Slack ou de qualquer serviço que aceite webhook

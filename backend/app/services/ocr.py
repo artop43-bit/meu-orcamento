@@ -49,6 +49,18 @@ NOT_ITEM = re.compile(
 QUANTITY = re.compile(r"\s\d+(?:[.,]\d+)?\s*(?:un|und|kg|g|lt?|ml|pc|pct|cx|fd)\b", re.I)
 MAX_ITEMS = 30
 
+# v1.9.0.1: nas linhas de total o OCR às vezes troca a vírgula por ponto ("279.17").
+MONEY_OCR = re.compile(r"(?<![\d,.])(\d{1,3}(?:\.\d{3})*,\d{2}|\d+[.,]\d{2})(?![\d,.])")
+# Somas que não são o total da compra.
+OTHER_SUM = re.compile(r"troco|desconto|acr[eé]scimo|tribut|imposto|sub\s*-?total|itens", re.I)
+PAYMENTS = (
+    ("pix", r"\bpix\b"),
+    ("credit", r"cr[eé]dito"),
+    ("debit", r"d[eé]bito"),
+    ("cash", r"dinheiro|esp[eé]cie"),
+)
+PAYMENT_LINE = re.compile("|".join(p for _, p in PAYMENTS) + r"|cart[aã]o", re.I)
+
 
 @dataclass
 class Item:
@@ -64,10 +76,14 @@ class Reading:
     description: str | None
     # v1.5: produtos do cupom (nome e valor da linha), para dividir a compra por categoria.
     items: list[Item] = field(default_factory=list)
+    # v1.9.0.1: forma de pagamento ("pix" | "debit" | "credit" | "boleto" | "cash"), se clara.
+    payment_method: str | None = None
 
 
 def _money(text: str) -> Decimal | None:
     try:
+        if "," not in text:  # "279.17": o OCR trocou a vírgula por ponto (só nas linhas de total)
+            return Decimal(text)
         return Decimal(text.replace(".", "").replace(",", "."))
     except InvalidOperation:
         return None
@@ -76,9 +92,42 @@ def _money(text: str) -> Decimal | None:
 # ---------------------------------------------------------------- boleto
 
 
+def _mod10(digits: str) -> int:
+    total, weight = 0, 2
+    for char in reversed(digits):
+        product = int(char) * weight
+        total += product // 10 + product % 10
+        weight = 1 if weight == 2 else 2
+    return (10 - total % 10) % 10
+
+
+def _mod11(digits: str) -> int:
+    total, weight = 0, 2
+    for char in reversed(digits):
+        total += int(char) * weight
+        weight = 2 if weight == 9 else weight + 1
+    rest = 11 - total % 11
+    return 1 if rest in (0, 1, 10, 11) else rest
+
+
+def _valid_line(digits: str) -> bool:
+    """Linha digitável de verdade: os três campos (módulo 10) e o código de barras (módulo 11).
+
+    v1.9.0.1: sem isso, 47 números quaisquer de um cupom (CNPJ, chave de acesso, protocolo)
+    viravam um "boleto" com valor e vencimento inventados.
+    """
+    if len(digits) != 47:
+        return False
+    fields = ((digits[0:9], digits[9]), (digits[10:20], digits[20]), (digits[21:31], digits[31]))
+    if any(_mod10(body) != int(dv) for body, dv in fields):
+        return False
+    free = digits[4:9] + digits[10:20] + digits[21:31]
+    return _mod11(digits[0:4] + digits[33:47] + free) == int(digits[32])
+
+
 def _boleto(digits: str, today: date) -> Reading | None:
     """Linha digitável de boleto bancário (47 dígitos): valor e vencimento exatos."""
-    if len(digits) != 47:
+    if not _valid_line(digits):
         return None
     factor = int(digits[33:37])
     cents = int(digits[37:47])
@@ -89,18 +138,18 @@ def _boleto(digits: str, today: date) -> Reading | None:
         new = date(2025, 2, 22) + timedelta(days=factor - 1000)
         due = min((old, new), key=lambda d: abs((d - today).days))
     amount = Decimal(cents) / 100 if cents else None
-    return Reading("boleto", amount, due, "Boleto")
+    return Reading("boleto", amount, due, "Boleto", payment_method="boleto")
 
 
 def _find_boleto(text: str, today: date) -> Reading | None:
-    for line in text.splitlines():
-        digits = re.sub(r"\D", "", line)
-        if len(digits) == 47:
-            return _boleto(digits, today)
-    joined = re.sub(r"\D", "", text)
-    match = re.search(r"\d{47}", joined)
-    if match and re.search(r"boleto|banco|benefici|vencimento|linha", text, re.I):
-        return _boleto(match.group(0), today)
+    """A linha digitável fica numa linha só ou quebrada em duas seguidas (fotos estreitas)."""
+    lines = [re.sub(r"\D", "", line) for line in text.splitlines()]
+    candidates = lines + [a + b for a, b in zip(lines, lines[1:], strict=False)]
+    for digits in candidates:
+        for start in range(len(digits) - 46):
+            found = _boleto(digits[start : start + 47], today)
+            if found:
+                return found
     return None
 
 
@@ -124,19 +173,68 @@ def _date(text: str, today: date) -> date | None:
     return max(past) if past else min(found)
 
 
+def _total_rank(line: str) -> int:
+    """Quanto a linha vale como total: 3 = a pagar (depois do desconto), 2 = total, 1 = pago."""
+    if re.search(r"a\s+pagar|valor\s+cobrado|valor\s+do\s+documento", line, re.I):
+        return 3
+    if re.search(r"valor\s+pago", line, re.I):
+        return 1  # o pago pode incluir o troco ("pago 50,00, troco 5,12")
+    return 2
+
+
 def _amount(text: str) -> Decimal | None:
     lines = text.splitlines()
-    totals: list[Decimal] = []
+    totals: list[tuple[int, Decimal]] = []
     for index, line in enumerate(lines):
-        if TOTAL_WORDS.search(line) and not re.search(r"troco|desconto|tribut|imposto", line, re.I):
-            values = MONEY.findall(line)
-            if not values and index + 1 < len(lines):
-                values = MONEY.findall(lines[index + 1])
-            totals.extend(v for v in (_money(x) for x in values) if v)
+        if not TOTAL_WORDS.search(line) or OTHER_SUM.search(line):
+            continue
+        values = MONEY_OCR.findall(line)
+        # "VALOR PAGO R$" com o valor na linha de baixo ("Dinheiro 270,00"); nunca a linha de
+        # desconto, acréscimo ou troco, nem um produto.
+        if not values and index + 1 < len(lines):
+            below = lines[index + 1]
+            if not OTHER_SUM.search(below) and (
+                PAYMENT_LINE.search(below) or sum(c.isalpha() for c in below) <= 3
+            ):
+                values = MONEY_OCR.findall(below)
+        rank = _total_rank(line)
+        totals.extend((rank, v) for v in (_money(x) for x in values) if v)
     if totals:
-        return max(totals)
+        best = max(rank for rank, _ in totals)
+        return max(v for rank, v in totals if rank == best)
     every = [v for v in (_money(x) for x in MONEY.findall(text)) if v]
     return max(every) if every else None
+
+
+def _discount(text: str) -> Decimal:
+    found = Decimal(0)
+    for line in text.splitlines():
+        if re.search(r"desconto", line, re.I):
+            for value in MONEY_OCR.findall(line):
+                found += abs(_money(value) or Decimal(0))
+    return found
+
+
+def _payment(text: str) -> str | None:
+    """Forma de pagamento: só depois do total (antes dele são produtos) e só se for uma só."""
+    lines = text.splitlines()
+    start = next(
+        (
+            i
+            for i, line in enumerate(lines)
+            if TOTAL_WORDS.search(line) and not re.search(r"c[oó]digo|unit|itens", line, re.I)
+        ),
+        None,
+    )
+    if start is None:
+        return None
+    found = {
+        method
+        for line in lines[start:]
+        for method, pattern in PAYMENTS
+        if re.search(pattern, line, re.I)
+    }
+    return found.pop() if len(found) == 1 else None
 
 
 def _description(text: str) -> str | None:
@@ -188,6 +286,21 @@ def _items(text: str) -> list[Item]:
     return found[:MAX_ITEMS] if len(found) >= 2 else []
 
 
+def _checked_items(text: str, total: Decimal | None) -> list[Item]:
+    """v1.9.0.1: a lista só vale se a soma bater com o total (com ou sem o desconto).
+
+    Uma vírgula perdida na foto ("1990" em vez de "19,90") faria sugerir valores errados.
+    """
+    items = _items(text)
+    if not items or total is None:
+        return []
+    added = sum((i.amount for i in items), Decimal(0))
+    cents = Decimal("0.02")
+    if abs(added - total) <= cents or abs(added - total - _discount(text)) <= cents:
+        return items
+    return []
+
+
 def parse(text: str, today: date | None = None) -> Reading:
     """Interpreta o texto lido da foto (separado da leitura para poder testar)."""
     today = today or date.today()
@@ -196,7 +309,9 @@ def parse(text: str, today: date | None = None) -> Reading:
         return boleto
     amount, when, description = _amount(text), _date(text, today), _description(text)
     kind = "cupom" if amount or when else "desconhecido"
-    return Reading(kind, amount, when, description, _items(text))
+    return Reading(
+        kind, amount, when, description, _checked_items(text, amount), payment_method=_payment(text)
+    )
 
 
 # ---------------------------------------------------------------- leitura da imagem

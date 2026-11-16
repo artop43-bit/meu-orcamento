@@ -28,6 +28,7 @@ from app.schemas.budget import (
     IncomePatch,
     MonthOut,
     MonthSummary,
+    PaymentMethod,
     RecurringIn,
     RecurringOut,
     RecurringPatch,
@@ -141,6 +142,8 @@ class ReceiptReading(BaseModel):
     date: date | None
     description: str | None
     items: list[ReceiptItem] = []
+    # v1.9.0.1: forma de pagamento lida do comprovante, só quando é uma só.
+    payment_method: PaymentMethod | None = None
 
 
 @router.post("/receipts/read")
@@ -164,6 +167,7 @@ def read_receipt(
         date=reading.date,
         description=reading.description,
         items=[_receipt_item(db, user, item) for item in reading.items],
+        payment_method=reading.payment_method,
     )
 
 
