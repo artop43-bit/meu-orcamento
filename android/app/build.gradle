@@ -6,7 +6,7 @@ plugins {
     id "com.android.application"
 }
 
-def host = System.getenv("TWA_HOST") ?: "144-22-130-13.sslip.io"
+def host = System.getenv("TWA_HOST") ?: "144-22-147-180.sslip.io"
 def assetStatements = """[{\\"relation\\":[\\"delegate_permission/common.handle_all_urls\\"],\\"target\\":{\\"namespace\\":\\"web\\",\\"site\\":\\"https://${host}\\"}}]"""
 
 android {

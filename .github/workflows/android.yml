@@ -17,7 +17,7 @@ on:
       host:
         description: "Endereço do site (sem https://)"
         required: true
-        default: "144-22-130-13.sslip.io"
+        default: "144-22-147-180.sslip.io"
   pull_request:
     paths:
       - "android/**"
@@ -58,7 +58,7 @@ jobs:
         env:
           VERSION_NAME: ${{ inputs.version_name || '1.0.0' }}
           VERSION_CODE: ${{ inputs.version_code || '1' }}
-          TWA_HOST: ${{ inputs.host || '144-22-130-13.sslip.io' }}
+          TWA_HOST: ${{ inputs.host || '144-22-147-180.sslip.io' }}
         run: gradle -p android assembleRelease --no-daemon
       - name: Impressão digital do certificado (para o assetlinks.json)
         run: keytool -list -v -keystore "$KEYSTORE_PATH" -storepass "$KEYSTORE_PASSWORD" | grep "SHA256:"
