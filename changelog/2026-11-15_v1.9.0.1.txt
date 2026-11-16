@@ -1,6 +1,6 @@
 MEU ORÇAMENTO · UPDATE LOG
 Versão 1.9.0.1 · Leitura de comprovante corrigida (hotfix)
-Data: 15/11/2026 às 22:20 (horário de Brasília)
+Data: 15/11/2026 às 22:55 (horário de Brasília)
 
 Ler comprovante (foto)
 - [x] Cupom fiscal não é mais confundido com boleto: o boleto só vale quando a linha digitável tem os dígitos verificadores certos (antes, 47 números quaisquer do cupom viravam um "boleto" com valor e vencimento inventados)
@@ -11,9 +11,11 @@ Ler comprovante (foto)
 - [x] Na dúvida, o campo fica em branco para preencher à mão, em vez de um valor inventado
 
 Correções
+- [x] Resumo da semana: compras no cartão aparecem pela fatura ("Fatura Roxo · 16/11"), como no lembrete de vencimentos, e não mais soltas
 - [x] Horário da v1.9.0 nas notas da versão: 18:47
 
 Testes
+- [x] Resumo da semana numa segunda com fatura do cartão vencendo (achado pelo teste automático no dia 16/11)
 - [x] O texto real lido da foto enviada pelo usuário (Rede Moleza): R$ 270,00, 09/05/2024, Dinheiro
 - [x] Boleto válido (em uma ou duas linhas), boleto com dígito errado, números espalhados, prioridade do "a pagar", formas de pagamento
 - [x] Auditoria pela interface: a forma de pagamento lida aparece marcada e é salva

@@ -12,7 +12,7 @@ export type Release = {
 export const RELEASES: Release[] = [
   {
     version: "1.9.0.1",
-    date: "15/11/2026 às 22:20",
+    date: "15/11/2026 às 22:55",
     title: "Leitura de comprovante corrigida",
     sections: [
       {
@@ -22,6 +22,10 @@ export const RELEASES: Release[] = [
           "O valor a pagar (depois do desconto), a data e a forma de pagamento vêm certos.",
           "Na dúvida, o campo fica em branco para você preencher, em vez de um valor inventado.",
         ],
+      },
+      {
+        title: "Correções",
+        items: ["Resumo da semana: compras no cartão aparecem pela fatura, como no lembrete de vencimentos."],
       },
     ],
   },

@@ -442,14 +442,23 @@ def weekly_message(db: Session, user: User, today: date) -> Message | None:
 
     week = [e for e in rows if start <= day_of(e) <= end]
     previous = [e for e in rows if before <= day_of(e) < start]
-    upcoming = sorted(
-        (
-            e
-            for e in rows
-            if not e.paid and e.due_date and today <= e.due_date <= today + timedelta(days=6)
-        ),
-        key=lambda e: e.due_date or today,
-    )
+    last_day = today + timedelta(days=6)
+    # (descrição, vencimento, valor). v1.9.0.1: compras no cartão entram pela fatura, como no
+    # lembrete de vencimentos (antes a compra aparecia solta no resumo da semana).
+    upcoming: list[tuple[str, date, Decimal]] = [
+        (e.description, e.due_date, e.amount)
+        for e in rows
+        if not e.paid and e.card_id is None and e.due_date and today <= e.due_date <= last_day
+    ]
+    from app.services import cards
+
+    for card in cards.credit_cards(db, user):
+        for first in {today.replace(day=1), last_day.replace(day=1)}:
+            data = cards.invoice(db, card, first, today)
+            due = data["due_date"]
+            if today <= due <= last_day and data["count"] and data["status"] != "paid":
+                upcoming.append((f"Fatura {card.name}", due, data["total"] - data["paid_total"]))
+    upcoming.sort(key=lambda row: row[1])
     if not week and not upcoming:
         return None
     total = sum((e.amount for e in week), Decimal("0"))
@@ -479,9 +488,8 @@ def weekly_message(db: Session, user: User, today: date) -> Message | None:
             Section(
                 "Vence nos próximos 7 dias",
                 [
-                    (e.description, short_date(e.due_date), "" if hide else brl(e.amount))
-                    for e in upcoming[:8]
-                    if e.due_date
+                    (description, short_date(due), "" if hide else brl(amount))
+                    for description, due, amount in upcoming[:8]
                 ],
             )
         )

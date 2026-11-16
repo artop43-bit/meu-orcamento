@@ -156,3 +156,45 @@ def test_endpoint_devolve_forma_de_pagamento(
     body = out.json()
     assert body["kind"] == "cupom" and body["amount"] == "270.00"
     assert body["payment_method"] == "cash"
+
+
+# ---------------------------------------------------------------- resumo da semana e cartão
+
+
+def test_resumo_da_semana_mostra_a_fatura_e_nao_a_compra(
+    user: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Achado no CI de 16/11/2026 (uma segunda): a compra no cartão aparecia solta no resumo
+    da semana, em vez da fatura (o lembrete de vencimentos já mostrava a fatura)."""
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    from app.services import budget as budget_service
+    from app.services import notify
+
+    monkeypatch.setattr(budget_service, "current_month", lambda *_: date(2030, 1, 1))
+    card = user.post(
+        "/api/cards",
+        json={"name": "Roxo", "kind": "credit", "closing_day": 1, "due_day": 16},
+    ).json()
+    user.post(
+        "/api/months/2029-12/expenses",
+        json={
+            "description": "Tênis",
+            "amount": "300.00",
+            "card_id": card["id"],
+            "purchase_date": "2029-12-10",
+        },
+    )
+    from app.core.email import outbox
+    from app.db.session import get_db
+    from app.main import app
+
+    db = next(app.dependency_overrides[get_db]())
+    outbox.clear()
+    monday = datetime(2030, 1, 14, 8, 30, tzinfo=ZoneInfo("America/Sao_Paulo"))
+    assert monday.weekday() == 0
+    notify.run_daily(db, monday)
+    [weekly] = [m for m in outbox if "semana" in m.subject]
+    assert "Tênis" not in weekly.body
+    assert "Fatura Roxo" in weekly.body and "16/01" in weekly.body
