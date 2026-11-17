@@ -9,6 +9,9 @@ tags: [meu-orcamento, erros, aprendizado]
   v1.8.0.2. Ver [[Mudanças rejeitadas pelo usuário]].
 - **Horário de publicação errado** nas notas → estimar antes do PR e corrigir depois.
 - **Mudar arquivo depois de abrir o PR** reinicia o CI (~27 min). Ajustar horário antes.
+- **Hora errada no Git Bash do Windows**: `TZ=America/Sao_Paulo date` não aplica o fuso (sem
+  tzdata) e a estimativa da v1.10.0 saiu 23:55 em vez de ~21:25 → pegar a hora com PowerShell
+  `Get-Date` e conferir com o relógio antes de escrever o horário (2026-11-17).
 - **Primeira proposta visual fora do padrão** → refazer em cima da tela real, com as classes
   existentes ([[Padrão visual]]).
 - **`gh pr merge --auto` junta na hora** — o repositório tem `allow_auto_merge=false`, então não
