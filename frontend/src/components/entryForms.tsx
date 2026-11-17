@@ -458,7 +458,8 @@ export function ExpenseForm({
         amount: value,
         category_id,
         ...extra,
-        paid,
+        // Crédito nunca entra pago: a compra ocupa o limite até a fatura ser paga.
+        paid: false,
         card_id: card.id,
         purchase_date: purchase,
         installments: kind === "installments" ? count : null,
@@ -962,7 +963,7 @@ export function ExpenseForm({
         <ScopeChoice scope={scope} setScope={setScope} what={expense!.installment_group_id ? "Esta e as próximas parcelas" : "Este mês e os seguintes"} />
       )}
 
-      {!expense && kind !== "recurring" && !debitCard && (
+      {!expense && kind !== "recurring" && !debitCard && !card && (
         <label className="check">
           <input type="checkbox" checked={paid} onChange={(e) => setPaidChoice(e.target.checked)} />
           {kind === "installments" ? "Primeira parcela já paga" : "Já paga"}

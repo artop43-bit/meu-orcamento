@@ -628,8 +628,10 @@ def _create_expense(db: Session, user: User, month: date, data: dict[str, Any]) 
     _check_benefit(db, user, data.get("account_id"), data.get("category_id"))
 
     if card_id is not None:
+        # Compra no crédito nunca entra paga: fica em aberto (e ocupa o limite) até a fatura
+        # ser paga em Cartões.
         return _create_card_expense(
-            db, user, data, card_id, purchase_date, installments, amount_mode, paid
+            db, user, data, card_id, purchase_date, installments, amount_mode, False
         )
 
     if repeat and not installments:
