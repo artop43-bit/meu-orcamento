@@ -11,6 +11,22 @@ export type Release = {
 
 export const RELEASES: Release[] = [
   {
+    version: "1.10.0",
+    date: "17/11/2026 às 23:55",
+    title: "Leitor de cupons novo",
+    sections: [
+      {
+        title: "Ler comprovante (foto)",
+        items: [
+          "A foto agora é lida por um leitor de cupons novo, que corrige a inclinação e entende melhor fotos de celular.",
+          "Os produtos do cupom só são sugeridos quando a soma deles fecha com o total.",
+          "Boleto, valor a pagar, data e forma de pagamento continuam funcionando como antes.",
+          "A leitura continua no servidor do app: a foto não vai para nenhum serviço externo.",
+        ],
+      },
+    ],
+  },
+  {
     version: "1.9.0.1",
     date: "15/11/2026 às 22:55",
     title: "Leitura de comprovante corrigida",

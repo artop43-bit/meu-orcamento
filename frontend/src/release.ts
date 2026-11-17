@@ -3,14 +3,15 @@
  * do changelog (pasta changelog/), que tem a mesma versão, data e hora.
  */
 export const RELEASE = {
-  version: "1.9.0.1",
+  version: "1.10.0",
   // Data e hora (Brasília) em que o update foi publicado.
-  releasedAt: "2026-11-15T22:55:00-03:00",
+  releasedAt: "2026-11-17T23:55:00-03:00",
 };
 
 /** Mostrado uma vez em "Novidades" depois do update (curto: o detalhe fica no changelog). */
 export const RELEASE_NOTES: { title: string; text: string }[] = [
-  { title: "Ler comprovante corrigido.", text: "Cupom não vira mais boleto; o valor a pagar, a data e a forma de pagamento vêm certos." },
+  { title: "Leitor de cupons novo.", text: "A foto do comprovante é lida por um leitor mais firme, que acerta melhor os produtos e o total." },
+  { title: "Tudo no app.", text: "A leitura continua no servidor do app, sem serviço externo." },
 ];
 
 export function releaseLabel(): string {
