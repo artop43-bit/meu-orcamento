@@ -5,6 +5,7 @@ from decimal import Decimal
 
 import pytest
 from fastapi.testclient import TestClient
+from leitor_comprovantes import LeitorComprovantes
 
 from app.services import budget as budget_service
 from app.services import ocr
@@ -98,7 +99,7 @@ def test_single_product_is_not_a_list() -> None:
 def test_read_receipt_suggests_category_per_item(
     user: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr(ocr, "read_text", lambda raw: NFCE)
+    monkeypatch.setattr(ocr, "extract", lambda raw: LeitorComprovantes().ler_texto(NFCE))
     from tests.test_v075 import png  # noqa: PLC0415
 
     out = user.post("/api/receipts/read", files={"image": ("cupom.png", png(), "image/png")})

@@ -160,6 +160,9 @@ jobs:
           docker buildx build --platform linux/arm64 --load -t api:arm64 ./backend
           docker run --rm --platform linux/arm64 api:arm64 \
             python -c "import argon2, cryptography, psycopg, app.main; print('ok', __import__('platform').machine())"
+          # v1.6: leitor de cupons (OpenCV + modelos ONNX do RapidOCR) carrega no ARM.
+          docker run --rm --platform linux/arm64 api:arm64 \
+            python -c "import cv2, leitor_comprovantes; from rapidocr_onnxruntime import RapidOCR; RapidOCR(); print('leitor ok')"
       - name: Backup
         run: docker buildx build --platform linux/arm64 ./deploy/backup
       - name: Caddy + frontend

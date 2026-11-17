@@ -5,6 +5,7 @@ from decimal import Decimal
 
 import pytest
 from fastapi.testclient import TestClient
+from leitor_comprovantes import LeitorComprovantes
 
 from app.core.email import OutgoingEmail
 from app.services import ocr
@@ -148,7 +149,7 @@ def user(client: TestClient, outbox: list[OutgoingEmail]) -> TestClient:
 def test_endpoint_devolve_forma_de_pagamento(
     user: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr(ocr, "read_text", lambda raw: REDE_MOLEZA)
+    monkeypatch.setattr(ocr, "extract", lambda raw: LeitorComprovantes().ler_texto(REDE_MOLEZA))
     from tests.test_v075 import png  # noqa: PLC0415
 
     out = user.post("/api/receipts/read", files={"image": ("cupom.png", png(), "image/png")})
