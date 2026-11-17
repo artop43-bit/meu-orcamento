@@ -57,6 +57,29 @@ def test_cupom_real_pelo_leitor() -> None:
     assert r.items == []  # produtos mal lidos: a soma não fecha, nada é sugerido
 
 
+def test_valor_a_pagar_vence_valor_pago_com_troco() -> None:
+    # Achado na revisão do PR 73: o leitor ficava com o "valor pago" (50,00, com troco).
+    texto = (
+        "LOJA X\nARROZ 5KG 27,90\nFEIJAO 1KG 16,98\nVALOR A PAGAR R$ 44,88\n"
+        "Dinheiro 50,00\nVALOR PAGO R$ 50,00\nTroco R$ 5,12\n"
+    )
+    r = ocr.from_result(leitura(texto), today=TODAY)
+    assert r.amount == Decimal("44.88")
+    assert [i.amount for i in r.items] == [Decimal("27.90"), Decimal("16.98")]
+
+
+def test_produtos_nao_aparecem_com_total_que_nao_fecha() -> None:
+    # Sem a linha de total e com o leitor reprovado, nenhum total fecha com os produtos.
+    vazio = leitura(CUPOM).model_copy(update={"itens": []})
+    texto_sem_total = CUPOM.replace("VALOR TOTAL R$                      44,88\n", "")
+    vazio = vazio.model_copy(
+        update={"texto_extraido": texto_sem_total, "valor_total": Decimal("99.00")}
+    )
+    vazio.validacao.aprovado = False
+    r = ocr.from_result(vazio, today=date(2026, 10, 21))
+    assert r.items == []
+
+
 def test_boleto_continua_valendo() -> None:
     r = ocr.from_result(leitura(f"Banco\nLinha digitável\n{BOLETO}\n"), today=date(2025, 10, 1))
     assert (r.kind, r.amount, r.date) == ("boleto", Decimal("1234.56"), date(2025, 10, 25))

@@ -12,6 +12,7 @@ Nada é salvo sozinho: o resultado só preenche o formulário, e a pessoa confir
 from __future__ import annotations
 
 import importlib.util
+import logging
 import re
 import threading
 from dataclasses import dataclass, field
@@ -30,6 +31,7 @@ _LOCK = threading.Semaphore(1)
 # O leitor carrega os modelos uma vez só (na primeira leitura) e é reaproveitado.
 _LEITOR: LeitorComprovantes | None = None
 _LEITOR_LOCK = threading.Lock()
+logger = logging.getLogger(__name__)
 
 MONEY = re.compile(r"(?<![\d,.])(\d{1,3}(?:\.\d{3})*,\d{2}|\d+,\d{2})(?![\d,])")
 DATE = re.compile(r"(?<!\d)(\d{2})[/.-](\d{2})[/.-](\d{4}|\d{2})(?!\d)")
@@ -344,6 +346,8 @@ def extract(raw: bytes) -> ResultadoComprovante:
     try:
         return _leitor().ler(raw, tipo="imagem")
     except Exception as exc:  # erro interno do OpenCV/ONNX numa foto estranha: nunca um 500
+        # No log, para uma instalação quebrada (cv2/ONNX) não passar por "foto ruim".
+        logger.exception("Leitor de cupons falhou")
         raise AppError(
             422, "ocr_failed", "Não foi possível ler a foto. Tente outra mais nítida."
         ) from exc
@@ -363,9 +367,9 @@ def _clean_name(text: str) -> str:
 def from_result(result: ResultadoComprovante, today: date | None = None) -> Reading:
     """Converte o resultado do leitor no `Reading` de sempre.
 
-    O que o leitor achou vale primeiro; o que ele não achou vem das regras de texto (`parse`)
-    sobre o mesmo texto lido. Os produtos só valem quando o leitor confere que a soma deles
-    fecha com o total (mesma ideia da v1.9.0.1: melhor não sugerir do que sugerir errado).
+    O que falta ao leitor vem das regras de texto (`parse`) sobre o mesmo texto lido. O total
+    do leitor só ganha do `parse` quando ele mesmo confere que os produtos fecham com esse total
+    (mesma ideia da v1.9.0.1: melhor não sugerir do que sugerir errado).
     """
     today = today or date.today()
     text = result.texto_extraido
@@ -373,18 +377,21 @@ def from_result(result: ResultadoComprovante, today: date | None = None) -> Read
     if base.kind == "boleto":
         return base
 
-    amount = result.valor_total or base.amount
+    # Sem a conferência, o "valor pago" (com troco) ganharia do "valor a pagar" do parse().
+    leitor_fechou = result.validacao.aprovado and result.valor_total is not None
+    amount = result.valor_total if leitor_fechou else (base.amount or result.valor_total)
     when = base.date or _date(result.data_hora or "", today)
     store = _clean_name(result.estabelecimento or "")
     description = store if sum(c.isalpha() for c in store) >= 3 else base.description
 
-    items = base.items
-    if result.validacao.aprovado:
+    # Os produtos do parse() foram conferidos contra o total dele: só valem com esse total.
+    items = base.items if amount == base.amount else []
+    if leitor_fechou:
         named = [(_clean_name(item.descricao), item.valor_total) for item in result.itens]
         found = [
-            Item(name, amount)
-            for name, amount in named
-            if amount > 0 and sum(c.isalpha() for c in name) >= 3
+            Item(name, value)
+            for name, value in named
+            if value > 0 and sum(c.isalpha() for c in name) >= 3
         ]
         if len(found) >= 2:
             items = found[:MAX_ITEMS]
@@ -394,5 +401,7 @@ def from_result(result: ResultadoComprovante, today: date | None = None) -> Read
 
 
 def read(raw: bytes) -> Reading:
-    files.prepare(raw, "receipt")  # mesma validação dos comprovantes (tipo, tamanho, pixels)
-    return from_result(extract(raw))
+    # Mesma validação dos comprovantes (tipo, tamanho, pixels). A imagem devolvida já vem em pé
+    # e reduzida: o leitor não abre uma foto de 40 MP em tamanho cheio.
+    image, *_ = files.prepare(raw, "receipt")
+    return from_result(extract(image))
