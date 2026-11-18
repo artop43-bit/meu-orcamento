@@ -20,6 +20,7 @@ dependencies = [
     "python-multipart>=0.0.20",
     "pywebpush>=2.0",
     "fpdf2>=2.8",
+    "leitor-comprovantes",
 ]
 
 [dependency-groups]
@@ -54,3 +55,6 @@ select = ["E", "F", "I", "B", "UP"]
 [tool.ruff.lint.isort]
 # A pasta local "alembic/" não é o pacote alembic.
 known-third-party = ["alembic"]
+
+[tool.uv.sources]
+leitor-comprovantes = { git = "https://github.com/artop43-bit/Leitor-de-cupons", rev = "cd4be97b37a2b5876cc18a7df4687a2de974a675" }

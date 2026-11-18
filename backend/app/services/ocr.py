@@ -1,29 +1,37 @@
 """Leitura de comprovante por foto (v1.3): valor, data e descrição para a pessoa conferir.
 
-A leitura roda no próprio servidor (Tesseract, sem serviço externo): a foto não sai do app.
+A leitura roda no próprio servidor, sem serviço externo: a foto não sai do app.
+v1.10: quem lê a foto é o leitor de cupons (`leitor_comprovantes`, RapidOCR em CPU), no lugar
+do Tesseract. As regras de texto deste arquivo continuam valendo como reserva campo a campo.
 - Boleto: a linha digitável traz o valor e o vencimento exatos (fator de vencimento).
 - Cupom, nota ou recibo: procura o total, a data e o nome do estabelecimento no texto, e
   (v1.5) os produtos com o valor de cada um.
 Nada é salvo sozinho: o resultado só preenche o formulário, e a pessoa confirma.
 """
 
-import io
+from __future__ import annotations
+
+import importlib.util
+import logging
 import re
-import shutil
-import subprocess
 import threading
 from dataclasses import dataclass, field
 from datetime import date, timedelta
 from decimal import Decimal, InvalidOperation
-
-from PIL import Image, ImageOps
+from typing import TYPE_CHECKING
 
 from app.core.errors import AppError
 from app.services import files
 
-# Um processo de cada vez: a VM tem poucos núcleos e a leitura é pesada.
+if TYPE_CHECKING:
+    from leitor_comprovantes import LeitorComprovantes, ResultadoComprovante
+
+# Uma leitura de cada vez: o OCR usa todos os núcleos e bastante memória.
 _LOCK = threading.Semaphore(1)
-TIMEOUT = 40  # segundos
+# O leitor carrega os modelos uma vez só (na primeira leitura) e é reaproveitado.
+_LEITOR: LeitorComprovantes | None = None
+_LEITOR_LOCK = threading.Lock()
+logger = logging.getLogger(__name__)
 
 MONEY = re.compile(r"(?<![\d,.])(\d{1,3}(?:\.\d{3})*,\d{2}|\d+,\d{2})(?![\d,])")
 DATE = re.compile(r"(?<!\d)(\d{2})[/.-](\d{2})[/.-](\d{4}|\d{2})(?!\d)")
@@ -255,12 +263,8 @@ def _item_name(line: str) -> str:
     quantities = [m for m in QUANTITY.finditer(line) if m.start() < end]
     if quantities:
         end = quantities[-1].start()
-    words = line[:end].split()
-    # Número do item e código de barras ("001 7891234567890 ARROZ").
-    while words and re.fullmatch(r"[\d.\-]+", words[0]):
-        words.pop(0)
-    clean = re.sub(r"[^\wÀ-ú&.\- ]", " ", " ".join(words))
-    return re.sub(r"\s+", " ", clean).strip(" .-")[:60].title()
+    # _clean_name tira o número do item e o código de barras ("001 7891234567890 ARROZ").
+    return _clean_name(line[:end])
 
 
 def _items(text: str) -> list[Item]:
@@ -318,49 +322,86 @@ def parse(text: str, today: date | None = None) -> Reading:
 
 
 def available() -> bool:
-    return shutil.which("tesseract") is not None
+    return importlib.util.find_spec("leitor_comprovantes") is not None
 
 
-def _prepare(raw: bytes) -> bytes:
-    """Foto pronta para leitura: em pé, cinza, com contraste e tamanho bom para o OCR."""
-    files.prepare(raw, "receipt")  # mesma validação dos comprovantes (tipo, tamanho, pixels)
-    with Image.open(io.BytesIO(raw)) as source:
-        image = ImageOps.exif_transpose(source).convert("L")
-    if max(image.size) < 1600:
-        scale = 1600 / max(image.size)
-        image = image.resize((int(image.width * scale), int(image.height * scale)))
-    image = ImageOps.autocontrast(image)
-    out = io.BytesIO()
-    image.save(out, "PNG")
-    return out.getvalue()
+def _leitor() -> LeitorComprovantes:
+    global _LEITOR
+    with _LEITOR_LOCK:
+        if _LEITOR is None:
+            from leitor_comprovantes import LeitorComprovantes
+
+            _LEITOR = LeitorComprovantes()
+        return _LEITOR
 
 
-def read_text(raw: bytes) -> str:
+def extract(raw: bytes) -> ResultadoComprovante:
+    """Lê a foto com o leitor de cupons (já validada por `files.prepare`)."""
     if not available():
         raise AppError(503, "ocr_unavailable", "A leitura de fotos não está disponível agora.")
-    image = _prepare(raw)
     if not _LOCK.acquire(timeout=60):
         raise AppError(
             503, "ocr_busy", "Muitas leituras ao mesmo tempo. Tente de novo em instantes."
         )
     try:
-        result = subprocess.run(
-            ["tesseract", "stdin", "stdout", "-l", "por", "--psm", "6"],
-            input=image,
-            capture_output=True,
-            timeout=TIMEOUT,
-            check=False,
-        )
-    except subprocess.TimeoutExpired as exc:
+        return _leitor().ler(raw, tipo="imagem")
+    except Exception as exc:  # erro interno do OpenCV/ONNX numa foto estranha: nunca um 500
+        # No log, para uma instalação quebrada (cv2/ONNX) não passar por "foto ruim".
+        logger.exception("Leitor de cupons falhou")
         raise AppError(
-            504, "ocr_timeout", "A leitura demorou demais. Tente uma foto mais nítida."
+            422, "ocr_failed", "Não foi possível ler a foto. Tente outra mais nítida."
         ) from exc
     finally:
         _LOCK.release()
-    if result.returncode != 0:
-        raise AppError(422, "ocr_failed", "Não foi possível ler a foto. Tente outra mais nítida.")
-    return result.stdout.decode("utf-8", errors="ignore")
+
+
+def _clean_name(text: str) -> str:
+    """Nome do produto ou da loja: sem número/código no começo, sem símbolos, até 60 letras."""
+    words = text.split()
+    while words and re.fullmatch(r"[\d.\-]+", words[0]):
+        words.pop(0)
+    clean = re.sub(r"[^\wÀ-ú&.\- ]", " ", " ".join(words))
+    return re.sub(r"\s+", " ", clean).strip(" .-")[:60].title()
+
+
+def from_result(result: ResultadoComprovante, today: date | None = None) -> Reading:
+    """Converte o resultado do leitor no `Reading` de sempre.
+
+    O que falta ao leitor vem das regras de texto (`parse`) sobre o mesmo texto lido. O total
+    do leitor só ganha do `parse` quando ele mesmo confere que os produtos fecham com esse total
+    (mesma ideia da v1.9.0.1: melhor não sugerir do que sugerir errado).
+    """
+    today = today or date.today()
+    text = result.texto_extraido
+    base = parse(text, today)
+    if base.kind == "boleto":
+        return base
+
+    # Sem a conferência, o "valor pago" (com troco) ganharia do "valor a pagar" do parse().
+    leitor_fechou = result.validacao.aprovado and result.valor_total is not None
+    amount = result.valor_total if leitor_fechou else (base.amount or result.valor_total)
+    when = base.date or _date(result.data_hora or "", today)
+    store = _clean_name(result.estabelecimento or "")
+    description = store if sum(c.isalpha() for c in store) >= 3 else base.description
+
+    # Os produtos do parse() foram conferidos contra o total dele: só valem com esse total.
+    items = base.items if amount == base.amount else []
+    if leitor_fechou:
+        named = [(_clean_name(item.descricao), item.valor_total) for item in result.itens]
+        found = [
+            Item(name, value)
+            for name, value in named
+            if value > 0 and sum(c.isalpha() for c in name) >= 3
+        ]
+        if len(found) >= 2:
+            items = found[:MAX_ITEMS]
+
+    kind = "cupom" if amount or when else "desconhecido"
+    return Reading(kind, amount, when, description, items, payment_method=base.payment_method)
 
 
 def read(raw: bytes) -> Reading:
-    return parse(read_text(raw))
+    # Mesma validação dos comprovantes (tipo, tamanho, pixels). A imagem devolvida já vem em pé
+    # e reduzida: o leitor não abre uma foto de 40 MP em tamanho cheio.
+    image, *_ = files.prepare(raw, "receipt")
+    return from_result(extract(image))

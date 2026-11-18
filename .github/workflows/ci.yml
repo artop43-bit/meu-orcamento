@@ -160,6 +160,23 @@ jobs:
           docker buildx build --platform linux/arm64 --load -t api:arm64 ./backend
           docker run --rm --platform linux/arm64 api:arm64 \
             python -c "import argon2, cryptography, psycopg, app.main; print('ok', __import__('platform').machine())"
+          # v1.10.0: o leitor de cupons (OpenCV + modelos ONNX do RapidOCR) lê uma foto no ARM.
+          docker run --rm -i --platform linux/arm64 api:arm64 python - <<'PY'
+          import io
+          from decimal import Decimal
+          from PIL import Image, ImageDraw, ImageFont
+          from leitor_comprovantes import LeitorComprovantes
+          linhas = ["MERCADO TESTE LTDA", "ARROZ 5KG 1 UN X 27,90 27,90",
+                    "FEIJAO 1KG 2 UN X 8,49 16,98", "VALOR TOTAL R$ 44,88"]
+          img = Image.new("RGB", (760, 60 + 48 * len(linhas)), "white")
+          d = ImageDraw.Draw(img)
+          for n, l in enumerate(linhas):
+              d.text((30, 30 + 48 * n), l, fill="black", font=ImageFont.load_default(size=28))
+          buf = io.BytesIO(); img.save(buf, "PNG")
+          r = LeitorComprovantes().ler(buf.getvalue(), tipo="imagem")
+          assert r.valor_total == Decimal("44.88"), r.valor_total
+          print("leitor ok no ARM:", r.valor_total)
+          PY
       - name: Backup
         run: docker buildx build --platform linux/arm64 ./deploy/backup
       - name: Caddy + frontend
