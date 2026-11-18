@@ -3,7 +3,7 @@ tags: [meu-orcamento, pendencias]
 ---
 # Pendências (em 17/11/2026)
 
-- [ ] Hotfix v1.9.0.2 — limite do cartão (aprovado; aguardando "Pode seguir").
+- [x] Limite do cartão — compra nunca entra paga e sempre ocupa o limite (PR #75, publicado junto da 1.10.0 em 17/11 21:20).
 - [ ] Safari (iPhone) — falta aparelho, versão do iOS e o que aparece.
 - [ ] Servidor antigo — mantê-lo parado; apagar depois de alguns dias sem problemas.
 - [ ] APK novo do Android (Actions › Android).
@@ -13,8 +13,9 @@ tags: [meu-orcamento, pendencias]
 - [ ] Bot (Tire sua dúvida) à parte — confirmar que a IA só escreve o código, não roda no bot.
 
 ## Recolocadas da lista anterior (17/11/2026)
-- [ ] **Horário da v1.9.0.1**: as notas dizem 22:55, a publicação real foi 16/11 às 00:44 —
-      corrigir na próxima versão.
+- [x] **Horário da v1.9.0.1**: corrigido para 16/11 00:44 nas notas da 1.10.0.
+- [ ] **Notas da 1.10.0**: dizem 21:45, a publicação real foi 17/11 às 21:20; e falta a linha
+      da correção do limite do cartão (PR #75 foi publicado junto). Corrigir na próxima versão.
 - [ ] **Leitor de cupons (v1.10.0)**: medir o tempo de leitura no servidor depois do deploy.
 - [ ] **Webhook, pontos menores da revisão**: DNS rebinding, faixas NAT64, menções (`@channel`),
       limite no "Enviar teste", testes de redirecionamento/HTTPError.

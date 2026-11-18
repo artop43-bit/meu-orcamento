@@ -9,6 +9,10 @@ tags: [meu-orcamento, erros, aprendizado]
   v1.8.0.2. Ver [[Mudanças rejeitadas pelo usuário]].
 - **Horário de publicação errado** nas notas → estimar antes do PR e corrigir depois.
 - **Mudar arquivo depois de abrir o PR** reinicia o CI (~27 min). Ajustar horário antes.
+- **Duas sessões juntando no `main` ao mesmo tempo**: o deploy de uma publica o `main` inteiro,
+  inclusive o merge da outra, antes do CI do `main` dessa outra terminar; e a versão sai sem as
+  notas da outra mudança (v1.10.0 levou o PR #75 do cartão). Uma sessão por vez junta no `main`;
+  quem juntar depois confere o `git log` do `main` e as notas (2026-11-17).
 - **Hora errada no Git Bash do Windows**: `TZ=America/Sao_Paulo date` não aplica o fuso (sem
   tzdata) e a estimativa da v1.10.0 saiu 23:55 em vez de ~21:25 → pegar a hora com PowerShell
   `Get-Date` e conferir com o relógio antes de escrever o horário (2026-11-17).

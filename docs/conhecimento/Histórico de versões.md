@@ -14,6 +14,7 @@ tags: [meu-orcamento, versoes]
 | 1.8.0.1 | 14/11 17:02 | Termo para entregar, pagamento a mais |
 | 1.8.0.2 | 14/11 19:33 | Cobrar só com a chave Pix |
 | 1.9.0 | 15/11 18:47 | Avisos por webhook, menu recolhido em janelas baixas, Divisões |
-| 1.9.0.1 | 16/11 00:44 | Leitura de comprovante corrigida; resumo da semana com a fatura do cartão (notas dizem 22:55: corrigir na próxima) |
+| 1.9.0.1 | 16/11 00:44 | Leitura de comprovante corrigida; resumo da semana com a fatura do cartão (horário corrigido nas notas da 1.10.0) |
+| 1.10.0 | 17/11 21:20 | Leitor de cupons novo (RapidOCR) no lugar do Tesseract; foi junto a correção do limite do cartão (PR #75), que não está nas notas (notas dizem 21:45: corrigir na próxima) |
 
 Detalhes em `changelog/` no repositório.
