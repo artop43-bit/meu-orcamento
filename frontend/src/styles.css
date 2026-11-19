@@ -7597,3 +7597,142 @@ textarea {
   gap: 12px;
   flex-wrap: wrap;
 }
+
+/* ---------------------------------------------------------- Hub de soluções */
+
+.hub {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.hub__bar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+.hub__bar-inner {
+  width: 100%;
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 12px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.hub__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.hub__account {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px 4px 4px;
+  border: 1px solid var(--border);
+  border-radius: 99px;
+  background: var(--surface-2);
+  color: inherit;
+  text-decoration: none;
+  max-width: 220px;
+  min-width: 0;
+}
+
+.hub__account:hover {
+  border-color: var(--accent);
+}
+
+.hub__account-name {
+  font-size: 0.88rem;
+  font-weight: 550;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hub__logout {
+  padding-inline: 12px;
+}
+
+.hub__main {
+  width: 100%;
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 28px 20px 24px;
+  flex: 1;
+}
+
+.hub-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr));
+  gap: 14px;
+}
+
+.hub-card {
+  align-items: center;
+}
+
+.hub-card__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.hub-card__cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--accent);
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.hub-card--soon {
+  opacity: 0.72;
+}
+
+.hub-card__icon--muted {
+  background: var(--surface-2);
+  color: var(--muted);
+}
+
+.hub__footer {
+  margin-top: auto;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+@media (max-width: 639px) {
+  .hub__bar-inner {
+    padding: 10px 14px;
+  }
+
+  .hub__account {
+    padding: 3px;
+  }
+
+  .hub__account-name,
+  .hub__logout-label {
+    display: none;
+  }
+
+  .hub__logout {
+    padding-inline: 10px;
+  }
+
+  .hub__main {
+    padding: 20px 14px 20px;
+  }
+}

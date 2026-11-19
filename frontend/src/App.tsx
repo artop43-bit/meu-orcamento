@@ -5,6 +5,7 @@ import { useMe } from "./api/auth";
 import { errorMessage } from "./api/client";
 import { Shell } from "./components/Shell";
 import ForgotPassword from "./pages/ForgotPassword";
+import Hub from "./pages/Hub";
 import Login from "./pages/Login";
 import MonthPage from "./pages/Month";
 import Register from "./pages/Register";
@@ -60,7 +61,7 @@ function RequireAuth() {
   if (me.isPending) return <FullPageMessage>Carregando…</FullPageMessage>;
   if (me.isError) return <FullPageMessage>{errorMessage(me.error)}</FullPageMessage>;
   if (!me.data) return <Navigate to="/entrar" replace state={{ from: location.pathname }} />;
-  return <Shell />;
+  return <Outlet />;
 }
 
 /** Páginas só para visitantes (login, cadastro): quem já entrou vai para o início. */
@@ -89,50 +90,53 @@ export default function App() {
         <Route path="/descadastrar" element={<Unsubscribe />} />
         <Route path="/nao-fui-eu" element={<NotMe />} />
         <Route element={<RequireAuth />}>
-          <Route path="/" element={<Navigate to="/orcamento" replace />} />
-          <Route path="/orcamento/:month?" element={<MonthPage />} />
-          <Route path="/calendario/:month?" element={<CalendarPage />} />
-          <Route path="/cartoes" element={<CardsPage />} />
-          <Route path="/contas" element={<AccountsPage />} />
-          <Route path="/revisar" element={<ReviewPage />} />
-          <Route path="/busca" element={<SearchPage />} />
-          <Route path="/mensagens" element={<InboxPage />} />
-          <Route path="/mensagens/conversas" element={<InboxPage />} />
-          <Route path="/mensagens/conversas/:id" element={<InboxPage />} />
-          <Route path="/dividas" element={<DebtsPage />} />
-          <Route path="/divisoes" element={<SplitsPage />} />
-          <Route path="/dividas/:id/tabela" element={<LoanTablePage />} />
-          <Route path="/admin" element={<AdminPage />} />
-          <Route path="/admin/sugestoes" element={<Navigate to="/admin?aba=solicitacoes" replace />} />
-          <Route path="/metas" element={<Goals />} />
-          <Route path="/historico" element={<History />} />
-          <Route path="/analises" element={<Analysis />} />
-          <Route path="/investimentos" element={<Investments />} />
-          <Route path="/ajustes" element={<SettingsLayout />}>
-            <Route index element={<SettingsHub />} />
-            <Route path="recorrencias" element={<RecurringPage />} />
-            <Route path="categorias" element={<Categories />} />
-            <Route path="dados" element={<DataPage />} />
-            <Route path="seguranca" element={<Security />} />
-            <Route path="preferencias" element={<PreferencesPage />} />
-            {/* Atalhos de teclado ficam em Preferências desde a v1.1. */}
-            <Route path="atalhos" element={<Navigate to="/ajustes/preferencias#atalhos" replace />} />
-            <Route path="perfil" element={<ProfilePage />} />
-            <Route path="solicitacoes" element={<SupportPage />} />
-            <Route path="solicitacoes/:id" element={<SupportPage />} />
-            <Route path="ajuda" element={<HelpPage />} />
-            <Route path="notas" element={<ReleaseNotesPage />} />
-            <Route path="app" element={<AppInstallPage />} />
+          <Route path="/" element={<Hub />} />
+          <Route path="/hub" element={<Navigate to="/" replace />} />
+          <Route element={<Shell />}>
+            <Route path="/orcamento/:month?" element={<MonthPage />} />
+            <Route path="/calendario/:month?" element={<CalendarPage />} />
+            <Route path="/cartoes" element={<CardsPage />} />
+            <Route path="/contas" element={<AccountsPage />} />
+            <Route path="/revisar" element={<ReviewPage />} />
+            <Route path="/busca" element={<SearchPage />} />
+            <Route path="/mensagens" element={<InboxPage />} />
+            <Route path="/mensagens/conversas" element={<InboxPage />} />
+            <Route path="/mensagens/conversas/:id" element={<InboxPage />} />
+            <Route path="/dividas" element={<DebtsPage />} />
+            <Route path="/divisoes" element={<SplitsPage />} />
+            <Route path="/dividas/:id/tabela" element={<LoanTablePage />} />
+            <Route path="/admin" element={<AdminPage />} />
+            <Route path="/admin/sugestoes" element={<Navigate to="/admin?aba=solicitacoes" replace />} />
+            <Route path="/metas" element={<Goals />} />
+            <Route path="/historico" element={<History />} />
+            <Route path="/analises" element={<Analysis />} />
+            <Route path="/investimentos" element={<Investments />} />
+            <Route path="/ajustes" element={<SettingsLayout />}>
+              <Route index element={<SettingsHub />} />
+              <Route path="recorrencias" element={<RecurringPage />} />
+              <Route path="categorias" element={<Categories />} />
+              <Route path="dados" element={<DataPage />} />
+              <Route path="seguranca" element={<Security />} />
+              <Route path="preferencias" element={<PreferencesPage />} />
+              {/* Atalhos de teclado ficam em Preferências desde a v1.1. */}
+              <Route path="atalhos" element={<Navigate to="/ajustes/preferencias#atalhos" replace />} />
+              <Route path="perfil" element={<ProfilePage />} />
+              <Route path="solicitacoes" element={<SupportPage />} />
+              <Route path="solicitacoes/:id" element={<SupportPage />} />
+              <Route path="ajuda" element={<HelpPage />} />
+              <Route path="notas" element={<ReleaseNotesPage />} />
+              <Route path="app" element={<AppInstallPage />} />
+            </Route>
+            {/* Endereços antigos continuam funcionando. */}
+            <Route path="/fixas" element={<Navigate to="/ajustes/recorrencias" replace />} />
+            <Route path="/categorias" element={<Navigate to="/ajustes/categorias" replace />} />
+            <Route path="/dados" element={<Navigate to="/ajustes/dados" replace />} />
+            <Route path="/seguranca" element={<Navigate to="/ajustes/seguranca" replace />} />
+            <Route path="/preferencias" element={<Navigate to="/ajustes/preferencias" replace />} />
+            <Route path="/ajuda" element={<Navigate to="/ajustes/ajuda" replace />} />
+            <Route path="/relatorio/ano/:ano" element={<AnnualReport />} />
+            <Route path="/relatorio/:month?" element={<Report />} />
           </Route>
-          {/* Endereços antigos continuam funcionando. */}
-          <Route path="/fixas" element={<Navigate to="/ajustes/recorrencias" replace />} />
-          <Route path="/categorias" element={<Navigate to="/ajustes/categorias" replace />} />
-          <Route path="/dados" element={<Navigate to="/ajustes/dados" replace />} />
-          <Route path="/seguranca" element={<Navigate to="/ajustes/seguranca" replace />} />
-          <Route path="/preferencias" element={<Navigate to="/ajustes/preferencias" replace />} />
-          <Route path="/ajuda" element={<Navigate to="/ajustes/ajuda" replace />} />
-          <Route path="/relatorio/ano/:ano" element={<AnnualReport />} />
-          <Route path="/relatorio/:month?" element={<Report />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

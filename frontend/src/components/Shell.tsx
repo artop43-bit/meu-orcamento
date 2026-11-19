@@ -14,6 +14,7 @@ import {
   EyeOff,
   History,
   Landmark,
+  LayoutGrid,
   LogOut,
   Mail,
   Monitor,
@@ -504,7 +505,7 @@ export function Shell() {
       </a>
       <aside ref={sidebarRef} className="sidebar no-print" aria-label="Menu principal">
         <div className="sidebar__head">
-          <Brand to="/" />
+          <Brand to="/orcamento" />
           <button
             type="button"
             className="icon-btn sidebar__collapse"
@@ -566,6 +567,10 @@ export function Shell() {
             ),
           )}
           <p className="sidebar__group" aria-hidden></p>
+          <NavLink to="/" end className="sidebar__link" data-label="Hub de soluções" onClick={(e) => onNavClick(e, "/")}>
+            <LayoutGrid size={20} />
+            Hub de soluções
+          </NavLink>
           <NavLink to={SETTINGS.to} className="sidebar__link" data-label={SETTINGS.label} onClick={(e) => onNavClick(e, SETTINGS.to)}>
             {SETTINGS.icon}
             {SETTINGS.label}
@@ -656,7 +661,7 @@ export function Shell() {
               <Mail size={18} />
               {inboxUnread > 0 && <span className="icon-btn__dot" aria-hidden />}
             </Link>
-            <Link to="/" className="brand__logo" aria-label="Meu Orçamento, início">
+            <Link to="/orcamento" className="brand__logo" aria-label="Meu Orçamento, início">
               <Wallet size={18} />
             </Link>
           </span>
@@ -796,6 +801,12 @@ export function Shell() {
               <Mail size={20} />
               Mensagens
               <NavBadge count={inboxUnread} label={unreadLabel} />
+            </Link>
+          </li>
+          <li>
+            <Link to="/">
+              <LayoutGrid size={20} />
+              Hub de soluções
             </Link>
           </li>
           <li>

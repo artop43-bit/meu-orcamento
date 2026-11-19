@@ -16,13 +16,21 @@ import { prefersReducedMotion } from "../lib/announce";
 import { haptic } from "../lib/haptics";
 import { maybeCountUp } from "./CountUp";
 
-export function Brand({ to }: { to?: string }) {
+export function Brand({
+  to,
+  label = "Meu Orçamento",
+  icon,
+}: {
+  to?: string;
+  label?: string;
+  icon?: ReactNode;
+}) {
   const content = (
     <>
       <span className="brand__logo" aria-hidden>
-        <Wallet size={18} />
+        {icon ?? <Wallet size={18} />}
       </span>
-      Meu Orçamento
+      {label}
     </>
   );
   return to ? (

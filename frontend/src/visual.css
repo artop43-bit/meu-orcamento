@@ -3840,3 +3840,10 @@ button.card-stack__card:disabled {
   resize: vertical;
   min-height: 160px;
 }
+
+/* Hub de soluções: barra superior com o mesmo vidro discreto do menu. */
+.hub__bar {
+  background: color-mix(in srgb, var(--surface) 84%, transparent);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+}
