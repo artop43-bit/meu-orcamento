@@ -34,7 +34,7 @@ from app.services.commerce.shared import (
     resolve_line_items,
     sync_won_deal_for_sale,
 )
-from app.services.common import row_lock_guard
+from app.services.common import get_owned, row_lock_guard
 
 ITEM_KINDS = ("product", "service")
 MOVEMENT_KINDS = ("in", "out", "adjust")
@@ -127,12 +127,14 @@ def list_items(
 
 
 def get_item(db: Session, user_id: uuid.UUID, item_id: uuid.UUID) -> CatalogItem:
-    item = db.scalar(
-        select(CatalogItem).where(CatalogItem.id == item_id, CatalogItem.user_id == user_id)
+    return get_owned(
+        db,
+        CatalogItem,
+        user_id,
+        item_id,
+        error_code="catalog_item_not_found",
+        error_msg="Item do catálogo não encontrado.",
     )
-    if item is None:
-        raise AppError(404, "catalog_item_not_found", "Item do catálogo não encontrado.")
-    return item
 
 
 def create_item(db: Session, user_id: uuid.UUID, data: dict[str, Any]) -> dict[str, Any]:
@@ -244,13 +246,15 @@ def adjust_stock(
 ) -> dict[str, Any]:
     if kind not in MOVEMENT_KINDS:
         raise AppError(400, "invalid_movement_kind", "Tipo de movimentação inválido.")
-    item = db.scalar(
-        select(CatalogItem)
-        .where(CatalogItem.id == item_id, CatalogItem.user_id == user_id)
-        .with_for_update()
+    item = get_owned(
+        db,
+        CatalogItem,
+        user_id,
+        item_id,
+        error_code="catalog_item_not_found",
+        error_msg="Item do catálogo não encontrado.",
+        lock=True,
     )
-    if item is None:
-        raise AppError(404, "catalog_item_not_found", "Item do catálogo não encontrado.")
     if item.kind != "product":
         raise AppError(409, "service_has_no_stock", "Serviços não possuem controle de estoque.")
 
@@ -362,14 +366,14 @@ def list_orders(db: Session, user_id: uuid.UUID) -> list[dict[str, Any]]:
 
 
 def get_order(db: Session, user_id: uuid.UUID, order_id: uuid.UUID) -> CommercialOrder:
-    order = db.scalar(
-        select(CommercialOrder).where(
-            CommercialOrder.id == order_id, CommercialOrder.user_id == user_id
-        )
+    return get_owned(
+        db,
+        CommercialOrder,
+        user_id,
+        order_id,
+        error_code="order_not_found",
+        error_msg="Pedido não encontrado.",
     )
-    if order is None:
-        raise AppError(404, "order_not_found", "Pedido não encontrado.")
-    return order
 
 
 def create_order(db: Session, user: User, data: dict[str, Any]) -> dict[str, Any]:
@@ -381,9 +385,14 @@ def create_order(db: Session, user: User, data: dict[str, Any]) -> dict[str, Any
 
     deal_id = data.get("crm_deal_id")
     if deal_id is not None:
-        deal = db.scalar(select(CrmDeal).where(CrmDeal.id == deal_id, CrmDeal.user_id == user.id))
-        if deal is None:
-            raise AppError(404, "deal_not_found", "Negócio do CRM não encontrado.")
+        get_owned(
+            db,
+            CrmDeal,
+            user.id,
+            deal_id,
+            error_code="deal_not_found",
+            error_msg="Negócio do CRM não encontrado.",
+        )
 
     now = utcnow()
     order: CommercialOrder | None = None
@@ -555,13 +564,15 @@ def _confirm_order_locked(
 
 
 def cancel_order(db: Session, user: User, order_id: uuid.UUID) -> dict[str, Any]:
-    order = db.scalar(
-        select(CommercialOrder)
-        .where(CommercialOrder.id == order_id, CommercialOrder.user_id == user.id)
-        .with_for_update()
+    order = get_owned(
+        db,
+        CommercialOrder,
+        user.id,
+        order_id,
+        error_code="order_not_found",
+        error_msg="Pedido não encontrado.",
+        lock=True,
     )
-    if order is None:
-        raise AppError(404, "order_not_found", "Pedido não encontrado.")
     if order.status == "cancelled":
         return serialize_order(order)
 

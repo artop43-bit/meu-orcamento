@@ -25,6 +25,7 @@ from app.models import (
     User,
 )
 from app.services import budget as budget_service
+from app.services.common import get_owned
 from app.services.crm import crm as crm_service
 from app.services.crm.parsing import format_phone_display
 
@@ -145,11 +146,14 @@ def resolve_contact_info(
 ) -> tuple[CrmContact | None, str]:
     contact: CrmContact | None = None
     if contact_id is not None:
-        contact = db.scalar(
-            select(CrmContact).where(CrmContact.id == contact_id, CrmContact.user_id == user_id)
+        contact = get_owned(
+            db,
+            CrmContact,
+            user_id,
+            contact_id,
+            error_code="contact_not_found",
+            error_msg="Contato do CRM não encontrado.",
         )
-        if contact is None:
-            raise AppError(404, "contact_not_found", "Contato do CRM não encontrado.")
     clean_name = (customer_name or (contact.name if contact else "")).strip()[:140]
     if not clean_name:
         raise AppError(400, "missing_customer", "Informe o nome do cliente.")

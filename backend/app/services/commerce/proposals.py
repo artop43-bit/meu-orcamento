@@ -34,7 +34,7 @@ from app.services.commerce.shared import (
     resolve_line_items,
     sync_won_deal_for_sale,
 )
-from app.services.common import row_lock_guard
+from app.services.common import get_owned, row_lock_guard
 from app.services.messaging import messages as messaging_messages
 
 DOC_TYPES = ("proposal", "service_order", "contract", "receipt")
@@ -85,14 +85,14 @@ def list_documents(
 
 
 def get_document(db: Session, user_id: uuid.UUID, doc_id: uuid.UUID) -> CommercialDocument:
-    doc = db.scalar(
-        select(CommercialDocument).where(
-            CommercialDocument.id == doc_id, CommercialDocument.user_id == user_id
-        )
+    return get_owned(
+        db,
+        CommercialDocument,
+        user_id,
+        doc_id,
+        error_code="document_not_found",
+        error_msg="Documento comercial não encontrado.",
     )
-    if doc is None:
-        raise AppError(404, "document_not_found", "Documento comercial não encontrado.")
-    return doc
 
 
 def create_document(db: Session, user: User, data: dict[str, Any]) -> dict[str, Any]:
@@ -102,13 +102,14 @@ def create_document(db: Session, user: User, data: dict[str, Any]) -> dict[str, 
 
     order: CommercialOrder | None = None
     if data.get("order_id") is not None:
-        order = db.scalar(
-            select(CommercialOrder).where(
-                CommercialOrder.id == data["order_id"], CommercialOrder.user_id == user.id
-            )
+        order = get_owned(
+            db,
+            CommercialOrder,
+            user.id,
+            data["order_id"],
+            error_code="order_not_found",
+            error_msg="Pedido de origem não encontrado.",
         )
-        if order is None:
-            raise AppError(404, "order_not_found", "Pedido de origem não encontrado.")
 
     contact_id = data.get("contact_id") or (order.contact_id if order else None)
     raw_customer_name = data.get("customer_name") or (order.customer_name if order else None)
@@ -125,9 +126,14 @@ def create_document(db: Session, user: User, data: dict[str, Any]) -> dict[str, 
 
     deal_id = data.get("crm_deal_id") or (order.crm_deal_id if order else None)
     if deal_id is not None:
-        deal = db.scalar(select(CrmDeal).where(CrmDeal.id == deal_id, CrmDeal.user_id == user.id))
-        if deal is None:
-            raise AppError(404, "deal_not_found", "Negócio do CRM não encontrado.")
+        get_owned(
+            db,
+            CrmDeal,
+            user.id,
+            deal_id,
+            error_code="deal_not_found",
+            error_msg="Negócio do CRM não encontrado.",
+        )
 
     now = utcnow()
     custom_title = str(data.get("title") or "").strip()[:160]
