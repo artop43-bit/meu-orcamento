@@ -1,8 +1,8 @@
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Query, status
+from fastapi import APIRouter, Depends, Query, status
 
-from app.api.deps import CurrentUser, DbSession
+from app.api.deps import CurrentUser, DbSession, require_solution
 from app.schemas.analysis import (
     AssetOut,
     MarketOverview,
@@ -13,7 +13,11 @@ from app.schemas.analysis import (
 )
 from app.services import market
 
-router = APIRouter(prefix="/market", tags=["mercado"])
+router = APIRouter(
+    prefix="/market",
+    tags=["mercado"],
+    dependencies=[Depends(require_solution("meu-orcamento"))],
+)
 
 
 @router.get("/overview")

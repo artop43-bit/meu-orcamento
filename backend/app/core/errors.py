@@ -72,7 +72,10 @@ def _validation_message(exc: RequestValidationError) -> str:
         if error["type"] in ("date_from_datetime_parsing", "date_parsing"):
             return "Data inválida. Use o formato dd/mm/aaaa."
         if field == "accept_terms":
-            return "Para criar a conta, aceite os Termos de uso e a Política de privacidade."
+            return (
+                "Para criar a conta, aceite os Termos de uso e confirme que leu a "
+                "Política de privacidade."
+            )
     return "Verifique os dados informados."
 
 

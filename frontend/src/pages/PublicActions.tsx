@@ -25,7 +25,8 @@ export function Unsubscribe() {
       {!state && <p className="muted">Processando…</p>}
       {state && <Alert tone={state.ok ? "success" : "error"}>{state.text}</Alert>}
       <p className="muted small">
-        Para escolher quais avisos receber, entre no app e abra <Link to="/ajustes/preferencias">Ajustes › Preferências</Link>.
+        Para escolher quais avisos receber, entre no app e abra <Link to="/preferencias">Preferências</Link> ou{" "}
+        <Link to="/ajustes/preferencias">Preferências do Meu Orçamento</Link>.
       </p>
     </AuthLayout>
   );
@@ -60,7 +61,7 @@ export function NotMe() {
         <li>encerrar todas as sessões abertas, em qualquer aparelho;</li>
         <li>levar você à criação de uma nova senha.</li>
       </ul>
-      <p className="muted small">Depois, recomendamos ativar a verificação em duas etapas em Ajustes › Segurança.</p>
+      <p className="muted small">Depois, recomendamos ativar a verificação em duas etapas em Configurações › Segurança.</p>
       <Button type="button" block loading={busy} onClick={() => void protect()} disabled={!token}>
         Encerrar sessões e criar nova senha
       </Button>

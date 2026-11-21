@@ -50,7 +50,7 @@ function Notices() {
         <EmptyGuide
           icon={<Megaphone size={22} />}
           title="Nenhum recado ainda"
-          text="Os recados da administração aparecem aqui, com espaço para responder. Uma cópia também chega por e-mail, se estiver ligada em Ajustes › Preferências."
+          text="Os recados da administração aparecem aqui, com espaço para responder. Uma cópia também chega por e-mail, se estiver ligada em Preferências do Hub."
         />
       </section>
     );

@@ -7,7 +7,7 @@
  * mostra as médias). Não mede em testes automáticos.
  */
 const SCREENS = new Set([
-  "orcamento", "calendario", "cartoes", "contas", "revisar", "busca", "mensagens", "dividas", "divisoes", "metas", "historico",
+  "orcamento", "calendario", "cartoes", "contas", "revisar", "busca", "mensagens", "mensageria", "dividas", "divisoes", "metas", "historico",
   "analises", "investimentos", "ajustes", "relatorio", "admin",
 ]); // prettier-ignore
 

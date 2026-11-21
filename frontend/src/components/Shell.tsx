@@ -1,5 +1,5 @@
 import { Suspense, useEffect, useLayoutEffect, useRef, useState, type MouseEvent, type ReactNode } from "react";
-import { useIsFetching, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useIsFetching, useQueryClient } from "@tanstack/react-query";
 import { startMeasure } from "../lib/perfReport";
 import { useReviewCount } from "../api/money";
 import {
@@ -14,9 +14,7 @@ import {
   EyeOff,
   History,
   Landmark,
-  LayoutGrid,
   LogOut,
-  Mail,
   Monitor,
   Moon,
   PanelLeftClose,
@@ -25,8 +23,6 @@ import {
   Scale,
   Search,
   Settings,
-  ShieldAlert,
-  ShieldCheck,
   Sun,
   Target,
   Users,
@@ -36,10 +32,8 @@ import {
 } from "lucide-react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router";
 
-import { authApi, ME_KEY, useMe } from "../api/auth";
-import { moneyApi } from "../api/money";
+import { useMe } from "../api/auth";
 import { useProfile } from "../api/profile";
-import { useInboxUnread } from "../api/inbox";
 import { announce, prefersReducedMotion } from "../lib/announce";
 import { GROUPS, groupEntry, groupOf, leafLabel, LEAVES, MOBILE_TABS, neighborTab, parentOf, sectionOf, type NavGroup } from "../lib/navigation";
 import { haptic } from "../lib/haptics";
@@ -47,6 +41,7 @@ import { prefetchProps, prefetchRoute } from "../lib/prefetch";
 import { discard, setOfflineOwner, useOfflineQueue } from "../lib/offline";
 import { setCycleStart } from "../lib/format";
 import { releaseLabel } from "../release";
+import { TwoFactorBanner } from "./account";
 import { Tour } from "./help";
 import { Avatar } from "./media";
 import { openPalette, PowerLayer } from "./power";
@@ -56,6 +51,7 @@ import { Brand, LoadingRegion, Sheet, Skeleton } from "./ui";
 import { UndoProvider } from "./undo";
 import { ErrorBoundary } from "./ErrorBoundary";
 import { OnboardingPage, preloadPages } from "../pages/lazy";
+import { useLeaveSolution } from "./SolutionTransition";
 import { resetSwipe, useMobileGestures } from "./useMobileGestures";
 
 const OPEN_GROUPS_KEY = "menu-grupos-abertos";
@@ -128,13 +124,10 @@ const LEAF_ICONS: Record<string, ReactNode> = {
 
 const SETTINGS: NavItem = { to: "/ajustes", label: "Ajustes", icon: <Settings size={20} /> };
 const THEME_ICON = { system: <Monitor size={17} />, light: <Sun size={17} />, dark: <Moon size={17} /> } as const;
-const ADMIN: NavItem = { to: "/admin", label: "Administração", icon: <ShieldCheck size={20} /> };
 // Telas fora dos grupos (títulos da barra do topo e do navegador).
 const EXTRA_TITLES: Record<string, string> = {
   "/revisar": "Para revisar",
   "/busca": "Busca",
-  "/admin": "Administração",
-  "/mensagens": "Mensagens",
   "/ajustes": "Ajustes",
 };
 
@@ -142,23 +135,6 @@ const EXTRA_TITLES: Record<string, string> = {
 const TAB_GROUPS = GROUPS.filter((g) => MOBILE_TABS.includes(g.key));
 const MORE_GROUPS = GROUPS.filter((g) => !MOBILE_TABS.includes(g.key));
 const ORDER = [...LEAVES, "/ajustes"];
-const LATER_KEY = "2fa-lembrar-depois";
-
-function readSession(key: string): boolean {
-  try {
-    return sessionStorage.getItem(key) === "1";
-  } catch {
-    return false;
-  }
-}
-
-function writeSession(key: string) {
-  try {
-    sessionStorage.setItem(key, "1");
-  } catch {
-    // Navegação privada sem armazenamento: o aviso some só nesta tela.
-  }
-}
 
 /**
  * Estrutura do app logado.
@@ -285,9 +261,6 @@ export function Shell() {
       document.removeEventListener("keydown", onKey);
     };
   }, [flyout]);
-  const [twoFactorLater, setTwoFactorLater] = useState(() => readSession(LATER_KEY));
-  const showTwoFactorBanner =
-    user && !user.totp_enabled && !user.twofa_prompt_dismissed && !twoFactorLater && location.pathname !== "/seguranca";
   const inMore = !group || !MOBILE_TABS.includes(group.key);
 
   // Depois de entrar, baixa as outras telas em segundo plano (navegação instantânea).
@@ -439,20 +412,6 @@ export function Shell() {
     },
   });
 
-  // "Agora não": some até fechar o navegador. "Não mostrar mais": fica salvo na conta
-  // (dá para ativar a qualquer momento em Segurança).
-  function remindLater() {
-    writeSession(LATER_KEY);
-    setTwoFactorLater(true);
-  }
-
-  async function dismissTwoFactor() {
-    if (user) queryClient.setQueryData(ME_KEY, { ...user, twofa_prompt_dismissed: true });
-    announce("Lembrete desativado. A verificação pode ser ativada em Ajustes, Segurança.");
-    await authApi.setTwoFactorPrompt(true).catch(() => undefined);
-  }
-
-  const inboxUnread = useInboxUnread(Boolean(user)).data ?? 0;
   const offline = useOffline();
   // Lançamentos feitos sem internet (fila deste aparelho, de cada conta).
   const queue = useOfflineQueue();
@@ -460,15 +419,7 @@ export function Shell() {
   const failedQueue = queue.filter((i) => i.error);
   useEffect(() => setOfflineOwner(user?.id ?? null), [user?.id]);
   const profile = useProfile();
-  const adminOverview = useQuery({
-    queryKey: ["admin", "overview"],
-    queryFn: moneyApi.adminOverview,
-    enabled: Boolean(user?.is_admin),
-    refetchInterval: 60_000,
-  });
-  const adminUnread = adminOverview.data?.feedback_new ?? 0;
   const displayName = profile.data?.display_name || user?.email || "";
-  const unreadLabel = `${inboxUnread} mensagem(ns) não lida(s)`;
   const themeLabel = THEMES.find(([value]) => value === prefs.theme)?.[1] ?? "Automático";
   const cycleTheme = (e?: MouseEvent<HTMLButtonElement>) => {
     const theme = nextTheme(prefs.theme);
@@ -476,13 +427,8 @@ export function Shell() {
     announce(`Tema: ${THEMES.find(([value]) => value === theme)?.[1]}`);
   };
 
-  async function logout() {
-    await authApi.logout().catch(() => undefined);
-    // Dados guardados para uso sem internet ficam só enquanto a pessoa está logada.
-    navigator.serviceWorker?.controller?.postMessage("limpar-dados");
-    queryClient.setQueryData(ME_KEY, null);
-    queryClient.clear();
-  }
+  // "Sair": a solução esmaece e volta ao Hub de Soluções (a conta continua conectada).
+  const exitToHub = useLeaveSolution();
 
   // Grupo do menu: só abre ou fecha (sem trocar de tela); vários podem ficar abertos.
   function toggleGroup(g: NavGroup) {
@@ -499,7 +445,7 @@ export function Shell() {
 
   return (
     <UndoProvider>
-    <div className="shell" data-menu={collapsed ? "collapsed" : undefined}>
+    <div className="shell" data-solution-root="meu-orcamento" data-menu={collapsed ? "collapsed" : undefined}>
       <a href="#conteudo" className="skip-link">
         Pular para o conteúdo
       </a>
@@ -567,21 +513,10 @@ export function Shell() {
             ),
           )}
           <p className="sidebar__group" aria-hidden></p>
-          <NavLink to="/" end className="sidebar__link" data-label="Hub de soluções" onClick={(e) => onNavClick(e, "/")}>
-            <LayoutGrid size={20} />
-            Hub de soluções
-          </NavLink>
           <NavLink to={SETTINGS.to} className="sidebar__link" data-label={SETTINGS.label} onClick={(e) => onNavClick(e, SETTINGS.to)}>
             {SETTINGS.icon}
             {SETTINGS.label}
           </NavLink>
-          {user?.is_admin && (
-            <NavLink to="/admin" className="sidebar__link" data-label={ADMIN.label}>
-              {ADMIN.icon}
-              {ADMIN.label}
-              <NavBadge count={adminUnread} label={`${adminUnread} solicitação(ões) não lida(s)`} />
-            </NavLink>
-          )}
         </nav>
         <div className="sidebar__tools" role="toolbar" aria-label="Ferramentas">
           <button type="button" className="sidebar__tool sidebar__tool--wide" onClick={openPalette} title="Buscar ou lançar (Ctrl+K)">
@@ -597,22 +532,9 @@ export function Shell() {
           >
             {prefs.privacy ? <Eye size={17} /> : <EyeOff size={17} />}
           </button>
-          <NavLink
-            to="/mensagens"
-            className="sidebar__tool sidebar__tool--messages"
-            aria-label={inboxUnread > 0 ? `Mensagens, ${unreadLabel}` : "Mensagens"}
-            title="Mensagens"
-          >
-            <Mail size={17} />
-            {inboxUnread > 0 && (
-              <span className="sidebar__tool-badge" aria-hidden>
-                {inboxUnread > 9 ? "9+" : inboxUnread}
-              </span>
-            )}
-          </NavLink>
         </div>
         <div className="sidebar__footer">
-          <Link to="/ajustes/perfil" className="sidebar__profile" title={collapsed ? `${displayName} · ${releaseLabel()}` : "Meu perfil"}>
+          <Link to="/perfil" className="sidebar__profile" title={collapsed ? `${displayName} · ${releaseLabel("meu-orcamento")}` : "Meu perfil"}>
             <Avatar fileId={profile.data?.avatar_id} name={displayName} size={32} />
             <span className="sidebar__user">
               <strong>{displayName}</strong>
@@ -620,7 +542,7 @@ export function Shell() {
             </span>
           </Link>
           <div className="sidebar__footer-row">
-            <button type="button" className="sidebar__link sidebar__logout" data-label="Sair" onClick={logout}>
+            <button type="button" className="sidebar__link sidebar__logout" data-label="Sair" title="Voltar para o Hub de Soluções" onClick={exitToHub}>
               <LogOut size={18} /> Sair
             </button>
             <button
@@ -642,7 +564,7 @@ export function Shell() {
             </Link>
           </span>
           <span className="app-version" title="Versão do Meu Orçamento">
-            {releaseLabel()}
+            {releaseLabel("meu-orcamento")}
           </span>
         </div>
       </aside>
@@ -657,10 +579,6 @@ export function Shell() {
             <button type="button" className="icon-btn" onClick={openPalette} aria-label="Buscar ou lançar">
               <Search size={18} />
             </button>
-            <Link to="/mensagens" className="icon-btn icon-btn--badge" aria-label={inboxUnread > 0 ? `Mensagens, ${unreadLabel}` : "Mensagens"}>
-              <Mail size={18} />
-              {inboxUnread > 0 && <span className="icon-btn__dot" aria-hidden />}
-            </Link>
             <Link to="/orcamento" className="brand__logo" aria-label="Meu Orçamento, início">
               <Wallet size={18} />
             </Link>
@@ -705,22 +623,7 @@ export function Shell() {
                 </button>
               </div>
             ))}
-            {showTwoFactorBanner && (
-              <div className="banner no-print" role="region" aria-label="Sugestão de segurança">
-                <ShieldAlert size={18} />
-                <span>
-                  Recomendado: <Link to="/ajustes/seguranca">ative a verificação em duas etapas</Link> para proteger o acesso.
-                </span>
-                <span className="banner__actions">
-                  <button type="button" onClick={remindLater}>
-                    Agora não
-                  </button>
-                  <button type="button" onClick={dismissTwoFactor}>
-                    Não mostrar mais
-                  </button>
-                </span>
-              </div>
-            )}
+            <TwoFactorBanner />
             {group?.children && (
               <nav className="group-tabs no-print" aria-label={group.label}>
                 {group.children.map((c) => (
@@ -772,19 +675,17 @@ export function Shell() {
         >
           <span className="tabbar__icon">
             <Ellipsis size={20} />
-            {inboxUnread + adminUnread > 0 && <span className="tabbar__dot" aria-hidden />}
           </span>
           Mais
-          {inboxUnread + adminUnread > 0 && <span className="sr-only"> (há mensagens novas)</span>}
         </button>
       </nav>
 
       <Sheet open={moreOpen} title="Mais opções" onClose={() => setMoreOpen(false)} instantClose={moreInstant}>
-        <Link to="/ajustes/perfil" className="menu-profile" onClick={closeMoreNow}>
+        <Link to="/perfil" className="menu-profile" onClick={closeMoreNow}>
           <Avatar fileId={profile.data?.avatar_id} name={displayName} size={44} />
           <span>
             <strong>{displayName}</strong>
-            <span className="muted small">Ver meu perfil</span>
+            <span className="muted small">Ver perfil</span>
           </span>
         </Link>
         <ul className="menu-list" onClick={(e) => (e.target as Element).closest("a") && closeMoreNow()}>
@@ -797,33 +698,11 @@ export function Shell() {
             </li>
           ))}
           <li>
-            <Link to="/mensagens" aria-current={section === "/mensagens" ? "page" : undefined}>
-              <Mail size={20} />
-              Mensagens
-              <NavBadge count={inboxUnread} label={unreadLabel} />
-            </Link>
-          </li>
-          <li>
-            <Link to="/">
-              <LayoutGrid size={20} />
-              Hub de soluções
-            </Link>
-          </li>
-          <li>
             <Link to={SETTINGS.to} aria-current={section === SETTINGS.to ? "page" : undefined}>
               {SETTINGS.icon}
               {SETTINGS.label}
             </Link>
           </li>
-          {user?.is_admin && (
-            <li>
-              <Link to="/admin">
-                {ADMIN.icon}
-                {ADMIN.label}
-                <NavBadge count={adminUnread} label={`${adminUnread} solicitação(ões) não lida(s)`} />
-              </Link>
-            </li>
-          )}
           <li>
             <fieldset className="radios menu-theme">
               <legend className="field-label">Tema</legend>
@@ -838,7 +717,13 @@ export function Shell() {
             </fieldset>
           </li>
           <li>
-            <button type="button" onClick={logout}>
+            <button
+              type="button"
+              onClick={() => {
+                closeMoreNow();
+                exitToHub();
+              }}
+            >
               <LogOut size={20} /> Sair
             </button>
           </li>
@@ -847,7 +732,7 @@ export function Shell() {
           {user?.email} · <Link to="/privacidade">Privacidade</Link> · <Link to="/termos">Termos</Link>
         </p>
         <p className="app-version" style={{ margin: "8px 0 0" }}>
-          {releaseLabel()}
+          {releaseLabel("meu-orcamento")}
         </p>
       </Sheet>
 

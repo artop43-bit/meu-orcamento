@@ -6,7 +6,7 @@
  * Recomendado: revisão por um advogado antes do lançamento.
  */
 export const LEGAL = {
-  serviceName: "Meu Orçamento",
+  serviceName: "Hub de Soluções",
   controllerName: "Arthur Vinicius",
   // Sem CNPJ no momento: o responsável é identificado pelo nome e pelo e-mail de contato.
   controllerDocument: "",
@@ -15,8 +15,8 @@ export const LEGAL = {
   hostingProvider: "Oracle Cloud (região São Paulo)",
   emailProvider: "Google (Gmail)",
   // Mesmo valor de TERMS_VERSION no backend.
-  version: "2026-10-16",
-  updatedAt: "16 de outubro de 2026",
+  version: "2026-11-21",
+  updatedAt: "21 de novembro de 2026",
 };
 
 export const LEGAL_IS_DRAFT = Object.values(LEGAL).some((value) => value.includes("["));

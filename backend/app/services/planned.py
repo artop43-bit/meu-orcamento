@@ -90,9 +90,11 @@ def confirm_planned(db: Session, user: User, item_id: uuid.UUID, paid: bool) -> 
 # ---------------------------------------------------------------- calendário
 
 
-def month_calendar(db: Session, user: User, month: date) -> list[dict[str, Any]]:
+def month_calendar(
+    db: Session, user: User, month: date, *, ensure: bool = True
+) -> list[dict[str, Any]]:
     """Tudo o que tem data no mês: contas, parcelas, rendas e planejados, em ordem."""
-    data = budget.get_month(db, user, month)
+    data = budget.get_month(db, user, month, ensure=ensure)
     last = month_end(month)
     categories = {c.id: c for c in db.scalars(select(Category).where(Category.user_id == user.id))}
     events: list[dict[str, Any]] = []

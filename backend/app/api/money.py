@@ -5,11 +5,11 @@ from datetime import date
 from decimal import Decimal
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Query, status
+from fastapi import APIRouter, Depends, Query, status
 from pydantic import BaseModel, Field, StringConstraints
 
 from app.api.budget import _changes
-from app.api.deps import CurrentUser, DbSession
+from app.api.deps import CurrentUser, DbSession, require_solution
 from app.core.months import current_month, parse_month
 from app.schemas.budget import (
     AccountBalance,
@@ -27,7 +27,10 @@ from app.schemas.budget import (
 )
 from app.services import money
 
-router = APIRouter(tags=["contas, revisar e busca"])
+router = APIRouter(
+    tags=["contas, revisar e busca"],
+    dependencies=[Depends(require_solution("meu-orcamento"))],
+)
 
 
 @router.get("/accounts")

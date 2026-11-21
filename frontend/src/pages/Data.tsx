@@ -36,6 +36,7 @@ import { useAccounts } from "../api/money";
 import { Badge, CategorySelect } from "../components/budget";
 import { DateField } from "../components/DateField";
 import { Tip } from "../components/help";
+import { StartOver } from "../components/StartOver";
 import { Alert, Button, PageHeader } from "../components/ui";
 import { announce } from "../lib/announce";
 import { addMonths, money, monthLabel, shortDate, thisMonth } from "../lib/format";
@@ -1243,6 +1244,9 @@ export default function DataPage() {
         ))}
       </nav>
       {tab === "importar" ? <ImportWizard /> : <ExportPanel />}
+      <div style={{ marginTop: 20 }}>
+        <StartOver />
+      </div>
     </>
   );
 }

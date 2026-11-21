@@ -10,6 +10,8 @@ export type User = {
   email_verified: boolean;
   totp_enabled: boolean;
   is_admin?: boolean;
+  blocked_resources?: string[];
+  storage_quota_mb?: number;
   twofa_prompt_dismissed: boolean;
   created_at: string;
   /** Configuração inicial guiada concluída (ou pulada). */

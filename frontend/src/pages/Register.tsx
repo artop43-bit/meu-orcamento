@@ -24,7 +24,7 @@ export default function Register() {
       return;
     }
     if (!accepted) {
-      setError("Para criar a conta, aceite os Termos de uso e a Política de privacidade.");
+      setError("Para criar a conta, aceite os Termos de uso e confirme que leu a Política de privacidade.");
       return;
     }
     setLoading(true);
@@ -43,8 +43,8 @@ export default function Register() {
       <AuthLayout title="Verifique seu e-mail">
         <Alert tone="success">{done}</Alert>
         <p className="muted">
-          Um link de confirmação foi enviado para <strong>{email}</strong> (válido por 24 horas). Durante o período de testes, o
-          acesso também precisa ser liberado pela administração; você receberá um e-mail quando isso acontecer.
+          Um link de confirmação foi enviado para <strong>{email}</strong> (válido por 24 horas). O acesso também precisa ser liberado pela
+          administração; você receberá um e-mail quando isso acontecer.
         </p>
         <p className="links">
           <Link to="/entrar">Ir para o login</Link>
@@ -90,11 +90,11 @@ export default function Register() {
         <label className="check small">
           <input type="checkbox" checked={accepted} onChange={(e) => setAccepted(e.target.checked)} required />
           <span>
-            Li e aceito os{" "}
+            Aceito os{" "}
             <Link to="/termos" target="_blank">
               Termos de uso
             </Link>{" "}
-            e a{" "}
+            e declaro que li a{" "}
             <Link to="/privacidade" target="_blank">
               Política de privacidade
             </Link>

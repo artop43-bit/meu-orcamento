@@ -16,9 +16,9 @@ from app.core.months import today_local
 from app.models import PerfDaily
 
 SCREENS = {
-    "orcamento", "calendario", "cartoes", "contas", "revisar", "busca", "mensagens", "dividas",
-    "divisoes", "metas", "historico", "analises", "investimentos", "ajustes", "relatorio",
-    "admin", "outras",
+    "orcamento", "calendario", "cartoes", "contas", "revisar", "busca", "mensagens", "mensageria",
+    "dividas", "divisoes", "metas", "historico", "analises", "investimentos", "ajustes",
+    "relatorio", "admin", "outras",
 }  # fmt: skip
 SLOW_MS = 2500
 MAX_MS = 60_000

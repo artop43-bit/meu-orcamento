@@ -96,7 +96,7 @@ def test(user: CurrentUser, db: DbSession) -> TestOut:
         "messages",
         "Notificações ativadas",
         "Você vai receber aqui os avisos do Meu Orçamento.",
-        "/ajustes/app",
+        "/app",
         force=True,
         webhook=False,
     )

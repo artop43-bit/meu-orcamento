@@ -12,7 +12,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models import Expense, Income, User
-from app.services import ask, lexicon, understand
+from app.services import ask, lexicon
+from app.services.bot.nlu import corrector
 from app.services.suggest import keyword_category
 from tests.test_v17_ask import TODAY, add, data, user  # noqa: F401  (fixtures)
 
@@ -107,7 +108,7 @@ def test_frontend_copy_of_the_lexicon_is_up_to_date() -> None:
     ],
 )
 def test_typos_are_fixed(typed: str, fixed: str) -> None:
-    assert understand.fix_typos(typed) == fixed
+    assert corrector.fix_typos(typed) == fixed
 
 
 @pytest.mark.parametrize(
@@ -124,13 +125,13 @@ def test_typos_are_fixed(typed: str, fixed: str) -> None:
     ],
 )
 def test_correct_sentences_stay_as_they_are(sentence: str) -> None:
-    assert understand.fix_typos(sentence) == sentence
+    assert corrector.fix_typos(sentence) == sentence
 
 
 def test_words_of_the_user_are_never_corrected() -> None:
     # "parcelo" pareceria "parcela"; se for uma palavra do próprio usuário, fica.
-    assert understand.fix_typos("gasto com parcelo") == "gasto com parcela"
-    assert understand.fix_typos("gasto com parcelo", lambda: {"parcelo"}) == "gasto com parcelo"
+    assert corrector.fix_typos("gasto com parcelo") == "gasto com parcela"
+    assert corrector.fix_typos("gasto com parcelo", lambda: {"parcelo"}) == "gasto com parcelo"
 
 
 # ---------------------------------------------------------------- lançamento ou pergunta
@@ -178,7 +179,7 @@ def test_words_of_the_user_are_never_corrected() -> None:
     ],
 )
 def test_entry_or_question(phrase: str, kind: str | None) -> None:
-    assert understand.entry_guess(phrase) == kind
+    assert corrector.entry_guess(phrase) == kind
 
 
 def test_bot_does_not_register_and_sends_to_quick_entry(data: TestClient, db: Session) -> None:  # noqa: F811
@@ -310,7 +311,7 @@ def test_asks_instead_of_guessing(data: TestClient, db: Session) -> None:  # noq
     lost = q(db, "bla bla")
     assert (
         lost["intent"] == "fallback"
-        and "Não tenho certeza" in lost["answer"]
+        and "não tenho certeza" in lost["answer"].lower()
         and lost["suggestions"]
     )
 

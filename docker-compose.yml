@@ -1,4 +1,6 @@
-# Ambiente de desenvolvimento. O compose de produção entra na fase de deploy.
+# Ambiente de desenvolvimento. Motores fiscais sob demanda via `--profile rtc`.
+include: [integrations/rtc/compose.yml]
+
 services:
   db:
     image: postgres:17-alpine
@@ -19,8 +21,25 @@ services:
 
   backend:
     build: ./backend
+    networks: [default, rtc]
     env_file: .env
-    command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+    # A cada .py salvo em app/ ou alembic/, atualiza o banco (migrações pendentes) e religa a
+    # API. O --reload do uvicorn não rodava o alembic de novo, e o banco ficava atrás do código.
+    command:
+      - watchfiles
+      - --filter
+      - python
+      - --target-type
+      - command
+      - sh -c 'alembic upgrade head && exec uvicorn app.main:app --host 0.0.0.0 --port 8000'
+      - app
+      - alembic
+    environment:
+      # Mensageria: conector do WhatsApp (serviço "whatsapp" abaixo). A chave vem do .env.
+      MESSAGING_CONNECTOR_URL: http://whatsapp:3100
+      RTC_REGULAR_URL: http://rtc-regular:8080
+      RTC_SIMPLES_URL: http://rtc-simples:8082
+      RTC_DANFSE_URL: http://rtc-danfse:8080
     volumes:
       - ./backend:/app
     ports:
@@ -29,10 +48,28 @@ services:
       db:
         condition: service_healthy
 
+  # Mensageria: conector do WhatsApp Web (Node 24 + Baileys), sem porta aberta no PC.
+  # Religa sozinho quando um arquivo de src/ muda; as sessões voltam do banco sem novo QR.
+  whatsapp:
+    build: ./integrations/whatsapp
+    environment:
+      HUB_API_URL: http://backend:8000
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      CONNECTOR_TOKEN: ${MESSAGING_CONNECTOR_TOKEN:-}
+      WORKERS: "2"
+    # Checagem periódica (polling): o --watch-path nativo não detecta edições do Windows no Docker.
+    command: ["node", "src/dev-watch.js"]
+    volumes:
+      - ./integrations/whatsapp/src:/app/src
+    depends_on:
+      - backend
+
   frontend:
     build: ./frontend
     environment:
       API_PROXY_TARGET: http://backend:8000
+      # No Windows o Vite dentro do Docker não percebe as edições sem checagem periódica.
+      VITE_USE_POLLING: "1"
     volumes:
       - ./frontend:/app
       - /app/node_modules

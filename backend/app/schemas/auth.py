@@ -22,6 +22,9 @@ class UserOut(BaseModel):
     created_at: datetime
     # Vê as sugestões enviadas pelo app (ADMIN_EMAILS no servidor).
     is_admin: bool = False
+    # Governança do Hub: recursos bloqueados para esta conta + cota de armazenamento em MB.
+    blocked_resources: list[str] = Field(default_factory=list)
+    storage_quota_mb: int = 50
     # Configuração inicial guiada já concluída (ou pulada).
     onboarded_at: datetime | None = None
     # v0.9: aparência salva na conta (None = ainda não escolheu; vale a do aparelho).

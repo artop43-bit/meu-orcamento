@@ -273,7 +273,7 @@ def _record(bind: Any, user_id: uuid.UUID, ok: bool) -> None:
                             body=(
                                 "Os avisos pararam de chegar ao seu webhook depois de "
                                 f"{MAX_FAILURES} tentativas sem resposta. Confira o endereço em "
-                                "Ajustes › Preferências."
+                                "Configurações › Preferências."
                             ),
                         )
                     )

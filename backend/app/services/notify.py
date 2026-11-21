@@ -25,6 +25,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.core.email import send_email
+from app.core.money import brl
 from app.core.months import add_months, month_of
 from app.db.types import utcnow
 from app.models import (
@@ -65,11 +66,6 @@ SEND_HOUR = 8
 
 def local_now() -> datetime:
     return datetime.now(ZoneInfo(get_settings().timezone))
-
-
-def brl(value: Decimal | float | int) -> str:
-    text = f"{Decimal(value):,.2f}".replace(",", "_").replace(".", ",").replace("_", ".")
-    return f"R$ {text}"
 
 
 def short_date(day: date) -> str:

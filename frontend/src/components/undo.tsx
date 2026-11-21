@@ -4,6 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { errorMessage, withKeepalive } from "../api/client";
 import { announce } from "../lib/announce";
 import { haptic } from "../lib/haptics";
+import { createUndoController, type PendingUndoItem } from "../lib/undoQueue";
 
 /**
  * Exclusão com "Desfazer": o item some da tela na hora, aparece um aviso com o botão
@@ -13,7 +14,7 @@ import { haptic } from "../lib/haptics";
 
 const DELAY = 6000;
 
-type Pending = { key: number; ids: string[]; message: string; commit: () => Promise<unknown> };
+type Pending = PendingUndoItem;
 /** Ação já feita (ex.: edição) que pode ser revertida pelo aviso. */
 type Done = { key: number; message: string; revert: () => Promise<unknown> };
 
@@ -42,8 +43,9 @@ export function UndoProvider({ children }: { children: ReactNode }) {
   const [pending, setPending] = useState<Pending | null>(null);
   const [hidden, setHidden] = useState<ReadonlySet<string>>(new Set());
   const [error, setError] = useState("");
-  const timer = useRef<number | undefined>(undefined);
-  const current = useRef<Pending | null>(null);
+  const ctrlRef = useRef<ReturnType<typeof createUndoController> | null>(null);
+  if (!ctrlRef.current) ctrlRef.current = createUndoController(DELAY);
+  const ctrl = ctrlRef.current;
 
   const unhide = useCallback((ids: string[]) => {
     setHidden((prev) => {
@@ -53,13 +55,8 @@ export function UndoProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  const commit = useCallback(
+  const executeCommit = useCallback(
     async (item: Pending) => {
-      window.clearTimeout(timer.current);
-      if (current.current?.key === item.key) {
-        current.current = null;
-        setPending(null);
-      }
       try {
         await item.commit();
         await queryClient.invalidateQueries({ queryKey: ["budget"] });
@@ -74,17 +71,30 @@ export function UndoProvider({ children }: { children: ReactNode }) {
     [queryClient, unhide],
   );
 
-  const start = useCallback((item: Pending, ms = DELAY) => {
-    window.clearTimeout(timer.current);
-    timer.current = window.setTimeout(() => void commit(item), ms);
-  }, [commit]);
+  const commit = useCallback(
+    async (item: Pending) => {
+      const taken = ctrl.takeIfKey(item.key);
+      if (!taken) return;
+      setPending(null);
+      await executeCommit(taken);
+    },
+    [ctrl, executeCommit],
+  );
+
+  const start = useCallback(
+    (item: Pending, ms = DELAY) => {
+      const prev = ctrl.schedule(item, (expired) => void commit(expired), ms);
+      if (prev) {
+        setPending(null);
+        void executeCommit(prev);
+      }
+    },
+    [commit, ctrl, executeCommit],
+  );
 
   const remove = useCallback<UndoApi["remove"]>(
     ({ ids, message, commit: send }) => {
-      // Uma exclusão nova confirma a anterior na hora.
-      if (current.current) void commit(current.current);
-      const item = { key: Date.now(), ids, message, commit: send };
-      current.current = item;
+      const item: Pending = { key: Date.now(), ids, message, commit: send };
       setError("");
       setPending(item);
       setHidden((prev) => new Set([...prev, ...ids]));
@@ -92,7 +102,7 @@ export function UndoProvider({ children }: { children: ReactNode }) {
       announce(`${message}. Para desfazer, use o botão Desfazer.`);
       start(item);
     },
-    [commit, start],
+    [start],
   );
 
   const [doneItem, setDoneItem] = useState<Done | null>(null);
@@ -128,7 +138,7 @@ export function UndoProvider({ children }: { children: ReactNode }) {
   }
 
   function undoLast(): boolean {
-    if (current.current) {
+    if (ctrl.current) {
       undo();
       return true;
     }
@@ -140,10 +150,8 @@ export function UndoProvider({ children }: { children: ReactNode }) {
   }
 
   function undo() {
-    const item = current.current;
+    const item = ctrl.takeCurrent();
     if (!item) return;
-    window.clearTimeout(timer.current);
-    current.current = null;
     setPending(null);
     unhide(item.ids);
     announce("Exclusão desfeita");
@@ -152,10 +160,18 @@ export function UndoProvider({ children }: { children: ReactNode }) {
   // Ao recarregar, fechar a aba ou trocar de app com uma exclusão pendente, envia na hora.
   // keepalive: sem ele o navegador cancela a requisição quando a página é recarregada.
   // visibilitychange: no celular, sair do app nem sempre dispara o pagehide.
+  const executeCommitRef = useRef(executeCommit);
+  useEffect(() => {
+    executeCommitRef.current = executeCommit;
+  }, [executeCommit]);
+
   useEffect(() => {
     const flush = () => {
-      const item = current.current;
-      if (item) withKeepalive(() => void commit(item));
+      const item = ctrl.takeCurrent();
+      if (item) {
+        setPending(null);
+        withKeepalive(() => void executeCommitRef.current(item));
+      }
     };
     const hidden = () => {
       if (document.visibilityState === "hidden") flush();
@@ -165,8 +181,10 @@ export function UndoProvider({ children }: { children: ReactNode }) {
     return () => {
       window.removeEventListener("pagehide", flush);
       document.removeEventListener("visibilitychange", hidden);
+      const item = ctrl.takeCurrent();
+      if (item) withKeepalive(() => void executeCommitRef.current(item));
     };
-  }, [commit]);
+  }, [ctrl]);
 
   const isHidden = useCallback((id: string) => hidden.has(id), [hidden]);
 
@@ -177,10 +195,14 @@ export function UndoProvider({ children }: { children: ReactNode }) {
         <div
           className="toast no-print"
           // Pausa enquanto o mouse ou o foco estão no aviso (dá tempo de ler e decidir).
-          onMouseEnter={() => window.clearTimeout(timer.current)}
-          onMouseLeave={() => start(pending, 3000)}
-          onFocus={() => window.clearTimeout(timer.current)}
-          onBlur={() => start(pending, 3000)}
+          onMouseEnter={() => ctrl.clearTimer()}
+          onMouseLeave={() => {
+            if (ctrl.current?.key === pending.key) start(pending, 3000);
+          }}
+          onFocus={() => ctrl.clearTimer()}
+          onBlur={() => {
+            if (ctrl.current?.key === pending.key) start(pending, 3000);
+          }}
         >
           <span>{pending.message}</span>
           <button type="button" onClick={undo}>

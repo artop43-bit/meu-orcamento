@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Webhook } from "lucide-react";
+import { Link } from "react-router";
 
 import { errorMessage } from "../api/client";
 import { WEBHOOK_KEY, webhookApi, type WebhookConfig } from "../api/webhook";
@@ -9,9 +10,12 @@ import { serviceLabel, WEBHOOK_KINDS, type WebhookKind } from "../lib/webhook";
 import { Alert, Button, Field } from "./ui";
 
 const EMPTY: WebhookConfig = { configured: false, hint: null, service: null, kinds: [], paused: false };
+const ACCOUNT_KINDS = new Set<WebhookKind>(["messages"]);
 
-/** Preferências › Avisos por webhook (v1.9.0): Discord, Slack ou qualquer endereço https. */
-export function WebhookSettings() {
+export type WebhookScope = "account" | "budget" | "all";
+
+/** Avisos por webhook (v1.9.0): conexão no Hub e escolha dos gatilhos por contexto. */
+export function WebhookSettings({ scope = "all" }: { scope?: WebhookScope }) {
   const queryClient = useQueryClient();
   const config = useQuery({ queryKey: WEBHOOK_KEY, queryFn: webhookApi.get });
   const [url, setUrl] = useState("");
@@ -43,7 +47,7 @@ export function WebhookSettings() {
     void run("save", async () => {
       show(await webhookApi.save(url));
       setUrl("");
-      return "Webhook salvo. Escolha abaixo os avisos que devem chegar lá.";
+      return "Webhook salvo. Escolha os avisos que devem chegar lá.";
     });
   }
 
@@ -64,20 +68,27 @@ export function WebhookSettings() {
     });
   }
 
-  // Muda na hora e confirma no servidor; se falhar, volta ao que era e explica.
+  // Muda na hora e confirma no servidor, preservando avisos de outros contextos.
   async function toggle(kind: WebhookKind, on: boolean) {
     const previous = queryClient.getQueryData<WebhookConfig>(WEBHOOK_KEY);
     if (!previous) return;
-    const kinds = on ? [...previous.kinds, kind] : previous.kinds.filter((k) => k !== kind);
-    show({ ...previous, kinds });
+    const nextKinds = on ? [...new Set([...previous.kinds, kind])] : previous.kinds.filter((k) => k !== kind);
+    show({ ...previous, kinds: nextKinds });
     setError("");
     try {
-      show(await webhookApi.kinds(kinds));
+      show(await webhookApi.kinds(nextKinds));
     } catch (err) {
       show(previous);
       setError(errorMessage(err));
     }
   }
+
+  const visibleKinds =
+    scope === "account"
+      ? WEBHOOK_KINDS.filter((k) => ACCOUNT_KINDS.has(k.key))
+      : scope === "budget"
+        ? WEBHOOK_KINDS.filter((k) => !ACCOUNT_KINDS.has(k.key))
+        : WEBHOOK_KINDS;
 
   const c = config.data;
   return (
@@ -86,55 +97,74 @@ export function WebhookSettings() {
         <Webhook size={18} aria-hidden /> Avisos por webhook
       </h2>
       <p className="muted small" style={{ margin: 0 }}>
-        Receba os avisos num servidor seu: Discord, Slack ou qualquer endereço que aceite webhook.
+        {scope === "budget"
+          ? "Receba os avisos financeiros do Meu Orçamento no webhook conectado à sua conta."
+          : "Receba os avisos num servidor seu: Discord, Slack ou qualquer endereço que aceite webhook."}
       </p>
       <Alert tone="error">{error}</Alert>
       <Alert tone="success">{done}</Alert>
       {!c ? (
         <p className="muted small">Carregando…</p>
       ) : !c.configured ? (
-        <form className="stack stack--tight" onSubmit={save}>
-          <Field
-            id="webhook-url"
-            label="Endereço do webhook"
-            type="url"
-            inputMode="url"
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-            maxLength={500}
-            placeholder="https://discord.com/api/webhooks/…"
-            autoComplete="off"
-            required
-          />
-          <div className="row">
-            <Button type="submit" loading={busy === "save"} disabled={!url.trim()}>
-              Salvar
-            </Button>
+        scope === "budget" ? (
+          <div className="stack stack--tight">
+            <p className="muted small" style={{ margin: 0 }}>
+              Nenhum endereço de webhook configurado.
+            </p>
+            <div>
+              <Link to="/preferencias#webhook" className="btn btn--secondary">
+                Configurar webhook
+              </Link>
+            </div>
           </div>
-        </form>
+        ) : (
+          <form className="stack stack--tight" onSubmit={save}>
+            <Field
+              id="webhook-url"
+              label="Endereço do webhook"
+              type="url"
+              inputMode="url"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              maxLength={500}
+              placeholder="https://discord.com/api/webhooks/…"
+              autoComplete="off"
+              required
+            />
+            <div className="row">
+              <Button type="submit" loading={busy === "save"} disabled={!url.trim()}>
+                Salvar
+              </Button>
+            </div>
+          </form>
+        )
       ) : (
         <>
           <p className="small" style={{ margin: 0 }}>
             Conectado a <strong>{serviceLabel(c.service ?? "generic")}</strong> · <span className="muted">{c.hint}</span>
           </p>
           {c.paused && <Alert tone="info">Os envios estão pausados: o endereço não respondeu 5 vezes. Envie um teste para retomar.</Alert>}
-          {WEBHOOK_KINDS.map(({ key, label }) => (
+          {visibleKinds.map(({ key, label }) => (
             <label className="check" key={key}>
               <input type="checkbox" checked={c.kinds.includes(key)} onChange={(e) => void toggle(key, e.target.checked)} />
               {label}
             </label>
           ))}
-          <p className="muted small" style={{ margin: 0 }}>
-            A opção “Ocultar valores nos e-mails” também vale aqui.
-          </p>
-          <div className="row">
-            <Button variant="secondary" loading={busy === "test"} onClick={test}>
-              Enviar teste
-            </Button>
-            <Button variant="danger" loading={busy === "remove"} onClick={remove}>
-              Remover
-            </Button>
-          </div>
+          {scope !== "account" && (
+            <p className="muted small" style={{ margin: 0 }}>
+              A opção “Ocultar valores nos e-mails” também vale aqui.
+            </p>
+          )}
+          {scope !== "budget" && (
+            <div className="row">
+              <Button variant="secondary" loading={busy === "test"} onClick={test}>
+                Enviar teste
+              </Button>
+              <Button variant="danger" loading={busy === "remove"} onClick={remove}>
+                Remover
+              </Button>
+            </div>
+          )}
         </>
       )}
     </section>

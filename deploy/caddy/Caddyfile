@@ -1,8 +1,18 @@
 {$DOMAIN} {
 	encode zstd gzip
 
+	# Mensageria: as rotas do conector do WhatsApp só são usadas na rede interna do Docker
+	# (whatsapp -> api:8000). De fora, não existem.
+	handle /api/messaging/connector/* {
+		respond 404
+	}
+
 	# API: o Caddy repassa o IP do visitante em X-Forwarded-For.
 	handle /api/* {
+		# Os arquivos maiores aceitos pela API têm 15 MiB. O teto inclui o multipart.
+		request_body {
+			max_size 20MB
+		}
 		reverse_proxy api:8000
 	}
 

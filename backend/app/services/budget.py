@@ -12,13 +12,16 @@ from decimal import ROUND_DOWN, Decimal
 from typing import Any
 
 from sqlalchemy import delete, func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.errors import AppError
+from app.core.money import fmt_num
 from app.core.months import add_months, current_month, cycle_date, parse_month, with_day
 from app.db.base import Base
 from app.db.types import utcnow
 from app.models import BudgetMonth, Category, Expense, Goal, Income, RecurringItem, User
+from app.services.common import row_lock_guard
 
 ZERO = Decimal("0.00")
 
@@ -205,18 +208,32 @@ def _materialize_opened(db: Session, user: User, item: RecurringItem, since: dat
     db.flush()
 
 
-def ensure_month(db: Session, user: User, month: date) -> None:
+def ensure_month(db: Session, user: User, month: date, *, commit: bool = True) -> None:
     """Na primeira vez que um mês é aberto, lança nele as contas e rendas fixas."""
     exists = db.scalar(
         select(BudgetMonth.id).where(BudgetMonth.user_id == user.id, BudgetMonth.month == month)
     )
     if exists is not None:
         return
-    db.add(BudgetMonth(user_id=user.id, month=month))
-    for item in db.scalars(select(RecurringItem).where(RecurringItem.user_id == user.id)):
-        if active_in(item, month):
-            _materialize(db, item, month)
-    db.commit()
+    with row_lock_guard(db):
+        exists = db.scalar(
+            select(BudgetMonth.id).where(BudgetMonth.user_id == user.id, BudgetMonth.month == month)
+        )
+        if exists is not None:
+            return
+        try:
+            with db.begin_nested():
+                db.add(BudgetMonth(user_id=user.id, month=month))
+                for item in db.scalars(
+                    select(RecurringItem).where(RecurringItem.user_id == user.id)
+                ):
+                    if active_in(item, month):
+                        _materialize(db, item, month)
+                db.flush()
+        except IntegrityError:
+            return
+        if commit:
+            db.commit()
 
 
 def list_recurring(db: Session, user: User) -> list[RecurringItem]:
@@ -422,20 +439,31 @@ def check_day_in_month(day: int | None, month: date) -> None:
         )
 
 
-def create_income(db: Session, user: User, month: date, data: dict[str, Any]) -> Income:
+def create_income(
+    db: Session,
+    user: User,
+    month: date,
+    data: dict[str, Any],
+    *,
+    commit: bool = True,
+) -> Income:
     """Lança a renda. Com repetição, cria uma fixa a partir deste mês e devolve a deste mês."""
     client_ref = data.pop("client_ref", None)
     if client_ref:
         ref = f"app:{client_ref.lower()}"
-        existing = db.scalar(
-            select(Income).where(Income.user_id == user.id, Income.import_ref == ref)
-        )
-        if existing is not None:
-            return existing
-        income = create_income(db, user, month, data)
-        income.import_ref = ref
-        db.commit()
-        return income
+        with row_lock_guard(db, user_id=user.id):
+            existing = db.scalar(
+                select(Income).where(Income.user_id == user.id, Income.import_ref == ref)
+            )
+            if existing is not None:
+                return existing
+            income = create_income(db, user, month, data, commit=False)
+            income.import_ref = ref
+            if commit:
+                db.commit()
+            else:
+                db.flush()
+            return income
     _check_account(db, user, data.get("account_id"))
     account_id = data.pop("account_id", None)
     repeat = data.pop("repeat", "once")
@@ -444,7 +472,10 @@ def create_income(db: Session, user: User, month: date, data: dict[str, Any]) ->
         check_day_in_month(data.get("day"), month)
         income = Income(user_id=user.id, month=month, account_id=account_id, **data)
         db.add(income)
-        db.commit()
+        if commit:
+            db.commit()
+        else:
+            db.flush()
         return income
 
     end = parse_month(until) if repeat == "period" and until else None
@@ -528,6 +559,15 @@ def create_expense(db: Session, user: User, month: date, data: dict[str, Any]) -
     client_ref = data.pop("client_ref", None)
     ref = f"app:{client_ref.lower()}" if client_ref else None
     if ref:
+        with row_lock_guard(db, user_id=user.id):
+            return _create_expense_locked(db, user, month, data, ref)
+    return _create_expense_locked(db, user, month, data, None)
+
+
+def _create_expense_locked(
+    db: Session, user: User, month: date, data: dict[str, Any], ref: str | None
+) -> list[Expense]:
+    if ref:
         # Lançamento feito sem internet e reenviado: devolve o que já entrou, sem duplicar.
         existing = list(
             db.scalars(
@@ -569,8 +609,8 @@ def _create_split(
         raise AppError(
             400,
             "split_sum",
-            f"A soma das partes (R$ {_brl(total)}) precisa ser igual ao total "
-            f"(R$ {_brl(data['amount'])}).",
+            f"A soma das partes (R$ {fmt_num(total)}) precisa ser igual ao total "
+            f"(R$ {fmt_num(data['amount'])}).",
         )
     for part in parts:
         _check_category(db, user, part["category_id"])
@@ -584,10 +624,6 @@ def _create_split(
         created.extend(rows)
     db.commit()
     return created
-
-
-def _brl(value: Decimal) -> str:
-    return f"{value:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
 
 def _create_expense(db: Session, user: User, month: date, data: dict[str, Any]) -> list[Expense]:
@@ -875,8 +911,9 @@ def _pct(part: Decimal, whole: Decimal) -> float | None:
     return round(float(part / whole * 100), 1)
 
 
-def get_month(db: Session, user: User, month: date) -> MonthData:
-    ensure_month(db, user, month)
+def get_month(db: Session, user: User, month: date, *, ensure: bool = True) -> MonthData:
+    if ensure:
+        ensure_month(db, user, month)
     incomes = list(
         db.scalars(
             select(Income)

@@ -63,8 +63,15 @@ self.addEventListener("fetch", (event) => {
   if (url.origin !== self.location.origin) return;
 
   if (url.pathname.startsWith("/api/")) {
-    // Arquivos (fotos, comprovantes) e o que muda a sessão não ficam guardados.
-    if (url.pathname.startsWith("/api/files/") || (url.pathname.startsWith("/api/auth/") && url.pathname !== "/api/auth/me")) return;
+    // Arquivos (fotos, comprovantes), Mensageria (mídias/avatares/polling) e sessão não ficam guardados.
+    if (
+      url.pathname.startsWith("/api/files/") ||
+      url.pathname.startsWith("/api/messaging/") ||
+      url.pathname.startsWith("/api/rtc/") ||
+      (url.pathname.startsWith("/api/auth/") && url.pathname !== "/api/auth/me")
+    ) {
+      return;
+    }
     event.respondWith(networkFirst(request, API));
     return;
   }

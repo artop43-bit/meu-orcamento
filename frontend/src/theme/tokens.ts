@@ -34,6 +34,8 @@ export const TOKENS = [
   "shadow-sm",
   "shadow",
   "shadow-lg",
+  // Fundo do QR Code da Mensageria: branco nos dois modos, para a câmera do celular ler.
+  "qr-paper",
 ] as const;
 
 export type Token = (typeof TOKENS)[number];
@@ -70,6 +72,7 @@ export const BASE: Theme = {
     "shadow-sm": "0 1px 2px rgb(16 24 20 / 6%)",
     shadow: "0 1px 3px rgb(16 24 20 / 6%), 0 4px 12px rgb(16 24 20 / 5%)",
     "shadow-lg": "0 12px 40px rgb(16 24 20 / 18%)",
+    "qr-paper": "#ffffff",
   },
   dark: {
     // v1.6: escuro mais profundo, para o brilho da cor de destaque aparecer (estilo Padrão).
@@ -97,6 +100,7 @@ export const BASE: Theme = {
     "shadow-sm": "0 1px 2px rgb(0 0 0 / 30%)",
     shadow: "0 1px 3px rgb(0 0 0 / 30%), 0 6px 16px rgb(0 0 0 / 25%)",
     "shadow-lg": "0 16px 48px rgb(0 0 0 / 55%)",
+    "qr-paper": "#ffffff",
   },
 };
 

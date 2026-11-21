@@ -135,6 +135,12 @@ def test_where_can_i_find(data: TestClient, db: Session) -> None:
         q(db, "onde fica a calculadora de juros")["links"][0]["to"]
         == "/analises?secao=calculadoras"
     )
+    assert q(db, "onde mudo minha senha?")["links"][0]["to"] == "/seguranca"
+    assert q(db, "onde mudo a cor do tema?")["links"][0]["to"] == "/preferencias"
+    assert q(db, "onde fica meu perfil?")["links"][0]["to"] == "/perfil"
+    assert q(db, "onde vejo as novidades da versão?")["links"][0]["to"] == "/notas"
+    assert q(db, "onde instalo o app?")["links"][0]["to"] == "/app"
+    assert q(db, "onde vejo a retrospectiva?")["links"][0]["to"] == "/analises?secao=retrospectiva"
     # "Onde mais gastei" é sobre gastos, não sobre telas.
     assert q(db, "onde mais gastei este mês?")["intent"] == "top_categories"
 

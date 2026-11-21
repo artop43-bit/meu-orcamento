@@ -47,6 +47,10 @@ def cleanup(db: Session) -> dict[str, int]:
     from app.services import perf
 
     perf.cleanup(db)  # estatísticas de velocidade com mais de 90 dias
+    from app.services import messaging
+
+    # Mensagens e mídias da Mensageria com mais de 7 dias.
+    messaging_purged = messaging.purge_old(db)
 
     error_groups = errors.cleanup(db)
     db.commit()
@@ -56,6 +60,9 @@ def cleanup(db: Session) -> dict[str, int]:
         "security_events": events,
         "emails": emails,
         "errors": error_groups,
+        "messaging_messages": messaging_purged["messages"],
+        "messaging_media": messaging_purged["media"],
+        "messaging_chats": messaging_purged["chats"],
     }
 
 

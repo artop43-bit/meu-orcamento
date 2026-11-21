@@ -1,0 +1,51 @@
+x-motor: &motor
+  networks: [rtc]
+  restart: unless-stopped
+  read_only: true
+  tmpfs: [/tmp]
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  logging:
+    driver: json-file
+    options:
+      max-size: 5m
+      max-file: '2'
+
+x-calculadora: &calculadora
+  <<: *motor
+  tmpfs:
+    - /tmp
+    - /run/sqlite-jdbc:exec,nosuid,nodev,mode=1777,size=32m
+  environment:
+    JDK_JAVA_OPTIONS: -Dorg.sqlite.tmpdir=/run/sqlite-jdbc --enable-native-access=ALL-UNNAMED
+    VERSAO_URL: http://127.0.0.1:1
+  mem_limit: 640m
+
+services:
+  rtc-regular:
+    <<: *calculadora
+    profiles: ["rtc"]
+    build:
+      context: .
+      dockerfile: Dockerfile.java
+      target: regular
+
+  rtc-simples:
+    <<: *calculadora
+    profiles: ["rtc"]
+    build:
+      context: .
+      dockerfile: Dockerfile.java
+      target: simples
+
+  rtc-danfse:
+    <<: *motor
+    profiles: ["rtc"]
+    build:
+      context: .
+      dockerfile: Dockerfile.danfse
+    mem_limit: 128m
+
+networks:
+  rtc:
+    internal: true

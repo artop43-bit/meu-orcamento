@@ -78,6 +78,15 @@ export function withKeepalive<T>(fn: () => T): T {
   }
 }
 
+const TRANSIENT_STATUSES = new Set([502, 503, 504]);
+
+function friendlyStatusMessage(status: number): string {
+  if (TRANSIENT_STATUSES.has(status)) {
+    return "Servidor indisponível no momento. Tente novamente em instantes.";
+  }
+  return `Erro inesperado (${status}).`;
+}
+
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   const headers: Record<string, string> = { "X-Requested-With": "fetch" };
   // Envio de arquivos (FormData): o navegador monta o Content-Type com o "boundary".
@@ -85,17 +94,37 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   if (body !== undefined && !isForm) headers["Content-Type"] = "application/json";
 
   const leaving = keepalive && !isForm && method !== "GET" ? noteLeaving(method, path, body) : null;
-  let response: Response;
-  try {
-    response = await fetch(`/api${path}`, {
-      method,
-      credentials: "include",
-      headers,
-      // Arquivos não cabem no limite do keepalive (64 KB); só requisições pequenas.
-      keepalive: keepalive && !isForm,
-      body: body === undefined ? undefined : isForm ? body : JSON.stringify(body),
-    });
-  } catch {
+  const maxAttempts = method === "GET" ? 2 : 1;
+  let response: Response | null = null;
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      response = await fetch(`/api${path}`, {
+        method,
+        credentials: "include",
+        headers,
+        // Arquivos não cabem no limite do keepalive (64 KB); só requisições pequenas.
+        keepalive: keepalive && !isForm,
+        body: body === undefined ? undefined : isForm ? body : JSON.stringify(body),
+      });
+    } catch {
+      if (attempt < maxAttempts) {
+        await new Promise((resolve) => setTimeout(resolve, 600));
+        continue;
+      }
+      throw new ApiError(0, "network", "Sem conexão com o servidor. Tente novamente.");
+    }
+    if (TRANSIENT_STATUSES.has(response.status) && attempt < maxAttempts) {
+      try {
+        await response.body?.cancel();
+      } catch {
+        // segue para a retentativa mesmo se o navegador já fechou o stream
+      }
+      await new Promise((resolve) => setTimeout(resolve, 700));
+      continue;
+    }
+    break;
+  }
+  if (!response) {
     throw new ApiError(0, "network", "Sem conexão com o servidor. Tente novamente.");
   }
   // O servidor respondeu (com sucesso ou erro): não há o que reenviar.
@@ -104,11 +133,8 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   if (response.status === 204) return undefined as T;
   const data = await response.json().catch(() => null);
   if (!response.ok) {
-    throw new ApiError(
-      response.status,
-      data?.error ?? "error",
-      data?.message ?? `Erro inesperado (${response.status}).`,
-    );
+    const code = data?.error ?? (TRANSIENT_STATUSES.has(response.status) ? "unavailable" : "error");
+    throw new ApiError(response.status, code, data?.message ?? friendlyStatusMessage(response.status));
   }
   return data as T;
 }

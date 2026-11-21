@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<NFSe versao="1.00" xmlns="http://www.sped.fazenda.gov.br/nfse">
+  <infNFSe Id="NFS35503080000000000000000000000000000000000000000001">
+    <xLocEmi>São Paulo</xLocEmi>
+    <xLocPrestacao>São Paulo</xLocPrestacao>
+    <nNFSe>1</nNFSe>
+    <cLocIncid>3550308</cLocIncid>
+    <xLocIncid>São Paulo</xLocIncid>
+    <ambGer>1</ambGer>
+    <cStat>100</cStat>
+    <dhProc>2026-11-20T10:00:00-03:00</dhProc>
+    <emit>
+      <CNPJ>00000000000000</CNPJ>
+      <xNome>Empresa fictícia para teste</xNome>
+      <enderNac><cMun>3550308</cMun><UF>SP</UF><CEP>01001000</CEP></enderNac>
+    </emit>
+    <valores><vLiq>100.00</vLiq></valores>
+    <DPS versao="1.00">
+      <infDPS>
+        <tpAmb>2</tpAmb>
+        <dhEmi>2026-11-20T10:00:00-03:00</dhEmi>
+        <serie>1</serie>
+        <nDPS>1</nDPS>
+        <dCompet>2026-11-20</dCompet>
+        <tpEmit>1</tpEmit>
+        <prest><regTrib><opSimpNac>1</opSimpNac></regTrib></prest>
+        <serv>
+          <cServ><cTribNac>010101</cTribNac><xDescServ>Serviço fictício</xDescServ></cServ>
+        </serv>
+        <valores>
+          <vServPrest><vServ>100.00</vServ></vServPrest>
+          <trib><tribMun><tribISSQN>1</tribISSQN></tribMun></trib>
+        </valores>
+      </infDPS>
+    </DPS>
+  </infNFSe>
+</NFSe>

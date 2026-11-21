@@ -5,7 +5,8 @@ from fastapi import APIRouter, Depends, Query, Response, status
 from pydantic import BaseModel
 
 from app.api.budget import _changes
-from app.api.deps import CurrentUser, DbSession
+from app.api.deps import CurrentUser, DbSession, require_solution
+from app.core.errors import AppError
 from app.core.months import format_month, parse_month
 from app.core.rate_limit import rate_limit
 from app.schemas.budget import (
@@ -19,9 +20,15 @@ from app.schemas.budget import (
     PlannedOut,
     PlannedPatch,
 )
+from app.services import admin as admin_service
 from app.services import planned, suggest
 
-router = APIRouter(tags=["calendário e sugestões"])
+router = APIRouter(
+    tags=["calendário e sugestões"],
+    dependencies=[Depends(require_solution("meu-orcamento"))],
+)
+
+public_router = APIRouter(tags=["calendário público"])
 
 
 # ---------------------------------------------------------------- sugestões
@@ -133,7 +140,7 @@ def delete_calendar_link(user: CurrentUser, db: DbSession) -> None:
     ical.revoke(db, user)
 
 
-@router.get(
+@public_router.get(
     "/calendar-feed/{token}.ics",
     dependencies=[Depends(rate_limit("calendar_feed", 60, 3600))],
 )
@@ -142,6 +149,10 @@ def calendar_feed(token: str, db: DbSession) -> Response:
     from app.services import ical
 
     user = ical.owner(db, token)
+    try:
+        admin_service.assert_resource_allowed(db, user, "meu-orcamento")
+    except AppError as exc:
+        raise AppError(404, "not_found", "Link de calendário não encontrado.") from exc
     return Response(
         content=ical.build(db, user),
         media_type="text/calendar; charset=utf-8",

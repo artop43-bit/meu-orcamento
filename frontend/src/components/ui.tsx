@@ -9,7 +9,7 @@ import {
   type PointerEvent,
   type ReactNode,
 } from "react";
-import { BarChart3, ChartPie, ShieldCheck, Target, Wallet, X } from "lucide-react";
+import { MessageCircle, LayoutGrid, ShieldCheck, SlidersHorizontal, Wallet, X } from "lucide-react";
 import { Link } from "react-router";
 
 import { prefersReducedMotion } from "../lib/announce";
@@ -42,26 +42,29 @@ export function Brand({
   );
 }
 
-/** Telas de entrada: tela dividida no desktop (marca + formulário), tela cheia no celular. */
+/** Telas de entrada: tela dividida no desktop (marca do Hub + formulário), tela cheia no celular. */
 export function AuthLayout({ title, children }: { title: string; children: ReactNode }) {
+  useEffect(() => {
+    document.title = `${title} · Hub de Soluções`;
+  }, [title]);
   return (
     <main className="auth">
       <aside className="auth__aside">
-        <Brand />
+        <Brand label="Hub de Soluções" icon={<LayoutGrid size={18} />} />
         <div>
-          <p className="auth__headline">Seu dinheiro organizado, mês a mês.</p>
+          <p className="auth__headline">Suas soluções reunidas em um só lugar.</p>
           <ul className="auth__features">
             <li>
-              <Wallet size={20} /> Orçamento, recorrências, cartões e metas em um só lugar
+              <LayoutGrid size={20} /> Uma conta única para todas as suas aplicações
             </li>
             <li>
-              <ChartPie size={20} /> Para onde vai cada real, por categoria
+              <Wallet size={20} /> Meu Orçamento com contas, cartões, metas e divisões
             </li>
             <li>
-              <BarChart3 size={20} /> Score, projeção de 12 meses e simulador
+              <MessageCircle size={20} /> Mensageria integrada ao WhatsApp Web e às demais ferramentas
             </li>
             <li>
-              <Target size={20} /> Metas com quanto falta e quanto guardar
+              <SlidersHorizontal size={20} /> Perfil, aparência e preferências em um só lugar
             </li>
             <li>
               <ShieldCheck size={20} /> Verificação em duas etapas e dados só seus
@@ -74,7 +77,7 @@ export function AuthLayout({ title, children }: { title: string; children: React
       </aside>
       <div className="auth__panel">
         <div className="auth__card">
-          <Brand />
+          <Brand label="Hub de Soluções" icon={<LayoutGrid size={18} />} />
           <h1>{title}</h1>
           {children}
         </div>

@@ -29,6 +29,7 @@ from app.schemas.auth import (
     TwoFactorStatusOut,
     UserOut,
 )
+from app.services import admin as admin_service
 from app.services import auth as auth_service
 from app.services.auth import LoginResult
 
@@ -60,12 +61,30 @@ def _set_session_cookie(response: Response, token: str) -> None:
     )
 
 
-def _login_response(response: Response, result: LoginResult) -> LoginOut:
+def _user_out(db: DbSession, user: CurrentUser) -> UserOut:
+    blocked = admin_service.effective_blocked_resources(db, user)
+    quota = getattr(user, "storage_quota_mb", 50) or 50
+    out = UserOut.model_validate(
+        {
+            **{
+                k: getattr(user, k)
+                for k in UserOut.model_fields
+                if k not in ("blocked_resources", "storage_quota_mb") and hasattr(user, k)
+            },
+            "blocked_resources": blocked,
+            "storage_quota_mb": quota,
+        }
+    )
+    return out
+
+
+def _login_response(db: DbSession, response: Response, result: LoginResult) -> LoginOut:
     if result.challenge is not None:
         return LoginOut(status="2fa_required", challenge=result.challenge)
     assert result.session_token is not None
+    assert result.user is not None
     _set_session_cookie(response, result.session_token)
-    return LoginOut(status="ok", user=UserOut.model_validate(result.user))
+    return LoginOut(status="ok", user=_user_out(db, result.user))
 
 
 # ---------------------------------------------------------------- cadastro
@@ -101,7 +120,7 @@ def login(
     user_agent: UserAgent = None,
 ) -> LoginOut:
     result = auth_service.login(db, body.email, body.password, user_agent, mail)
-    return _login_response(response, result)
+    return _login_response(db, response, result)
 
 
 @router.post("/login/2fa", dependencies=LIMIT_2FA)
@@ -113,7 +132,7 @@ def login_2fa(
     user_agent: UserAgent = None,
 ) -> LoginOut:
     result = auth_service.complete_login_2fa(db, body.challenge, body.code, user_agent, mail)
-    return _login_response(response, result)
+    return _login_response(db, response, result)
 
 
 class NotMeOut(BaseModel):
@@ -138,8 +157,8 @@ def logout(response: Response, db: DbSession, token: SessionToken) -> None:
 
 
 @router.get("/me")
-def me(user: CurrentUser) -> UserOut:
-    return UserOut.model_validate(user)
+def me(user: CurrentUser, db: DbSession) -> UserOut:
+    return _user_out(db, user)
 
 
 # ---------------------------------------------------------------- senha

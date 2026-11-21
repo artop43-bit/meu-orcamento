@@ -4,6 +4,8 @@
 
 name: meu-orcamento
 
+include: [integrations/rtc/compose.yml]
+
 x-logging: &logging
   driver: json-file
   options:
@@ -30,6 +32,7 @@ services:
 
   api:
     build: ./backend
+    networks: [default, rtc]
     restart: unless-stopped
     env_file: .env.production
     environment:
@@ -37,6 +40,11 @@ services:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       FRONTEND_URL: https://${DOMAIN}
       CORS_ORIGINS: https://${DOMAIN}
+      # Mensageria: conector do WhatsApp na rede interna (sem porta aberta para fora).
+      MESSAGING_CONNECTOR_URL: http://whatsapp:3100
+      RTC_REGULAR_URL: http://rtc-regular:8080
+      RTC_SIMPLES_URL: http://rtc-simples:8082
+      RTC_DANFSE_URL: http://rtc-danfse:8080
     depends_on:
       db:
         condition: service_healthy
@@ -57,6 +65,25 @@ services:
       ENVIRONMENT: production
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
     command: ["python", "-m", "app.cli", "schedule"]
+    depends_on:
+      api:
+        condition: service_healthy
+    logging: *logging
+
+  # Mensageria: conector do WhatsApp Web (Node 24 + Baileys). Cada número conectado usa de
+  # 30 a 80 MB; o teto de 8 GB protege o banco e a API. Credenciais ficam no Postgres.
+  whatsapp:
+    build: ./integrations/whatsapp
+    restart: unless-stopped
+    # Sem env_file de propósito: o conector recebe só o que usa (nenhum outro segredo do servidor).
+    environment:
+      HUB_API_URL: http://api:8000
+      DATABASE_URL: "${MESSAGING_CONNECTOR_DATABASE_URL:-postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}}"
+      CONNECTOR_TOKEN: ${MESSAGING_CONNECTOR_TOKEN:-}
+      WORKERS: "2"
+      WORKER_MAX_OLD_SPACE_MB: "3072"
+    mem_limit: 8g
+    stop_grace_period: 15s
     depends_on:
       api:
         condition: service_healthy

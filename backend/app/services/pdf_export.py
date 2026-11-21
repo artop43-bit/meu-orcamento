@@ -15,6 +15,7 @@ from fpdf import FPDF
 from fpdf.enums import XPos, YPos
 
 from app.core.config import get_settings
+from app.core.money import brl as _core_brl
 from app.services.insights import MONTH_NAMES
 
 FONTS = Path(__file__).resolve().parent.parent / "assets" / "fonts"
@@ -31,10 +32,7 @@ BAD = (196, 52, 52)
 
 
 def brl(value: Decimal | float, signed: bool = False) -> str:
-    amount = Decimal(str(value))
-    text = f"{abs(amount):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-    sign = "-" if amount < 0 else ("+" if signed and amount > 0 else "")
-    return f"{sign}R$ {text}"
+    return _core_brl(value, signed=signed)
 
 
 def month_name(month: date) -> str:

@@ -1,44 +1,25 @@
-import type { ReactNode } from "react";
-import { ArrowLeftRight, ChevronLeft, ChevronRight, CircleHelp, Repeat, ShieldCheck, SlidersHorizontal, Smartphone, Sparkles, Tags, UserRound } from "lucide-react";
+import { ArrowLeftRight, ChevronLeft, CircleHelp, Repeat, SlidersHorizontal, Tags } from "lucide-react";
 import { Link, Outlet, useLocation } from "react-router";
 
+import { SettingsCards, type SettingsItem } from "../components/SettingsCards";
 import { PageHeader } from "../components/ui";
 
-export type SettingsItem = { to: string; label: string; description: string; icon: ReactNode };
+export type { SettingsItem };
 
 export const SETTINGS_ITEMS: SettingsItem[] = [
-  { to: "/ajustes/perfil", label: "Perfil", description: "Nome, foto, banner, resumo pessoal e retrospectiva do mês ou do ano.", icon: <UserRound size={20} /> },
   { to: "/ajustes/recorrencias", label: "Recorrências", description: "Despesas e receitas lançadas automaticamente, assinaturas e custo anual.", icon: <Repeat size={20} /> },
   { to: "/ajustes/categorias", label: "Categorias e regras", description: "Categorias, limites mensais e regras de classificação automática.", icon: <Tags size={20} /> },
-  { to: "/ajustes/dados", label: "Importar e exportar", description: "Extratos OFX/CSV, planilhas e backup completo dos dados.", icon: <ArrowLeftRight size={20} /> },
-  { to: "/ajustes/seguranca", label: "Segurança", description: "Senha, verificação em duas etapas, sessões ativas e exclusão da conta.", icon: <ShieldCheck size={20} /> },
-  { to: "/ajustes/preferencias", label: "Preferências", description: "Tema, cor de destaque, tamanho do texto, densidade e privacidade.", icon: <SlidersHorizontal size={20} /> },
-  { to: "/ajustes/app", label: "App e notificações", description: "Instalar no Android, iPhone ou computador e receber avisos no aparelho.", icon: <Smartphone size={20} /> },
-  { to: "/ajustes/notas", label: "Notas da versão", description: "Novidades de cada atualização e atalho para enviar sugestões.", icon: <Sparkles size={20} /> },
+  { to: "/ajustes/dados", label: "Importar e exportar", description: "Extratos OFX/CSV, planilhas, backup completo e recomeçar do zero.", icon: <ArrowLeftRight size={20} /> },
+  { to: "/ajustes/preferencias", label: "Preferências", description: "Mês financeiro, chave Pix, MEI, avisos financeiros, privacidade e atalhos.", icon: <SlidersHorizontal size={20} /> },
   { to: "/ajustes/ajuda", label: "Central de ajuda", description: "Guia de cada tela, exemplos e o tour de apresentação.", icon: <CircleHelp size={20} /> },
 ];
 
-/** Tela "Ajustes": lista das sub-telas. */
+/** Tela "Ajustes" do Meu Orçamento: apenas configurações específicas da solução. */
 export default function SettingsHub() {
   return (
     <>
-      <PageHeader title="Ajustes" subtitle="Configurações da conta, dados e preferências." />
-      <ul className="settings-list">
-        {SETTINGS_ITEMS.map((item) => (
-          <li key={item.to}>
-            <Link to={item.to} className="settings-list__item">
-              <span className="settings-list__icon" aria-hidden>
-                {item.icon}
-              </span>
-              <span className="settings-list__text">
-                <strong>{item.label}</strong>
-                <span className="muted small">{item.description}</span>
-              </span>
-              <ChevronRight size={18} aria-hidden className="muted" />
-            </Link>
-          </li>
-        ))}
-      </ul>
+      <PageHeader title="Ajustes" subtitle="Configurações, dados e preferências do Meu Orçamento." />
+      <SettingsCards items={SETTINGS_ITEMS} />
     </>
   );
 }
@@ -61,4 +42,3 @@ export function SettingsLayout() {
     </>
   );
 }
-

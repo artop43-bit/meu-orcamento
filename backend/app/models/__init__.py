@@ -19,6 +19,23 @@ from app.models.budget import (
     Transfer,
     WatchItem,
 )
+from app.models.commerce import (
+    CatalogItem,
+    CatalogMovement,
+    CommercialDocument,
+    CommercialOrder,
+)
+from app.models.crm import (
+    CrmActivity,
+    CrmContact,
+    CrmDashboard,
+    CrmDeal,
+    CrmPipeline,
+    CrmStage,
+    CrmWidget,
+    DataSnapshot,
+    DataSource,
+)
 from app.models.debts import (
     Loan,
     LoanInstallment,
@@ -29,6 +46,16 @@ from app.models.debts import (
     SplitShare,
 )
 from app.models.indexes import FOREIGN_KEY_INDEXES  # noqa: F401 (registra os índices)
+from app.models.memory import NotebookNote, VaultDocument
+from app.models.messaging import (
+    MessagingAuthKey,
+    MessagingChat,
+    MessagingConnectorKV,
+    MessagingMedia,
+    MessagingMessage,
+    MessagingQuickReply,
+    MessagingSession,
+)
 from app.models.support import (
     Announcement,
     AnnouncementReply,
@@ -52,6 +79,12 @@ from app.models.user import (
     User,
     UserSession,
 )
+from app.models.work import (
+    AgendaEvent,
+    ProjectTask,
+    ProjectTimeEntry,
+    WorkProject,
+)
 
 __all__ = [
     "LoanInstallment",
@@ -66,9 +99,22 @@ __all__ = [
     "Announcement",
     "AuthToken",
     "BudgetMonth",
+    "CatalogItem",
+    "CatalogMovement",
     "Category",
+    "CommercialDocument",
+    "CommercialOrder",
     "CategoryRule",
     "CreditCard",
+    "CrmActivity",
+    "CrmContact",
+    "CrmDashboard",
+    "CrmDeal",
+    "CrmPipeline",
+    "CrmStage",
+    "CrmWidget",
+    "DataSnapshot",
+    "DataSource",
     "EmailLog",
     "Expense",
     "Goal",
@@ -84,7 +130,15 @@ __all__ = [
     "PerfDaily",
     "Income",
     "Investment",
+    "MessagingAuthKey",
+    "MessagingChat",
+    "MessagingConnectorKV",
+    "MessagingMedia",
+    "MessagingMessage",
+    "MessagingQuickReply",
+    "MessagingSession",
     "MoneyAccount",
+    "NotebookNote",
     "RecoveryCode",
     "RecurringItem",
     "PlannedExpense",
@@ -99,4 +153,9 @@ __all__ = [
     "Transfer",
     "User",
     "UserSession",
+    "VaultDocument",
+    "AgendaEvent",
+    "ProjectTask",
+    "ProjectTimeEntry",
+    "WorkProject",
 ]

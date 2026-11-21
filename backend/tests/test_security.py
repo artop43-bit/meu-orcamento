@@ -24,7 +24,9 @@ def test_register_requires_accepting_terms(client: TestClient, outbox: Outbox) -
     ):
         response = client.post("/api/auth/register", json=payload)
         assert response.status_code == 422
-        assert "Termos de uso" in response.json()["message"]
+        mensagem = response.json()["message"]
+        assert "aceite os Termos de uso" in mensagem
+        assert "confirme que leu a Política de privacidade" in mensagem
     assert outbox == []
 
 
@@ -32,7 +34,7 @@ def test_terms_acceptance_is_recorded(client: TestClient, outbox: Outbox, db: Se
     create_verified_user(client, outbox)
     user = db.scalars(select(User)).one()
     assert user.terms_accepted_at is not None
-    assert user.terms_version == "2026-10-16"
+    assert user.terms_version == "2026-11-21"
 
 
 # ---------------------------------------------------------------- limite por IP
@@ -215,3 +217,52 @@ def test_cleanup(client: TestClient, outbox: Outbox, db: Session) -> None:
     assert removed["security_events"] == 1
     # A sessão ainda válida continua funcionando.
     assert client.get("/api/auth/me").status_code == 200
+
+
+def test_heavy_upload_and_pdf_routes_stay_sync() -> None:
+    """E5: Rotas pesadas de OCR/PDF/mídia devem continuar síncronas (`def`)."""
+    import inspect
+
+    from fastapi.routing import APIRoute
+
+    from app.main import app
+
+    def iter_api_routes(router, prefix: str = ""):  # type: ignore[no-untyped-def]
+        for route in router.routes:
+            if isinstance(route, APIRoute):
+                yield prefix + route.path, route
+            elif hasattr(route, "original_router"):
+                ctx = getattr(route, "include_context", None)
+                sub_prefix = prefix + (getattr(ctx, "prefix", "") or "")
+                yield from iter_api_routes(route.original_router, sub_prefix)
+
+    heavy_paths = {
+        "/api/crm/sources/preview/pdf",
+        "/api/crm/sources/preview/csv",
+        "/api/messaging/chats/{chat_id}/media",
+        "/api/proposals/{doc_id}/pdf",
+        "/api/receipts/read",
+        "/api/export/annual.pdf",
+        "/api/cofre/documents",
+        "/api/cofre/from-messaging/{media_id}",
+        "/api/cofre/from-proposal/{doc_id}",
+    }
+    found: set[str] = set()
+    for full_path, route in iter_api_routes(app.router):
+        if full_path in heavy_paths:
+            found.add(full_path)
+            assert not inspect.iscoroutinefunction(route.endpoint), (
+                f"Rota pesada {full_path} deve permanecer `def`, nunca `async def`."
+            )
+    assert found == heavy_paths
+
+
+def test_row_lock_guard_preserves_flushed_writes_in_same_tx(db: Session) -> None:
+    from app.services.common import row_lock_guard
+
+    user = User(email="flush-guard@example.com", password_hash="x")
+    db.add(user)
+    db.flush()
+    with row_lock_guard(db, user_id=user.id):
+        assert db.get(User, user.id) is not None
+    assert db.scalar(select(User.id).where(User.email == "flush-guard@example.com")) == user.id

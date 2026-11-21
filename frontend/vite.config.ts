@@ -23,6 +23,8 @@ export default defineConfig({
     port: 5173,
     // Endereços do GitHub Codespaces (o Vite recusa hosts desconhecidos por segurança).
     allowedHosts: [".app.github.dev", ".githubpreview.dev"],
+    // Docker no Windows: as edições feitas no PC não geram aviso dentro do contêiner.
+    watch: process.env.VITE_USE_POLLING === "1" ? { usePolling: true, interval: 300 } : undefined,
     proxy: {
       "/api": { target: apiTarget, changeOrigin: true },
     },

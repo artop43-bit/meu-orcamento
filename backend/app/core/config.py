@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     rate_limit_enabled: bool = True
     # Versão vigente dos Termos de uso e da Política de privacidade. Ao mudar os textos,
     # atualize aqui: o aceite fica registrado com a versão aceita.
-    terms_version: str = "2026-10-16"
+    terms_version: str = "2026-11-21"
     # Por quanto tempo os eventos de segurança (logins etc.) ficam guardados.
     security_event_retention_days: int = 180
     # None = seguro automaticamente em produção (HTTPS).
@@ -51,6 +51,17 @@ class Settings(BaseSettings):
     admin_emails: str = ""
     # Beta fechado: cadastro novo só entra depois que um admin libera.
     signup_approval: bool = True
+    # Mensageria: conector interno do WhatsApp (ex.: http://whatsapp:3100) e a chave
+    # compartilhada com ele. Qualquer um dos dois vazio = recurso indisponível.
+    messaging_connector_url: str = ""
+    messaging_connector_token: str = ""
+    # Quantos números podem ficar conectados ao mesmo tempo neste servidor.
+    messaging_max_sessions: int = 100
+
+    # Motores fiscais na rede interna, sem serviços externos em tempo de execução.
+    rtc_regular_url: str = ""
+    rtc_simples_url: str = ""
+    rtc_danfse_url: str = ""
 
     @property
     def cors_origin_list(self) -> list[str]:

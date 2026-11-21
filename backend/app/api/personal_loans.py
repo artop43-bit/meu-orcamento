@@ -6,13 +6,16 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Query, Response, status
+from fastapi import APIRouter, Depends, Query, Response, status
 from pydantic import BaseModel, Field, model_validator
 
-from app.api.deps import CurrentUser, DbSession
+from app.api.deps import CurrentUser, DbSession, require_solution
 from app.services import personal_loans
 
-router = APIRouter(tags=["empréstimos a amigos"])
+router = APIRouter(
+    tags=["empréstimos a amigos"],
+    dependencies=[Depends(require_solution("meu-orcamento"))],
+)
 
 Money = Annotated[Decimal, Field(gt=0, le=Decimal("10000000"), max_digits=12, decimal_places=2)]
 Percent = Annotated[Decimal, Field(ge=0, le=100, max_digits=8, decimal_places=4)]

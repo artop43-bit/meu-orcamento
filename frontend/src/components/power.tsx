@@ -26,7 +26,7 @@ import { getPrefs, togglePrivacy } from "../lib/prefs";
 import { looksLikeEntry, parseQuickEntry } from "../lib/quickEntry";
 import { normalizeText } from "../lib/text";
 import { money } from "../lib/format";
-import { RELEASE, RELEASE_NOTES } from "../release";
+import { markWhatsNewSeen, releaseNameAndVersion, releaseOf, releaseSolutionForPath, releaseTag, shouldShowWhatsNew } from "../release";
 import { ImagePicker } from "./media";
 import { Alert, Button, Sheet } from "./ui";
 import { useUndo } from "./undo";
@@ -140,6 +140,7 @@ const PAGES: [string, string, string][] = [
   ["/orcamento", "Orçamento", "mes contas renda"],
   ["/calendario", "Calendário", "vencimentos agenda planejados"],
   ["/analises", "Insights", "analise consultor score graficos"],
+  ["/analises?secao=retrospectiva", "Resumo e retrospectiva", "retrospectiva resumo anual"],
   ["/investimentos", "Investimentos", "carteira"],
   ["/investimentos?secao=cotacoes", "Cotações", "mercado dolar bitcoin bolsa"],
   ["/contas", "Contas", "saldo banco transferencia"],
@@ -151,10 +152,16 @@ const PAGES: [string, string, string][] = [
   ["/ajustes", "Ajustes", "configuracoes"],
   ["/ajustes/recorrencias", "Recorrências e assinaturas", "fixas"],
   ["/ajustes/categorias", "Categorias e regras", "limites"],
-  ["/ajustes/dados", "Importar e exportar", "extrato ofx csv excel"],
-  ["/ajustes/preferencias", "Preferências", "tema cor texto privacidade aparencia atalhos teclado teclas"],
-  ["/ajustes/seguranca", "Segurança", "senha 2fa"],
+  ["/ajustes/dados", "Importar e exportar", "extrato ofx csv excel backup comecar do zero"],
+  ["/ajustes/preferencias", "Preferências do orçamento", "mes financeiro pix mei privacidade atalhos avisos"],
   ["/ajustes/ajuda", "Central de ajuda", "como usar tour"],
+  ["/perfil", "Perfil", "perfil nome foto bio"],
+  ["/configuracoes", "Configurações", "configuracoes conta hub"],
+  ["/seguranca", "Segurança", "senha 2fa sessoes excluir"],
+  ["/preferencias", "Preferências da conta", "tema cor cores aparencia estilo escuro claro glass"],
+  ["/app", "App e notificações", "app apk instalar celular notificacoes"],
+  ["/mensagens", "Mensagens", "recados solicitacoes suporte"],
+  ["/notas", "Notas da versão", "novidades versao atualizacao"],
 ];
 
 export function CommandPalette() {
@@ -323,34 +330,36 @@ export function CommandPalette() {
 
 // ---------------------------------------------------------------- o que há de novo
 
-const SEEN_KEY = "novidades-vistas";
-
 export function WhatsNew() {
+  const location = useLocation();
+  const solution = releaseSolutionForPath(location.pathname);
+  return <SolutionWhatsNew key={solution} solution={solution} />;
+}
+
+function SolutionWhatsNew({ solution }: { solution: ReturnType<typeof releaseSolutionForPath> }) {
+  const release = releaseOf(solution);
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
   useEffect(() => {
     try {
-      const seen = localStorage.getItem(SEEN_KEY);
-      // Quem acabou de chegar (sem versão vista) vê o tour, não as novidades.
-      if (seen === null) localStorage.setItem(SEEN_KEY, RELEASE.version);
-      else if (seen !== RELEASE.version && !navigator.webdriver) setOpen(true);
+      if (shouldShowWhatsNew(solution, localStorage) && !navigator.webdriver) setOpen(true);
     } catch {
       // Sem armazenamento: não mostra.
     }
-  }, []);
+  }, [solution]);
   function close() {
     try {
-      localStorage.setItem(SEEN_KEY, RELEASE.version);
+      markWhatsNewSeen(solution, localStorage);
     } catch {
       // ok
     }
     setOpen(false);
   }
   return (
-    <Sheet open={open} title={`Novidades da versão ${RELEASE.version}`} onClose={close}>
+    <Sheet open={open} title={`Novidades · ${releaseNameAndVersion(solution)}`} onClose={close}>
       <div className="stack">
         <ul className="whats-new">
-          {RELEASE_NOTES.map((note) => (
+          {release.notes.map((note) => (
             <li key={note.title}>
               <Sparkles size={16} aria-hidden />
               <span>
@@ -365,7 +374,7 @@ export function WhatsNew() {
             variant="secondary"
             onClick={() => {
               close();
-              navigate("/ajustes/notas");
+              navigate(`/notas?solucao=${solution}`);
             }}
           >
             Ver todas as notas
@@ -415,7 +424,7 @@ export function FeedbackSheet() {
 
 (${context})` : message.trim(),
           page: location.pathname + location.search,
-          app_version: RELEASE.version,
+          app_version: releaseTag(releaseSolutionForPath(location.pathname)),
         },
         images,
       );
@@ -494,7 +503,7 @@ export function FeedbackSheet() {
           </label>
           <ImagePicker files={images} onChange={setImages} />
           <p className="muted small" style={{ margin: 0 }}>
-            São enviados também a tela atual ({location.pathname}) e a versão {RELEASE.version}. Nenhum valor financeiro é incluído.
+            São enviados também a tela atual ({location.pathname}) e a versão {releaseNameAndVersion(releaseSolutionForPath(location.pathname))}. Nenhum valor financeiro é incluído.
           </p>
           <div className="form-actions">
             <Button type="button" variant="secondary" onClick={() => setOpen(false)}>
@@ -510,15 +519,24 @@ export function FeedbackSheet() {
   );
 }
 
-/** Tudo o que é global: atalhos, Ctrl+K, novidades, sugestões. Fica dentro do Shell. */
+/** Camada de novidades e solicitações compartilhada com o Hub de Soluções. */
+export function HubLayer() {
+  return (
+    <>
+      <WhatsNew />
+      <FeedbackSheet />
+    </>
+  );
+}
+
+/** Tudo o que é global dentro de uma solução: atalhos, Ctrl+K, novidades, sugestões. */
 export function PowerLayer() {
   useShortcuts();
   return (
     <>
       <CommandPalette />
       <ShortcutsSheet />
-      <WhatsNew />
-      <FeedbackSheet />
+      <HubLayer />
     </>
   );
 }

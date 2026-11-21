@@ -83,6 +83,7 @@ def seed_demo(
         user.password_hash = security.hash_password(password)
         user.failed_login_attempts = 0
         user.locked_until = None
+        user.is_admin = True
         db.commit()
         return password, False
 
@@ -93,6 +94,7 @@ def seed_demo(
         email_verified_at=now,
         terms_accepted_at=now,
         terms_version=get_settings().terms_version,
+        is_admin=True,
         # Com dados de exemplo, a configuração inicial guiada já não faz sentido.
         onboarded_at=now if with_data else None,
     )

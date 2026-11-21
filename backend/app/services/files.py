@@ -144,6 +144,9 @@ def store(
             if purpose == "attachment" and exc.code == "invalid_image":
                 raise AppError(400, "invalid_file", ATTACHMENT_HELP) from exc
             raise
+    from app.services import admin as admin_service
+
+    admin_service.assert_storage_quota(db, owner, len(data))
     item = StoredFile(
         owner_id=owner.id,
         purpose=purpose,

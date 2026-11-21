@@ -3,11 +3,11 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Query, status
+from fastapi import APIRouter, Depends, Query, status
 from pydantic import BaseModel, Field
 
 from app.api.budget import _changes
-from app.api.deps import CurrentUser, DbSession
+from app.api.deps import CurrentUser, DbSession, require_solution
 from app.core.months import current_month, format_month, parse_month, today_local
 from app.schemas.analysis import (
     AnalysisConfig,
@@ -29,7 +29,7 @@ from app.schemas.analysis import (
 )
 from app.services import analysis, ask, ask_history, indicators, insights, investments, series
 
-router = APIRouter(tags=["análises"])
+router = APIRouter(tags=["análises"], dependencies=[Depends(require_solution("meu-orcamento"))])
 
 
 # ---------------------------------------------------------------- análises

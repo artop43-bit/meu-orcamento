@@ -4,10 +4,10 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, File, Form, Query, Response, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Query, Response, UploadFile
 from pydantic import BaseModel, StringConstraints
 
-from app.api.deps import CurrentUser, DbSession
+from app.api.deps import CurrentUser, DbSession, require_feature, require_solution
 from app.core.errors import AppError
 from app.core.months import current_month, format_month, parse_month
 from app.schemas.data import (
@@ -22,7 +22,10 @@ from app.schemas.data import (
 )
 from app.services import export, legacy_import, statement_import
 
-router = APIRouter(tags=["importar e exportar"])
+router = APIRouter(
+    tags=["importar e exportar"],
+    dependencies=[Depends(require_solution("meu-orcamento"))],
+)
 
 MAX_EXPORT_MONTHS = 120
 XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -113,14 +116,14 @@ def export_count(
     }
 
 
-@router.get("/export/annual")
+@router.get("/export/annual", dependencies=[Depends(require_feature("feature:data_export"))])
 def export_annual(
     user: CurrentUser, db: DbSession, year: Annotated[int, Query(ge=2000, le=2100)]
 ) -> dict[str, Any]:
     return export.annual(db, user, year)
 
 
-@router.get("/export/annual.pdf")
+@router.get("/export/annual.pdf", dependencies=[Depends(require_feature("feature:data_export"))])
 def export_annual_pdf(
     user: CurrentUser, db: DbSession, year: Annotated[int, Query(ge=2000, le=2100)]
 ) -> Response:
@@ -136,7 +139,7 @@ def export_annual_pdf(
     return _attachment(content, f"meu-orcamento_resumo-anual_{year}.pdf", "application/pdf")
 
 
-@router.get("/export/transactions")
+@router.get("/export/transactions", dependencies=[Depends(require_feature("feature:data_export"))])
 def export_transactions(
     user: CurrentUser,
     db: DbSession,
@@ -172,7 +175,7 @@ def export_transactions(
     return _attachment(export.to_xlsx(rows, summary), f"{name}.xlsx", XLSX)
 
 
-@router.get("/export/backup")
+@router.get("/export/backup", dependencies=[Depends(require_feature("feature:data_export"))])
 def export_backup(user: CurrentUser, db: DbSession) -> Response:
     content = json.dumps(export.backup(db, user), ensure_ascii=False, indent=2).encode("utf-8")
     return _attachment(content, "meu-orcamento-backup.json", "application/json")
@@ -190,7 +193,7 @@ def _read_upload(upload: UploadFile) -> bytes:
     return raw
 
 
-@router.post("/import/analyze")
+@router.post("/import/analyze", dependencies=[Depends(require_feature("feature:pdf_ocr_upload"))])
 def import_analyze(
     user: CurrentUser, db: DbSession, file: Annotated[UploadFile, File()]
 ) -> dict[str, Any]:
@@ -200,7 +203,7 @@ def import_analyze(
     return importer.analyze(db, user, _read_upload(file), file.filename or "arquivo")
 
 
-@router.post("/import/preview")
+@router.post("/import/preview", dependencies=[Depends(require_feature("feature:pdf_ocr_upload"))])
 def import_preview(
     user: CurrentUser,
     db: DbSession,

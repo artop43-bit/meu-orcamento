@@ -1,3 +1,4 @@
+from collections.abc import Callable
 from typing import Annotated
 
 from fastapi import BackgroundTasks, Depends, Request
@@ -8,6 +9,7 @@ from app.core.email import send_email
 from app.core.errors import AppError
 from app.db.session import get_db
 from app.models import EmailLog, User
+from app.services import admin as admin_service
 from app.services import auth as auth_service
 from app.services.auth import Mailer
 
@@ -44,6 +46,18 @@ def get_admin_user(user: CurrentUserBase) -> User:
 
 
 AdminUser = Annotated[User, Depends(get_admin_user)]
+
+
+def require_solution(solution_id: str) -> Callable[[CurrentUser, DbSession], None]:
+    """Dependência FastAPI que barra o acesso (403) se a solução estiver bloqueada para a conta."""
+
+    def _check(user: CurrentUser, db: DbSession) -> None:
+        admin_service.assert_resource_allowed(db, user, solution_id)
+
+    return _check
+
+
+require_feature = require_solution
 
 
 def get_mailer(background: BackgroundTasks, db: DbSession) -> Mailer:

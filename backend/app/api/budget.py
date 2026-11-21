@@ -3,10 +3,10 @@ from datetime import date
 from decimal import Decimal
 from typing import Annotated, Any
 
-from fastapi import APIRouter, File, Query, UploadFile, status
+from fastapi import APIRouter, Depends, File, Query, UploadFile, status
 from pydantic import BaseModel
 
-from app.api.deps import CurrentUser, DbSession
+from app.api.deps import CurrentUser, DbSession, require_feature, require_solution
 from app.core.errors import AppError
 from app.core.months import current_month, format_month, parse_month
 from app.schemas.budget import (
@@ -35,7 +35,7 @@ from app.schemas.budget import (
 )
 from app.services import budget as service
 
-router = APIRouter(tags=["orçamento"])
+router = APIRouter(tags=["orçamento"], dependencies=[Depends(require_solution("meu-orcamento"))])
 
 Scope = Annotated[DeleteScope, Query(description="one = só este; following = este e os próximos")]
 
@@ -146,7 +146,7 @@ class ReceiptReading(BaseModel):
     payment_method: PaymentMethod | None = None
 
 
-@router.post("/receipts/read")
+@router.post("/receipts/read", dependencies=[Depends(require_feature("feature:pdf_ocr_upload"))])
 def read_receipt(
     user: CurrentUser, db: DbSession, image: Annotated[UploadFile, File()]
 ) -> ReceiptReading:

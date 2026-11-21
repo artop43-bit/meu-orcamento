@@ -158,8 +158,8 @@ ANALYTIC_WORDS = _words(
 
 # ---------------------------------------------------------------- medidas, agrupamentos e assuntos
 
-# Cada conceito tem as palavras que o acionam. O entendimento (understand.py) monta as regras a
-# partir daqui, e a correção de digitação usa estas palavras como alvo.
+# Cada conceito tem as palavras que o acionam. O planejador (bot/nlu/planner.py) monta as regras a
+# partir daqui, e a correção de digitação (bot/nlu/corrector.py) usa estas palavras como alvo.
 CONCEPTS: dict[str, list[str]] = {
     # o que se quer saber
     "spend": _words(

@@ -14,6 +14,7 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.core.money import brl as _core_brl
 from app.core.months import add_months, format_month
 from app.models import Expense, Income, User
 from app.services import analysis, budget, investments, planned
@@ -40,8 +41,7 @@ MONTH_NAMES = [
 
 def brl(value: Decimal) -> str:
     """R$ 1.234,56 (valor absoluto; o texto diz se é a mais ou a menos)."""
-    text = f"{abs(value):,.2f}".replace(",", "_").replace(".", ",").replace("_", ".")
-    return f"R$ {text}"
+    return _core_brl(value, abs_val=True)
 
 
 def pct(value: float) -> str:
@@ -457,7 +457,7 @@ def consultant(db: Session, user: User, month: date, today: date | None = None) 
             _message(
                 "info",
                 "Segurança da conta",
-                "Ative a verificação em duas etapas em Ajustes › Segurança para proteger o "
+                "Ative a verificação em duas etapas em Configurações › Segurança para proteger o "
                 "acesso mesmo em caso de vazamento da senha.",
             )
         )

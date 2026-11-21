@@ -9,6 +9,7 @@ import {
   PlayCircle,
   Repeat,
   SlidersHorizontal,
+  Sparkles,
   Tags,
   Target,
   Upload,
@@ -115,10 +116,16 @@ const TOPICS: Topic[] = [
     items: ["Importação de extratos OFX/CSV e exportação em CSV, Excel, PDF e backup completo."],
   },
   {
+    icon: <Sparkles size={20} />,
+    title: "Resumo e retrospectiva",
+    to: "/analises?secao=retrospectiva",
+    items: ["Médias dos meses fechados, taxa de poupança e retrospectiva compartilhável do mês ou do ano."],
+  },
+  {
     icon: <SlidersHorizontal size={20} />,
     title: "Preferências e atalhos",
     to: "/ajustes/preferencias",
-    items: ["Tema, cor de destaque, tamanho do texto, densidade e modo privacidade (tecla P). Ctrl+K abre os comandos."],
+    items: ["Mês financeiro, chave Pix, MEI, avisos financeiros, modo privacidade (tecla P) e atalhos (Ctrl+K)."],
   },
 ];
 

@@ -30,12 +30,12 @@ describe("navegação em grupos", () => {
     // Telas do "Mais" e sub-telas não trocam de aba.
     expect(neighborTab("/investimentos", 1)).toBeNull();
     expect(neighborTab("/investimentos", -1)).toBeNull();
-    expect(neighborTab("/ajustes/perfil", 1)).toBeNull();
+    expect(neighborTab("/ajustes/dados", 1)).toBeNull();
     expect(neighborTab("/dividas/abc", 1)).toBeNull();
   });
 
   it("voltar das sub-telas", () => {
-    expect(parentOf("/ajustes/perfil")).toBe("/ajustes");
+    expect(parentOf("/ajustes/dados")).toBe("/ajustes");
     expect(parentOf("/mensagens/conversas/123")).toBe("/mensagens/conversas");
     expect(parentOf("/mensagens/conversas")).toBe("/mensagens");
     expect(parentOf("/mensagens")).toBeNull();

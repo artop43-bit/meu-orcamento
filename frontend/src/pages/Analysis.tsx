@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import {
   ArrowDownLeft,
@@ -35,6 +35,7 @@ import { AnalysisResult, Builder, PRESETS, SavedCard, useSaved } from "../compon
 import { Bar } from "../components/budget";
 import { AskBot } from "../components/AskBot";
 import { Calculators } from "../components/Calculators";
+import { FinancialRecapSection } from "../components/FinancialRecap";
 import { Chart } from "../components/chart/Chart";
 import { FeesCard, PersonalInflationCard } from "../components/XRay";
 import { AlertsCard, ConsultantCard, useInsights } from "../components/consultant";
@@ -218,7 +219,7 @@ function SummarySection({ month, setMonth, goTo }: { month: string; setMonth: (m
           <ConsultantCard data={data} />
           <section className="card stack">
             <h2>Como começar</h2>
-            <ol className="steps">
+            <ol className="analysis-start-steps">
               <li>
                 Configure lançamentos mensais (salário, aluguel, internet) em <Link to="/ajustes/recorrencias">Recorrências</Link>.
               </li>
@@ -997,7 +998,9 @@ function SimulatorTab() {
 
 // ---------------------------------------------------------------- página
 
-type SectionKey = "resumo" | "tendencias" | "categorias" | "saude" | "patrimonio" | "comparar" | "projecao" | "simulador" | "calculadoras" | "duvida" | "monte";
+const ReformaTributaria = lazy(() => import("../components/rtc/ReformaTributaria"));
+
+type SectionKey = "resumo" | "tendencias" | "categorias" | "saude" | "patrimonio" | "retrospectiva" | "comparar" | "projecao" | "simulador" | "calculadoras" | "reforma-tributaria" | "duvida" | "monte";
 
 const SECTIONS: { key: SectionKey; label: string; group: string; icon: LucideIcon }[] = [
   { key: "resumo", label: "Resumo", group: "Visão geral", icon: LayoutDashboard },
@@ -1006,10 +1009,12 @@ const SECTIONS: { key: SectionKey; label: string; group: string; icon: LucideIco
   { key: "categorias", label: "Categorias", group: "Visão geral", icon: Tags },
   { key: "saude", label: "Saúde financeira", group: "Visão geral", icon: HeartPulse },
   { key: "patrimonio", label: "Patrimônio e metas", group: "Visão geral", icon: Landmark },
+  { key: "retrospectiva", label: "Retrospectiva", group: "Visão geral", icon: Sparkles },
   { key: "comparar", label: "Comparar meses", group: "Ferramentas", icon: GitCompareArrows },
   { key: "projecao", label: "Projeção", group: "Ferramentas", icon: Telescope },
   { key: "simulador", label: "Simulador", group: "Ferramentas", icon: FlaskConical },
   { key: "calculadoras", label: "Calculadoras", group: "Ferramentas", icon: Calculator },
+  { key: "reforma-tributaria", label: "Reforma Tributária", group: "Ferramentas", icon: Receipt },
   { key: "monte", label: "Monte sua análise", group: "Personalizar", icon: WandSparkles },
 ];
 
@@ -1073,6 +1078,12 @@ export default function Analysis() {
           {section === "categorias" && <CategoriesSection month={month} setMonth={setMonth} />}
           {section === "saude" && <HealthSection month={month} setMonth={setMonth} />}
           {section === "patrimonio" && <WealthSection month={month} />}
+          {section === "retrospectiva" && (
+            <>
+              <SectionTitle title="Resumo e retrospectiva" text="Médias dos meses fechados e destaques em telas para compartilhar." />
+              <FinancialRecapSection />
+            </>
+          )}
           {section === "comparar" && (
             <>
               <SectionTitle title="Comparar meses" text="Dois meses lado a lado, categoria por categoria." />
@@ -1095,6 +1106,14 @@ export default function Analysis() {
             <>
               <SectionTitle title="Calculadoras" text="Juros compostos, planejamento, à vista ou parcelado, antecipação de parcelas e reserva de emergência." />
               <Calculators />
+            </>
+          )}
+          {section === "reforma-tributaria" && (
+            <>
+              <SectionTitle title="Reforma Tributária" text="Simule tributos sobre vendas e serviços, consulte os códigos da Receita e gere o PDF de uma nota de serviço." />
+              <Suspense fallback={<p role="status" className="muted">Carregando ferramentas fiscais…</p>}>
+                <ReformaTributaria />
+              </Suspense>
             </>
           )}
           {section === "duvida" && (

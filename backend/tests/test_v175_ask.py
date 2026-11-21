@@ -288,7 +288,7 @@ def test_follow_up_keeps_subject_or_period(data: TestClient, db: Session) -> Non
     before = q(db, "e em fevereiro?", context=biggest["context"])
     assert before["intent"] == "biggest" and "fevereiro de 2030" in before["answer"]
     # Sem contexto, "e em janeiro?" não inventa assunto.
-    assert q(db, "e em janeiro?")["intent"] in ("fallback", "sum", "empty")
+    assert q(db, "e em janeiro?")["intent"] == "fallback"
 
 
 def test_unknown_question_suggests_similar_ones(data: TestClient, db: Session) -> None:

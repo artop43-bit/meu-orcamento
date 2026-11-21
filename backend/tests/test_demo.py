@@ -13,7 +13,10 @@ from tests.conftest import login
 def test_empty_demo_account_for_qa(client: TestClient, db: Session) -> None:
     password, created = seed_demo(db, with_data=False)
     assert created
-    assert login(client, DEMO_EMAIL, password).json()["status"] == "ok"
+    logged = login(client, DEMO_EMAIL, password).json()
+    assert logged["status"] == "ok"
+    assert logged["user"]["is_admin"] is True
+    assert client.get("/api/admin/overview").status_code == 200
     month = client.get(f"/api/months/{format_month(current_month())}").json()
     assert month["expenses"] == [] and month["incomes"] == []
     assert len(client.get("/api/categories").json()) == 11

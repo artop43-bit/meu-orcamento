@@ -9,6 +9,8 @@ from app.api import (
     analysis,
     auth,
     budget,
+    commerce,
+    crm,
     data,
     debts,
     errors,
@@ -17,13 +19,18 @@ from app.api import (
     health,
     inbox,
     market,
+    memory,
+    messaging,
+    messaging_connector,
     money,
     notifications,
     personal_loans,
     planner,
     push,
+    rtc,
     sharing,
     support,
+    work,
 )
 from app.core.config import DEFAULT_SECRET_KEY, get_settings
 from app.core.errors import register_error_handlers
@@ -36,7 +43,7 @@ SECURITY_HEADERS = {
     "X-Content-Type-Options": "nosniff",
     "X-Frame-Options": "DENY",
     "Referrer-Policy": "no-referrer",
-    "Permissions-Policy": "camera=(), microphone=(), geolocation=(), payment=()",
+    "Permissions-Policy": "camera=(), microphone=(self), geolocation=(), payment=()",
     "Cross-Origin-Opener-Policy": "same-origin",
 }
 
@@ -76,6 +83,12 @@ def create_app() -> FastAPI:
             # Descadastro com um clique (RFC 8058): o provedor de e-mail envia o POST sem o
             # cabeçalho; não usa sessão, só o token assinado do próprio link.
             and request.url.path != "/api/notifications/unsubscribe"
+            # Conector interno do WhatsApp: autenticação entre servidores pelo
+            # X-Connector-Token, sem cookie de sessão.
+            and not (
+                request.url.path.startswith("/api/messaging/connector/")
+                and bool(request.headers.get("x-connector-token"))
+            )
         ):
             response: Response = JSONResponse(
                 {"error": "csrf", "message": "Requisição bloqueada por segurança."},
@@ -108,6 +121,7 @@ def create_app() -> FastAPI:
     app.include_router(analysis.router, prefix="/api")
     app.include_router(data.router, prefix="/api")
     app.include_router(planner.router, prefix="/api")
+    app.include_router(planner.public_router, prefix="/api")
     app.include_router(market.router, prefix="/api")
     app.include_router(extras.router, prefix="/api")
     app.include_router(admin.router, prefix="/api")
@@ -115,6 +129,16 @@ def create_app() -> FastAPI:
     app.include_router(support.router, prefix="/api")
     app.include_router(notifications.router, prefix="/api")
     app.include_router(inbox.router, prefix="/api")
+    app.include_router(messaging.router, prefix="/api")
+    app.include_router(messaging_connector.router, prefix="/api")
+    app.include_router(crm.router, prefix="/api")
+    app.include_router(commerce.catalog_router, prefix="/api")
+    app.include_router(commerce.proposals_router, prefix="/api")
+    app.include_router(work.projects_router, prefix="/api")
+    app.include_router(work.agenda_router, prefix="/api")
+    app.include_router(memory.vault_router, prefix="/api")
+    app.include_router(memory.notebook_router, prefix="/api")
+    app.include_router(rtc.router, prefix="/api")
     app.include_router(sharing.router, prefix="/api")
     app.include_router(personal_loans.router, prefix="/api")
     app.include_router(push.router, prefix="/api")

@@ -22,9 +22,20 @@ export function parseMoney(input: string): string | null {
   return Number(text).toFixed(2);
 }
 
+/** Converte entrada monetária digitada ("1.234,50") para número ("NaN" -> 0). */
+export function moneyToNumber(raw: string): number {
+  const parsed = parseMoney(raw);
+  if (parsed !== null) return Number(parsed);
+  return Number(raw.replace(",", ".")) || 0;
+}
+
 /** Valor da API para exibir num campo editável ("1234.50" → "1234,50"). */
 export function moneyInput(value: string): string {
   return Number(value).toFixed(2).replace(".", ",");
+}
+
+export function plural(count: number, singular: string, multiple = `${singular}s`): string {
+  return count === 1 ? singular : multiple;
 }
 
 const MONTH_NAMES = [
@@ -79,10 +90,21 @@ export function percent(value: number | null): string {
   return value === null ? "—" : `${value.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%`;
 }
 
-/** Data de hoje (fuso local) no formato AAAA-MM-DD. */
-export function todayISO(): string {
-  const now = new Date();
-  return `${thisMonth()}-${String(now.getDate()).padStart(2, "0")}`;
+/** Data de hoje (calendário local) no formato AAAA-MM-DD. */
+export function todayISO(now = new Date()): string {
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, "0");
+  const d = String(now.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+/** Cabeçalho conversacional da saudação com dia da semana e mês por extenso. */
+export function formatDateHeading(now = new Date()): string {
+  return now.toLocaleDateString("pt-BR", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  });
 }
 
 /**

@@ -5,13 +5,16 @@ from datetime import date
 from decimal import Decimal
 from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, status
+from fastapi import APIRouter, Depends, status
 from pydantic import BaseModel, Field, model_validator
 
-from app.api.deps import CurrentUser, DbSession
+from app.api.deps import CurrentUser, DbSession, require_solution
 from app.services import loans
 
-router = APIRouter(tags=["dívidas e patrimônio"])
+router = APIRouter(
+    tags=["dívidas e patrimônio"],
+    dependencies=[Depends(require_solution("meu-orcamento"))],
+)
 
 Money = Annotated[Decimal, Field(gt=0, max_digits=12, decimal_places=2)]
 OptionalMoney = Annotated[Decimal, Field(ge=0, max_digits=12, decimal_places=2)]

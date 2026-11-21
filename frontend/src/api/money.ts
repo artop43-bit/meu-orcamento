@@ -93,6 +93,21 @@ export type AdminUser = {
   last_seen_at: string | null;
   active_sessions: number;
   entries: number;
+  blocked_resources?: string[];
+  storage_quota_mb?: number;
+  storage_used_bytes?: number;
+};
+
+export type AdminResourceMeta = {
+  id: string;
+  label: string;
+  description: string;
+};
+
+export type AdminGovernance = {
+  solutions: AdminResourceMeta[];
+  features: AdminResourceMeta[];
+  global_blocked_resources: string[];
 };
 
 export type AdminAction =
@@ -136,6 +151,17 @@ export const moneyApi = {
   adminUsers: () => api.get<AdminUser[]>("/admin/users"),
   adminAction: (id: string, action: AdminAction) => api.post<{ status: string }>(`/admin/users/${id}/action`, { action }),
   adminEmails: () => api.get<SentEmail[]>("/admin/emails"),
+  adminGovernance: () => api.get<AdminGovernance>("/admin/governance"),
+  adminUpdateGovernance: (global_blocked_resources: string[]) =>
+    api.put<AdminGovernance>("/admin/governance", { global_blocked_resources }),
+  adminUpdateUserPermissions: (
+    id: string,
+    body: { blocked_resources?: string[]; storage_quota_mb?: number },
+  ) =>
+    api.patch<{ user_id: string; blocked_resources: string[]; storage_quota_mb: number }>(
+      `/admin/users/${id}/permissions`,
+      body,
+    ),
 };
 
 export const moneyKeys = {

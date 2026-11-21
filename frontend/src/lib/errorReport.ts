@@ -1,4 +1,4 @@
-import { RELEASE } from "../release";
+import { releaseSolutionForPath, releaseTag } from "../release";
 
 /**
  * Painel de erros (v1.3): erros das telas vão para Administração › Erros, sem serviço externo.
@@ -23,7 +23,7 @@ export function reportError(error: unknown, extra?: string) {
       name: err.name.slice(0, 80),
       message: err.message.slice(0, 300),
       path: location.pathname,
-      release: RELEASE.version,
+      release: releaseTag(releaseSolutionForPath(location.pathname)),
       detail: detail.slice(0, 4000) || null,
     }),
   }).catch(() => undefined);

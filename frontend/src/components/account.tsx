@@ -1,10 +1,65 @@
 import { useState, type FormEvent } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link, useNavigate } from "react-router";
+import { ShieldAlert } from "lucide-react";
+import { Link, useLocation, useNavigate } from "react-router";
 
-import { authApi, ME_KEY, type User } from "../api/auth";
+import { authApi, ME_KEY, useMe, type User } from "../api/auth";
 import { errorMessage } from "../api/client";
+import { announce } from "../lib/announce";
 import { Alert, Button, Field } from "./ui";
+
+const LATER_KEY = "2fa-lembrar-depois";
+
+function readLater(): boolean {
+  try {
+    return sessionStorage.getItem(LATER_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+/** Aviso discreto para ativar o 2FA, compartilhado entre o Hub e as soluções. */
+export function TwoFactorBanner() {
+  const queryClient = useQueryClient();
+  const { data: user } = useMe();
+  const location = useLocation();
+  const [later, setLater] = useState(readLater);
+  const visible =
+    user && !user.totp_enabled && !user.twofa_prompt_dismissed && !later && location.pathname !== "/seguranca";
+  if (!visible) return null;
+
+  function remindLater() {
+    try {
+      sessionStorage.setItem(LATER_KEY, "1");
+    } catch {
+      // Navegação privada sem armazenamento: o aviso some só nesta tela.
+    }
+    setLater(true);
+  }
+
+  async function dismiss() {
+    if (user) queryClient.setQueryData(ME_KEY, { ...user, twofa_prompt_dismissed: true });
+    announce("Lembrete desativado. A verificação pode ser ativada em Configurações › Segurança.");
+    await authApi.setTwoFactorPrompt(true).catch(() => undefined);
+  }
+
+  return (
+    <div className="banner no-print" role="region" aria-label="Sugestão de segurança">
+      <ShieldAlert size={18} />
+      <span>
+        Recomendado: <Link to="/seguranca">ative a verificação em duas etapas</Link> para proteger o acesso.
+      </span>
+      <span className="banner__actions">
+        <button type="button" onClick={remindLater}>
+          Agora não
+        </button>
+        <button type="button" onClick={() => void dismiss()}>
+          Não mostrar mais
+        </button>
+      </span>
+    </div>
+  );
+}
 
 const SESSIONS_KEY = ["auth", "sessions"] as const;
 const EVENTS_KEY = ["auth", "events"] as const;
@@ -166,7 +221,7 @@ export function DeleteAccountSection({ user }: { user: User }) {
       <div className="stack">
         <p className="muted">
           Apaga sua conta e <strong>todos</strong> os seus dados: lançamentos, metas, investimentos e histórico. Não dá
-          para desfazer. Antes, se quiser, baixe o <Link to="/dados">backup completo</Link>.
+          para desfazer. Antes, se quiser, baixe o <Link to="/ajustes/dados?aba=exportar">backup completo</Link>.
         </p>
         <div>
           <Button type="button" variant="danger" onClick={() => setOpen(true)}>

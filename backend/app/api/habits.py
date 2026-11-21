@@ -5,14 +5,14 @@ from datetime import date
 from decimal import Decimal
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, status
+from fastapi import APIRouter, Depends, status
 from pydantic import BaseModel, Field, StringConstraints
 
-from app.api.deps import CurrentUser, DbSession
+from app.api.deps import CurrentUser, DbSession, require_solution
 from app.core.months import parse_month
 from app.services import challenges, recovery
 
-router = APIRouter(tags=["hábitos"])
+router = APIRouter(tags=["hábitos"], dependencies=[Depends(require_solution("meu-orcamento"))])
 
 ChallengeKind = Literal["no_keyword", "no_category", "no_nonessential", "max_category"]
 

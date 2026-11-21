@@ -14,7 +14,7 @@ if [ -f .env.production ]; then
 fi
 
 WORK="$(mktemp -d)"
-COMPOSE=(docker compose -p meu-orcamento-smoke -f docker-compose.prod.yml --env-file .env.production)
+COMPOSE=(docker compose --profile rtc -p meu-orcamento-smoke -f docker-compose.prod.yml --env-file .env.production)
 BASE="https://localhost"
 JAR="$WORK/cookies.txt"
 EMAIL="smoke@example.com"
@@ -30,6 +30,7 @@ check() {
 }
 get() { curl -sSk --max-time 20 "$@"; }
 api() { get -b "$JAR" -c "$JAR" -H "Content-Type: application/json" -H "X-Requested-With: fetch" "$@"; }
+db_sql() { "${COMPOSE[@]}" exec -T db psql -X -v ON_ERROR_STOP=1 -U orcamento -d orcamento "$@"; }
 
 cleanup() {
   local status=$?
@@ -57,6 +58,7 @@ SECRET_KEY=$(head -c 48 /dev/urandom | od -An -tx1 | tr -d ' \n')
 EMAIL_BACKEND=console
 EMAIL_FROM=Meu Orçamento <nao-responda@localhost>
 BACKUP_AGE_RECIPIENT=$RECIPIENT
+MESSAGING_CONNECTOR_TOKEN=$(head -c 24 /dev/urandom | od -An -tx1 | tr -d ' \n')
 EOF
 umask 022
 
@@ -67,6 +69,11 @@ echo "==> Site e API"
 check "frontend servido em HTTPS" grep -q "<title>Meu Orçamento</title>" <(get "$BASE/")
 check "rotas do app caem no index.html" grep -q 'id="root"' <(get "$BASE/orcamento/2030-01")
 check "API conectada ao PostgreSQL" grep -q '"database":"ok"' <(get "$BASE/api/health/db")
+# Mensageria: o conector do WhatsApp sobe, responde e alcança a API (sem nenhum número conectado).
+check "conector do WhatsApp no ar" "${COMPOSE[@]}" exec -T whatsapp node -e \
+  "fetch('http://localhost:3100/health').then(r => r.json()).then(j => process.exit(j.ok ? 0 : 1), () => process.exit(1))"
+code="$(curl -sk -o /dev/null -w '%{http_code}' "$BASE/api/messaging/connector/sessions")"
+check "rotas do conector fechadas para fora ($code)" test "$code" = 404
 code="$(curl -s -o /dev/null -w '%{http_code}' "http://localhost/")"
 check "HTTP redireciona para HTTPS ($code)" test "$code" = 308 -o "$code" = 301
 
@@ -81,6 +88,12 @@ check "CSP permite imagens blob: (prévia de fotos)" grep -qi "^content-security
 check "cabeçalho Server oculto" bash -c "! grep -qi '^server:' '$WORK/h-site'"
 check "API com Cache-Control: no-store" grep -qi "^cache-control: no-store" "$WORK/h-api"
 
+echo "==> Limite de corpo da API"
+truncate -s 20000001 "$WORK/corpo-acima-do-limite"
+code="$(get -o /dev/null -w '%{http_code}' -H 'Expect: 100-continue' \
+  --data-binary "@$WORK/corpo-acima-do-limite" "$BASE/api/auth/login")"
+check "Caddy recusa corpo acima de 20 MB ($code)" test "$code" = 413
+
 echo "==> App instalável (v1.0)"
 get -D "$WORK/h-sw" -o /dev/null "$BASE/sw.js"
 check "service worker publicado e sem cache" grep -qi "^cache-control: no-cache" "$WORK/h-sw"
@@ -91,6 +104,24 @@ check "assetlinks.json como JSON" grep -qi "^content-type: application/json" "$W
 
 echo "==> Banco inacessível de fora"
 check "porta 5432 fechada no host" bash -c "! (exec 3<>/dev/tcp/127.0.0.1/5432) 2>/dev/null"
+
+echo "==> Permissões dedicadas à Mensageria"
+check "papel restrito criado no PostgreSQL" db_sql < deploy/scripts/whatsapp-db-role.sql
+check "permissões do conector podem ser reaplicadas" db_sql < deploy/scripts/whatsapp-db-role.sql
+permissoes="$(db_sql -qAt <<'SQL'
+BEGIN;
+INSERT INTO public.messaging_connector_kv (key, value) VALUES
+    ('wa_version', 'teste'), ('chave_interna_teste', 'teste')
+ON CONFLICT (key) DO NOTHING;
+SET LOCAL ROLE hub_whatsapp;
+SELECT count(*) = 1 AND min(key) = 'wa_version'
+    AND NOT has_table_privilege(current_user, 'public.users', 'SELECT,UPDATE')
+    AND has_table_privilege(current_user, 'public.messaging_auth_keys', 'DELETE')
+FROM public.messaging_connector_kv;
+ROLLBACK;
+SQL
+)"
+check "conector vê só a chave de versão e tem acesso às credenciais da Mensageria" test "$permissoes" = t
 
 echo "==> Cadastro, confirmação e login"
 api -X POST "$BASE/api/auth/register" \

@@ -1,9 +1,26 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
-import { addMonths, money, moneyInput, monthLabel, parseMoney, percent, shortDate, textOn } from "./format";
+import {
+  addMonths,
+  money,
+  moneyInput,
+  monthLabel,
+  parseMoney,
+  percent,
+  plural,
+  shortDate,
+  textOn,
+  todayISO,
+} from "./format";
 
 // O Intl usa espaço não separável entre "R$" e o número.
 const brl = (text: string) => text.replace(/ /g, " ");
+
+it("escolhe a forma do singular e do plural em contagens", () => {
+  expect(plural(1, "item", "itens")).toBe("item");
+  expect(plural(0, "item", "itens")).toBe("itens");
+  expect(plural(2, "projeto")).toBe("projetos");
+});
 
 describe("money", () => {
   it("formata em reais", () => {
@@ -90,5 +107,17 @@ describe("textOn (v1.6)", () => {
   it("sem cor válida, segue a cor do texto do tema", () => {
     expect(textOn(null)).toBe("var(--fg)");
     expect(textOn("azul")).toBe("var(--fg)");
+  });
+});
+
+describe("todayISO (B7)", () => {
+  it("mantém a data local mesmo à noite após as 21h", () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date(2026, 10, 20, 22, 30, 0));
+      expect(todayISO()).toBe("2026-11-20");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

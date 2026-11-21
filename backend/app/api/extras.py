@@ -2,10 +2,10 @@
 
 import uuid
 
-from fastapi import APIRouter, status
+from fastapi import APIRouter, Depends, status
 
 from app.api.budget import _changes
-from app.api.deps import CurrentUser, DbSession
+from app.api.deps import CurrentUser, DbSession, require_solution
 from app.core.months import current_month, parse_month
 from app.schemas.budget import (
     BulkIn,
@@ -25,7 +25,9 @@ from app.schemas.budget import (
 )
 from app.services import budget, cards, daily, rules, subscriptions
 
-router = APIRouter(tags=["conforto (v0.6)"])
+router = APIRouter(
+    tags=["conforto (v0.6)"], dependencies=[Depends(require_solution("meu-orcamento"))]
+)
 
 
 # ---------------------------------------------------------------- cartões
