@@ -19,6 +19,7 @@ from app.models import (
     MessagingSession,
     User,
 )
+from app.services.common import get_owned
 from app.services.messaging import connector_client
 from app.services.messaging.phones import (
     DEFAULT_CONTACT_NAME,
@@ -150,12 +151,14 @@ def list_chats(
 
 
 def get_chat(db: Session, user: User, chat_id: uuid.UUID) -> MessagingChat:
-    chat = db.scalar(
-        select(MessagingChat).where(MessagingChat.id == chat_id, MessagingChat.user_id == user.id)
+    return get_owned(
+        db,
+        MessagingChat,
+        user.id,
+        chat_id,
+        error_code="chat_not_found",
+        error_msg="Conversa não encontrada.",
     )
-    if chat is None:
-        raise AppError(404, "chat_not_found", "Conversa não encontrada.")
-    return chat
 
 
 def create_or_open_chat(
@@ -417,13 +420,13 @@ def create_quick_reply(
 
 
 def delete_quick_reply(db: Session, user: User, reply_id: uuid.UUID) -> None:
-    item = db.scalar(
-        select(MessagingQuickReply).where(
-            MessagingQuickReply.id == reply_id,
-            MessagingQuickReply.user_id == user.id,
-        )
+    item = get_owned(
+        db,
+        MessagingQuickReply,
+        user.id,
+        reply_id,
+        error_code="quick_reply_not_found",
+        error_msg="Atalho não encontrado.",
     )
-    if item is None:
-        raise AppError(404, "quick_reply_not_found", "Atalho não encontrado.")
     db.delete(item)
     db.commit()

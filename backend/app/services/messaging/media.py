@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.core.errors import AppError
 from app.db.types import utcnow
 from app.models import MessagingMedia, MessagingMessage, MessagingSession, User, VaultDocument
+from app.services.common import get_owned
 
 # Limite seguro para proteger memória e banco na VM ARM64.
 MAX_MEDIA_BYTES = 8 * 1024 * 1024
@@ -276,15 +277,14 @@ def store_connector_media(
 
 
 def get_media_for_user(db: Session, user: User, media_id: uuid.UUID) -> MessagingMedia:
-    media = db.scalar(
-        select(MessagingMedia).where(
-            MessagingMedia.id == media_id,
-            MessagingMedia.user_id == user.id,
-        )
+    return get_owned(
+        db,
+        MessagingMedia,
+        user.id,
+        media_id,
+        error_code="media_not_found",
+        error_msg="Mídia não encontrada.",
     )
-    if media is None:
-        raise AppError(404, "media_not_found", "Mídia não encontrada.")
-    return media
 
 
 def get_media_for_connector(
