@@ -181,6 +181,15 @@ export function isSolutionBlocked(
   return blockedResources.includes(solutionId);
 }
 
+/** Confere se a conta atual pode usar uma solução considerando bloqueios configurados no Hub. */
+export function canUseSolution(
+  me: { blocked_resources?: readonly string[] | null; is_admin?: boolean } | null | undefined,
+  solutionId: string,
+): boolean {
+  if (me?.is_admin) return true;
+  return !isSolutionBlocked(solutionId, me?.blocked_resources);
+}
+
 function matchesPrefix(pathname: string, prefix: string): boolean {
   return pathname === prefix || pathname.startsWith(`${prefix}/`);
 }

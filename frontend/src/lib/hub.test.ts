@@ -4,6 +4,7 @@ import {
   activeSolutions,
   areaForPath,
   canSkipSplashByClick,
+  canUseSolution,
   computeSplashExitDelay,
   findSolution,
   HUB_AREA,
@@ -240,5 +241,17 @@ describe("tempos da transição entre soluções", () => {
     expect(isSolutionBlocked("mensageria", [])).toBe(false);
     expect(isSolutionBlocked("mensageria", ["mensageria", "feature:external_api"])).toBe(true);
     expect(isSolutionBlocked("dashboard-crm", ["mensageria"])).toBe(false);
+  });
+
+  it("canUseSolution oculta ou libera atalhos conforme bloqueios da conta", () => {
+    expect(canUseSolution(undefined, "cofre")).toBe(true);
+    expect(canUseSolution(null, "caderno")).toBe(true);
+    expect(canUseSolution({ blocked_resources: [] }, "cofre")).toBe(true);
+    expect(canUseSolution({ blocked_resources: ["cofre"] }, "cofre")).toBe(false);
+    expect(canUseSolution({ blocked_resources: ["cofre"] }, "caderno")).toBe(true);
+    expect(canUseSolution({ blocked_resources: ["caderno", "cofre"] }, "caderno")).toBe(false);
+    expect(
+      canUseSolution({ is_admin: true, blocked_resources: ["cofre", "caderno"] }, "cofre"),
+    ).toBe(true);
   });
 });

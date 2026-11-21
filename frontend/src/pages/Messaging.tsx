@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { MessageCircle, MessageSquarePlus } from "lucide-react";
 import { useNavigate, useParams } from "react-router";
 
+import { useMe } from "../api/auth";
 import { ApiError, errorMessage } from "../api/client";
 import {
   messagingApi,
@@ -20,6 +21,7 @@ import { Composer } from "../components/messaging/Composer";
 import { ContactSheet } from "../components/messaging/ContactSheet";
 import { NewChatSheet } from "../components/messaging/NewChatSheet";
 import { announce } from "../lib/announce";
+import { canUseSolution } from "../lib/hub";
 import { payloadForChat } from "../lib/messaging";
 
 /** Tela da Mensageria: junta a lista de conversas, a conversa aberta e as janelas. */
@@ -27,6 +29,9 @@ export default function Messaging() {
   const { chatId: routeChatId } = useParams<{ chatId?: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const me = useMe().data;
+  const canUseCaderno = canUseSolution(me, "caderno");
+  const canUseCofre = canUseSolution(me, "cofre");
 
   const [filter, setFilter] = useState<ChatFilter>("all");
   const [search, setSearch] = useState("");
@@ -149,6 +154,8 @@ export default function Messaging() {
               onInsertDraft={(text) =>
                 setExternalDraft((prev) => ({ chatId: activeChat.id, text, seq: (prev?.seq ?? 0) + 1 }))
               }
+              canUseCaderno={canUseCaderno}
+              canUseCofre={canUseCofre}
             />
             <Composer
               key={activeChat.id}

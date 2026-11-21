@@ -44,6 +44,8 @@ export function ChatThread({
   onReply,
   onFileDrop,
   onInsertDraft,
+  canUseCaderno = true,
+  canUseCofre = true,
 }: {
   chat: MessagingChat;
   messages: MessagingMessage[];
@@ -53,6 +55,8 @@ export function ChatThread({
   onReply: (message: MessagingMessage) => void;
   onFileDrop?: (file: File) => void;
   onInsertDraft?: (text: string) => void;
+  canUseCaderno?: boolean;
+  canUseCofre?: boolean;
 }) {
   const qc = useQueryClient();
   const endRef = useRef<HTMLDivElement>(null);
@@ -206,7 +210,7 @@ export function ChatThread({
           </span>
         </div>
         <div className="row row--tight">
-          {onInsertDraft && (
+          {onInsertDraft && canUseCaderno && (
             <button
               type="button"
               className="btn btn--secondary btn--sm"
@@ -294,9 +298,14 @@ export function ChatThread({
                   onZoomImage={setZoomMedia}
                   onLaunchBudget={openBudgetLaunch}
                   onWorkAction={openWorkModal}
-                  onSaveToVault={(m) => {
-                    if (m.media_id && !saveToVault.isPending) saveToVault.mutate(m);
-                  }}
+                  canSaveToVault={canUseCofre}
+                  onSaveToVault={
+                    canUseCofre
+                      ? (m) => {
+                          if (m.media_id && !saveToVault.isPending) saveToVault.mutate(m);
+                        }
+                      : undefined
+                  }
                 />
               ))}
             </div>
@@ -345,11 +354,12 @@ export function ChatThread({
         onClose={() => setWorkModalOpen(false)}
       />
 
-      <Sheet
-        open={scriptsOpen}
-        title="Roteiros & notas do Caderno"
-        onClose={() => setScriptsOpen(false)}
-      >
+      {canUseCaderno && (
+        <Sheet
+          open={scriptsOpen}
+          title="Roteiros & notas do Caderno"
+          onClose={() => setScriptsOpen(false)}
+        >
         <div className="stack">
           <label className="list-tools__search">
             <Search size={16} aria-hidden />
@@ -390,6 +400,7 @@ export function ChatThread({
           </ul>
         </div>
       </Sheet>
+      )}
     </>
   );
 }

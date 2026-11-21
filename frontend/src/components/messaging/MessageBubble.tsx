@@ -268,6 +268,7 @@ export function MessageBubble({
   onLaunchBudget,
   onWorkAction,
   onSaveToVault,
+  canSaveToVault = true,
 }: {
   message: MessagingMessage;
   onReply: (message: MessagingMessage) => void;
@@ -275,6 +276,7 @@ export function MessageBubble({
   onLaunchBudget?: (message: MessagingMessage) => void;
   onWorkAction?: (message: MessagingMessage) => void;
   onSaveToVault?: (message: MessagingMessage) => void;
+  canSaveToVault?: boolean;
 }) {
   const [copiedImg, setCopiedImg] = useState(false);
   const out = message.direction === "out";
@@ -434,7 +436,8 @@ export function MessageBubble({
               <CalendarPlus size={13} aria-hidden />
             </button>
           )}
-          {onSaveToVault &&
+          {canSaveToVault &&
+            onSaveToVault &&
             message.media_id &&
             (message.message_type === "image" || message.message_type === "document") && (
               <button
