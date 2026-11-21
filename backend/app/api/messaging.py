@@ -331,7 +331,6 @@ def send_media(
             "media_too_large",
             "O arquivo passa do limite de 8 MB permitido para envio.",
         )
-    admin_service.assert_storage_quota(db, user, len(raw))
     parsed_reply: uuid.UUID | None = None
     if reply_to_id and reply_to_id.strip():
         try:

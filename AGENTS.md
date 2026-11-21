@@ -67,7 +67,7 @@ Os links `[[Nome da nota]]` são do Obsidian: mantenha-os e use o nome exato do 
   Preferências globais, App, Mensagens, Notas da versão e Administração.
 - `HUB_SOLUTIONS` em `frontend/src/lib/hub.ts` é o catálogo central.
 - Sair dentro da solução retorna ao Hub; encerrar a sessão fica na barra do Hub.
-- Governança (`/admin`): bloqueio global e por usuário de soluções e sub-recursos (`require_solution`, `require_feature`), cota em MB (`assert_storage_quota`, padrão 200 MB) e isolamento estrito por `user_id`.
+- Governança (`/admin`): bloqueio global e por usuário de soluções e sub-recursos (`require_solution`, `require_feature`), cota de arquivos em MB (`assert_storage_quota`, padrão 100 MB: comprovantes, anexos, Cofre e dados do CRM; mídias da Mensageria ficam fora, com teto próprio de 300 MB por conta que apaga as mais antigas — 2026-11-21) e isolamento estrito por `user_id`.
 - Não há salto de navegação interna entre soluções: voltar ao Hub para escolher outra.
   Endereço digitado, favorito, recarga e notificação continuam abrindo direto.
 - Cada solução tem número, notas e Novidades próprios; versões em preparação não têm data.
@@ -116,7 +116,7 @@ Os links `[[Nome da nota]]` são do Obsidian: mantenha-os e use o nome exato do 
 
 ### 10.1 Cofre & Garantias e Caderno & Conhecimento (Fase D)
 - `/cofre` (`cofre`, API em `/api/cofre`) e `/caderno` (`caderno`, API em `/api/caderno`), integrados via `SolutionShell`, `SolutionGate` e `HUB_SOLUTIONS`.
-- Cofre (migração `0044`, `vault_documents`): arquivo permanente local de PDFs e imagens (PNG/JPG/WebP até 15 MB; rejeita SVG/HTML, valida imagem por Pillow e conta na cota de 200 MB/usuário via `assert_storage_quota`), extração de texto local PyMuPDF + OCR `leitor_comprovantes` (até 5 páginas sob `feature:pdf_ocr_upload`), radar de vencimentos/garantias ligado como 6ª camada `"cofre"` na Agenda 360° e arquivamento direto de mídias da Mensageria e PDFs A4 de Propostas preservado mesmo após a limpeza de 7 dias (`messaging/cleanup.py`).
+- Cofre (migração `0044`, `vault_documents`): arquivo permanente local de PDFs e imagens (PNG/JPG/WebP até 15 MB; rejeita SVG/HTML, valida imagem por Pillow e conta na cota de arquivos de 100 MB/usuário via `assert_storage_quota`), extração de texto local PyMuPDF + OCR `leitor_comprovantes` (até 5 páginas sob `feature:pdf_ocr_upload`), radar de vencimentos/garantias ligado como 6ª camada `"cofre"` na Agenda 360° e arquivamento direto de mídias da Mensageria e PDFs A4 de Propostas preservado mesmo após a limpeza de 7 dias (`messaging/cleanup.py`).
 - Caderno (`notebook_notes`): notas em Markdown com 5 modelos prontos, links internos `[[...]]`, grafo de backlinks bidirecional, busca Okapi BM25 100% local (sem IA) com normalização de acentos e gaveta rápida **Roteiro** na Mensageria inserindo conteúdo na mensagem em composição.
 
 ## 11. Padrão de Experiência "Meu Orçamento" (Obrigatório em qualquer tela nova)

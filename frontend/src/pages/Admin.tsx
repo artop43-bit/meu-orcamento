@@ -53,14 +53,14 @@ function UserPermissionsSheet({
     enabled: Boolean(user),
   });
   const [blocked, setBlocked] = useState<string[]>([]);
-  const [quotaMb, setQuotaMb] = useState(200);
+  const [quotaMb, setQuotaMb] = useState(100);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
     if (!user) return;
     setBlocked(user.blocked_resources ?? []);
-    setQuotaMb(user.storage_quota_mb ?? 200);
+    setQuotaMb(user.storage_quota_mb ?? 100);
     setError("");
   }, [user]);
 
@@ -241,10 +241,14 @@ function UsersTab() {
                     <dd>{u.entries}</dd>
                   </div>
                   <div>
-                    <dt>Armazenamento / Cota</dt>
+                    <dt>Arquivos / Cota</dt>
                     <dd>
-                      {formatStorageMb(u.storage_used_bytes)} / {u.storage_quota_mb ?? 200} MB
+                      {formatStorageMb(u.storage_used_bytes)} / {u.storage_quota_mb ?? 100} MB
                     </dd>
+                  </div>
+                  <div>
+                    <dt>Mídias do WhatsApp (temporárias)</dt>
+                    <dd>{formatStorageMb(u.messaging_used_bytes)} / 300 MB</dd>
                   </div>
                 </dl>
                 <div className="admin-user__actions">

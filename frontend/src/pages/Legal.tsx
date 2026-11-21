@@ -153,7 +153,8 @@ export function Privacy() {
           antes ou desligar o histórico nas <Link to="/ajustes/preferencias#privacidade">Preferências do Meu Orçamento</Link>.
         </li>
         <li>
-          A rotina da Mensageria remove do Hub mensagens e mídias com mais de sete dias. Conversas fixadas
+          A rotina da Mensageria remove do Hub mensagens e mídias com mais de sete dias. As mídias de cada
+          conta ocupam no máximo 300 MB: passando disso, as mais antigas saem antes. Conversas fixadas
           ou com informações de atendimento ou vínculos podem continuar na lista. A cópia do WhatsApp
           segue as regras do próprio WhatsApp. Se você arquivar uma mídia no Cofre, essa cópia continua
           guardada até ser excluída ou a conta ser encerrada.
@@ -161,8 +162,9 @@ export function Privacy() {
         <li>O Hub processa o XML e o PDF do DANFSe durante a solicitação, sem armazenar os arquivos.</li>
         <li>
           Ao excluir a conta, seus dados vinculados são removidos da base principal. As cópias de segurança
-          criptografadas seguem a rotação do ambiente, com prazo padrão de sete dias para cópias no servidor
-          e 30 dias para cópias remotas, quando configuradas.
+          criptografadas seguem a rotação do ambiente: sete dias para cópias no servidor e, nas cópias
+          remotas, quando configuradas, as diárias dos últimos sete dias e as semanais das últimas quatro
+          semanas. As mídias da Mensageria não entram nas cópias de segurança.
         </li>
       </ul>
 

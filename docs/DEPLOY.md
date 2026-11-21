@@ -264,14 +264,21 @@ desse acesso. Mensagens e eventos continuam passando pela API interna.
    ```powershell
    age -d -i age-key.txt -o backup.dump meu-orcamento_AAAA-MM-DD_HHMM.dump.age
    ```
-3. Envie para a VM (`scp`) e restaure (isso **substitui** os dados atuais):
+3. Envie para a VM (`scp`) e restaure (isso **substitui** os dados atuais). O backup não leva
+   os arquivos das mídias da Mensageria (são temporários), então a restauração é em partes:
+   estrutura, dados, soltar as referências às mídias e, por fim, chaves e índices:
    ```bash
    deploy/scripts/compose.sh stop api scheduler
-   deploy/scripts/compose.sh exec -T db pg_restore --clean --if-exists --no-owner \
-     -U orcamento -d orcamento < backup.dump
+   R="deploy/scripts/compose.sh exec -T db pg_restore --no-owner -U orcamento -d orcamento"
+   $R --clean --if-exists --section=pre-data < backup.dump
+   $R --section=data < backup.dump
+   deploy/scripts/compose.sh exec -T db psql -U orcamento -d orcamento -c \
+     "UPDATE messaging_messages SET media_id = NULL; UPDATE vault_documents SET messaging_media_id = NULL;"
+   $R --section=post-data < backup.dump
    deploy/scripts/compose.sh start api scheduler
    rm backup.dump
    ```
+   Os backups ficam no bucket em `diario/` (últimos 7 dias) e `semanal/` (últimas 4 semanas).
 
 Se a instalação usa a conexão dedicada da Mensageria, garanta que o papel
 `hub_whatsapp` exista antes da restauração. Depois da importação, reaplique

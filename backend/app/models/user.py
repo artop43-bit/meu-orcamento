@@ -40,7 +40,7 @@ class User(Base):
     # Governança do Hub: JSON com ids de soluções/recursos bloqueados pelo admin para esta conta
     # (ex.: ["mensageria", "feature:external_api"]) e cota de armazenamento em MB.
     blocked_resources: Mapped[str | None] = mapped_column(Text)
-    storage_quota_mb: Mapped[int] = mapped_column(SmallInteger, default=200, server_default="200")
+    storage_quota_mb: Mapped[int] = mapped_column(SmallInteger, default=100, server_default="100")
 
     # Perfil (tudo opcional). As preferências do resumo ficam em JSON: quais dados aparecem
     # no perfil e se a retrospectiva mostra valores em reais.

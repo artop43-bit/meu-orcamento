@@ -96,6 +96,7 @@ export type AdminUser = {
   blocked_resources?: string[];
   storage_quota_mb?: number;
   storage_used_bytes?: number;
+  messaging_used_bytes?: number;
 };
 
 export type AdminResourceMeta = {

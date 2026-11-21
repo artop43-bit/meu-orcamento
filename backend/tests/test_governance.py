@@ -174,15 +174,25 @@ def test_storage_quota_blocks_uploads_above_user_limit(
     client.post("/api/auth/logout")
     assert login(client, comum.email).status_code == 200
 
-    chat = client.post(
-        "/api/messaging/chats", json={"phone": "5511977776666", "name": "Teste"}
-    ).json()
+    # Arquivo permanente (Cofre) passa da cota: bloqueado.
     up = client.post(
-        f"/api/messaging/chats/{chat['id']}/media",
+        "/api/cofre/documents",
         files={"file": ("foto.png", _png_bytes(64), "image/png")},
+        data={"title": "Documento"},
     )
     assert up.status_code == 413
     assert up.json()["error"] == "quota_exceeded"
+
+    # Mídia da Mensageria não conta na cota de arquivos (D4, 21/11/2026): a recusa aqui é só
+    # por falta de WhatsApp conectado, nunca por cota.
+    chat = client.post(
+        "/api/messaging/chats", json={"phone": "5511977776666", "name": "Teste"}
+    ).json()
+    media = client.post(
+        f"/api/messaging/chats/{chat['id']}/media",
+        files={"file": ("foto.png", _png_bytes(64), "image/png")},
+    )
+    assert media.json()["error"] != "quota_exceeded"
 
 
 def test_calendar_feed_respects_blocked_meu_orcamento(

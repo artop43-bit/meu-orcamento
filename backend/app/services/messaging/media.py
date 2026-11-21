@@ -4,14 +4,18 @@ import re
 import unicodedata
 import uuid
 
-from sqlalchemy import select
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.orm import Session
 
 from app.core.errors import AppError
-from app.models import MessagingMedia, MessagingSession, User
+from app.db.types import utcnow
+from app.models import MessagingMedia, MessagingMessage, MessagingSession, User, VaultDocument
 
 # Limite seguro para proteger memória e banco na VM ARM64.
 MAX_MEDIA_BYTES = 8 * 1024 * 1024
+# Teto das mídias guardadas por conta. Elas são temporárias (somem em 7 dias), não contam na
+# cota de arquivos e nunca bloqueiam nada: passando do teto, as mais antigas saem antes.
+MEDIA_CAP_BYTES = 300 * 1024 * 1024
 MAX_AVATAR_BYTES = 2 * 1024 * 1024
 MEDIA_KINDS = ("image", "audio", "video", "document", "sticker")
 
@@ -179,7 +183,62 @@ def store_media(
     )
     db.add(media)
     db.flush()
+    trim_to_cap(db, user_id, keep_id=media.id)
     return media
+
+
+def release_media(db: Session, media_ids: set[uuid.UUID]) -> int:
+    """Apaga mídias soltando antes as mensagens e a cópia do Cofre que apontam para elas."""
+    if not media_ids:
+        return 0
+    now = utcnow()
+    db.execute(
+        update(MessagingMessage)
+        .where(MessagingMessage.media_id.in_(media_ids))
+        .values(media_id=None, updated_at=now)
+    )
+    # Mantém a cópia permanente do Cofre intacta mesmo no SQLite sem FK cascata.
+    db.execute(
+        update(VaultDocument)
+        .where(VaultDocument.messaging_media_id.in_(media_ids))
+        .values(messaging_media_id=None, updated_at=now)
+    )
+    return db.execute(delete(MessagingMedia).where(MessagingMedia.id.in_(media_ids))).rowcount
+
+
+def media_bytes(db: Session, user_id: uuid.UUID) -> int:
+    """Espaço ocupado pelas mídias da Mensageria da conta."""
+    total = db.scalar(
+        select(func.coalesce(func.sum(MessagingMedia.size_bytes), 0)).where(
+            MessagingMedia.user_id == user_id
+        )
+    )
+    return int(total or 0)
+
+
+def trim_to_cap(
+    db: Session,
+    user_id: uuid.UUID,
+    *,
+    keep_id: uuid.UUID | None = None,
+    cap_bytes: int = MEDIA_CAP_BYTES,
+) -> int:
+    """Passando do teto, apaga as mídias mais antigas da conta (nunca a que acabou de chegar)."""
+    excess = media_bytes(db, user_id) - cap_bytes
+    if excess <= 0:
+        return 0
+    rows = db.execute(
+        select(MessagingMedia.id, MessagingMedia.size_bytes)
+        .where(MessagingMedia.user_id == user_id, MessagingMedia.id != keep_id)
+        .order_by(MessagingMedia.created_at, MessagingMedia.id)
+    ).all()
+    to_delete: set[uuid.UUID] = set()
+    for media_id, size in rows:
+        if excess <= 0:
+            break
+        to_delete.add(media_id)
+        excess -= int(size or 0)
+    return release_media(db, to_delete)
 
 
 def _active_session_user(db: Session, session_id: uuid.UUID) -> User:

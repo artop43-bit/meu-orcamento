@@ -596,3 +596,88 @@ def test_polling_chats_and_media_metadata_does_not_load_binary_payloads(
     assert chat_avatar_url(loaded_chat) is not None
     assert "avatar_data" in inspect(loaded_chat).unloaded
     assert client.get(f"/api/messaging/chats/{chat_id}/avatar").content == TINY_PNG
+
+
+def test_media_cap_removes_oldest_and_keeps_new_and_vault_copy(
+    client: TestClient, outbox: list, db: Session
+) -> None:
+    """D4 (21/11/2026): passando do teto, as mídias mais antigas saem; nada é bloqueado."""
+    from app.models import User, VaultDocument
+    from app.services.messaging import media as media_service
+
+    auth(client, outbox)
+    created = client.post("/api/messaging/chats", json={"phone": "5511966667777"}).json()
+    chat = db.get(MessagingChat, uuid.UUID(created["id"]))
+    user = db.get(User, chat.user_id)
+    now = utcnow()
+    old = []
+    for i in range(3):
+        m = MessagingMedia(
+            user_id=user.id,
+            kind="image",
+            mime_type="image/png",
+            size_bytes=40,
+            data=TINY_PNG,
+            created_at=now - timedelta(hours=3 - i),
+        )
+        db.add(m)
+        db.flush()
+        old.append(m.id)
+    msg = MessagingMessage(
+        user_id=user.id,
+        chat_id=chat.id,
+        direction="in",
+        body="foto",
+        status="received",
+        media_id=old[0],
+    )
+    db.add(msg)
+    vault = VaultDocument(
+        user_id=user.id,
+        title="Cópia arquivada",
+        file_name="foto.png",
+        mime_type="image/png",
+        size_bytes=len(TINY_PNG),
+        sha256="0" * 64,
+        data=TINY_PNG,
+        messaging_media_id=old[0],
+    )
+    db.add(vault)
+    db.commit()
+
+    # Teto 60 bytes abaixo do total: saem só as 2 mais antigas (40 + 40), a nova fica.
+    new = media_service.store_media(db, user.id, kind="image", mime_type="image/png", data=TINY_PNG)
+    cap = 3 * 40 + len(TINY_PNG) - 60
+    removed = media_service.trim_to_cap(db, user.id, keep_id=new.id, cap_bytes=cap)
+    db.commit()
+
+    left = set(db.scalars(select(MessagingMedia.id).where(MessagingMedia.user_id == user.id)))
+    assert removed == 2
+    assert new.id in left and old[2] in left
+    assert old[0] not in left and old[1] not in left
+    db.refresh(msg)
+    db.refresh(vault)
+    assert msg.media_id is None
+    assert vault.messaging_media_id is None and vault.data == TINY_PNG
+
+
+def test_messaging_media_is_outside_file_quota_and_default_quota_is_100mb(
+    client: TestClient, outbox: list, db: Session
+) -> None:
+    from app.models import User
+    from app.services import admin as admin_service
+
+    auth(client, outbox)
+    created = client.post("/api/messaging/chats", json={"phone": "5511966668888"}).json()
+    user = db.get(User, db.get(MessagingChat, uuid.UUID(created["id"])).user_id)
+    assert admin_service.DEFAULT_STORAGE_QUOTA_MB == 100
+    assert user.storage_quota_mb == 100
+    before = admin_service.user_storage_bytes(db, user.id)
+    db.add(
+        MessagingMedia(
+            user_id=user.id, kind="image", mime_type="image/png", size_bytes=5_000_000, data=b"x"
+        )
+    )
+    db.commit()
+    assert admin_service.user_storage_bytes(db, user.id) == before
+    assert admin_service.messaging_media_map(db)[user.id] == 5_000_000

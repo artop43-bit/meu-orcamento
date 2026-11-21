@@ -16,8 +16,8 @@ from app.models import (
     MessagingMedia,
     MessagingMessage,
     NotebookNote,
-    VaultDocument,
 )
+from app.services.messaging.media import release_media
 from app.services.messaging.messages import preview
 
 RETENTION = timedelta(days=7)
@@ -52,23 +52,7 @@ def purge_old(db: Session, *, retention: timedelta = RETENTION) -> dict[str, int
     old_media_ids = set(
         db.scalars(select(MessagingMedia.id).where(MessagingMedia.created_at < cutoff)).all()
     )
-    media_to_delete = expired_media_ids | old_media_ids
-    removed_media = 0
-    if media_to_delete:
-        db.execute(
-            update(MessagingMessage)
-            .where(MessagingMessage.media_id.in_(media_to_delete))
-            .values(media_id=None, updated_at=now)
-        )
-        # Mantém a cópia permanente do Cofre intacta mesmo no SQLite sem FK cascata.
-        db.execute(
-            update(VaultDocument)
-            .where(VaultDocument.messaging_media_id.in_(media_to_delete))
-            .values(messaging_media_id=None, updated_at=now)
-        )
-        removed_media = db.execute(
-            delete(MessagingMedia).where(MessagingMedia.id.in_(media_to_delete))
-        ).rowcount
+    removed_media = release_media(db, expired_media_ids | old_media_ids)
 
     # Atualiza prévia e data das conversas que tiveram mensagens antigas removidas.
     for chat_id in affected_chat_ids:

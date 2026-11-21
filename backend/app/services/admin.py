@@ -34,7 +34,7 @@ EMAIL_LOG_DAYS = 30
 GLOBAL_BLOCKED_KV_KEY = "hub_global_blocked_resources"
 MIN_STORAGE_QUOTA_MB = 5
 MAX_STORAGE_QUOTA_MB = 2048
-DEFAULT_STORAGE_QUOTA_MB = 200
+DEFAULT_STORAGE_QUOTA_MB = 100
 
 CONTROLLABLE_SOLUTIONS: list[dict[str, str]] = [
     {
@@ -222,19 +222,10 @@ def user_storage_map(db: Session) -> dict[uuid.UUID, int]:
             ).group_by(VaultDocument.user_id)
         ).all()
     )
-    media = dict(
-        db.execute(
-            select(
-                MessagingMedia.user_id, func.coalesce(func.sum(MessagingMedia.size_bytes), 0)
-            ).group_by(MessagingMedia.user_id)
-        ).all()
-    )
     totals: dict[uuid.UUID, int] = {}
     for uid, size in stored.items():
         totals[uid] = totals.get(uid, 0) + int(size or 0)
     for uid, size in vault.items():
-        totals[uid] = totals.get(uid, 0) + int(size or 0)
-    for uid, size in media.items():
         totals[uid] = totals.get(uid, 0) + int(size or 0)
     for uid, rows_json in db.execute(
         select(DataSource.user_id, DataSnapshot.rows_json).join(
@@ -245,7 +236,21 @@ def user_storage_map(db: Session) -> dict[uuid.UUID, int]:
     return totals
 
 
+def messaging_media_map(db: Session) -> dict[uuid.UUID, int]:
+    """Espaço das mídias da Mensageria por conta (temporárias, fora da cota de arquivos)."""
+    rows = db.execute(
+        select(
+            MessagingMedia.user_id, func.coalesce(func.sum(MessagingMedia.size_bytes), 0)
+        ).group_by(MessagingMedia.user_id)
+    ).all()
+    return {uid: int(size or 0) for uid, size in rows}
+
+
 def user_storage_bytes(db: Session, user_id: uuid.UUID) -> int:
+    """Arquivos permanentes da conta (comprovantes, anexos, Cofre e dados do CRM).
+
+    As mídias da Mensageria ficam de fora: são temporárias e têm teto próprio.
+    """
     stored = int(
         db.scalar(
             select(func.coalesce(func.sum(StoredFile.size), 0)).where(
@@ -262,21 +267,13 @@ def user_storage_bytes(db: Session, user_id: uuid.UUID) -> int:
         )
         or 0
     )
-    media = int(
-        db.scalar(
-            select(func.coalesce(func.sum(MessagingMedia.size_bytes), 0)).where(
-                MessagingMedia.user_id == user_id
-            )
-        )
-        or 0
-    )
     snaps = db.scalars(
         select(DataSnapshot.rows_json)
         .join(DataSource, DataSnapshot.source_id == DataSource.id)
         .where(DataSource.user_id == user_id)
     ).all()
     snapshots = sum(_snapshot_size_bytes(r) for r in snaps)
-    return stored + vault + media + snapshots
+    return stored + vault + snapshots
 
 
 def assert_storage_quota(db: Session, user: User, incoming_bytes: int) -> None:
@@ -346,6 +343,7 @@ def list_users(db: Session) -> list[dict[str, Any]]:
 
     avatars = files.latest_ids(db, [u.id for u in users], "avatar")
     storage_map = user_storage_map(db)
+    media_map = messaging_media_map(db)
     return [
         {
             "id": u.id,
@@ -365,6 +363,7 @@ def list_users(db: Session) -> list[dict[str, Any]]:
             "storage_quota_mb": getattr(u, "storage_quota_mb", DEFAULT_STORAGE_QUOTA_MB)
             or DEFAULT_STORAGE_QUOTA_MB,
             "storage_used_bytes": storage_map.get(u.id, 0),
+            "messaging_used_bytes": media_map.get(u.id, 0),
         }
         for u in users
     ]

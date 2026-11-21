@@ -11,7 +11,6 @@ from sqlalchemy.orm import Session
 from app.core.errors import AppError
 from app.db.types import utcnow
 from app.models import MessagingMedia, MessagingMessage, User
-from app.services import admin as admin_service
 from app.services.messaging import connector_client
 from app.services.messaging.chats import get_chat
 from app.services.messaging.media import media_label, store_media
@@ -221,8 +220,7 @@ def send_media_message(
     if session.status != "ready":
         raise AppError(409, "whatsapp_disconnected", "Conecte o WhatsApp para enviar mensagens.")
 
-    admin_service.assert_storage_quota(db, user, len(data))
-
+    # Mídias da Mensageria não contam na cota de arquivos: têm teto próprio (media.MEDIA_CAP_BYTES).
     reply_msg: MessagingMessage | None = None
     if reply_to_id is not None:
         reply_msg = db.scalar(

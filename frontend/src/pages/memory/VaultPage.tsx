@@ -130,7 +130,7 @@ export default function VaultPage() {
   }
 
   const allOpen = shown.length > 0 && shown.every((d) => open.has(d.id));
-  const quotaBytes = (summary?.quota_mb ?? 200) * 1024 * 1024;
+  const quotaBytes = (summary?.quota_mb ?? 100) * 1024 * 1024;
   const usedPct =
     summary && quotaBytes > 0
       ? Math.min(100, Math.round((summary.account_used_bytes / quotaBytes) * 100))

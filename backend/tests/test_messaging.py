@@ -11,7 +11,9 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.db.types import utcnow
+from app.services import admin as admin_service
 from app.services.messaging import connector_client
+from app.services.messaging import media as media_service
 from tests.messaging_helpers import (
     CONNECTOR_URL,
     TOKEN,
@@ -874,7 +876,8 @@ def test_messaging_bridges_blocked_and_pdf_send_quota(
         },
     ).json()
 
-    # C5: estoura cota de armazenamento ao enviar PDF da proposta para a Mensageria.
+    # Cota de arquivos cheia não bloqueia a Mensageria (decisão D4 de 21/11/2026): a mídia
+    # enviada vai para o teto próprio das mídias e não conta na cota de arquivos.
     dono.storage_quota_mb = 5
     db.add(
         StoredFile(
@@ -889,12 +892,14 @@ def test_messaging_bridges_blocked_and_pdf_send_quota(
         )
     )
     db.commit()
+    files_before = admin_service.user_storage_bytes(db, dono.id)
     quota_send = client.post(
         f"/api/proposals/{doc['id']}/send-messaging",
         json={"chat_id": chat["id"]},
     )
-    assert quota_send.status_code == 413
-    assert quota_send.json()["error"] == "quota_exceeded"
+    assert quota_send.status_code < 300, quota_send.text
+    assert admin_service.user_storage_bytes(db, dono.id) == files_before
+    assert media_service.media_bytes(db, dono.id) > 0
 
     # C4: bloqueio em meu-orcamento e dashboard-crm impede pontes via Mensageria.
     assert login(client, adm.email).status_code == 200

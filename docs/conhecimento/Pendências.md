@@ -61,7 +61,8 @@ tags: [meu-orcamento, pendencias]
 - [x] Fase D (Cofre & Garantias e Caderno) foi pedida e fica — confirmado pelo Arthur (2026-11-21).
 - [x] Reforma Tributária (`rtc`, ~1,4 GB de RAM) só vai para a produção junto com o update do Hub (2026-11-21).
 - [x] D2 (caixas marcadas antes de confirmar pedido/aprovar proposta), D3 (etiqueta exclusiva de projeto) e D9 (excluir com desfazer) confirmados pelo Arthur (2026-11-21).
-- [ ] D4 — cota por conta: o Arthur pediu a análise do Claude antes de decidir (2026-11-21).
+- [x] D4 — cota: arquivos permanentes (comprovantes, anexos, Cofre e CRM) com 100 MB por conta, que o admin pode aumentar; mídias da Mensageria fora da cota, com teto de 300 MB que apaga as mais antigas; backup remoto com 7 diárias + 4 semanais e sem as mídias temporárias — recomendação do Claude aprovada pelo Arthur (2026-11-21).
+- [ ] Conferir no painel da Oracle o limite gratuito do Object Storage e criar alarme de orçamento (Budgets) antes do deploy do Hub.
 - [ ] D8 — Termos e Privacidade: o Arthur vai ler e pediu revisão do Claude antes de publicar (2026-11-21).
 
 ## Revisão geral 21/11/2026 — Checklist de correções, decisões D1–D4 e Fase D
