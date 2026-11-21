@@ -6,4 +6,4 @@ Caderno & Base de Conhecimento
 - [x] Novo endereço `/caderno` integrado ao Hub de Soluções com cadernos, etiquetas e notas fixadas.
 - [x] Links bidirecionais `[[Nome da nota]]` com lista de referências cruzadas (backlinks).
 - [x] Modelos prontos para atas de reunião, roteiros comerciais de WhatsApp, POPs e planejamento.
-- [x] Busca instantânea local BM25 e consulta rápida de roteiros direto na Mensageria.
+- [x] Busca instantânea local BM25, listagem paginada por trecho e carregamento completo sob demanda ao abrir ou inserir na Mensageria.

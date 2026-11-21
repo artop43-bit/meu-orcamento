@@ -12,7 +12,9 @@ Conversas
 Correções
 - [x] Valores brasileiros e compras no cartão seguem as regras do orçamento.
 - [x] Anexos e rascunhos ficam na própria conversa.
-- [x] Limpeza preserva conversas com vínculos e informações de atendimento.
+- [x] Limpeza preserva conversas com vínculos (inclusive notas do Caderno) e informações de atendimento.
+- [x] Gaveta Roteiro aguarda 300 ms após digitar para buscar e carrega o texto completo ao inserir na mensagem.
+- [x] Atalhos Roteiro e Guardar no Cofre ficam ocultos na conversa quando o Caderno ou o Cofre estiverem bloqueados para a conta.
 
 Validação
 - Resultado dos testes registrado em docs/conhecimento/Testes e auditorias.md.

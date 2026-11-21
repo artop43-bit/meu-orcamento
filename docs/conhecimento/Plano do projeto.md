@@ -51,6 +51,11 @@ Deixar o projeto fácil de manter por qualquer pessoa ou IA.
 - [x] Retomada da revisão de 21/11: decisões D5–D7 confirmadas, D8 atualizado para as nove
       soluções, itens H1–H7 e E1 concluídos e ajustes C2/C8 preparados no código.
       A ativação em produção segue em [[Pendências]].
+- [x] Correções 2 — Frente 1 (Cofre, Caderno, Mensageria e snapshots CRM, 21/11/2026):
+      migração `0046`, payloads sob demanda no Cofre, regra `"vault"` de imagens (15 MB/6000 px),
+      rate limit e parada no OCR ocupado, `limit`/`excerpt` + debounce na gaveta Roteiro,
+      unicidade contra clique duplo, `size_bytes` em `data_snapshots`, preservação de conversas
+      com nota no Caderno, bloqueio visual na Mensageria e organização do `NotebookPage`.
 - [ ] Pasta `laboratorio/` no repositório para peças desenvolvidas à parte (ver
       [[Como trabalhamos]]).
 - [ ] Testar a **restauração** de um backup (backup que nunca foi restaurado não é garantia).

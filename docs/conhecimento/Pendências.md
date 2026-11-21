@@ -84,3 +84,7 @@ tags: [meu-orcamento, pendencias]
   notas da versão conferindo as soluções do catálogo do Hub.
 - [ ] **C2 e C8 em produção**: aplicar a configuração do Caddy e provisionar e ativar o papel
   dedicado do conector na janela de deploy aprovada.
+
+## Checklist de correções 2 — Frente 1 (21/11/2026)
+- [x] **R1–R8 e R13** (branch `exp/hub-cofre`, migração `0046`): `VaultDocument.data` com `deferred=True`, regra `"vault"` (15 MB / 6000 px / JPEG 92 / PNG sem perda / sem EXIF), rate limit (`5/60s`) e parada imediata no OCR ocupado, `limit` + `excerpt` + `GET /api/caderno/notes/{id}` + `useDebouncedValue` (300 ms) na gaveta Roteiro, índices únicos parciais + `DataSnapshot.size_bytes` (`0046`), preservação de conversas ligadas a notas do Caderno na limpeza semanal, ocultação de atalhos bloqueados na Mensageria (`canUseSolution`) e extração de `NotebookEditor`/`NotebookList` sem estilos inline.
+- [ ] **Sugestão futura para o Cofre**: adicionar botão "Ler texto de novo" em `VaultPage.tsx` para documentos salvos sem OCR quando o leitor estava ocupado (não incluído nesta entrega por não fazer parte do pedido aprovado).

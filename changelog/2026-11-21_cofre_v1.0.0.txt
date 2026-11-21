@@ -4,6 +4,8 @@ Data: Em preparação
 
 Cofre & Garantias
 - [x] Novo endereço `/cofre` integrado ao Hub de Soluções com entrada padronizada.
-- [x] Guarde PDFs, notas fiscais, comprovantes e fotos com leitura local de texto para busca.
+- [x] Guarde PDFs, notas fiscais, comprovantes e fotos (até 15 MB e 6.000 px, preservando nitidez e removendo metadados/EXIF de localização) com leitura local de texto para busca.
+- [x] Listagem, Agenda e pontes carregam apenas o resumo dos documentos, baixando o arquivo completo só ao visualizar ou baixar.
+- [x] Proteção contra clique duplo ao arquivar da Mensageria ou Propostas e aviso imediato sem travar quando a fila de OCR estiver ocupada.
 - [x] Controle de validade e garantias integrado automaticamente à Agenda 360° (`/agenda`).
 - [x] Botão "Guardar no Cofre" na Mensageria e em Propostas & PDFs protegendo documentos importantes contra a limpeza semanal de 7 dias.
