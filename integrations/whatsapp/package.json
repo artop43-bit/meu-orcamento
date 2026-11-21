@@ -1,0 +1,20 @@
+{
+  "name": "hub-whatsapp-conector",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Conector do WhatsApp (Baileys) para a Mensageria do Hub de Soluções",
+  "type": "module",
+  "main": "src/index.js",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "baileys": "7.0.0-rc14",
+    "pg": "8.23.1",
+    "pino": "9.14.0"
+  }
+}

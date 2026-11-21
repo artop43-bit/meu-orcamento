@@ -1,0 +1,12 @@
+# Fica fora da imagem: dependências locais (o npm ci instala de novo), testes, documentação e segredos.
+node_modules
+test
+*.md
+*.log
+.git
+.gitignore
+.env
+.env.*
+coverage
+Dockerfile
+.dockerignore
