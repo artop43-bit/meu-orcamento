@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session, load_only
 
 from app.core.errors import AppError
 from app.core.months import today_local
+from app.core.rate_limit import limiter
 from app.db.types import utcnow
 from app.models import (
     CommercialDocument,
@@ -53,6 +54,13 @@ CATEGORY_LABELS: dict[str, str] = {
     "other": "Outro documento",
 }
 EXPIRY_FILTER_STATUSES = ("all", "valid", "expiring_soon", "expired", "no_expiry")
+OCR_BUSY_WARNING = (
+    "Documento guardado. A leitura do texto não foi feita agora; tente enviar de novo mais tarde."
+)
+
+
+def _is_ocr_busy(exc: AppError) -> bool:
+    return exc.code == "ocr_busy" or "ocupado" in exc.message.lower()
 
 
 def _extract_pdf_text(raw: bytes, *, allow_ocr: bool) -> tuple[str | None, bool, str | None]:
@@ -68,6 +76,7 @@ def _extract_pdf_text(raw: bytes, *, allow_ocr: bool) -> tuple[str | None, bool,
     ocr_used = False
     ocr_pages = 0
     truncated = False
+    ocr_busy = False
     try:
         total = len(doc)
         if total == 0:
@@ -75,13 +84,20 @@ def _extract_pdf_text(raw: bytes, *, allow_ocr: bool) -> tuple[str | None, bool,
         for idx in range(min(total, MAX_PDF_PAGES)):
             page = doc[idx]
             text = (page.get_text("text") or "").strip()
-            if len(text) < MIN_DIGITAL_CHARS and allow_ocr and receipt_ocr.available():
+            if (
+                len(text) < MIN_DIGITAL_CHARS
+                and allow_ocr
+                and receipt_ocr.available()
+                and not ocr_busy
+            ):
                 if ocr_pages >= MAX_OCR_PAGES:
                     truncated = True
                 else:
                     try:
                         ocr_txt = (_ocr_page(page) or "").strip()
-                    except AppError:
+                    except AppError as exc:
+                        if _is_ocr_busy(exc):
+                            ocr_busy = True
                         ocr_txt = ""
                     if ocr_txt:
                         text = ocr_txt
@@ -93,6 +109,8 @@ def _extract_pdf_text(raw: bytes, *, allow_ocr: bool) -> tuple[str | None, bool,
         doc.close()
 
     merged = "\n\n".join(chunks).strip()[:100_000] or None
+    if ocr_busy:
+        return merged, ocr_used, OCR_BUSY_WARNING
     warning = f"Indexado por OCR até {MAX_OCR_PAGES} páginas digitalizadas." if truncated else None
     return merged, ocr_used, warning
 
@@ -125,14 +143,17 @@ def _prepare_vault_payload(
 
     extracted_text = None
     ocr_used = False
+    warning = None
     if allow_ocr and receipt_ocr.available():
         try:
             res = receipt_ocr.extract(prepared)
             extracted_text = (res.texto_extraido or "").strip()[:100_000] or None
             ocr_used = bool(extracted_text)
-        except AppError:
+        except AppError as exc:
             extracted_text = None
-    return prepared, content_type, safe_name[:160], extracted_text, ocr_used, None
+            if _is_ocr_busy(exc):
+                warning = OCR_BUSY_WARNING
+    return prepared, content_type, safe_name[:160], extracted_text, ocr_used, warning
 
 
 def _expiry_state(doc: VaultDocument, ref: date) -> tuple[str, int | None]:
@@ -397,6 +418,12 @@ def archive_from_messaging_media(
     )
     if existing is not None:
         return {"archived": False, "document": _serialize(existing, today_local())}
+    if limiter.hit(f"cofre-from-messaging:{user.id}", 5, 60) is not None:
+        raise AppError(
+            429,
+            "rate_limited",
+            "Muitos envios seguidos no Cofre. Tente novamente em um minuto.",
+        )
 
     contact_id: uuid.UUID | None = None
     msg = db.scalar(
@@ -470,6 +497,12 @@ def archive_from_proposal(
     )
     if existing is not None:
         return {"archived": False, "document": _serialize(existing, today_local())}
+    if limiter.hit(f"cofre-from-messaging:{user.id}", 5, 60) is not None:
+        raise AppError(
+            429,
+            "rate_limited",
+            "Muitos envios seguidos no Cofre. Tente novamente em um minuto.",
+        )
 
     pdf_bytes, filename = proposals_service.render_document_pdf(db, user, prop.id)
     cat_by_type = {"contract": "contract", "receipt": "receipt"}

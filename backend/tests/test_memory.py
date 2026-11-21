@@ -7,6 +7,7 @@ import uuid
 from datetime import date, timedelta
 
 import pymupdf
+import pytest
 from fastapi.testclient import TestClient
 from PIL import Image
 from sqlalchemy import event, inspect, select
@@ -465,3 +466,85 @@ def test_vault_image_rule_6mb_4000px_strips_exif_and_rejects_svg(
         data={"title": "Grande demais"},
     )
     assert too_big.status_code == 413
+
+
+def test_vault_upload_rate_limit_and_ocr_busy_stops_early(
+    client: TestClient, db: Session, outbox: list, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.core.errors import AppError
+    from app.services import ocr as receipt_ocr
+
+    user = _make_user(client, db, outbox, "cofre_r3@example.com")
+    assert login(client, user.email).status_code == 200
+
+    # 1) PDF escaneado com 3 páginas quando OCR está ocupado: para na 1ª tentativa e retorna aviso.
+    doc = pymupdf.open()
+    for _ in range(3):
+        doc.new_page()
+    blank_pdf = doc.tobytes()
+    doc.close()
+
+    ocr_calls = 0
+
+    expected_warning = (
+        "Documento guardado. A leitura do texto não foi feita agora; "
+        "tente enviar de novo mais tarde."
+    )
+
+    def busy_ocr_page(_page: object) -> str:
+        nonlocal ocr_calls
+        ocr_calls += 1
+        raise AppError(
+            503, "ocr_busy", "Muitas leituras ao mesmo tempo. Tente de novo em instantes."
+        )
+
+    monkeypatch.setattr(receipt_ocr, "available", lambda: True)
+    monkeypatch.setattr(vault_service, "_ocr_page", busy_ocr_page)
+
+    res_pdf = client.post(
+        "/api/cofre/documents",
+        files={"file": ("escaneado.pdf", blank_pdf, "application/pdf")},
+        data={"title": "PDF OCR Ocupado"},
+    )
+    assert res_pdf.status_code == 201, res_pdf.text
+    body_pdf = res_pdf.json()
+    assert ocr_calls == 1
+    assert body_pdf["ocr_used"] is False
+    assert body_pdf["has_extracted_text"] is False
+    assert body_pdf["warning"] == expected_warning
+
+    # 2) Imagem quando OCR está ocupado também salva sem texto e devolve o aviso.
+    def busy_extract(_raw: bytes) -> object:
+        raise AppError(
+            503, "ocr_busy", "Muitas leituras ao mesmo tempo. Tente de novo em instantes."
+        )
+
+    monkeypatch.setattr(receipt_ocr, "extract", busy_extract)
+    res_img = client.post(
+        "/api/cofre/documents",
+        files={"file": ("foto.png", _png_bytes(), "image/png")},
+        data={"title": "PNG OCR Ocupado"},
+    )
+    assert res_img.status_code == 201, res_img.text
+    body_img = res_img.json()
+    assert body_img["ocr_used"] is False
+    assert body_img["has_extracted_text"] is False
+    assert body_img["warning"] == expected_warning
+
+    # 3) Rate limit: 5 uploads por minuto liberados (já fizemos 2 acima), 6º retorna 429.
+    small_pdf = _pdf_bytes("Texto digital suficiente para nao precisar de OCR.")
+    for i in range(3):
+        ok = client.post(
+            "/api/cofre/documents",
+            files={"file": (f"ok-{i}.pdf", small_pdf, "application/pdf")},
+            data={"title": f"Doc {i}"},
+        )
+        assert ok.status_code == 201, ok.text
+
+    blocked = client.post(
+        "/api/cofre/documents",
+        files={"file": ("sexto.pdf", small_pdf, "application/pdf")},
+        data={"title": "Sexto"},
+    )
+    assert blocked.status_code == 429
+    assert blocked.json()["error"] == "rate_limited"

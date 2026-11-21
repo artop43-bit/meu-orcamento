@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 
 from app.api.deps import CurrentUser, DbSession, require_solution
 from app.core.errors import AppError
+from app.core.rate_limit import limiter
 from app.services.memory import notebook as notebook_service
 from app.services.memory import vault as vault_service
 
@@ -97,6 +98,15 @@ class NotePatchIn(BaseModel):
 # ---------------------------------------------------------------- Cofre de Documentos & Garantias
 
 
+def _limit_vault_upload(user: CurrentUser) -> None:
+    if limiter.hit(f"cofre-upload:{user.id}", 5, 60) is not None:
+        raise AppError(
+            429,
+            "rate_limited",
+            "Muitos envios seguidos no Cofre. Tente novamente em um minuto.",
+        )
+
+
 @vault_router.get("/hub/bridges")
 def get_vault_bridges(user: CurrentUser, db: DbSession) -> dict[str, Any]:
     return vault_service.list_hub_bridges(db, user)
@@ -133,6 +143,7 @@ def upload_vault_document(
     project_id: Annotated[uuid.UUID | None, Form()] = None,
     proposal_id: Annotated[uuid.UUID | None, Form()] = None,
 ) -> dict[str, Any]:
+    _limit_vault_upload(user)
     # Leitura síncrona para execução segura fora do event loop (regra E5).
     if file.size is not None and file.size > vault_service.MAX_VAULT_BYTES:
         raise AppError(413, "file_too_large", "O documento ultrapassa o limite de 15 MB.")
