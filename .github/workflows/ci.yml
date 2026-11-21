@@ -20,6 +20,7 @@ jobs:
     outputs:
       backend: ${{ steps.diff.outputs.backend }}
       frontend: ${{ steps.diff.outputs.frontend }}
+      whatsapp: ${{ steps.diff.outputs.whatsapp }}
       stack: ${{ steps.diff.outputs.stack }}
       e2e: ${{ steps.diff.outputs.e2e }}
       devcontainer: ${{ steps.diff.outputs.devcontainer }}
@@ -46,7 +47,8 @@ jobs:
           out() { if has "$2"; then echo "$1=true"; else echo "$1=false"; fi >> "$GITHUB_OUTPUT"; }
           out backend '^backend/'
           out frontend '^frontend/'
-          out stack '^(backend|frontend|deploy)/|^docker-compose'
+          out whatsapp '^integrations/whatsapp/'
+          out stack '^(backend|frontend|deploy|integrations/(whatsapp|rtc))/|^docker-compose'
           out e2e '^(backend|frontend|e2e)/'
           out devcontainer '^\.devcontainer/|^backend/(pyproject\.toml|uv\.lock)$|^frontend/package(-lock)?\.json$'
           # Tarefas pesadas (imagens ARM, produção, e2e, Codespaces): não rodam em rascunho.
@@ -133,6 +135,22 @@ jobs:
       - run: npm test
       - run: npm run build
 
+  # Conector do WhatsApp da Mensageria (Node 24 + Baileys): testes unitários.
+  whatsapp:
+    needs: changes
+    if: needs.changes.outputs.whatsapp == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: integrations/whatsapp
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - run: npm ci
+      - run: npm test
+
   # Sobe a stack de produção inteira (docker-compose.prod.yml) em https://localhost e testa
   # site, segurança, cadastro/login e backup + restauração. Ver deploy/scripts/smoke-test.sh.
   production:
@@ -177,8 +195,31 @@ jobs:
           assert r.valor_total == Decimal("44.88"), r.valor_total
           print("leitor ok no ARM:", r.valor_total)
           PY
+      - name: Conector do WhatsApp (build + import da Baileys no ARM)
+        run: |
+          docker buildx build --platform linux/arm64 --load -t whatsapp:arm64 ./integrations/whatsapp
+          docker run --rm --platform linux/arm64 whatsapp:arm64 \
+            node -e "import('baileys').then(m => console.log('ok', typeof m.default, process.arch))"
       - name: Backup
         run: docker buildx build --platform linux/arm64 ./deploy/backup
+      - name: Reforma Tributária (motores oficiais sem acesso externo)
+        run: |
+          for motor in regular simples; do
+            docker buildx build --platform linux/arm64 --load \
+              -f integrations/rtc/Dockerfile.java --target "$motor" \
+              -t "rtc-qa-rtc-$motor" integrations/rtc
+          done
+          docker buildx build --platform linux/arm64 --load \
+            -f integrations/rtc/Dockerfile.danfse -t rtc-qa-rtc-danfse integrations/rtc
+          export DOCKER_DEFAULT_PLATFORM=linux/arm64
+          trap 'docker compose -p rtc-qa -f integrations/rtc/compose.yml down' EXIT
+          docker compose -p rtc-qa -f integrations/rtc/compose.yml --profile rtc up -d --no-build
+          docker run --rm --network rtc-qa_rtc \
+            -e PYTHONPATH=/app \
+            -e RTC_REGULAR_URL=http://rtc-regular:8080 \
+            -e RTC_SIMPLES_URL=http://rtc-simples:8082 \
+            -e RTC_DANFSE_URL=http://rtc-danfse:8080 \
+            -v "$PWD/integrations/rtc:/rtc:ro" api:arm64 python /rtc/smoke.py
       - name: Caddy + frontend
         run: docker buildx build --platform linux/arm64 -f deploy/caddy/Dockerfile .
 
@@ -214,6 +255,12 @@ jobs:
           (cd frontend && npm ci)
           uv run --no-project --with playwright python -m playwright install --with-deps chromium
       - name: Subir API e site
+        env:
+          # Mensageria: a persona faz o papel do conector do WhatsApp pela API (X-Connector-Token).
+          # O endereço do conector não responde de propósito: "Conectar" marca erro, mas o pedido
+          # continua valendo e os eventos simulados são aplicados.
+          MESSAGING_CONNECTOR_TOKEN: e2e-conector
+          MESSAGING_CONNECTOR_URL: http://127.0.0.1:9
         run: |
           cd backend
           uv run alembic upgrade head
@@ -225,8 +272,12 @@ jobs:
           npm run build
           API_PROXY_TARGET=http://127.0.0.1:8000 nohup npx vite preview --port 5173 --strictPort > /tmp/web.log 2>&1 &
           for _ in $(seq 1 60); do curl -fsS -o /dev/null http://localhost:5173/ && curl -fsS -o /dev/null http://127.0.0.1:8000/api/health && break; sleep 1; done
+      - name: Termos, privacidade e aceite no cadastro
+        run: uv run --no-project --with playwright python e2e/legal.py
       - name: Persona (QA pela interface)
         run: uv run --no-project --with playwright --with pyotp python e2e/persona.py
+      - name: Reforma Tributária (simulação e DANFSe)
+        run: uv run --no-project --with playwright --with pyotp python e2e/rtc.py
       - name: Layout (texto cortado ou fora da caixa, 3 tamanhos de tela)
         if: always()
         run: uv run --no-project --with playwright python e2e/layout.py

@@ -296,13 +296,17 @@ def main() -> int:
     with sync_playwright() as p:
         browser = getattr(p, "chromium").launch(channel=None if BROWSER == "chromium" else BROWSER)
         page = browser.new_page(locale="pt-BR", viewport={"width": 1366, "height": 900})
+        if os.environ.get("QA_RTC_REAL") != "1":
+            from rtc import _resposta_exemplo
+
+            page.route("**/api/rtc/**", _resposta_exemplo)
         for path in PUBLIC:
             combos += check(page, path, problems)
         page.goto(f"{BASE}/entrar")
         page.get_by_label("E-mail").fill(EMAIL)
         page.get_by_label("Senha").fill(PASSWORD)
         page.get_by_role("button", name="Entrar").click()
-        page.wait_for_url("**/orcamento**")
+        page.get_by_role("heading", name="Escolha uma solução").wait_for()
         for path in PAGES:
             combos += check(page, path, problems)
         browser.close()

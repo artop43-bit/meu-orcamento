@@ -22,7 +22,28 @@ CRED = pathlib.Path(os.environ.get("QA_CREDENTIALS", "backend/local-dev-cred.txt
 EMAIL = re.search(r"E-mail:\s*(\S+)", CRED)[1]
 PASSWORD = re.search(r"Senha:\s*(\S+)", CRED)[1]
 
-PAGES = ["/orcamento", "/contas", "/cartoes", "/dividas", "/divisoes", "/calendario", "/metas", "/analises", "/historico", "/investimentos", "/ajustes", "/mensagens"]
+PAGES = [
+    "/",
+    "/perfil",
+    "/configuracoes",
+    "/seguranca",
+    "/preferencias",
+    "/app",
+    "/notas",
+    "/mensageria",
+    "/orcamento",
+    "/contas",
+    "/cartoes",
+    "/dividas",
+    "/divisoes",
+    "/calendario",
+    "/metas",
+    "/analises",
+    "/historico",
+    "/investimentos",
+    "/ajustes",
+    "/mensagens",
+]
 
 # Arrasto feito com eventos de toque do próprio navegador; mede, a cada quadro, quanto da
 # largura da tela fica sem a página nem a tela vizinha (deve ser zero).
@@ -79,6 +100,8 @@ def main():
         page.get_by_label("E-mail").fill(EMAIL)
         page.get_by_label("Senha").fill(PASSWORD)
         page.get_by_role("button", name="Entrar").click()
+        page.get_by_role("heading", name="Escolha uma solução").wait_for()
+        page.get_by_role("link", name=re.compile("^Meu Orçamento")).click()
         page.wait_for_url("**/orcamento**")
         idle(page)
         width = page.evaluate("innerWidth")

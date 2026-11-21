@@ -106,7 +106,7 @@ def login(page: Page) -> None:
     page.get_by_label("E-mail").fill(EMAIL)
     page.get_by_label("Senha").fill(PASSWORD)
     page.get_by_role("button", name="Entrar").click()
-    page.wait_for_url("**/orcamento**")
+    page.get_by_role("heading", name="Escolha uma solução").wait_for()
 
 
 def framing(page: Page, problems: list[str]) -> int:
@@ -187,6 +187,10 @@ def main() -> int:
         page = browser.new_context(
             locale="pt-BR", viewport={"width": 390, "height": HEIGHT}, is_mobile=True, has_touch=True, color_scheme="dark"
         ).new_page()
+        if os.environ.get("QA_RTC_REAL") != "1":
+            from rtc import _resposta_exemplo
+
+            page.route("**/api/rtc/**", _resposta_exemplo)
         login(page)
         combos = framing(page, problems)
         page.evaluate(APPLY, "padrao")

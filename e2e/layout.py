@@ -27,10 +27,30 @@ EMAIL = re.search(r"E-mail:\s*(\S+)", CRED)[1]
 PASSWORD = re.search(r"Senha:\s*(\S+)", CRED)[1]
 
 PAGES = [
+    ("hub", "/"),
+    ("perfil", "/perfil"),
+    ("configuracoes", "/configuracoes"),
+    ("seguranca", "/seguranca"),
+    ("conta-preferencias", "/preferencias"),
+    ("app", "/app"),
+    ("notas", "/notas"),
+    ("mensageria", "/mensageria"),
+    ("crm-paineis", "/crm"),
+    ("crm-funil", "/crm/funil"),
+    ("crm-contatos", "/crm/contatos"),
+    ("crm-fontes", "/crm/fontes"),
+    ("catalogo", "/catalogo"),
+    ("catalogo-pedidos", "/catalogo/pedidos"),
+    ("propostas", "/propostas"),
+    ("projetos", "/projetos"),
+    ("agenda", "/agenda"),
+    ("cofre", "/cofre"),
+    ("caderno", "/caderno"),
     ("orcamento", "/orcamento"),
     ("calendario", "/calendario"),
+    ("reforma-tributaria", "/analises?secao=reforma-tributaria"),
     *[(f"insights-{s}", f"/analises?secao={s}") for s in (
-        "resumo", "tendencias", "categorias", "saude", "patrimonio", "comparar", "projecao", "simulador", "monte",
+        "resumo", "tendencias", "categorias", "saude", "patrimonio", "retrospectiva", "comparar", "projecao", "simulador", "monte",
     )],
     ("investimentos", "/investimentos"),
     ("cotacoes", "/investimentos?secao=cotacoes"),
@@ -45,17 +65,14 @@ PAGES = [
     ("categorias", "/ajustes/categorias"),
     ("dados", "/ajustes/dados"),
     ("dados-exportar", "/ajustes/dados?aba=exportar"),
-    ("notas", "/ajustes/notas"),
     ("mensagens", "/mensagens"),
     ("conversas", "/mensagens/conversas"),
     ("admin-quadro", "/admin?aba=solicitacoes&visao=quadro"),
     ("admin-erros", "/admin?aba=erros"),
     ("dividas", "/dividas"),
     ("divisoes", "/divisoes"),
-    ("app", "/ajustes/app"),
     ("calculadoras", "/analises?secao=calculadoras"),
     ("admin-recados", "/admin?aba=recados"),
-    ("seguranca", "/ajustes/seguranca"),
     ("preferencias", "/ajustes/preferencias"),
     ("ajuda", "/ajustes/ajuda"),
     ("admin", "/admin"),
@@ -63,7 +80,6 @@ PAGES = [
     ("admin-solicitacoes", "/admin?aba=solicitacoes"),
     ("admin-solicitacoes-usuarios", "/admin?aba=solicitacoes&visao=usuarios"),
     ("admin-solicitacoes-status", "/admin?aba=solicitacoes&visao=status"),
-    ("perfil", "/ajustes/perfil"),
 ]
 
 VIEWPORTS = {
@@ -134,6 +150,29 @@ DETECT = r"""
     if (dlg && hasText && !scrolls(el)) {
       const d = dlg.getBoundingClientRect();
       if (r.left < d.left - 1 || r.right > d.right + 1) issues.push({ kind: 'fora-da-janela', text: label(el), where: path(el) });
+    }
+    if (el.tagName === 'LEGEND') {
+      const box = el.closest('fieldset');
+      if (box && !box.classList.contains('radios')) {
+        const bs = getComputedStyle(box);
+        const br = box.getBoundingClientRect();
+        const hasTopBorder = parseFloat(bs.borderTopWidth) > 0 && bs.borderTopStyle !== 'none';
+        if (hasTopBorder && r.top < br.top + 2 && r.bottom > br.top - 1) {
+          issues.push({ kind: 'legend-on-card-border', text: label(el), where: path(el) });
+        }
+      }
+    }
+    if (!scrolls(el) && el.matches('button, a.btn, input:not([type="hidden"]), select, textarea, .field, .chip-btn, .pill')) {
+      const box = el.closest('.card, fieldset, .sheet__inner');
+      if (box) {
+        const br = box.getBoundingClientRect();
+        if (r.right > br.right + 2 || r.left < br.left - 2) {
+          issues.push({ kind: 'escapes-card-bounds', text: label(el), where: path(el), right: Math.round(r.right), boxRight: Math.round(br.right) });
+        }
+      }
+    }
+    if (!scrolls(el) && el.matches('button, a.btn, .chip-btn, .pill') && !hidden && el.clientWidth > 0 && el.scrollWidth > el.clientWidth + 2) {
+      issues.push({ kind: 'control-text-overflow', text: label(el), where: path(el), w: el.clientWidth, need: el.scrollWidth });
     }
   }
   const seen = new Set();
@@ -211,6 +250,8 @@ def login(page: Page):
     page.get_by_label("E-mail").fill(EMAIL)
     page.get_by_label("Senha").fill(PASSWORD)
     page.get_by_role("button", name="Entrar").click()
+    page.get_by_role("heading", name="Escolha uma solução").wait_for(timeout=15000)
+    page.get_by_role("link", name=re.compile("^Meu Orçamento")).click()
     page.wait_for_url("**/orcamento**", timeout=15000)
 
 
@@ -277,7 +318,19 @@ def dialogs(page: Page, device: str):
         ("/dividas", "Novo financiamento", "form-financiamento"),
         ("/divisoes", "Nova anotação", "form-divisao-anotacao"),
         ("/mensagens/conversas", "Nova solicitação", "form-solicitacao"),
-        ("/ajustes/perfil", "Editar perfil", "form-perfil"),
+        ("/perfil", "Editar perfil", "form-perfil"),
+        ("/crm", "Novo painel", "form-crm-painel"),
+        ("/crm", "Adicionar gráfico", "form-crm-grafico"),
+        ("/crm/funil", "Novo negócio", "form-crm-negocio"),
+        ("/crm/contatos", "Novo contato", "form-crm-contato"),
+        ("/crm/fontes", "Conectar API", "form-crm-api"),
+        ("/catalogo", "Novo item", "form-catalogo-item"),
+        ("/catalogo", "Novo pedido", "form-catalogo-pedido"),
+        ("/propostas", "Novo documento", "form-proposta-doc"),
+        ("/projetos", "Novo projeto", "form-projeto"),
+        ("/agenda", "Novo compromisso", "form-agenda-compromisso"),
+        ("/cofre", "Guardar documento", "form-cofre-doc"),
+        ("/caderno", "Nova nota", "form-caderno-nota"),
     ):
         page.goto(BASE + url)
         settle(page, 500)
@@ -296,8 +349,8 @@ def dialogs(page: Page, device: str):
     d.get_by_role("button", name="Continuar").click()
     d.get_by_label("Valor total").fill("12.000,00")
     form(page, device, "form-meta-valor")
-    # Começar do zero (Perfil › Zona de risco), com tudo marcado.
-    page.goto(BASE + "/ajustes/perfil")
+    # Começar do zero (Importar e exportar › Zona de risco), com tudo marcado.
+    page.goto(BASE + "/ajustes/dados")
     settle(page, 500)
     page.get_by_role("button", name="Começar do zero").click()
     page.locator("dialog[open]").get_by_label("Selecionar tudo").check()
@@ -310,6 +363,8 @@ def dialogs(page: Page, device: str):
     page.get_by_role("button", name="Revisar e enviar").click()
     form(page, device, "form-recado-previa")
     if device.startswith("celular"):
+        page.goto(BASE + "/orcamento")
+        settle(page, 400)
         page.locator(".tabbar").get_by_role("button", name="Mais").click()
         page.wait_for_timeout(350)
         check(page, device, "menu-mais", full=False, scope="dialog[open]")
@@ -373,6 +428,10 @@ def main() -> int:
             return 1 if results else 0
         for device, opts in VIEWPORTS.items():
             ctx = browser.new_context(locale="pt-BR", **opts)
+            if os.environ.get("QA_RTC_REAL") != "1":
+                from rtc import _resposta_exemplo
+
+                ctx.route("**/api/rtc/**", _resposta_exemplo)
             page = ctx.new_page()
             login(page)
             for name, url in PAGES:

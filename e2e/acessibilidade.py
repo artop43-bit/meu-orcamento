@@ -26,13 +26,34 @@ AXE = pathlib.Path(__file__).resolve().parent.parent / "frontend" / "node_module
 
 PUBLIC = ["/entrar", "/cadastro", "/esqueci-senha", "/privacidade", "/termos"]
 PAGES = [
+    "/",
+    "/perfil",
+    "/configuracoes",
+    "/seguranca",
+    "/preferencias",
+    "/app",
+    "/notas",
+    "/mensageria",
+    "/crm",
+    "/crm/funil",
+    "/crm/contatos",
+    "/crm/fontes",
+    "/catalogo",
+    "/catalogo/pedidos",
+    "/propostas",
+    "/projetos",
+    "/agenda",
+    "/cofre",
+    "/caderno",
     "/orcamento",
+    "/analises?secao=reforma-tributaria",
     "/metas",
     "/analises?secao=resumo",
     "/analises?secao=tendencias",
     "/analises?secao=categorias",
     "/analises?secao=saude",
     "/analises?secao=patrimonio",
+    "/analises?secao=retrospectiva",
     "/analises?secao=comparar",
     "/analises?secao=projecao",
     "/analises?secao=simulador",
@@ -47,24 +68,20 @@ PAGES = [
     "/busca?q=mercado",
     "/admin",
     "/admin?aba=solicitacoes",
-    "/ajustes/perfil",
     "/ajustes",
     "/ajustes/recorrencias",
     "/ajustes/categorias",
     "/ajustes/dados",
     "/ajustes/dados?aba=exportar",
-    "/ajustes/notas",
     "/mensagens",
     "/mensagens/conversas",
     "/admin?aba=solicitacoes&visao=quadro",
     "/admin?aba=erros",
     "/dividas",
     "/divisoes",
-    "/ajustes/app",
     "/analises?secao=calculadoras",
     "/analises?secao=duvida",
     "/admin?aba=recados",
-    "/ajustes/seguranca",
     "/ajustes/preferencias",
     "/ajustes/ajuda",
 ]
@@ -110,13 +127,17 @@ def main() -> int:
         page.get_by_label("E-mail").fill(EMAIL)
         page.get_by_label("Senha").fill(PASSWORD)
         page.get_by_role("button", name="Entrar").click()
-        page.wait_for_url("**/orcamento**")
+        page.get_by_role("heading", name="Escolha uma solução").wait_for()
         state = guest.storage_state()
         guest.close()
 
         for device, options in DEVICES.items():
             for scheme in ("light", "dark"):
                 ctx = browser.new_context(storage_state=state, color_scheme=scheme, reduced_motion="reduce", **options)
+                if os.environ.get("QA_RTC_REAL") != "1":
+                    from rtc import _resposta_exemplo
+
+                    ctx.route("**/api/rtc/**", _resposta_exemplo)
                 page = ctx.new_page()
                 label = f"{device} {'claro' if scheme == 'light' else 'escuro'}"
                 for path in PAGES:
@@ -136,7 +157,7 @@ def main() -> int:
                 page.wait_for_timeout(400)
                 audit(page, f"{label} janela Nova receita", found)
                 page.keyboard.press("Escape")
-                page.goto(f"{BASE}/ajustes/perfil")
+                page.goto(f"{BASE}/ajustes/dados")
                 settle(page)
                 page.get_by_role("button", name="Começar do zero").click()
                 page.locator("dialog[open]").get_by_label("Selecionar tudo").check()

@@ -22,7 +22,7 @@ import re
 import sys
 import time
 import traceback
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 import pyotp
 from playwright.sync_api import Page, expect, sync_playwright
@@ -32,6 +32,8 @@ OUT = pathlib.Path(os.environ.get("QA_OUT", "e2e/saida"))
 OUT.mkdir(parents=True, exist_ok=True)
 CRED = pathlib.Path(os.environ.get("QA_CREDENTIALS", "backend/local-dev-cred.txt")).read_text(encoding="utf-8")
 BROWSER = os.environ.get("QA_BROWSER", "chromium")
+# Mensageria: o e2e faz o papel do conector do WhatsApp pela API (mesmo valor da API no CI).
+CONNECTOR_TOKEN = os.environ.get("MESSAGING_CONNECTOR_TOKEN", "e2e-conector")
 EMAIL = re.search(r"E-mail:\s*(\S+)", CRED)[1]
 PASSWORD = re.search(r"Senha:\s*(\S+)", CRED)[1]
 TODAY = date.today()
@@ -206,6 +208,88 @@ def api(page: Page, path: str):
     return response.json()
 
 
+def connector(page: Page, path: str, events: list[dict] | None = None):
+    """Simula o conector do WhatsApp: chama /api/messaging/connector com o cabeçalho X-Connector-Token."""
+    url = f"{BASE}/api/messaging/connector{path}"
+    headers = {"X-Connector-Token": CONNECTOR_TOKEN}
+    if events is None:
+        response = page.request.get(url, headers=headers)
+    else:
+        response = page.request.post(url, headers=headers, data={"events": events})
+    assert response.ok, (
+        f"conector {path}: {response.status} {response.text()[:200]} "
+        "(a API precisa de MESSAGING_CONNECTOR_TOKEN e MESSAGING_CONNECTOR_URL; ver o job e2e do CI)"
+    )
+    return response.json()
+
+
+def connector_events(page: Page, *events: dict) -> None:
+    result = connector(page, "/events", list(events))
+    assert result == {"processed": len(events), "ignored": 0}, result
+
+
+def simple_pdf_bytes(lines: list[str]) -> bytes:
+    """Gera um PDF 1.4 válido com linhas de texto (sem biblioteca externa no e2e)."""
+    ops = ["BT", "/F1 11 Tf"]
+    y = 760
+    for line in lines:
+        safe = line.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
+        ops.append(f"1 0 0 1 40 {y} Tm ({safe}) Tj")
+        y -= 18
+    ops.append("ET")
+    stream = "\n".join(ops).encode("latin-1")
+    objs = [
+        b"1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj\n",
+        b"2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj\n",
+        b"3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >> endobj\n",
+        b"4 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj\n",
+        f"5 0 obj << /Length {len(stream)} >> stream\n".encode("ascii") + stream + b"\nendstream endobj\n",
+    ]
+    out = bytearray(b"%PDF-1.4\n")
+    offsets = []
+    for obj in objs:
+        offsets.append(len(out))
+        out.extend(obj)
+    xref_pos = len(out)
+    out.extend(f"xref\n0 {len(objs) + 1}\n0000000000 65535 f \n".encode("ascii"))
+    for off in offsets:
+        out.extend(f"{off:010d} 00000 n \n".encode("ascii"))
+    out.extend(f"trailer << /Size {len(objs) + 1} /Root 1 0 R >>\nstartxref\n{xref_pos}\n%%EOF\n".encode("ascii"))
+    return bytes(out)
+
+
+def now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+# Áreas do Meu Orçamento e Mensageria (mesmos prefixos de frontend/src/lib/hub.ts).
+BUDGET_LINKS_JS = r"""() => [...document.querySelectorAll("a[href]")]
+    .map((a) => new URL(a.getAttribute("href"), location.href).pathname)
+    .filter((path) => /^\/(orcamento|calendario|cartoes|contas|revisar|busca|dividas|divisoes|metas|historico|analises|investimentos|ajustes|relatorio)(\/|$)/.test(path))"""
+
+OTHER_SOLUTIONS_FROM_CRM_JS = r"""() => [...document.querySelectorAll("a[href]")]
+    .map((a) => new URL(a.getAttribute("href"), location.href).pathname)
+    .filter((path) => /^\/(orcamento|calendario|cartoes|contas|revisar|busca|dividas|divisoes|metas|historico|analises|investimentos|ajustes|relatorio|mensageria)(\/|$)/.test(path))"""
+
+
+def assert_no_other_solution_links(page: Page, own_prefixes: tuple[str, ...], where: str) -> None:
+    links = page.evaluate(
+        r"""(own) => [...document.querySelectorAll("a[href]")]
+            .map((a) => new URL(a.getAttribute("href"), location.href).pathname)
+            .filter((p) => /^\/(orcamento|calendario|cartoes|contas|revisar|busca|dividas|divisoes|metas|historico|analises|investimentos|ajustes|relatorio|mensageria|crm|catalogo|propostas|projetos|agenda)(\/|$)/.test(p)
+                && !own.some((pre) => p === pre || p.startsWith(pre + "/")))""",
+        list(own_prefixes),
+    )
+    assert not links, f"links diretos de {where} para outra solução: {links}"
+
+
+def ensure_row_open(row) -> None:
+    head = row.locator(".person-row__head")
+    if head.get_attribute("aria-expanded") != "true":
+        head.click()
+    expect(head).to_have_attribute("aria-expanded", "true")
+
+
 # ---------------------------------------------------------------- dados da persona
 
 FIXED = [  # descrição, valor, categoria, dia
@@ -237,10 +321,25 @@ DAYS = [6, 12, 25, 22, 14, 18, 9]
 @step("Login com a conta de demonstração (vazia)")
 def login(page: Page):
     page.goto(f"{BASE}/entrar")
+    idle(page)
+    page.screenshot(path=OUT / "hub-login.png")
     page.get_by_label("E-mail").fill(EMAIL)
     page.get_by_label("Senha").fill(PASSWORD)
     page.get_by_role("button", name="Entrar").click()
+    expect(page.get_by_role("heading", name="Escolha uma solução")).to_be_visible()
+    idle(page)
+    page.screenshot(path=OUT / "hub-inicio.png")
+    # A animação de entrada aparece já no clique e cobre o carregamento; o endereço troca depois.
+    # "^": a descrição do cartão da Mensageria também cita o Meu Orçamento.
+    page.get_by_role("link", name=re.compile("^Meu Orçamento")).click()
+    splash = page.locator('[data-solution-transition="meu-orcamento"]')
+    expect(splash).to_be_visible(timeout=3000)
+    expect(splash).to_contain_text("Meu Orçamento")
+    page.wait_for_timeout(550)
+    page.screenshot(path=OUT / "transicao-meu-orcamento.png")
     page.wait_for_url("**/orcamento**")
+    expect(page.locator("[data-solution-transition]")).to_have_count(0, timeout=5000)
+    expect(page.locator('[data-solution-root="meu-orcamento"]')).to_be_visible()
     idle(page)
 
 
@@ -270,6 +369,15 @@ def empty_state(page: Page):
     idle(page)
     expect(page.get_by_role("heading", name="Sem lançamentos no período")).to_be_visible()
     expect(page.get_by_role("heading", name="Como começar")).to_be_visible()
+    guide = page.locator(".analysis-start-steps")
+    viewport = page.viewport_size
+    try:
+        page.set_viewport_size({"width": 390, "height": 844})
+        expect(guide).to_have_css("flex-direction", "column")
+        expect(guide.get_by_role("link", name="Recorrências")).to_be_visible()
+    finally:
+        if viewport:
+            page.set_viewport_size(viewport)
 
 
 @step("Faixa do 2FA: 'Agora não' esconde até fechar o navegador")
@@ -1061,9 +1169,9 @@ def support_requests(page: Page):
     page.screenshot(path=OUT / "v075-minhas-solicitacoes.png", full_page=True)
 
 
-@step("v0.7.5: perfil com foto, dados opcionais, resumo e retrospectiva com imagem para baixar")
+@step("v0.7.5: perfil no Hub (foto e dados), resumo e retrospectiva em Análises")
 def profile(page: Page):
-    page.goto(f"{BASE}/ajustes/perfil")
+    page.goto(f"{BASE}/perfil")
     idle(page)
     page.get_by_role("button", name="Adicionar foto").click()
     d = dialog(page)
@@ -1083,14 +1191,23 @@ def profile(page: Page):
     d.get_by_label("Nome de exibição").fill("Carla Souza")
     d.get_by_label("Cidade").fill("Belo Horizonte")
     d.get_by_label("Profissão").fill("Assistente administrativa")
-    d.get_by_label("Média de receitas").uncheck()
     d.get_by_role("button", name="Salvar").click()
     expect(d).to_have_count(0, timeout=8000)
     idle(page)
     expect(page.get_by_role("heading", name="Carla Souza")).to_be_visible()
+    expect(page.locator(".hub__account-name")).to_contain_text("Carla Souza")
+    page.screenshot(path=OUT / "v075-perfil.png", full_page=True)
+
+    page.goto(f"{BASE}/analises?secao=retrospectiva")
+    idle(page)
+    page.get_by_role("button", name="Personalizar").click()
+    d = dialog(page)
+    d.get_by_label("Média de receitas").uncheck()
+    d.get_by_role("button", name="Salvar").click()
+    expect(d).to_have_count(0, timeout=8000)
+    idle(page)
     expect(page.locator(".profile-stats")).not_to_contain_text("Média de receitas")
     expect(page.locator(".profile-stats")).to_contain_text("Taxa de poupança")
-    expect(page.locator(".sidebar__profile")).to_contain_text("Carla Souza")
 
     page.get_by_role("button", name="Ver retrospectiva").click()
     story = page.locator("dialog.story[open]")
@@ -1107,7 +1224,6 @@ def profile(page: Page):
     assert path.read_bytes()[:8] == b"\x89PNG\r\n\x1a\n" and path.stat().st_size > 5000
     page.keyboard.press("Escape")
     expect(story).to_have_count(0)
-    page.screenshot(path=OUT / "v075-perfil.png", full_page=True)
 
 
 @step("v0.7.5: cartão de débito (sem limite e sem fatura) e crédito sem a opção 'Sem cartão'")
@@ -1187,11 +1303,11 @@ def validation(page: Page):
     page.keyboard.press("Escape")
 
 
-@step("Versão e data do update no fim do menu")
+@step("Versão da solução e estado da publicação no fim do menu")
 def version(page: Page):
     page.goto(f"{BASE}/orcamento")
     idle(page)
-    expect(page.locator(".sidebar .app-version")).to_contain_text(re.compile(r"Versão \d+\.\d+\.\d+(?:\.\d+)? · \d{2}/\d{2}/\d{4} às \d{2}:\d{2}"))
+    expect(page.locator(".sidebar .app-version")).to_contain_text(re.compile(r"Versão \d+\.\d+\.\d+(?:\.\d+)? · (?:Em preparação|\d{2}/\d{2}/\d{4} às \d{2}:\d{2})"))
 
 
 @step("Celular: deslizar entre telas, abas dos grupos, voltar da sub-tela e arrastar a janela para fechar")
@@ -1298,9 +1414,9 @@ def mobile_sections(browser):
     # Tema: três opções alinhadas numa linha só.
     heights = menu.locator(".menu-theme label").evaluate_all("els => els.map((e) => Math.round(e.getBoundingClientRect().height))")
     assert len(set(heights)) == 1 and heights[0] < 52, heights
-    menu.get_by_role("link", name="Mensagens").click()
+    menu.get_by_role("link", name="Ajustes").click()
     expect(menu).to_have_count(0, timeout=250)
-    page.wait_for_url("**/mensagens")
+    page.wait_for_url("**/ajustes")
     # Barra de baixo: área de toque de pelo menos 44 px em cada aba.
     boxes = page.locator(".tabbar a, .tabbar button").evaluate_all("els => els.map((e) => { const r = e.getBoundingClientRect(); return [r.width, r.height]; })")
     assert all(w >= 44 and h >= 44 for w, h in boxes), boxes
@@ -1330,7 +1446,7 @@ def mobile_sections(browser):
     page.wait_for_url("**/dividas")
     # Sub-tela: deslizar para a direita volta para a tela de cima (mesma seção) e a página
     # termina no lugar, sem sobras do gesto na tela (v1.4.2).
-    for sub, top in (("/ajustes/perfil", "/ajustes"), ("/mensagens/conversas", "/mensagens")):
+    for sub, top in (("/ajustes/dados", "/ajustes"), ("/ajustes/preferencias", "/ajustes")):
         page.goto(f"{BASE}{sub}")
         idle(page, 700)
         swipe_checked(60, 330)
@@ -1552,10 +1668,10 @@ def email_notices(page: Page):
     assert api(page, "/notifications/prefs")["notify_due"] is True
 
 
-@step("v1.9.0: avisos por webhook: salvar, escolher os avisos e remover")
+@step("v1.9.0: avisos por webhook: salvar no Hub, escolher os avisos no orçamento e remover")
 def webhook_notices(page: Page):
     # Sem "Enviar teste": o e2e não posta em endereço de fora.
-    page.goto(f"{BASE}/ajustes/preferencias")
+    page.goto(f"{BASE}/preferencias")
     idle(page)
     card = page.locator("#webhook")
     expect(card.get_by_role("heading", name="Avisos por webhook")).to_be_visible()
@@ -1565,22 +1681,41 @@ def webhook_notices(page: Page):
     card.get_by_label("Endereço do webhook").fill("https://hooks.slack.com/services/T000/B000/XXXX")
     card.get_by_role("button", name="Salvar").click()
     expect(card.get_by_text("Conectado a")).to_contain_text("Slack")
+    page.goto(f"{BASE}/ajustes/preferencias")
+    idle(page)
+    card = page.locator("#webhook")
     mark(card.get_by_label("Resumo da semana (segundas)"))
     idle(page, 400)
     assert api(page, "/notifications/webhook")["kinds"] == ["weekly"]
     assert "XXXX" not in str(api(page, "/notifications/webhook")["hint"])[:-4]
+    page.goto(f"{BASE}/preferencias")
+    idle(page)
+    card = page.locator("#webhook")
     card.get_by_role("button", name="Remover").click()
     expect(card.get_by_label("Endereço do webhook")).to_be_visible()
     assert api(page, "/notifications/webhook")["configured"] is False
 
 
-@step("Notas da versão em Ajustes, com atalho para enviar sugestão")
+@step("Notas da versão em Configurações do Hub, com atalho para enviar sugestão")
 def release_notes(page: Page):
-    page.goto(f"{BASE}/ajustes")
+    page.goto(f"{BASE}/")
+    solution_names = page.locator(".hub-grid .hub-card__head strong")
+    expect(solution_names.first).to_be_visible()
+    expected_releases = ["Hub de Soluções", *solution_names.all_text_contents()]
+    page.goto(f"{BASE}/configuracoes")
     idle(page)
-    page.get_by_role("link", name=re.compile("Notas da versão")).click()
-    page.wait_for_url("**/ajustes/notas")
+    page.locator(".settings-list").get_by_role("link", name=re.compile("Notas da versão")).click()
+    page.wait_for_url("**/notas")
     idle(page)
+    expect(page.get_by_role("tab")).to_have_count(len(expected_releases) + 1)
+    expect(page.locator(".release--current")).to_have_count(len(expected_releases))
+    for label in expected_releases:
+        page.get_by_role("tab", name=label, exact=True).click()
+        current = page.locator(".release--current")
+        expect(current).to_have_count(1)
+        expect(current).to_contain_text(re.compile(r"Versão \d+\.\d+\.\d+"))
+        expect(current).to_contain_text("Em preparação")
+    page.get_by_role("tab", name="Meu Orçamento", exact=True).click()
     current = page.locator(".release--current")
     expect(current).to_contain_text(re.compile(r"Versão \d+\.\d+\.\d+(?:\.\d+)?"))
     head = page.locator(".release__head").nth(1)
@@ -1589,7 +1724,7 @@ def release_notes(page: Page):
     page.get_by_role("button", name="Enviar sugestão").first.click()
     d = dialog(page)
     expect(d).to_contain_text("Nova solicitação")
-    expect(d).to_contain_text(re.compile(r"Referente a: Versão \d+\.\d+\.\d+(?:\.\d+)?"))
+    expect(d).to_contain_text("Referente a: Notas da versão: Meu Orçamento")
     page.keyboard.press("Escape")
     expect(d).to_have_count(0)
 
@@ -1611,11 +1746,11 @@ def inbox_and_announcement(page: Page):
     expect(page.locator(".alert--success")).to_contain_text(re.compile(r"Recado enviado para \d+ usuário"))
     expect(page.locator(".item", has_text="Manutenção programada")).to_contain_text("lido por 0")
     page.screenshot(path=OUT / "v09-admin-recados.png", full_page=True)
-    # Menu: contador de não lidas em Mensagens; o importante fica no topo.
-    page.goto(f"{BASE}/orcamento")
+    # Barra do Hub: aviso de não lidas em Mensagens; o importante fica no topo.
+    page.goto(f"{BASE}/")
     idle(page)
-    balloon = page.locator(".sidebar .sidebar__tool--messages")
-    expect(balloon.locator(".sidebar__tool-badge")).to_have_text("1")
+    balloon = page.locator('.hub__bar a[href="/mensagens"]')
+    expect(balloon.locator(".icon-btn__dot")).to_be_visible()
     balloon.click()
     page.wait_for_url("**/mensagens")
     idle(page)
@@ -1625,8 +1760,6 @@ def inbox_and_announcement(page: Page):
     expect(first).to_contain_text("Importante")
     expect(first.locator(".notice__body")).to_contain_text("sábado")
     expect(page.get_by_role("radiogroup", name="Filtrar mensagens")).to_have_count(0)
-    # v1.3.2: um só acesso no menu (o balão) e, em Recados, sem o botão de nova solicitação.
-    expect(page.locator(".sidebar").get_by_role("button", name="Nova solicitação")).to_have_count(0)
     expect(page.get_by_role("button", name="Nova solicitação")).to_have_count(0)
     page.get_by_role("navigation", name="Mensagens").get_by_role("link", name="Solicitações").click()
     expect(page.get_by_role("button", name="Nova solicitação")).to_be_visible()
@@ -1634,7 +1767,7 @@ def inbox_and_announcement(page: Page):
     idle(page, 500)
     page.screenshot(path=OUT / "v09-mensagens.png", full_page=True)
     assert api(page, "/inbox/unread")["unread"] == 0, "abrir os recados deveria marcar como lidos"
-    expect(balloon.locator(".sidebar__tool-badge")).to_have_count(0)
+    expect(balloon.locator(".icon-btn__dot")).to_have_count(0)
     # A cópia por e-mail vai para o painel de e-mails enviados.
     emails = api(page, "/admin/emails")
     assert any("Manutenção programada" in e["subject"] for e in emails), "recado sem cópia por e-mail"
@@ -1659,6 +1792,8 @@ def theme_on_account(page: Page):
     mobile.get_by_label("E-mail").fill(EMAIL)
     mobile.get_by_label("Senha").fill(PASSWORD)
     mobile.get_by_role("button", name="Entrar").click()
+    expect(mobile.get_by_role("heading", name="Escolha uma solução")).to_be_visible()
+    mobile.get_by_role("link", name=re.compile("^Meu Orçamento")).click()
     mobile.wait_for_url("**/orcamento**")
     expect(mobile.locator("html")).to_have_attribute("data-theme", "dark")
     # No celular, o tema também se troca pelo menu "Mais". Espera a tela assentar: logo depois do
@@ -1683,9 +1818,9 @@ def theme_on_account(page: Page):
     expect(page.locator("html")).not_to_have_attribute("data-theme", "dark")
 
 
-@step("v1.1: 10 cores de destaque em Preferências, salvas na conta")
+@step("v1.1: 10 cores de destaque em Preferências do Hub, salvas na conta")
 def accent_colors(page: Page):
-    page.goto(f"{BASE}/ajustes/preferencias")
+    page.goto(f"{BASE}/preferencias")
     idle(page)
     picker = page.get_by_role("group", name="Cor de destaque")
     expect(picker.locator(".accent-swatch")).to_have_count(10)
@@ -1703,9 +1838,9 @@ def accent_colors(page: Page):
     assert api(page, "/auth/me")["accent"] == "verde"
 
 
-@step("v1.6: estilo Liquid glass em Preferências, salvo na conta, com a cor escolhida")
+@step("v1.6: estilo Liquid glass em Preferências do Hub, salvo na conta, com a cor escolhida")
 def visual_style(page: Page):
-    page.goto(f"{BASE}/ajustes/preferencias")
+    page.goto(f"{BASE}/preferencias")
     idle(page)
     picker = page.get_by_role("group", name="Estilo")
     expect(picker.locator(".style-option")).to_have_count(2)
@@ -1732,7 +1867,7 @@ def visual_style(page: Page):
     page.reload()
     idle(page)
     expect(page.locator("html")).to_have_attribute("data-style", "glass")
-    page.goto(f"{BASE}/ajustes/preferencias")
+    page.goto(f"{BASE}/preferencias")
     idle(page)
     page.get_by_role("group", name="Estilo").locator(".style-option", has_text="Padrão").click()
     page.get_by_role("group", name="Cor de destaque").locator(".accent-swatch", has_text="Verde").click()
@@ -1797,7 +1932,7 @@ def fluid_navigation(page: Page):
 
 @step("v0.9: começar do zero — escolher áreas, backup, senha e frase; zera só as análises salvas")
 def start_over(page: Page):
-    page.goto(f"{BASE}/ajustes/perfil")
+    page.goto(f"{BASE}/ajustes/dados")
     idle(page)
     page.get_by_role("button", name="Começar do zero").click()
     d = dialog(page)
@@ -1984,12 +2119,12 @@ def split_expenses(page: Page):
     expect(page.locator(".person-row", has_text="Bia")).to_have_count(0)
 
 
-@step("v1.0: App e notificações (APK, instalar, notificações) e aviso de sem conexão")
+@step("v1.0: App e notificações em Configurações do Hub (APK, instalar, notificações) e aviso de sem conexão")
 def app_install(page: Page):
-    page.goto(f"{BASE}/ajustes")
+    page.goto(f"{BASE}/configuracoes")
     idle(page)
     page.locator(".settings-list").get_by_role("link", name=re.compile("App e notificações")).click()
-    page.wait_for_url("**/ajustes/app")
+    page.wait_for_url("**/app")
     idle(page)
     link = page.get_by_role("link", name=re.compile("Baixar o app"))
     expect(link).to_have_attribute("href", "/downloads/meu-orcamento.apk")
@@ -2452,6 +2587,896 @@ def v14_insights(page: Page):
         page.screenshot(path=OUT / "v14-alocacao.png", full_page=True)
 
 
+@step("Hub de Soluções: perfil isolado, botão de Configurações e 'Sair' da solução volta ao Hub")
+def hub_flow(page: Page):
+    page.goto(f"{BASE}/orcamento")
+    idle(page)
+    expect(page.locator(".sidebar").get_by_role("link", name="Hub de soluções")).to_have_count(0)
+    page.locator(".sidebar").get_by_role("button", name="Sair").click()
+    expect(page.get_by_role("heading", name="Escolha uma solução")).to_be_visible()
+    assert api(page, "/auth/me")["email"] == EMAIL
+    page.locator(".hub__account").click()
+    page.wait_for_url("**/perfil")
+    idle(page, 400)
+    expect(page.locator(".sidebar")).to_have_count(0)
+    expect(page.locator(".profile-hero__meta")).to_contain_text(EMAIL)
+    expect(page.locator(".hub-tabs")).to_have_count(0)
+    page.screenshot(path=OUT / "hub-perfil.png", full_page=True)
+    page.locator(".hub__bar").get_by_role("link", name="Configurações").click()
+    page.wait_for_url("**/configuracoes")
+    idle(page, 400)
+    page.screenshot(path=OUT / "hub-configuracoes.png", full_page=True)
+    page.locator(".settings-list").get_by_role("link", name=re.compile("^Segurança")).click()
+    page.wait_for_url("**/seguranca")
+    idle(page, 400)
+    expect(page.locator(".sidebar")).to_have_count(0)
+    page.screenshot(path=OUT / "hub-seguranca.png", full_page=True)
+    page.locator(".breadcrumb").get_by_role("link", name="Configurações").click()
+    page.wait_for_url("**/configuracoes")
+    page.locator(".settings-list").get_by_role("link", name=re.compile("^Preferências")).click()
+    page.wait_for_url("**/preferencias")
+    idle(page, 400)
+    page.screenshot(path=OUT / "hub-preferencias.png", full_page=True)
+    page.locator(".hub__bar").get_by_role("link", name="Hub de Soluções").click()
+    expect(page.get_by_role("heading", name="Escolha uma solução")).to_be_visible()
+    page.get_by_role("link", name=re.compile("^Meu Orçamento")).click()
+    expect(page.locator('[data-solution-transition="meu-orcamento"]')).to_be_visible(timeout=3000)
+    # Esc pula a animação: a tela troca na hora e a chegada não toca a animação de novo.
+    page.keyboard.press("Escape")
+    page.wait_for_url("**/orcamento**", timeout=3000)
+    expect(page.locator("[data-solution-transition]")).to_have_count(0, timeout=1500)
+    expect(page.locator('[data-solution-root="meu-orcamento"]')).to_be_visible()
+
+
+@step("Mensageria: transição, conexão com o WhatsApp (conector simulado), conversas, envio com confirmação de leitura, vínculo com o Orçamento e sem atalho entre soluções")
+def mensageria_flow(page: Page):
+    page.goto(f"{BASE}/")
+    idle(page)
+    expect(page.get_by_role("link", name=re.compile("^Meu Orçamento"))).to_be_visible()
+    expect(page.get_by_role("link", name=re.compile("Mensageria"))).to_be_visible()
+    expect(page.get_by_text("Nova solução")).to_have_count(0)
+
+    # Entra na Mensageria pelo Hub: a transição padronizada (logo → nome) aparece já no clique,
+    # enquanto a tela carrega, e sai quando a tela da solução está montada.
+    page.get_by_role("link", name=re.compile("Mensageria")).click()
+    splash = page.locator('[data-solution-transition="mensageria"]')
+    expect(splash).to_be_visible(timeout=3000)
+    expect(splash).to_contain_text("Mensageria")
+    page.wait_for_timeout(550)
+    page.screenshot(path=OUT / "transicao-mensageria.png")
+    page.wait_for_url("**/mensageria**")
+    expect(page.locator("[data-solution-transition]")).to_have_count(0, timeout=5000)
+    expect(page.locator('[data-solution-root="mensageria"]')).to_be_visible()
+    idle(page)
+
+    # Conexão: "Conectar" pede o QR Code ao conector. No CI o conector não está no ar (endereço
+    # sem resposta de propósito): a API marca erro, mas o pedido continua valendo, e o e2e faz o
+    # papel do conector pela API (cabeçalho X-Connector-Token).
+    expect(page.locator(".wa-conn-btn")).to_contain_text("Desconectado")
+    known = {item["session_id"] for item in connector(page, "/sessions")["sessions"]}
+    page.locator(".wa-conn-btn").click()
+    d = dialog(page)
+    expect(d).to_contain_text("Conexão com o WhatsApp")
+    expect(d.locator(".badge")).to_have_text("Desconectado")
+    d.get_by_role("button", name="Conectar", exact=True).click()
+    expect(d.locator(".badge")).not_to_have_text("Desconectado", timeout=10000)
+    fresh = [item["session_id"] for item in connector(page, "/sessions")["sessions"] if item["session_id"] not in known]
+    assert len(fresh) == 1, f"a sessão desta conta não apareceu para o conector: {fresh}"
+    session_id = fresh[0]
+
+    # O conector manda o QR Code: a janela desenha o código.
+    connector_events(
+        page, {"type": "status", "session_id": session_id, "status": "qr", "qr": "2@E2E-HUB-QR,chave-publica,segredo"}
+    )
+    expect(d.locator(".wa-qr__box svg")).to_be_visible(timeout=15000)
+    expect(d.locator(".badge")).to_have_text("Aguardando QR")
+    page.screenshot(path=OUT / "mensageria-qr.png")
+
+    # O celular leu o QR: conectado, com número e nome do aparelho.
+    connector_events(
+        page,
+        {
+            "type": "status",
+            "session_id": session_id,
+            "status": "ready",
+            "phone": "5531912345678",
+            "display_name": "WhatsApp da Carla",
+            "wa_jid": "5531912345678@s.whatsapp.net",
+        },
+    )
+    expect(d.locator(".badge")).to_have_text("Conectado", timeout=10000)
+    expect(d.locator(".wa-conn-meta")).to_contain_text("WhatsApp da Carla")
+    expect(d.locator(".wa-qr__box")).to_have_count(0)
+    page.keyboard.press("Escape")
+    expect(d).to_have_count(0)
+    expect(page.locator(".wa-conn-btn")).to_have_class(re.compile("is-online"))
+
+    # Mensagem recebida de um contato novo: a conversa aparece na lista com 1 não lida.
+    connector_events(
+        page,
+        {
+            "type": "message",
+            "session_id": session_id,
+            "external_id": "E2E-IN-MARCOS-1",
+            "remote_jid": "5531988887777@s.whatsapp.net",
+            "from_me": False,
+            "push_name": "Marcos (freela)",
+            "body": "Oi Carla! O site fica em R$ 600,00, pode ser?",
+            "message_type": "chat",
+            "timestamp": now_iso(),
+        },
+    )
+    marcos = page.locator(".wa-chat-item").filter(has_text="Marcos (freela)")
+    expect(marcos).to_be_visible(timeout=15000)
+    expect(marcos.locator(".wa-unread")).to_have_text("1")
+    marcos.click()
+    expect(page.locator(".wa-msg--in")).to_contain_text("R$ 600,00")
+    expect(marcos.locator(".wa-unread")).to_have_count(0, timeout=10000)
+
+    # Nome da agenda prevalece sobre apelido e nomes mascarados (+55·······80) são ignorados.
+    connector_events(
+        page,
+        {
+            "type": "contact",
+            "session_id": session_id,
+            "jid": "5531988887777@s.whatsapp.net",
+            "name": "Marcos Silva",
+            "source": "contact",
+        },
+    )
+    masked = connector(
+        page,
+        "/events",
+        [
+            {
+                "type": "contact",
+                "session_id": session_id,
+                "jid": "5531988887777@s.whatsapp.net",
+                "name": "+55·······77",
+                "source": "push",
+            }
+        ],
+    )
+    assert masked == {"processed": 0, "ignored": 1}, masked
+    expect(page.locator(".wa-chat-item").filter(has_text="Marcos Silva")).to_be_visible(timeout=15000)
+
+    # Foto de perfil do contato enviada pelo conector aparece no avatar.
+    avatar_res = page.request.post(
+        f"{BASE}/api/messaging/connector/sessions/{session_id}/avatar?jid=5531988887777%40s.whatsapp.net&mime_type=image%2Fpng",
+        headers={"X-Connector-Token": CONNECTOR_TOKEN, "Content-Type": "image/png"},
+        data=png_bytes(96, 96, (45, 110, 190)),
+    )
+    assert avatar_res.ok, f"avatar upload falhou: {avatar_res.status} {avatar_res.text()[:200]}"
+    expect(page.locator(".wa-avatar__img").first).to_be_visible(timeout=15000)
+    assert image_loaded(page, ".wa-avatar__img"), "foto de perfil do contato não carregou"
+
+    # Cria uma nova conversa vinculada à Duda (do Meu Orçamento).
+    page.get_by_role("button", name="Nova conversa").first.click()
+    d = dialog(page)
+    d.get_by_label("Telefone (com DDD)").fill("(11) 99876-5432")
+    d.get_by_label("Pessoa no Meu Orçamento (opcional)").select_option(label="Duda")
+    expect(d.get_by_label("Nome")).to_have_value("Duda")
+    d.get_by_role("button", name="Abrir conversa").click()
+    expect(d).to_have_count(0, timeout=8000)
+    idle(page)
+
+    # Conectado: a caixa de mensagem fica liberada e a mensagem entra "na fila" do conector.
+    composer = page.get_by_label("Mensagem", exact=True)
+    expect(composer).to_be_enabled()
+    expect(page.locator(".wa-composer__notice")).to_have_count(0)
+    composer.fill("Oi Duda, tudo bem?")
+    page.get_by_role("button", name="Enviar mensagem").click()
+    first_out = page.locator(".wa-msg--out").filter(has_text="Oi Duda, tudo bem?")
+    expect(first_out).to_be_visible(timeout=8000)
+    expect(first_out.locator('[aria-label="Na fila"]')).to_be_visible()
+
+    # O conector busca a fila (e a reserva), envia e confirma; depois o WhatsApp avisa que a Duda leu (✓✓).
+    items = connector(page, f"/outbox?session_ids={session_id}")["items"]
+    first = next((item for item in items if item["body"] == "Oi Duda, tudo bem?"), None)
+    assert first, f"a mensagem não chegou na fila do conector: {items}"
+    assert first["session_id"] == session_id and first["remote_jid"] == "5511998765432@s.whatsapp.net", first
+    assert first["quoted"] is None, first
+    again = connector(page, f"/outbox?session_ids={session_id}")["items"]
+    assert all(item["message_id"] != first["message_id"] for item in again), "a fila entregou a mesma mensagem duas vezes"
+    connector_events(
+        page,
+        {
+            "type": "ack",
+            "session_id": session_id,
+            "message_id": first["message_id"],
+            "status": "sent",
+            "external_id": "3EB0E2E0HUB0000001",
+        },
+        {"type": "receipt", "session_id": session_id, "external_id": "3EB0E2E0HUB0000001", "status": "read"},
+    )
+    expect(first_out.locator(".wa-tick--read")).to_be_visible(timeout=12000)
+    expect(first_out.locator('[aria-label="Lida"]')).to_be_visible()
+
+    # A Duda responde citando a mensagem; a resposta da Carla (pela tela) cita a da Duda.
+    connector_events(
+        page,
+        {
+            "type": "message",
+            "session_id": session_id,
+            "external_id": "E2E-IN-DUDA-1",
+            "remote_jid": "5511998765432@s.whatsapp.net",
+            "from_me": False,
+            "push_name": "Duda",
+            "body": "Tudo ótimo! Sexta está confirmado.",
+            "message_type": "chat",
+            "timestamp": now_iso(),
+            "quoted_external_id": "3EB0E2E0HUB0000001",
+        },
+    )
+    incoming = page.locator(".wa-msg--in").filter(has_text="Sexta está confirmado.")
+    expect(incoming).to_be_visible(timeout=12000)
+    expect(incoming.locator(".wa-msg__quote")).to_contain_text("Oi Duda, tudo bem?")
+    incoming.get_by_role("button", name="Responder mensagem", exact=True).click()
+    expect(page.locator(".wa-reply-bar")).to_contain_text("Sexta está confirmado.")
+    composer.fill("Passando para confirmar o combinado de sexta.")
+    page.keyboard.press("Enter")
+    expect(page.locator(".wa-msg--out")).to_have_count(2, timeout=8000)
+    reply_out = page.locator(".wa-msg--out").filter(has_text="Passando para confirmar")
+    expect(reply_out.locator(".wa-msg__quote")).to_contain_text("Sexta está confirmado.")
+    items = connector(page, f"/outbox?session_ids={session_id}")["items"]
+    second = next((item for item in items if item["body"].startswith("Passando para confirmar")), None)
+    assert second and second["quoted"], f"resposta sem citação na fila do conector: {items}"
+    assert second["quoted"]["external_id"] == "E2E-IN-DUDA-1" and second["quoted"]["from_me"] is False, second
+    connector_events(
+        page,
+        {
+            "type": "ack",
+            "session_id": session_id,
+            "message_id": second["message_id"],
+            "status": "sent",
+            "external_id": "3EB0E2E0HUB0000002",
+        },
+        {"type": "receipt", "session_id": session_id, "external_id": "3EB0E2E0HUB0000002", "status": "delivered"},
+    )
+    expect(reply_out.locator('[aria-label="Entregue"]')).to_be_visible(timeout=12000)
+
+    # Mídia recebida: foto enviada pela Duda é anexada pelo conector e exibida na bolha.
+    connector_events(
+        page,
+        {
+            "type": "message",
+            "session_id": session_id,
+            "external_id": "E2E-IN-DUDA-IMG",
+            "remote_jid": "5511998765432@s.whatsapp.net",
+            "from_me": False,
+            "push_name": "Duda",
+            "body": "📷 Foto · Comprovante do combinado",
+            "message_type": "image",
+            "timestamp": now_iso(),
+        },
+    )
+    media_res = page.request.post(
+        f"{BASE}/api/messaging/connector/sessions/{session_id}/media?kind=image&mime_type=image%2Fpng&file_name=comprovante.png",
+        headers={"X-Connector-Token": CONNECTOR_TOKEN, "Content-Type": "image/png"},
+        data=png_bytes(220, 140, (60, 150, 110)),
+    )
+    assert media_res.ok, f"media upload falhou: {media_res.status}"
+    media_id = media_res.json()["media_id"]
+    connector_events(
+        page,
+        {
+            "type": "media_attach",
+            "session_id": session_id,
+            "external_id": "E2E-IN-DUDA-IMG",
+            "media_id": media_id,
+        },
+    )
+    expect(page.locator(".wa-media-img").first).to_be_visible(timeout=15000)
+    assert image_loaded(page, ".wa-media-img"), "imagem recebida não carregou na bolha"
+
+    # Envio de mídia pela tela: anexa imagem com legenda e confirma entrega na fila do conector.
+    page.locator('.wa-composer input[type="file"]').set_input_files(
+        {"name": "orcamento.png", "mimeType": "image/png", "buffer": png_bytes(160, 100, (120, 80, 200))}
+    )
+    expect(page.locator(".wa-attach-bar")).to_be_visible()
+    composer.fill("Segue a prévia")
+    page.get_by_role("button", name="Enviar mensagem").click()
+    sent_media = page.locator(".wa-msg--out").filter(has_text="Segue a prévia")
+    expect(sent_media).to_be_visible(timeout=10000)
+    outbox_media = connector(page, f"/outbox?session_ids={session_id}")["items"]
+    media_item = next((i for i in outbox_media if i.get("media")), None)
+    assert media_item and media_item["media"]["kind"] == "image", f"mídia não chegou à fila: {outbox_media}"
+    connector_events(
+        page,
+        {
+            "type": "ack",
+            "session_id": session_id,
+            "message_id": media_item["message_id"],
+            "status": "sent",
+            "external_id": "3EB0E2E0HUB0000003",
+        },
+    )
+
+    idle(page, 300)
+    page.screenshot(path=OUT / "mensageria-conversa.png")
+
+    # Lançar no crédito segue a regra real do orçamento: em aberto e ocupando o limite.
+    cards_before = [c for c in api(page, "/cards") if c["card"]["kind"] in ("credit", "both")]
+    assert cards_before, "a persona precisa ter um cartão para conferir o Lançar no crédito"
+    card_before = cards_before[0]
+    card_id = card_before["card"]["id"]
+    page.get_by_role("button", name="Lançar", exact=True).click()
+    d = dialog(page)
+    launch_description = f"Compra no crédito pela Mensageria {time.time_ns()}"
+    d.get_by_label("Descrição", exact=True).fill(launch_description)
+    d.get_by_label("Valor (R$)", exact=True).fill("1.234,56")
+    d.get_by_label("Meio de pagamento").select_option("credit")
+    paid = d.get_by_label("Já está pago")
+    expect(paid).not_to_be_checked()
+    expect(paid).to_be_disabled()
+    d.get_by_label("Cartão de crédito", exact=True).select_option(card_id)
+    save = d.get_by_role("button", name="Salvar no Meu Orçamento")
+    save.click()
+    expect(d).to_contain_text("registrada no Meu Orçamento", timeout=8000)
+    expect(save).to_be_disabled()
+    expect(d).to_have_count(0, timeout=8000)
+    card_after = next(c for c in api(page, "/cards") if c["card"]["id"] == card_id)
+    assert round(float(card_after["used"]) - float(card_before["used"]), 2) == 1234.56
+    invoices = api(page, f"/cards/{card_id}/invoices")
+    matching = [
+        expense
+        for invoice in invoices
+        for expense in api(page, f"/cards/{card_id}/invoices/{invoice['month']}")
+        if expense["description"] == launch_description
+    ]
+    assert len(matching) == 1 and matching[0]["paid"] is False, matching
+
+    # Dados do contato: exibe o saldo integrado do Meu Orçamento, salva no CRM e não tem link para outra solução.
+    page.get_by_role("button", name="Dados do contato").click()
+    d = dialog(page)
+    expect(d).to_contain_text("Duda te deve R$ 425,00")
+    d.get_by_role("button", name="Salvar no CRM").click()
+    expect(d.get_by_role("status")).to_contain_text(
+        re.compile("Contato salvo no Dashboard & CRM|Contato já estava vinculado no Dashboard & CRM"),
+        timeout=8000,
+    )
+    links = page.evaluate(BUDGET_LINKS_JS)
+    assert not links, f"links da Mensageria para o Meu Orçamento: {links}"
+    page.keyboard.press("Escape")
+    expect(d).to_have_count(0)
+    links = page.evaluate(BUDGET_LINKS_JS)
+    assert not links, f"links da Mensageria para o Meu Orçamento: {links}"
+
+    # Sem atalho entre soluções: um salto direto da Mensageria para o Meu Orçamento pelo
+    # histórico do app cai no Hub (sem montar o Meu Orçamento e sem animação de entrada).
+    page.evaluate("() => { history.pushState(null, '', '/orcamento'); dispatchEvent(new PopStateEvent('popstate')); }")
+    page.wait_for_url(f"{BASE}/", timeout=5000)
+    expect(page.get_by_role("heading", name="Escolha uma solução")).to_be_visible()
+    expect(page.locator('[data-solution-root="meu-orcamento"]')).to_have_count(0)
+    expect(page.locator("[data-solution-transition]")).to_have_count(0)
+
+    # Voltar do navegador (do Hub para a Mensageria) também toca a animação de entrada.
+    page.go_back()
+    page.wait_for_url("**/mensageria/**")
+    expect(page.locator('[data-solution-transition="mensageria"]')).to_be_visible(timeout=3000)
+    expect(page.locator("[data-solution-transition]")).to_have_count(0, timeout=5000)
+    expect(page.locator(".wa-msg--in").first).to_contain_text("Sexta está confirmado.")
+
+    # Botão Sair volta para o Hub sem encerrar a sessão.
+    page.locator(".wa-bar").get_by_role("button", name="Sair").click()
+    expect(page.get_by_role("heading", name="Escolha uma solução")).to_be_visible()
+    assert api(page, "/auth/me")["email"] == EMAIL
+
+
+@step("Dashboard & CRM: transição, painéis ao vivo, funil com receita no Orçamento, contatos, leitor de PDF e sem salto entre soluções")
+def crm_flow(page: Page):
+    page.goto(f"{BASE}/")
+    idle(page)
+    page.screenshot(path=OUT / "hub-solucoes.png", full_page=True)
+    crm_card = page.get_by_role("link", name=re.compile("^Dashboard & CRM"))
+    expect(crm_card).to_be_visible()
+
+    # Entra no Dashboard & CRM pelo Hub com a animação padrão (logo → nome).
+    crm_card.click()
+    splash = page.locator('[data-solution-transition="dashboard-crm"]')
+    expect(splash).to_be_visible(timeout=3000)
+    expect(splash).to_contain_text("Dashboard & CRM")
+    page.wait_for_url("**/crm**")
+    expect(page.locator("[data-solution-transition]")).to_have_count(0, timeout=5000)
+    expect(page.locator('[data-solution-root="dashboard-crm"]')).to_be_visible()
+    idle(page)
+    expect(page.get_by_role("heading", name="Painéis")).to_be_visible()
+    page.screenshot(path=OUT / "crm-paineis.png", full_page=True)
+
+    # Cria um painel usando a fonte ao vivo da Mensageria.
+    page.get_by_role("button", name="Novo painel").click()
+    d = dialog(page)
+    d.get_by_label("Nome do painel").fill("Atendimento WhatsApp")
+    d.get_by_label("Modelo inicial").select_option("messaging_overview")
+    d.get_by_role("button", name="Criar painel").click()
+    expect(d).to_have_count(0, timeout=8000)
+    idle(page)
+    expect(page.get_by_role("button", name="Atendimento WhatsApp", exact=True)).to_have_attribute("aria-pressed", "true")
+
+    # Contatos: Duda já aparece (salva a partir da Mensageria) e sem links para outras soluções.
+    page.locator(".crm-nav").get_by_role("link", name="Contatos").click()
+    page.wait_for_url("**/crm/contatos")
+    idle(page)
+    expect(page.locator(".items > .item", has_text="Duda")).to_be_visible()
+    links = page.evaluate(OTHER_SOLUTIONS_FROM_CRM_JS)
+    assert not links, f"links diretos do CRM para outra solução: {links}"
+    page.screenshot(path=OUT / "crm-contatos.png", full_page=True)
+
+    # Funil CRM: cria negócio, move para Ganho e lança receita real no Meu Orçamento.
+    page.locator(".crm-nav").get_by_role("link", name="Funil CRM").click()
+    page.wait_for_url("**/crm/funil")
+    idle(page)
+    page.get_by_role("button", name="Novo negócio").click()
+    d = dialog(page)
+    d.get_by_label("Título do negócio").fill("Consultoria Hub")
+    d.get_by_label("Valor (R$)").fill("1850,00")
+    d.get_by_label("Contato vinculado").select_option(label="Duda")
+    d.get_by_role("button", name="Salvar negócio").click()
+    expect(d).to_have_count(0, timeout=8000)
+    idle(page)
+    deal_card = page.locator(".crm-deal-card", has_text="Consultoria Hub")
+    expect(deal_card).to_be_visible()
+    deal_card.locator("select").select_option(label="Ganho")
+    idle(page, 400)
+    incomes_before = len(api(page, f"/months/{CURRENT}")["incomes"])
+    page.locator(".crm-deal-card", has_text="Consultoria Hub").locator(".crm-deal-card__main").click()
+    d = dialog(page)
+    d.get_by_role("button", name="Enviar receita ao Meu Orçamento").click()
+    expect(d).to_contain_text("lançada no Meu Orçamento", timeout=8000)
+    page.keyboard.press("Escape")
+    expect(d).to_have_count(0)
+    incomes_after = api(page, f"/months/{CURRENT}")["incomes"]
+    assert len(incomes_after) == incomes_before + 1, "receita do negócio ganho não foi lançada no Meu Orçamento"
+    assert any(i["description"].startswith("CRM: Consultoria Hub") for i in incomes_after), incomes_after
+    page.screenshot(path=OUT / "crm-funil.png", full_page=True)
+
+    # Fontes de Dados: lê um PDF real, mostra prévia editável e cria painel automático.
+    page.locator(".crm-nav").get_by_role("link", name="Fontes").click()
+    page.wait_for_url("**/crm/fontes")
+    idle(page)
+    pdf_bytes = simple_pdf_bytes(
+        [
+            "Relatorio de Vendas Mensais",
+            "Cliente   Categoria   Valor   Data",
+            "Padaria Central   Servicos   R$ 1.250,00   05/11/2026",
+            "Clinica Horizonte   Consultoria   R$ 2.400,00   12/11/2026",
+            "Studio Alfa   Design   R$ 950,00   18/11/2026",
+        ]
+    )
+    page.locator('input[type="file"][accept*="pdf"]').set_input_files(
+        {"name": "vendas-novembro.pdf", "mimeType": "application/pdf", "buffer": pdf_bytes}
+    )
+    expect(page.get_by_text(re.compile(r"Prévia e tradução · vendas-novembro\.pdf"))).to_be_visible(timeout=15000)
+    page.screenshot(path=OUT / "crm-fontes-pdf-previa.png", full_page=True)
+    page.get_by_role("button", name="Confirmar e salvar fonte").click()
+    page.wait_for_url(re.compile(r"/crm/?$"), timeout=10000)
+    idle(page)
+    imported_panel = page.get_by_role("button", name=re.compile("Painel · vendas-novembro"))
+    expect(imported_panel).to_be_visible(timeout=10000)
+    imported_panel.click()
+    expect(imported_panel).to_have_attribute("aria-pressed", "true")
+    idle(page)
+    expect(page.locator("main").get_by_role("article").first).to_be_visible()
+    page.screenshot(path=OUT / "crm-painel-pdf.png", full_page=True)
+
+    # Sem salto direto entre soluções: pushState do CRM para /orcamento cai no Hub.
+    page.evaluate("() => { history.pushState(null, '', '/orcamento'); dispatchEvent(new PopStateEvent('popstate')); }")
+    page.wait_for_url(f"{BASE}/", timeout=5000)
+    expect(page.get_by_role("heading", name="Escolha uma solução")).to_be_visible()
+
+    # Volta para o CRM e testa o botão Sair (retorna ao Hub mantendo a sessão).
+    page.goto(f"{BASE}/crm")
+    idle(page)
+    page.locator(".crm-bar").get_by_role("button", name="Sair").click()
+    expect(page.get_by_role("heading", name="Escolha uma solução")).to_be_visible()
+    assert api(page, "/auth/me")["email"] == EMAIL
+
+
+@step("Catálogo & Estoque: transição, item, movimentação, desfazer exclusão, pedido integrado e sem salto entre soluções")
+def catalog_flow(page: Page):
+    page.goto(f"{BASE}/")
+    idle(page)
+    card = page.get_by_role("link", name=re.compile("^Catálogo & Estoque"))
+    expect(card).to_be_visible()
+    card.click()
+    expect(page.locator('[data-solution-transition="catalogo"]')).to_be_visible(timeout=3000)
+    page.wait_for_url("**/catalogo**")
+    expect(page.locator("[data-solution-transition]")).to_have_count(0, timeout=5000)
+    expect(page.locator('[data-solution-root="catalogo"]')).to_be_visible()
+    idle(page)
+
+    page.get_by_role("button", name="Novo item").first.click()
+    d = dialog(page)
+    item_name = "Placa Solar 550W com suporte de alumínio para telhado"
+    d.get_by_label("Nome").fill(item_name)
+    d.get_by_label(re.compile("^Código / SKU")).fill("SKU-SOLAR-550-SUPORTE-ALUMINIO")
+    d.get_by_label("Custo unitário (R$)").fill("420,00")
+    d.get_by_label("Preço de venda (R$)").fill("780,00")
+    d.get_by_label("Estoque inicial").fill("10")
+    d.get_by_role("button", name="Cadastrar item").click()
+    expect(d).to_have_count(0, timeout=8000)
+    idle(page)
+
+    item_row = page.locator(".person-row", has_text="Placa Solar 550W")
+    expect(item_row).to_be_visible()
+    item_id = item_row.get_attribute("data-catalog-row")
+    assert item_id
+    expect(item_row.locator(".person-row__who strong")).to_have_attribute("title", item_name)
+    expect(item_row.get_by_text("Cód. SKU-SOLAR-550-SUPORTE-ALUMINIO", exact=True)).to_be_visible()
+    ensure_row_open(item_row)
+    item_row.get_by_role("button", name="Movimentar estoque").click()
+    d = dialog(page)
+    d.locator('input[type="number"]').fill("5")
+    d.get_by_role("button", name="Registrar movimentação").click()
+    expect(d).to_have_count(0, timeout=8000)
+    idle(page)
+    expect(item_row).to_contain_text("15 un em estoque")
+
+    # D9: excluir com "Desfazer" restaura o item sem apagar do banco.
+    page.get_by_role("button", name="Novo item").first.click()
+    d = dialog(page)
+    d.get_by_label("Nome").fill("Cabo Teste Undo")
+    d.get_by_label("Preço de venda (R$)").fill("35,00")
+    d.get_by_role("button", name="Cadastrar item").click()
+    expect(d).to_have_count(0, timeout=8000)
+    idle(page)
+    undo_row = page.locator(".person-row", has_text="Cabo Teste Undo")
+    ensure_row_open(undo_row)
+    undo_row.get_by_role("button", name="Excluir Cabo Teste Undo").click()
+    expect(undo_row).to_have_count(0)
+    page.get_by_role("button", name="Desfazer").click()
+    expect(undo_row).to_have_count(1)
+    ensure_row_open(undo_row)
+    undo_row.get_by_role("button", name="Excluir Cabo Teste Undo").click()
+    page.wait_for_timeout(6800)
+    idle(page)
+
+    # Pedido integrado: confirma com baixa automática de estoque.
+    page.get_by_role("button", name="Novo pedido").click()
+    d = dialog(page)
+    d.get_by_label("Nome do cliente").fill("Cliente Balcão")
+    d.get_by_label("Catálogo", exact=True).first.select_option(item_id)
+    desc = d.get_by_placeholder("Descrição do item").first
+    expect(desc).to_have_value(item_name)
+    assert desc.evaluate("(field) => field.scrollHeight <= field.clientHeight + 1")
+    d.get_by_role("button", name="Confirmar e salvar pedido").click()
+    expect(d).to_have_count(0, timeout=8000)
+    idle(page)
+    page.locator(".crm-nav").get_by_role("link", name="Pedidos").click()
+    page.wait_for_url("**/catalogo/pedidos")
+    idle(page)
+    expect(page.locator(".person-row", has_text="Cliente Balcão")).to_be_visible()
+    assert_no_other_solution_links(page, ("/catalogo",), "Catálogo")
+
+    page.evaluate("() => { history.pushState(null, '', '/orcamento'); dispatchEvent(new PopStateEvent('popstate')); }")
+    page.wait_for_url(f"{BASE}/", timeout=5000)
+    page.goto(f"{BASE}/catalogo")
+    idle(page)
+    page.get_by_role("button", name="Sair").click()
+    expect(page.get_by_role("heading", name="Escolha uma solução")).to_be_visible()
+    assert api(page, "/auth/me")["email"] == EMAIL
+
+
+@step("Propostas & PDFs: transição, emissão e download de PDF A4, aprovação integrada, desfazer e sem salto entre soluções")
+def proposals_flow(page: Page):
+    page.goto(f"{BASE}/")
+    idle(page)
+    card = page.get_by_role("link", name=re.compile("^Propostas & PDFs"))
+    expect(card).to_be_visible()
+    card.click()
+    expect(page.locator('[data-solution-transition="propostas"]')).to_be_visible(timeout=3000)
+    page.wait_for_url("**/propostas**")
+    expect(page.locator("[data-solution-transition]")).to_have_count(0, timeout=5000)
+    expect(page.locator('[data-solution-root="propostas"]')).to_be_visible()
+    idle(page)
+
+    page.get_by_role("button", name="Novo documento").first.click()
+    d = dialog(page)
+    document_title = "Instalação Residencial com suporte e revisão elétrica"
+    d.get_by_label("Título").fill(document_title)
+    d.get_by_label("Nome do cliente").fill("Lucas Almeida")
+    d.get_by_placeholder("Descrição do item").first.fill("Serviço Completo")
+    d.get_by_label("Unitário (R$)").first.fill("1200,00")
+    d.get_by_role("button", name="Emitir documento em PDF").click()
+    expect(d).to_have_count(0, timeout=8000)
+    idle(page)
+
+    row = page.locator(".person-row", has_text="Instalação Residencial")
+    expect(row).to_be_visible()
+    expect(row.locator(".person-row__who strong")).to_have_attribute("title", document_title)
+    ensure_row_open(row)
+    with page.expect_download() as download:
+        row.get_by_role("button", name="PDF", exact=True).click()
+    assert download.value.suggested_filename.endswith(".pdf")
+    assert download.value.path().read_bytes().startswith(b"%PDF-")
+
+    incomes_before = len(api(page, f"/months/{CURRENT}")["incomes"])
+    row.get_by_role("button", name="Aprovar").click()
+    d = dialog(page)
+    expect(d.get_by_label(re.compile("Lançar receita"))).to_be_checked()
+    d.get_by_role("button", name="Confirmar aprovação").click()
+    expect(d).to_have_count(0, timeout=8000)
+    idle(page, 500)
+    incomes_after = api(page, f"/months/{CURRENT}")["incomes"]
+    assert len(incomes_after) == incomes_before + 1, "receita da proposta aprovada não foi lançada no Meu Orçamento"
+
+    # Ponte Propostas -> Cofre arquiva o PDF A4 com 1 toque.
+    row.get_by_role("button", name="Cofre").click()
+    expect(page.locator("main")).to_contain_text("Cofre", timeout=8000)
+    idle(page)
+
+    # D9: excluir com "Desfazer".
+    page.get_by_role("button", name="Novo documento").first.click()
+    d = dialog(page)
+    d.get_by_label("Título").fill("Rascunho Desfazer")
+    d.get_by_label("Nome do cliente").fill("Teste")
+    d.get_by_placeholder("Descrição do item").first.fill("Serviço Desfazer")
+    d.get_by_label("Unitário (R$)").first.fill("100,00")
+    d.get_by_role("button", name="Emitir documento em PDF").click()
+    expect(d).to_have_count(0, timeout=8000)
+    idle(page)
+    undo_doc = page.locator(".person-row", has_text="Rascunho Desfazer")
+    ensure_row_open(undo_doc)
+    undo_doc.get_by_role("button", name="Excluir Rascunho Desfazer").click()
+    expect(undo_doc).to_have_count(0)
+    page.get_by_role("button", name="Desfazer").click()
+    expect(undo_doc).to_have_count(1)
+    assert_no_other_solution_links(page, ("/propostas",), "Propostas")
+
+    page.evaluate("() => { history.pushState(null, '', '/catalogo'); dispatchEvent(new PopStateEvent('popstate')); }")
+    page.wait_for_url(f"{BASE}/", timeout=5000)
+    page.goto(f"{BASE}/propostas")
+    idle(page)
+    page.get_by_role("button", name="Sair").click()
+    expect(page.get_by_role("heading", name="Escolha uma solução")).to_be_visible()
+
+
+@step("Projetos & Tarefas: transição, Kanban, horas apontadas, desfazer exclusão e sem salto entre soluções")
+def projects_flow(page: Page):
+    page.goto(f"{BASE}/")
+    idle(page)
+    card = page.get_by_role("link", name=re.compile("^Projetos & Tarefas"))
+    expect(card).to_be_visible()
+    card.click()
+    expect(page.locator('[data-solution-transition="projetos"]')).to_be_visible(timeout=3000)
+    page.wait_for_url("**/projetos**")
+    expect(page.locator("[data-solution-transition]")).to_have_count(0, timeout=5000)
+    expect(page.locator('[data-solution-root="projetos"]')).to_be_visible()
+    idle(page)
+
+    page.get_by_role("button", name="Novo projeto").first.click()
+    d = dialog(page)
+    d.get_by_label("Nome do projeto").fill("Portal Institucional")
+    d.get_by_label("Valor orçado (R$)").fill("2400,00")
+    d.get_by_label("Meta valor/hora (R$)").fill("120,00")
+    d.get_by_role("button", name="Criar projeto").click()
+    expect(d).to_have_count(0, timeout=8000)
+    idle(page)
+
+    project = page.locator("[data-project-row]", has_text="Portal Institucional")
+    toggle = project.locator(".person-row__head")
+    expect(toggle).to_have_attribute("aria-expanded", "true")
+    toggle.click()
+    expect(project.get_by_role("button", name="Editar projeto")).to_have_count(0)
+    toggle.click()
+    project.get_by_role("button", name="Editar projeto").click()
+    d = dialog(page)
+    expect(d.get_by_label("Nome do projeto")).to_have_value("Portal Institucional")
+    d.get_by_label("Descrição / escopo", exact=False).fill("Página acessível para o cliente.")
+    d.get_by_role("button", name="Salvar projeto").click()
+    expect(d).to_have_count(0, timeout=8000)
+    expect(page.get_by_text("Página acessível para o cliente.", exact=True)).to_be_visible()
+
+    page.get_by_role("button", name="Nova tarefa").click()
+    d = dialog(page)
+    d.get_by_label("Título da tarefa").fill("Publicar DNS")
+    d.get_by_label("Prazo da tarefa").fill(br_date(TODAY.isoformat()))
+    d.get_by_role("button", name="Adicionar tarefa").click()
+    expect(d).to_have_count(0, timeout=8000)
+    idle(page)
+
+    task_card = page.locator(".crm-deal-card", has_text="Publicar DNS")
+    expect(task_card).to_be_visible()
+    task_card.get_by_role("button", name="Fazendo").click()
+    idle(page, 400)
+
+    page.get_by_role("button", name="Apontar horas").first.click()
+    d = dialog(page)
+    d.get_by_label("Horas").fill("2")
+    d.get_by_role("button", name="Registrar horas").click()
+    expect(d).to_have_count(0, timeout=8000)
+    idle(page)
+
+    task_card.get_by_role("button", name="Excluir tarefa Publicar DNS").click()
+    expect(task_card).to_have_count(0)
+    page.get_by_role("button", name="Desfazer").click()
+    expect(task_card).to_have_count(1)
+    project.get_by_role("button", name="Excluir projeto Portal Institucional").click()
+    expect(project).to_have_count(0)
+    page.get_by_role("button", name="Desfazer").click()
+    expect(project).to_be_visible()
+    assert_no_other_solution_links(page, ("/projetos",), "Projetos")
+
+    page.evaluate("() => { history.pushState(null, '', '/propostas'); dispatchEvent(new PopStateEvent('popstate')); }")
+    page.wait_for_url(f"{BASE}/", timeout=5000)
+    page.goto(f"{BASE}/projetos")
+    idle(page)
+    page.get_by_role("button", name="Sair").click()
+    expect(page.get_by_role("heading", name="Escolha uma solução")).to_be_visible()
+
+
+@step("Agenda 360°: transição, camada de Projetos na linha do tempo, novo compromisso, desfazer exclusão e sem salto entre soluções")
+def agenda_flow(page: Page):
+    page.goto(f"{BASE}/")
+    idle(page)
+    card = page.get_by_role("link", name=re.compile("^Agenda & Compromissos"))
+    expect(card).to_be_visible()
+    card.click()
+    expect(page.locator('[data-solution-transition="agenda"]')).to_be_visible(timeout=3000)
+    page.wait_for_url("**/agenda**")
+    expect(page.locator("[data-solution-transition]")).to_have_count(0, timeout=5000)
+    expect(page.locator('[data-solution-root="agenda"]')).to_be_visible()
+    idle(page)
+
+    viewport = page.viewport_size
+    try:
+        page.set_viewport_size({"width": 390, "height": 844})
+        expect(page.locator(".agenda-period__short")).to_be_visible()
+        expect(page.locator(".agenda-period__full")).to_be_hidden()
+        assert page.get_by_role("tablist", name="Modo de visualização").evaluate(
+            "(row) => new Set([...row.children].map((b) => b.offsetTop)).size === 1"
+        )
+        assert page.locator(".agenda-layers .swatch--projects").evaluate(
+            """(dot) => getComputedStyle(dot).getPropertyValue("--ev").trim() ===
+              getComputedStyle(document.documentElement).getPropertyValue("--chart-7").trim()"""
+        )
+        assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
+        page.screenshot(path=OUT / "agenda-controles-celular.png")
+    finally:
+        if viewport:
+            page.set_viewport_size(viewport)
+
+    timeline = page.get_by_role("list", name="Linha do tempo 360°")
+    expect(timeline.get_by_text("Publicar DNS")).to_be_visible()
+    expect(
+        page.get_by_role("region", name="Lembretes dos próximos 7 dias").get_by_text(
+            re.compile("Garantia Freezer")
+        )
+    ).to_be_visible()
+    page.get_by_role("tab", name="Próximos").click()
+    idle(page)
+    expect(timeline.get_by_text(re.compile("Garantia Freezer"))).to_be_visible()
+    page.get_by_role("tab", name="Semana").click()
+    idle(page)
+    page.get_by_role("button", name="Novo compromisso").first.click()
+    d = dialog(page)
+    d.get_by_label("Título").fill("Reunião de Alinhamento")
+    d.get_by_label("Data do compromisso").fill(br_date(TODAY.isoformat()))
+    d.get_by_label("Horário").fill("14:30")
+    d.get_by_role("button", name="Salvar compromisso").click()
+    expect(d).to_have_count(0, timeout=8000)
+    idle(page)
+
+    expect(timeline.get_by_text("Reunião de Alinhamento")).to_be_visible()
+    timeline.get_by_role("button", name="Excluir Reunião de Alinhamento").click()
+    expect(timeline.get_by_text("Reunião de Alinhamento")).to_have_count(0)
+    page.get_by_role("button", name="Desfazer").click()
+    expect(timeline.get_by_text("Reunião de Alinhamento")).to_be_visible()
+    assert_no_other_solution_links(page, ("/agenda",), "Agenda")
+
+    page.evaluate("() => { history.pushState(null, '', '/projetos'); dispatchEvent(new PopStateEvent('popstate')); }")
+    page.wait_for_url(f"{BASE}/", timeout=5000)
+    page.goto(f"{BASE}/agenda")
+    idle(page)
+    page.get_by_role("button", name="Sair").click()
+    expect(page.get_by_role("heading", name="Escolha uma solução")).to_be_visible()
+    assert api(page, "/auth/me")["email"] == EMAIL
+
+
+@step("Cofre & Garantias: transição, upload de PDF com busca por texto OCR, validade na Agenda e desfazer exclusão")
+def cofre_flow(page: Page):
+    page.goto(f"{BASE}/")
+    idle(page)
+    card = page.get_by_role("link", name=re.compile("^Cofre & Garantias"))
+    expect(card).to_be_visible()
+    card.click()
+    expect(page.locator('[data-solution-transition="cofre"]')).to_be_visible(timeout=3000)
+    page.wait_for_url("**/cofre**")
+    expect(page.locator("[data-solution-transition]")).to_have_count(0, timeout=5000)
+    expect(page.locator('[data-solution-root="cofre"]')).to_be_visible()
+    idle(page)
+
+    # Cópia arquivada a partir de Propostas já está presente.
+    expect(page.locator(".person-row", has_text="Instalação Residencial")).to_be_visible()
+
+    pdf = simple_pdf_bytes(["Certificado Oficial de Garantia", "Freezer Gelado Modelo FX-900", "Cobertura total 24 meses"])
+    page.get_by_role("button", name="Guardar documento").first.click()
+    d = dialog(page)
+    d.locator('input[type="file"]').set_input_files(
+        {"name": "garantia-freezer.pdf", "mimeType": "application/pdf", "buffer": pdf}
+    )
+    d.get_by_label("Título do documento").fill("Garantia Freezer")
+    d.get_by_label("Emissor ou loja").fill("Refrigera Sul")
+    d.get_by_label("Validade do documento").fill(br_date((TODAY + timedelta(days=5)).isoformat()))
+    d.get_by_role("button", name="Guardar documento").click()
+    expect(d).to_have_count(0, timeout=15000)
+    idle(page)
+
+    # Busca encontra texto extraído de dentro do PDF.
+    sb = page.get_by_role("searchbox", name=re.compile("Buscar"))
+    sb.fill("FX-900")
+    idle(page, 400)
+    vrow = page.locator(".person-row", has_text="Garantia Freezer")
+    expect(vrow).to_be_visible()
+    sb.fill("")
+    idle(page, 400)
+
+    # Desfazer exclusão (D9).
+    ensure_row_open(vrow)
+    vrow.get_by_role("button", name="Excluir Garantia Freezer").click()
+    expect(vrow).to_have_count(0)
+    page.get_by_role("button", name="Desfazer").click()
+    expect(vrow).to_have_count(1)
+    assert_no_other_solution_links(page, ("/cofre",), "Cofre")
+
+    page.evaluate("() => { history.pushState(null, '', '/caderno'); dispatchEvent(new PopStateEvent('popstate')); }")
+    page.wait_for_url(f"{BASE}/", timeout=5000)
+    page.goto(f"{BASE}/cofre")
+    idle(page)
+    page.get_by_role("button", name="Sair").click()
+    expect(page.get_by_role("heading", name="Escolha uma solução")).to_be_visible()
+
+
+@step("Caderno & Conhecimento: transição, nota com modelo, [[wikilinks]], busca BM25 e desfazer exclusão")
+def caderno_flow(page: Page):
+    page.goto(f"{BASE}/")
+    idle(page)
+    card = page.get_by_role("link", name=re.compile("^Caderno & Conhecimento"))
+    expect(card).to_be_visible()
+    card.click()
+    expect(page.locator('[data-solution-transition="caderno"]')).to_be_visible(timeout=3000)
+    page.wait_for_url("**/caderno**")
+    expect(page.locator("[data-solution-transition]")).to_have_count(0, timeout=5000)
+    expect(page.locator('[data-solution-root="caderno"]')).to_be_visible()
+    idle(page)
+
+    page.get_by_role("button", name="Nova nota").first.click()
+    d = dialog(page)
+    d.get_by_label("Título").fill("Manual Comercial")
+    d.get_by_label("Caderno / pasta").fill("Comercial")
+    d.get_by_role("button", name="Criar nota").click()
+    expect(d).to_have_count(0, timeout=8000)
+    idle(page)
+
+    page.get_by_label(re.compile("^Conteúdo em Markdown")).fill(
+        "# Manual\nUse o [[Roteiro Solar]] antes de gerar a proposta."
+    )
+    page.get_by_role("button", name="Salvar nota").click()
+    idle(page, 400)
+    page.get_by_role("button", name="Leitura & Links").click()
+    link_btn = page.locator(".nb-wikilink", has_text="[[Roteiro Solar]]")
+    expect(link_btn).to_be_visible()
+    link_btn.click()
+    idle(page, 400)
+    expect(page.locator(".nb-sidebar")).to_contain_text("Roteiro Solar")
+
+    # Busca BM25 e exclusão com Desfazer.
+    sb = page.get_by_role("searchbox", name=re.compile("Buscar notas"))
+    sb.fill("proposta")
+    idle(page, 400)
+    expect(page.locator(".nb-sidebar")).to_contain_text("Manual Comercial")
+    sb.fill("")
+    idle(page, 400)
+    assert_no_other_solution_links(page, ("/caderno",), "Caderno")
+
+    page.evaluate("() => { history.pushState(null, '', '/cofre'); dispatchEvent(new PopStateEvent('popstate')); }")
+    page.wait_for_url(f"{BASE}/", timeout=5000)
+    page.goto(f"{BASE}/caderno")
+    idle(page)
+    page.get_by_role("button", name="Sair").click()
+    expect(page.get_by_role("heading", name="Escolha uma solução")).to_be_visible()
+
+
 @step("Segurança: ativar 2FA, sair, entrar com código, desativar")
 def two_factor(page: Page):
     page.goto(f"{BASE}/seguranca")
@@ -2476,7 +3501,10 @@ def two_factor(page: Page):
     time.sleep(31 - (time.time() % 30))
     page.get_by_label(re.compile("Código")).fill(totp.now())
     page.get_by_role("button", name=re.compile("Entrar|Confirmar|Verificar")).click()
+    expect(page.get_by_role("heading", name="Escolha uma solução")).to_be_visible()
+    page.get_by_role("link", name=re.compile("^Meu Orçamento")).click()
     page.wait_for_url("**/orcamento**")
+    expect(page.locator("[data-solution-transition]")).to_have_count(0, timeout=5000)
     idle(page)
     expect(page.get_by_role("region", name="Sugestão de segurança")).to_have_count(0)
     page.goto(f"{BASE}/seguranca")
@@ -2631,11 +3659,39 @@ def mobile(browser):
     page.screenshot(path=OUT / "celular-categorias.png", full_page=True)
     overflow = page.evaluate("document.documentElement.scrollWidth > window.innerWidth")
     assert not overflow, "rolagem lateral no celular"
-    for path in ("/orcamento", "/calendario", "/metas", "/analises", "/investimentos", "/investimentos?secao=cotacoes", "/historico", "/ajustes", "/ajustes/recorrencias", "/ajustes/dados", "/ajustes/dados?aba=exportar", "/ajustes/notas", "/mensagens", "/mensagens/conversas", "/dividas", "/divisoes", "/ajustes/app", "/analises?secao=calculadoras", "/ajustes/seguranca", "/ajustes/ajuda", "/cartoes", "/contas", "/revisar", "/busca", "/ajustes/preferencias"):
+    for path in ("/", "/perfil", "/configuracoes", "/seguranca", "/preferencias", "/app", "/notas", "/mensageria", "/crm", "/crm/funil", "/crm/contatos", "/crm/fontes", "/orcamento", "/calendario", "/metas", "/analises", "/analises?secao=retrospectiva", "/investimentos", "/investimentos?secao=cotacoes", "/historico", "/ajustes", "/ajustes/recorrencias", "/ajustes/dados", "/ajustes/dados?aba=exportar", "/mensagens", "/mensagens/conversas", "/dividas", "/divisoes", "/analises?secao=calculadoras", "/ajustes/ajuda", "/cartoes", "/contas", "/revisar", "/busca", "/ajustes/preferencias"):
         page.goto(BASE + path)
         idle(page, 300)
         wide = page.evaluate("document.documentElement.scrollWidth - window.innerWidth")
         assert wide <= 0, f"{path}: {wide}px de rolagem lateral"
+    page.goto(f"{BASE}/")
+    idle(page, 300)
+    page.screenshot(path=OUT / "celular-hub.png", full_page=True)
+    page.goto(f"{BASE}/perfil")
+    idle(page, 300)
+    page.screenshot(path=OUT / "celular-hub-perfil.png", full_page=True)
+    page.goto(f"{BASE}/configuracoes")
+    idle(page, 300)
+    page.screenshot(path=OUT / "celular-hub-configuracoes.png", full_page=True)
+    page.goto(f"{BASE}/mensageria")
+    idle(page, 300)
+    page.screenshot(path=OUT / "celular-mensageria-lista.png")
+    page.locator(".wa-chat-item").first.click()
+    idle(page, 300)
+    wide = page.evaluate("document.documentElement.scrollWidth - window.innerWidth")
+    assert wide <= 0, f"/mensageria conversa: {wide}px de rolagem lateral"
+    page.screenshot(path=OUT / "celular-mensageria-conversa.png")
+    page.get_by_role("button", name="Voltar para conversas").click()
+    expect(page.locator(".wa-chat-item").first).to_be_visible()
+    for crm_path, shot in (
+        ("/crm", "celular-crm-paineis.png"),
+        ("/crm/funil", "celular-crm-funil.png"),
+        ("/crm/contatos", "celular-crm-contatos.png"),
+        ("/crm/fontes", "celular-crm-fontes.png"),
+    ):
+        page.goto(BASE + crm_path)
+        idle(page, 300)
+        page.screenshot(path=OUT / shot, full_page=True)
     ctx.close()
 
 
@@ -2867,6 +3923,13 @@ def v176(page: Page):
     assert response.ok, response.status
 
 
+@step("Reforma Tributária: simular nos dois regimes, consultar códigos e baixar DANFSe")
+def reforma_tributaria(page: Page):
+    from rtc import validar_reforma
+
+    validar_reforma(page, BASE)
+
+
 def main():
     with sync_playwright() as p:
         browser = p.chromium.launch(
@@ -2899,6 +3962,7 @@ def main():
         consultant(page, months)
         dashboard(page, months)
         other_tabs(page, months)
+        reforma_tributaria(page)
         chart_interaction(page)
         builder(page)
         saved_analyses(page)
@@ -2943,6 +4007,15 @@ def main():
         v175_ask(page)
         v176(page)
         v18_loans(page)
+        hub_flow(page)
+        mensageria_flow(page)
+        crm_flow(page)
+        catalog_flow(page)
+        proposals_flow(page)
+        projects_flow(page)
+        cofre_flow(page)
+        caderno_flow(page)
+        agenda_flow(page)
         two_factor(page)
         banner_never(page)
         STATE["state"] = ctx.storage_state()
