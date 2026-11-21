@@ -63,7 +63,7 @@ tags: [meu-orcamento, pendencias]
 - [x] D2 (caixas marcadas antes de confirmar pedido/aprovar proposta), D3 (etiqueta exclusiva de projeto) e D9 (excluir com desfazer) confirmados pelo Arthur (2026-11-21).
 - [x] D4 — cota: arquivos permanentes (comprovantes, anexos, Cofre e CRM) com 100 MB por conta, que o admin pode aumentar; mídias da Mensageria fora da cota, com teto de 300 MB que apaga as mais antigas; backup remoto com 7 diárias + 4 semanais e sem as mídias temporárias — recomendação do Claude aprovada pelo Arthur (2026-11-21).
 - [ ] Conferir no painel da Oracle o limite gratuito do Object Storage e criar alarme de orçamento (Budgets) antes do deploy do Hub.
-- [ ] D8 — Termos e Privacidade: o Arthur vai ler e pediu revisão do Claude antes de publicar (2026-11-21).
+- [ ] D8 — Termos e Privacidade: o Arthur vai ler e pediu revisão do Claude antes de publicar (2026-11-21); ajustes T1–T8 concluídos.
 
 ## Revisão geral 21/11/2026 — Checklist de correções, decisões D1–D4 e Fase D
 - [x] Seções **A**, **B1–B8**, **C1–C7**, **D9**, **E1–E6**, **F1–F6** e correções de layout mobile/Reforma Tributária implementadas e validadas localmente (testes backend/frontend/WhatsApp, suítes Playwright completas no Chrome e checagens de segurança locais em instância temporária isolada).
@@ -77,6 +77,12 @@ tags: [meu-orcamento, pendencias]
   a confirmação de compromissos e o envio de PDFs pelo WhatsApp, e os modelos atuais de Contrato e Recibo (2026-11-21).
 - [x] **D8**: Termos de uso e Política de privacidade atualizados para incluir Cofre e Caderno.
   A revisão `2026-11-21` é exibida e registrada em novos cadastros.
+- [x] **Termos e Privacidade — revisão T1–T8 (21/11/2026)**: ajustes aplicados em `Legal.tsx`
+  e cobertos por `Legal.test.ts` (aviso único de mudanças, fontes públicas de cotação, controlador
+  em uso comercial, ações/visibilidade da administração conferidas em `admin.py`/`support.py`,
+  avisos de investimentos e segurança, desconexão do WhatsApp antes de excluir a conta, lacunas
+  LGPD — transferência internacional, dados sensíveis, credenciais cifradas, 30 dias de sessão e
+  90 dias de desempenho, canal do encarregado e sem IA — e redação).
 - [x] **C2 e C8 preparados no repositório**: teto de 20 MB no Caddy e acesso dedicado do conector
   ao PostgreSQL, com permissão sobre suas credenciais de sessão e a chave `wa_version`.
 - [x] **H1–H7 e E1**: nomes e valores melhor enquadrados, textos no singular e plural,

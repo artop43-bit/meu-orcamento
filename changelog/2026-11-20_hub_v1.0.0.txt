@@ -9,6 +9,7 @@ Hub e conta
 - [x] Notas, número de versão e aviso de Novidades próprios para cada solução.
 - [x] Termos de uso e Política de privacidade atualizados para as soluções do Hub, com a versão registrada no cadastro.
 - [x] Cofre e Caderno incluídos na revisão de 21/11, com esclarecimento sobre cópias arquivadas no Cofre.
+- [x] Revisão T1–T8 dos Termos e da Política de privacidade concluída (aviso único de mudanças, fontes de cotação, controlador em uso comercial, ações e visibilidade exatas da administração, avisos de investimentos e segurança, desconexão do WhatsApp ao excluir a conta, lacunas LGPD e redação).
 - [x] Limite de 20 MB para o corpo de requisições da API no Caddy.
 
 Validação

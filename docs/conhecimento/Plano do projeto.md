@@ -81,7 +81,8 @@ Desenvolvidas à parte, com casos reais e porcentagem de acerto, depois trazidas
 - [ ] Página inicial que explica o site para quem ainda não tem conta.
 - [ ] Convite para amigos.
 - [x] Atualizar os Termos de uso e a Política de privacidade para as soluções do Hub.
-      A revisão de 20/11/2026 inclui integrações, retenção, alcance do backup e versão registrada no cadastro.
+      A revisão de 20/11/2026 inclui integrações, retenção, alcance do backup e versão registrada no cadastro;
+      em 21/11/2026, incluídos Cofre e Caderno (D8) e concluídos os ajustes T1–T8.
 
 ## Ritmo de versões
 - Uma versão por vez: checklist → aprovação → código → testes → fotos → PR → deploy → aviso.
