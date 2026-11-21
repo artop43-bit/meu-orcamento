@@ -50,7 +50,7 @@ class VaultDocument(Base):
     mime_type: Mapped[str] = mapped_column(String(100))
     size_bytes: Mapped[int] = mapped_column(Integer)
     sha256: Mapped[str] = mapped_column(String(64))
-    data: Mapped[bytes] = mapped_column(LargeBinary)
+    data: Mapped[bytes] = mapped_column(LargeBinary, deferred=True)
     extracted_text: Mapped[str | None] = mapped_column(Text)
     ocr_used: Mapped[bool] = mapped_column(Boolean, default=False)
 

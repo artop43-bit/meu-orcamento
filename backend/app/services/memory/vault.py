@@ -9,7 +9,7 @@ from typing import Any
 
 import pymupdf
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, load_only
 
 from app.core.errors import AppError
 from app.core.months import today_local
@@ -505,7 +505,21 @@ def collect_agenda_expiries(
     """Camada da Agenda 360° com validades e garantias próximas no Cofre."""
     docs = list(
         db.scalars(
-            select(VaultDocument).where(
+            select(VaultDocument)
+            .options(
+                load_only(
+                    VaultDocument.id,
+                    VaultDocument.title,
+                    VaultDocument.category,
+                    VaultDocument.issuer,
+                    VaultDocument.file_name,
+                    VaultDocument.expires_at,
+                    VaultDocument.notify_days_before,
+                    VaultDocument.contact_id,
+                    VaultDocument.project_id,
+                )
+            )
+            .where(
                 VaultDocument.user_id == user.id,
                 VaultDocument.expires_at.is_not(None),
                 VaultDocument.expires_at >= start_date,

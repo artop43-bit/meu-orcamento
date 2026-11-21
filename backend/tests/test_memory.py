@@ -9,11 +9,21 @@ from datetime import date, timedelta
 import pymupdf
 from fastapi.testclient import TestClient
 from PIL import Image
-from sqlalchemy import select
+from sqlalchemy import event, inspect, select
+from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
 
-from app.models import Expense, MessagingChat, MessagingMedia, MessagingMessage, Project, User
+from app.models import (
+    Expense,
+    MessagingChat,
+    MessagingMedia,
+    MessagingMessage,
+    Project,
+    User,
+    VaultDocument,
+)
 from app.services.budget import ensure_month
+from app.services.memory import vault as vault_service
 from app.services.messaging.cleanup import purge_old
 from tests.conftest import create_verified_user, login
 
@@ -321,3 +331,56 @@ def test_projects_d3_exclusive_budget_tag_prevents_collision(
     assert proj["budget_project_id"] is not None
     assert proj["budget_project_id"] != str(old_tag.id)
     assert proj["expenses_total"] == "0.00"
+
+
+def test_vault_listing_agenda_and_bridges_do_not_load_binary_payload(
+    client: TestClient, db: Session, engine: Engine, outbox: list
+) -> None:
+    user = _make_user(client, db, outbox, "cofre_deferred@example.com")
+    assert login(client, user.email).status_code == 200
+
+    pdf = _pdf_bytes("Manual Garantia TV OLED 65")
+    exp_date = (date.today() + timedelta(days=5)).isoformat()
+    up = client.post(
+        "/api/cofre/documents",
+        files={"file": ("manual-tv.pdf", pdf, "application/pdf")},
+        data={"title": "Manual TV", "category": "warranty", "expires_at": exp_date},
+    )
+    assert up.status_code == 201, up.text
+    doc_id = uuid.UUID(up.json()["id"])
+
+    db.expunge_all()
+    loaded = db.scalar(select(VaultDocument).where(VaultDocument.id == doc_id))
+    assert loaded is not None
+    assert "data" in inspect(loaded).unloaded
+    vault_service._serialize(loaded, date.today())
+    assert "data" in inspect(loaded).unloaded
+
+    seen_sql: list[str] = []
+
+    def _capture(_conn, _cursor, statement: str, *_args) -> None:  # type: ignore[no-untyped-def]
+        if statement.lstrip().upper().startswith("SELECT"):
+            seen_sql.append(statement)
+
+    event.listen(engine, "before_cursor_execute", _capture)
+    try:
+        listed = client.get("/api/cofre/documents")
+        assert listed.status_code == 200
+        assert len(listed.json()["documents"]) == 1
+        tl = client.get(
+            "/api/agenda/timeline",
+            params={"start": date.today().isoformat(), "end": exp_date, "layers": "cofre"},
+        )
+        assert tl.status_code == 200
+        bridges = client.get("/api/caderno/hub/bridges")
+        assert bridges.status_code == 200
+        assert len(bridges.json()["vault_docs"]) == 1
+    finally:
+        event.remove(engine, "before_cursor_execute", _capture)
+
+    assert seen_sql
+    assert all("vault_documents.data" not in stmt.lower() for stmt in seen_sql)
+
+    dl = client.get(f"/api/cofre/documents/{doc_id}/file")
+    assert dl.status_code == 200
+    assert dl.content == pdf

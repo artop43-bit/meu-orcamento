@@ -137,9 +137,9 @@ def list_memory_bridges(
         )
         out["vault_docs"] = (
             [
-                {"id": v.id, "title": v.title, "category": v.category}
-                for v in db.scalars(
-                    select(VaultDocument)
+                {"id": row.id, "title": row.title, "category": row.category}
+                for row in db.execute(
+                    select(VaultDocument.id, VaultDocument.title, VaultDocument.category)
                     .where(VaultDocument.user_id == user.id)
                     .order_by(VaultDocument.created_at.desc())
                     .limit(60)
