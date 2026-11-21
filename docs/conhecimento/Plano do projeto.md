@@ -51,6 +51,9 @@ Deixar o projeto fácil de manter por qualquer pessoa ou IA.
 - [x] Retomada da revisão de 21/11: decisões D5–D7 confirmadas, D8 atualizado para as nove
       soluções, itens H1–H7 e E1 concluídos e ajustes C2/C8 preparados no código.
       A ativação em produção segue em [[Pendências]].
+- [x] Frente 2 da revisão 2 (21/11/2026): teste de retentativa em `next_sequence` (R9), uso de
+      `get_owned` nas consultas pontuais de Catálogo & Propostas, Projetos & Agenda e Mensageria
+      (R11), e ajuste para **Hub de Soluções** nos e-mails de conta (`auth.py`).
 - [ ] Pasta `laboratorio/` no repositório para peças desenvolvidas à parte (ver
       [[Como trabalhamos]]).
 - [ ] Testar a **restauração** de um backup (backup que nunca foi restaurado não é garantia).

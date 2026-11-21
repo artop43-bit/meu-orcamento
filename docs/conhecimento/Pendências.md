@@ -82,5 +82,6 @@ tags: [meu-orcamento, pendencias]
 - [x] **H1–H7 e E1**: nomes e valores melhor enquadrados, textos no singular e plural,
   navegação e cores da Agenda, edição e exclusão nos cartões de Projetos, e teste das
   notas da versão conferindo as soluções do catálogo do Hub.
+- [x] **Frente 2 (revisão 21/11 — R9, R11 e e-mails de conta)**: adicionado teste de colisão/retentativa em `next_sequence` (`test_commerce.py`), padronizadas consultas pontuais por `id + user_id` para `get_owned` em Catálogo & Propostas, Projetos & Agenda e Mensageria, e atualizado o nome da plataforma para **Hub de Soluções** nos e-mails de conta (`auth.py`).
 - [ ] **C2 e C8 em produção**: aplicar a configuração do Caddy e provisionar e ativar o papel
   dedicado do conector na janela de deploy aprovada.
