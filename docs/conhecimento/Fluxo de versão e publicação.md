@@ -8,13 +8,22 @@ tags: [meu-orcamento, processo, deploy]
 - `1.8.0.1`, `1.8.0.2` — hotfix (4º número).
 - Uma versão por PR. Branch de trabalho do Claude: `claude/<nome>`; reiniciar a partir da
   `main` a cada versão nova.
+- Notas da versão separadas por solução (Hub, Meu Orçamento, Mensageria, Dashboard & CRM): o que
+  é de uma solução não entra nas notas de outra, e uma versão já publicada não ganha itens
+  novos — decisão do Arthur (2026-11-20).
+- Cada solução tem a própria numeração de versão (o Meu Orçamento segue a sua; Hub, Mensageria e
+  Dashboard & CRM começam em 1.0.0) — decisão do Arthur (2026-11-20).
 
 ## Arquivos que mudam em toda versão
 | Arquivo | O quê |
 |---|---|
-| `changelog/AAAA-MM-DD_vX.Y.Z.txt` | Registro detalhado (modelo abaixo) |
-| `frontend/src/release.ts` | `RELEASE.version`, `releasedAt` (ISO com -03:00) e `RELEASE_NOTES` (2–3 itens curtos para o aviso "Novidades") |
+| `changelog/AAAA-MM-DD_<solucao>_vX.Y.Z.txt` | Um registro detalhado por solução e versão (modelo abaixo); preservar arquivos publicados |
+| `frontend/src/release.ts` | `SOLUTION_RELEASES[solucao]`: `version`, `releasedAt` (ISO com -03:00; `null` em preparação) e `notes` para o aviso "Novidades" |
 | `frontend/src/lib/releases.ts` | Histórico de Ajustes › Notas da versão (a versão nova no topo) |
+
+- Versões em preparação ficam sem data no histórico e mostram "Em preparação"; rodapé,
+  Novidades e relatórios de erro usam a solução atual — evita atribuir uma publicação
+  inexistente ou a versão de outra solução (2026-11-20).
 
 Modelo do changelog:
 ```
@@ -31,6 +40,10 @@ Correções
 Testes
 - [x] ...
 ```
+
+## Branch de teste do Hub
+- `exp/hub-solucoes` é o teste do futuro update do Hub: commits e push **só nesse branch**,
+  **sem merge na `main`** até o Arthur liberar (2026-11-21).
 
 ## Onde trabalhar
 - Trabalhar na cópia local do repositório no PC → enviar ao GitHub → publicar no

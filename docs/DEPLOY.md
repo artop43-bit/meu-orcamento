@@ -233,6 +233,30 @@ deploy/scripts/compose.sh restart api        # reiniciar a API
 deploy/scripts/compose.sh exec db psql -U orcamento orcamento   # console do banco
 ```
 
+### Acesso dedicado ao PostgreSQL para a Mensageria
+
+Na janela de deploy aprovada, com as migrações atualizadas, aplique o script no banco
+do Hub usando o administrador do banco. Se ainda não existir, o script cria
+`hub_whatsapp` sem login. O script pode ser reaplicado após restaurar um backup.
+A API continua usando sua própria configuração de banco.
+
+```bash
+deploy/scripts/compose.sh exec -T db sh -c 'exec psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"' \
+  < deploy/scripts/whatsapp-db-role.sql
+deploy/scripts/compose.sh exec db sh -c 'exec psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
+```
+
+No console do PostgreSQL, use `\password hub_whatsapp` para definir uma senha e
+`ALTER ROLE hub_whatsapp LOGIN;` para habilitar o acesso. Em `.env.production`, preencha
+`MESSAGING_CONNECTOR_DATABASE_URL` com a URL desse papel no banco do Hub, codificando
+caracteres reservados da senha na URL. Em seguida, recrie apenas o serviço `whatsapp`
+na janela aprovada e confira sua saúde e as sessões. Enquanto a URL dedicada estiver
+vazia, o Compose usa a conexão já configurada para a Mensageria.
+
+O conector pode ler e alterar suas credenciais de sessão e o valor `wa_version`.
+As demais chaves de configuração e as tabelas das outras soluções ficam fora
+desse acesso. Mensagens e eventos continuam passando pela API interna.
+
 ### Restaurar um backup
 
 1. Baixe o arquivo `.dump.age` do bucket (console da Oracle) para o seu PC.
@@ -248,6 +272,12 @@ deploy/scripts/compose.sh exec db psql -U orcamento orcamento   # console do ban
    deploy/scripts/compose.sh start api scheduler
    rm backup.dump
    ```
+
+Se a instalação usa a conexão dedicada da Mensageria, garanta que o papel
+`hub_whatsapp` exista antes da restauração. Depois da importação, reaplique
+`deploy/scripts/whatsapp-db-role.sql` antes de retomar a Mensageria. A restauração
+com `--no-owner` a partir de um backup sem permissões recria as tabelas sem as
+concessões desse papel.
 
 Faça um teste de restauração de vez em quando: backup que nunca foi restaurado não é garantia.
 

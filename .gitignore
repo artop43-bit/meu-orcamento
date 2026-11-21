@@ -19,6 +19,8 @@ dist/
 
 # Editores / SO
 .vscode/
+# Cache de ferramenta de análise de código (outra IA), não faz parte do projeto
+.enola/
 .idea/
 .DS_Store
 Thumbs.db

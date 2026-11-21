@@ -1,10 +1,10 @@
 ---
 tags: [meu-orcamento, indice]
 ---
-# Meu Orçamento — Memória compartilhada
+# Hub de Soluções (Meu Orçamento) — Memória compartilhada
 
 Base de conhecimento do projeto, lida por todo agente (Claude, Gemini, Codex...) e pelo Arthur
-no Obsidian. Comece pelo [[Plano do projeto]] e pelas [[Regras de trabalho com o Claude]].
+no Obsidian. Comece pelo [[Plano do projeto]], [[Regras de trabalho com o Claude]] e [[Padrão visual]].
 
 ## Direção
 - [[Plano do projeto]] — fases e próximo passo
