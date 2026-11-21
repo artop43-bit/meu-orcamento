@@ -3926,3 +3926,12 @@ button.card-stack__card:disabled {
     box-shadow: var(--glass-highlight), var(--shadow-lg);
   }
 }
+
+/* Caderno e Cofre: classes sem estilo inline (tokens de theme.css) */
+.nb-inline-code {
+  white-space: nowrap;
+}
+
+.vault-field-hint {
+  margin: 0;
+}

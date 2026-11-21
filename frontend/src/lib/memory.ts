@@ -77,3 +77,68 @@ export function parseInlineMarkdown(line: string): MarkdownSegment[] {
   }
   return out;
 }
+
+const WIKILINK_RE = /\[\[([^\[\]|]+)(?:\|[^\[\]]+)?\]\]/g;
+
+/** Remove acentos e normaliza espaços para busca local e resolução de `[[links]]`. */
+export function foldMemoryText(raw: string | null | undefined): string {
+  return (raw ?? "")
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+
+/** Extrai destinos únicos de links `[[Nota]]` ou `[[Nota|Apelido]]` preservando a ordem. */
+export function extractWikilinks(content: string | null | undefined): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const match of (content ?? "").matchAll(WIKILINK_RE)) {
+    const label = (match[1] ?? "").replace(/\s+/g, " ").trim().slice(0, 160);
+    const key = foldMemoryText(label);
+    if (label && !seen.has(key)) {
+      seen.add(key);
+      out.push(label);
+    }
+  }
+  return out;
+}
+
+/** Resolve quais notas citam `targetId` via `[[Título]]`, ignorando acentos e maiúsculas. */
+export function buildNoteBacklinks<
+  T extends { id: string; title: string; content?: string; excerpt?: string },
+>(notes: readonly T[], targetId: string): { id: string; title: string }[] {
+  const target = notes.find((n) => n.id === targetId);
+  if (!target) return [];
+  const targetKey = foldMemoryText(target.title);
+  if (!targetKey) return [];
+  const backlinks: { id: string; title: string }[] = [];
+  for (const source of notes) {
+    if (source.id === target.id) continue;
+    const links = extractWikilinks(source.content ?? source.excerpt ?? "");
+    if (links.some((label) => foldMemoryText(label) === targetKey)) {
+      backlinks.push({ id: source.id, title: source.title });
+    }
+  }
+  return backlinks;
+}
+
+/** Confere se a nota corresponde à busca ignorando acentos e diferenças de maiúsculas. */
+export function noteMatchesQuery(
+  note: {
+    title: string;
+    folder?: string;
+    tags?: readonly string[];
+    content?: string;
+    excerpt?: string;
+  },
+  query: string,
+): boolean {
+  const needle = foldMemoryText(query);
+  if (!needle) return true;
+  const haystack = foldMemoryText(
+    [note.title, note.folder ?? "", ...(note.tags ?? []), note.content ?? note.excerpt ?? ""].join(" "),
+  );
+  return haystack.includes(needle);
+}

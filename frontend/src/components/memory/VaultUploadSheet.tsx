@@ -175,7 +175,7 @@ export function VaultUploadSheet({
             <DateField value={expiresAt} onChange={setExpiresAt} label="Validade do documento" />
           </label>
         </div>
-        <p className="muted small" style={{ margin: 0 }}>
+        <p className="muted small vault-field-hint">
           Quando preenchida, a validade aparece automaticamente na Agenda 360°.
         </p>
 

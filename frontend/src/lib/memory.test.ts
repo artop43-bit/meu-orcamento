@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import { expiryBadgeInfo, formatVaultSize, parseInlineMarkdown } from "./memory";
+import {
+  buildNoteBacklinks,
+  expiryBadgeInfo,
+  extractWikilinks,
+  foldMemoryText,
+  formatVaultSize,
+  noteMatchesQuery,
+  parseInlineMarkdown,
+} from "./memory";
 
 describe("helpers de Memória Documental (Cofre e Caderno)", () => {
   it("traduz status de validade e tamanho de arquivo em português", () => {
@@ -24,5 +32,42 @@ describe("helpers de Memória Documental (Cofre e Caderno)", () => {
       { kind: "code", text: "POP-01" },
       { kind: "text", text: "." },
     ]);
+  });
+
+  it("extrai links [[...]] únicos e preserva ordem ignorando duplicatas por acento", () => {
+    const links = extractWikilinks(
+      "Consultar [[Roteiro Comercial]], [[roteiro comercial|atalho]] e [[Orçamento Padrão]].",
+    );
+    expect(links).toEqual(["Roteiro Comercial", "Orçamento Padrão"]);
+    expect(extractWikilinks("Sem colchetes [simples] ou [[ ]]")).toEqual([]);
+  });
+
+  it("monta backlinks bidirecionais mesmo com diferenças de acento e maiúsculas", () => {
+    const notes = [
+      { id: "1", title: "Orçamento Padrão", content: "Base principal" },
+      { id: "2", title: "Ata de Reunião", content: "Seguir [[orcamento padrao|modelo]]." },
+      { id: "3", title: "POP Atendimento", content: "Revisar [[Orçamento Padrão]] antes de enviar." },
+      { id: "4", title: "Nota Avulsa", content: "Sem referência." },
+    ];
+    expect(buildNoteBacklinks(notes, "1")).toEqual([
+      { id: "2", title: "Ata de Reunião" },
+      { id: "3", title: "POP Atendimento" },
+    ]);
+    expect(buildNoteBacklinks(notes, "999")).toEqual([]);
+  });
+
+  it("normaliza acentos e encontra notas em buscas com cedilha ou til", () => {
+    expect(foldMemoryText("  Atenção · Orçamento  NFe  ")).toBe("atencao · orcamento nfe");
+    const nota = {
+      title: "Garantia · Instalação Elétrica",
+      folder: "Operação",
+      tags: ["Revisão", "Técnica"],
+      excerpt: "Condição válida até março para manutenção preventiva.",
+    };
+    expect(noteMatchesQuery(nota, "instalacao eletrica")).toBe(true);
+    expect(noteMatchesQuery(nota, "MANUTENCAO")).toBe(true);
+    expect(noteMatchesQuery(nota, "revisao")).toBe(true);
+    expect(noteMatchesQuery(nota, "operacao")).toBe(true);
+    expect(noteMatchesQuery(nota, "inexistente")).toBe(false);
   });
 });

@@ -1,16 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import {
-  BookOpenText,
-  FilePlus2,
-  Link2,
-  Pin,
-  PinOff,
-  Plus,
-  Search,
-  Sparkles,
-  Trash2,
-} from "lucide-react";
+import { BookOpenText, Link2, Plus, Search, Sparkles } from "lucide-react";
 
 import { errorMessage } from "../../api/client";
 import {
@@ -22,49 +12,14 @@ import {
   type NotebookNote,
   type NoteTemplateKind,
 } from "../../api/memory";
-import { Badge } from "../../components/budget";
-import { EmptyGuide, Tip } from "../../components/help";
+import { EmptyGuide } from "../../components/help";
+import { NotebookEditor } from "../../components/memory/NotebookEditor";
+import { NotebookList } from "../../components/memory/NotebookList";
 import { Alert, Button, LoadingRegion, PageHeader, Sheet, Skeleton } from "../../components/ui";
 import { useUndo } from "../../components/undo";
 import { announce } from "../../lib/announce";
-import { formatDateHeading, shortDate } from "../../lib/format";
-import { parseInlineMarkdown } from "../../lib/memory";
-
-function MarkdownLine({
-  line,
-  onFollowLink,
-}: {
-  line: string;
-  onFollowLink: (label: string) => void;
-}) {
-  const trimmed = line.trim();
-  if (!trimmed) return <br />;
-  const isH1 = trimmed.startsWith("# ");
-  const isH2 = trimmed.startsWith("## ");
-  const body = isH1 ? trimmed.slice(2) : isH2 ? trimmed.slice(3) : trimmed;
-  const segs = parseInlineMarkdown(body);
-  const content = segs.map((seg, i) => {
-    if (seg.kind === "bold") return <strong key={i}>{seg.text}</strong>;
-    if (seg.kind === "code") return <code key={i}>{seg.text}</code>;
-    if (seg.kind === "wikilink") {
-      return (
-        <button
-          key={i}
-          type="button"
-          className="nb-wikilink"
-          onClick={() => onFollowLink(seg.label)}
-        >
-          [[{seg.label}]]
-        </button>
-      );
-    }
-    return <span key={i}>{seg.text}</span>;
-  });
-
-  if (isH1) return <h3 className="nb-md__h1">{content}</h3>;
-  if (isH2) return <h4 className="nb-md__h2">{content}</h4>;
-  return <p className="nb-md__p">{content}</p>;
-}
+import { formatDateHeading } from "../../lib/format";
+import { foldMemoryText } from "../../lib/memory";
 
 export default function NotebookPage() {
   const qc = useQueryClient();
@@ -198,16 +153,15 @@ export default function NotebookPage() {
   }
 
   function handleFollowWikilink(label: string) {
+    const labelKey = foldMemoryText(label);
     const linkedTargetId = activeNote?.links.find(
-      (lk) => lk.label.trim().toLowerCase() === label.trim().toLowerCase(),
+      (lk) => foldMemoryText(lk.label) === labelKey,
     )?.target_id;
     if (linkedTargetId) {
       setSelectedId(linkedTargetId);
       return;
     }
-    const existing = notes.find(
-      (n) => n.title.trim().toLowerCase() === label.trim().toLowerCase(),
-    );
+    const existing = notes.find((n) => foldMemoryText(n.title) === labelKey);
     if (existing) {
       setSelectedId(existing.id);
       return;
@@ -283,7 +237,7 @@ export default function NotebookPage() {
             </p>
             <p className="greeting__text">
               Conecte assuntos digitando{" "}
-              <code style={{ whiteSpace: "nowrap" }}>[[Nome da nota]]</code> — também fica acessível rápido dentro da Mensageria.
+              <code className="nb-inline-code">[[Nome da nota]]</code> — também fica acessível rápido dentro da Mensageria.
             </p>
           </div>
 
@@ -395,210 +349,35 @@ export default function NotebookPage() {
           </div>
 
           <div className="notebook-grid">
-            <aside className="card stack nb-sidebar" aria-label="Lista de notas">
-              <div className="split">
-                <strong>Notas ({notes.length})</strong>
-                <button
-                  type="button"
-                  className="btn btn--secondary btn--sm"
-                  onClick={() => openNewModal("meeting")}
-                >
-                  <FilePlus2 size={14} /> Modelo
-                </button>
-              </div>
-              {notes.length === 0 ? (
-                <p className="muted small">Nenhuma nota corresponde a essa busca.</p>
-              ) : (
-                <ul className="items">
-                  {notes.map((n) => (
-                    <li
-                      key={n.id}
-                      className={`item nb-note-item ${selectedId === n.id ? "is-selected" : ""}`}
-                    >
-                      <button
-                        type="button"
-                        className="nb-note-pick"
-                        onClick={() => setSelectedId(n.id)}
-                        aria-current={selectedId === n.id ? "true" : undefined}
-                      >
-                        <span className="item__main">
-                          <strong className="item__title">
-                            {n.pinned ? "📌 " : ""}
-                            {n.title}
-                          </strong>
-                          <span className="item__meta">
-                            {n.folder} · {shortDate(n.updated_at.slice(0, 10))}
-                          </span>
-                        </span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </aside>
+            <NotebookList
+              notes={notes}
+              selectedId={selectedId}
+              onSelect={setSelectedId}
+              onOpenTemplate={() => openNewModal("meeting")}
+            />
 
-            {activeNote ? (
-              <section className="card stack" aria-label={`Editor da nota ${activeNote.title}`}>
-                <div className="split">
-                  <div className="row row--tight">
-                    <Badge tone="accent">{activeNote.folder}</Badge>
-                    {activeNote.tags.map((t) => (
-                      <Badge key={t} tone="neutral">
-                        #{t}
-                      </Badge>
-                    ))}
-                  </div>
-                  <div className="row row--tight">
-                    <div className="segmented" role="group" aria-label="Modo de exibição">
-                      <button
-                        type="button"
-                        className={`chip-btn ${previewMode === "edit" ? "is-active" : ""}`}
-                        aria-pressed={previewMode === "edit"}
-                        onClick={() => setPreviewMode("edit")}
-                      >
-                        Editar
-                      </button>
-                      <button
-                        type="button"
-                        className={`chip-btn ${previewMode === "preview" ? "is-active" : ""}`}
-                        aria-pressed={previewMode === "preview"}
-                        onClick={() => setPreviewMode("preview")}
-                      >
-                        Leitura & Links
-                      </button>
-                    </div>
-                    <button
-                      type="button"
-                      className="btn btn--secondary btn--sm"
-                      onClick={() => togglePin.mutate(activeNote)}
-                      aria-label={activeNote.pinned ? "Desafixar nota" : "Fixar nota no topo"}
-                    >
-                      {activeNote.pinned ? <PinOff size={14} /> : <Pin size={14} />}
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn--secondary btn--sm"
-                      aria-label={`Excluir ${activeNote.title}`}
-                      onClick={() => deleteNoteWithUndo(activeNote)}
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                </div>
-
-                {previewMode === "edit" ? (
-                  <form className="inline-form stack" onSubmit={(e) => saveNote.mutate(e)}>
-                    <div className="grid-2">
-                      <label className="field">
-                        <span className="field-label">Título da nota</span>
-                        <input
-                          value={draftTitle}
-                          onChange={(e) => setDraftTitle(e.target.value)}
-                          required
-                          maxLength={160}
-                        />
-                      </label>
-                      <label className="field">
-                        <span className="field-label">Caderno / pasta</span>
-                        <input
-                          value={draftFolder}
-                          onChange={(e) => setDraftFolder(e.target.value)}
-                          maxLength={60}
-                        />
-                      </label>
-                    </div>
-
-                    <label className="field">
-                      <span className="field-label">
-                        Etiquetas (separadas por vírgula){" "}
-                        <Tip>Pesquisadas junto no ranking BM25 do Caderno.</Tip>
-                      </span>
-                      <input
-                        value={draftTags}
-                        onChange={(e) => setDraftTags(e.target.value)}
-                        placeholder="Ex.: whatsapp, vendas, checklist"
-                      />
-                    </label>
-
-                    <div className="field">
-                      <label htmlFor="nb-editor-body" className="field-label">
-                        Conteúdo em Markdown (use [[Nome de outra nota]] para ligar ideias)
-                      </label>
-                      <textarea
-                        id="nb-editor-body"
-                        rows={11}
-                        value={draftContent}
-                        onChange={(e) => setDraftContent(e.target.value)}
-                      />
-                    </div>
-
-                    <div className="form-actions">
-                      <Button type="submit" loading={saveNote.isPending}>
-                        Salvar nota
-                      </Button>
-                    </div>
-                  </form>
-                ) : (
-                  <div className="stack">
-                    <h2 className="m-0">{draftTitle}</h2>
-                    <div className="summary-box nb-preview">
-                      {draftContent.split("\n").map((line, idx) => (
-                        <MarkdownLine key={idx} line={line} onFollowLink={handleFollowWikilink} />
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {(activeNote.links.length > 0 || activeNote.backlinks.length > 0) && (
-                  <div className="summary-box stack--compact">
-                    {activeNote.links.length > 0 && (
-                      <div className="row row--tight">
-                        <span className="muted small">Links [[…]]:</span>
-                        {activeNote.links.map((lk) => (
-                          <button
-                            key={lk.label}
-                            type="button"
-                            className="chip-btn"
-                            onClick={() => handleFollowWikilink(lk.label)}
-                          >
-                            {lk.target_id ? `↗ ${lk.target_title}` : `+ Criar "${lk.label}"`}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                    {activeNote.backlinks.length > 0 && (
-                      <div className="row row--tight">
-                        <span className="muted small">Citada por:</span>
-                        {activeNote.backlinks.map((bl) => (
-                          <button
-                            key={bl.id}
-                            type="button"
-                            className="chip-btn"
-                            onClick={() => setSelectedId(bl.id)}
-                          >
-                            ← {bl.title}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </section>
-            ) : selectedId && activeNoteQuery.isPending ? (
-              <section className="card stack">
-                <LoadingRegion label="Carregando conteúdo da nota">
-                  <Skeleton height={220} />
-                </LoadingRegion>
-              </section>
-            ) : selectedId && activeNoteQuery.isError ? (
-              <section className="card">
-                <Alert tone="error">{errorMessage(activeNoteQuery.error)}</Alert>
-              </section>
-            ) : (
-              <section className="card">
-                <p className="muted">Selecione uma nota à esquerda ou crie uma nova.</p>
-              </section>
-            )}
+            <NotebookEditor
+              activeNote={activeNote}
+              selectedId={selectedId}
+              isLoading={activeNoteQuery.isPending}
+              errorText={activeNoteQuery.isError ? errorMessage(activeNoteQuery.error) : null}
+              previewMode={previewMode}
+              onPreviewModeChange={setPreviewMode}
+              draftTitle={draftTitle}
+              onDraftTitleChange={setDraftTitle}
+              draftFolder={draftFolder}
+              onDraftFolderChange={setDraftFolder}
+              draftTags={draftTags}
+              onDraftTagsChange={setDraftTags}
+              draftContent={draftContent}
+              onDraftContentChange={setDraftContent}
+              saving={saveNote.isPending}
+              onSave={(e) => saveNote.mutate(e)}
+              onTogglePin={(note) => togglePin.mutate(note)}
+              onDelete={deleteNoteWithUndo}
+              onFollowWikilink={handleFollowWikilink}
+              onSelectNote={setSelectedId}
+            />
           </div>
         </>
       )}
