@@ -33,7 +33,7 @@ from app.services.memory.bridges import list_memory_bridges, validate_hub_links
 from app.services.memory.notebook import fold_text
 from app.services.messaging.media import ascii_filename, clean_file_name
 
-MAX_VAULT_BYTES = 15 * 1024 * 1024
+MAX_VAULT_BYTES = files.RULES["vault"].max_bytes
 VAULT_CATEGORIES = (
     "warranty",
     "contract",
@@ -118,7 +118,7 @@ def _prepare_vault_payload(
         return raw, "application/pdf", safe_name[:160], extracted_text, ocr_used, warning
 
     # Para não aceitar SVG/HTML nem bombas de pixel, revalida imagens pelo Pillow.
-    prepared, content_type, _, _ = files.prepare(raw, "receipt")
+    prepared, content_type, _, _ = files.prepare(raw, "vault")
     ext = {"image/png": "png", "image/jpeg": "jpg", "image/webp": "webp"}.get(content_type, "img")
     if "." not in safe_name:
         safe_name = f"{safe_name}.{ext}"

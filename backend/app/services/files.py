@@ -31,6 +31,8 @@ class Rule:
     max_side: int  # lado maior depois de reduzir (imagens estáticas)
     formats: tuple[str, ...]
     animated: bool
+    quality: int = 84
+    preserve_format: bool = False
 
 
 RULES = {
@@ -41,6 +43,15 @@ RULES = {
     "receipt": Rule(5 * MB, 2560, ("PNG", "JPEG", "WEBP"), animated=False),
     # Imagem do objetivo de uma meta.
     "goal": Rule(8 * MB, 1600, ("PNG", "JPEG", "WEBP", "GIF"), animated=True),
+    # Cofre permanente: até 15 MB e 6000 px, mantendo o formato sem metadados/EXIF.
+    "vault": Rule(
+        15 * MB,
+        6000,
+        ("PNG", "JPEG", "WEBP"),
+        animated=False,
+        quality=92,
+        preserve_format=True,
+    ),
 }
 # Comprovantes e imagens de metas são só do dono (nem a administração abre).
 OWNER_ONLY = ("receipt", "goal")
@@ -96,10 +107,28 @@ def prepare(raw: bytes, purpose: str) -> tuple[bytes, str, int, int]:
     # Estática: aplica a rotação do EXIF, reduz e regrava sem metadados.
     image = ImageOps.exif_transpose(image)
     image.thumbnail((rule.max_side, rule.max_side))
+    for meta_key in ("exif", "xmp", "XML:com.adobe.xmp", "icc_profile", "photoshop", "adobe"):
+        image.info.pop(meta_key, None)
     out = io.BytesIO()
     if fmt == "GIF":
         image.save(out, "GIF")
         kind = "GIF"
+    elif rule.preserve_format:
+        kind = fmt
+        if fmt == "PNG":
+            if image.mode not in ("RGB", "RGBA"):
+                image = image.convert(
+                    "RGBA" if "A" in image.getbands() or "transparency" in image.info else "RGB"
+                )
+            image.save(out, "PNG", optimize=True)
+        elif fmt == "JPEG":
+            if image.mode != "RGB":
+                image = image.convert("RGB")
+            image.save(out, "JPEG", quality=rule.quality, optimize=True)
+        else:
+            if image.mode not in ("RGB", "RGBA"):
+                image = image.convert("RGB")
+            image.save(out, "WEBP", quality=rule.quality, method=4)
     else:
         # v1.7.5: tudo o que é estático é gravado em WebP (arquivo bem menor, abre mais rápido no
         # celular). Foto (JPEG/WebP) com perda quase invisível; PNG (print, logo, transparência)
@@ -114,7 +143,7 @@ def prepare(raw: bytes, purpose: str) -> tuple[bytes, str, int, int]:
         else:
             if image.mode not in ("RGB", "RGBA"):
                 image = image.convert("RGB")
-            image.save(out, "WEBP", quality=84, method=4)
+            image.save(out, "WEBP", quality=rule.quality, method=4)
     data = out.getvalue()
     if len(data) > rule.max_bytes:
         raise _too_big(rule)

@@ -11,6 +11,7 @@ from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
 from app.api.deps import CurrentUser, DbSession, require_solution
+from app.core.errors import AppError
 from app.services.memory import notebook as notebook_service
 from app.services.memory import vault as vault_service
 
@@ -133,7 +134,11 @@ def upload_vault_document(
     proposal_id: Annotated[uuid.UUID | None, Form()] = None,
 ) -> dict[str, Any]:
     # Leitura síncrona para execução segura fora do event loop (regra E5).
+    if file.size is not None and file.size > vault_service.MAX_VAULT_BYTES:
+        raise AppError(413, "file_too_large", "O documento ultrapassa o limite de 15 MB.")
     raw = file.file.read(vault_service.MAX_VAULT_BYTES + 1)
+    if len(raw) > vault_service.MAX_VAULT_BYTES:
+        raise AppError(413, "file_too_large", "O documento ultrapassa o limite de 15 MB.")
     return vault_service.create_document(
         db,
         user,

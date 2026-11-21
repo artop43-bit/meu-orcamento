@@ -384,3 +384,84 @@ def test_vault_listing_agenda_and_bridges_do_not_load_binary_payload(
     dl = client.get(f"/api/cofre/documents/{doc_id}/file")
     assert dl.status_code == 200
     assert dl.content == pdf
+
+
+def test_vault_image_rule_6mb_4000px_strips_exif_and_rejects_svg(
+    client: TestClient, db: Session, outbox: list
+) -> None:
+    from app.core.errors import AppError
+    from app.services import files
+
+    user = _make_user(client, db, outbox, "cofre_img_r2@example.com")
+    assert login(client, user.email).status_code == 200
+
+    # 1) Imagem ~6 MB (acima da regra antiga de 5 MB) é aceita pelo Cofre.
+    noisy = Image.effect_noise((2200, 2200), 90).convert("RGB")
+    buf_6mb = io.BytesIO()
+    noisy.save(buf_6mb, format="JPEG", quality=100, subsampling=0)
+    raw_6mb = buf_6mb.getvalue()
+    assert 5 * 1024 * 1024 < len(raw_6mb) <= 15 * 1024 * 1024
+    up_big = client.post(
+        "/api/cofre/documents",
+        files={"file": ("nota-grande.jpg", raw_6mb, "image/jpeg")},
+        data={"title": "Foto 6 MB"},
+    )
+    assert up_big.status_code == 201, up_big.text
+    assert up_big.json()["mime_type"] == "image/jpeg"
+
+    # 2) Imagem de 4000 px mantém 4000 px e perde EXIF GPS na regravação.
+    hi_res = Image.new("RGB", (4000, 120), (200, 120, 40))
+    exif = hi_res.getexif()
+    exif[271] = "CameraTeste"
+    exif[34853] = {1: "S", 2: (23.0, 33.0, 0.0)}
+    buf_4k = io.BytesIO()
+    hi_res.save(buf_4k, format="JPEG", quality=95, exif=exif.tobytes())
+    up_4k = client.post(
+        "/api/cofre/documents",
+        files={"file": ("garantia-4k.jpg", buf_4k.getvalue(), "image/jpeg")},
+        data={"title": "Foto 4000 px"},
+    )
+    assert up_4k.status_code == 201, up_4k.text
+    dl_4k = client.get(up_4k.json()["file_url"])
+    assert dl_4k.status_code == 200
+    with Image.open(io.BytesIO(dl_4k.content)) as out_img:
+        assert out_img.format == "JPEG"
+        assert out_img.size == (4000, 120)
+        assert dict(out_img.getexif()) == {}
+        assert "exif" not in out_img.info
+
+    # 3) PNG mantém formato sem perda.
+    png_img = Image.new("RGBA", (64, 64), (0, 0, 0, 0))
+    png_img.putpixel((10, 10), (12, 34, 56, 255))
+    buf_png = io.BytesIO()
+    png_img.save(buf_png, format="PNG")
+    prepared_png, ctype_png, w_png, h_png = files.prepare(buf_png.getvalue(), "vault")
+    assert ctype_png == "image/png"
+    assert (w_png, h_png) == (64, 64)
+    with Image.open(io.BytesIO(prepared_png)) as out_png:
+        assert out_png.format == "PNG"
+        assert out_png.convert("RGBA").getpixel((10, 10)) == (12, 34, 56, 255)
+        assert out_png.convert("RGBA").getpixel((0, 0))[3] == 0
+
+    # 4) SVG recusado na preparação e no endpoint.
+    svg = b'<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>'
+    try:
+        files.prepare(svg, "vault")
+    except AppError as exc:
+        assert exc.status_code == 400
+    else:
+        raise AssertionError("SVG deveria ter sido rejeitado")
+    bad_svg = client.post(
+        "/api/cofre/documents",
+        files={"file": ("vetor.svg", svg, "image/svg+xml")},
+        data={"title": "SVG"},
+    )
+    assert bad_svg.status_code == 400
+
+    # 5) Arquivo acima de 15 MB é rejeitado antes de salvar.
+    too_big = client.post(
+        "/api/cofre/documents",
+        files={"file": ("gigante.jpg", b"x" * (15 * 1024 * 1024 + 1), "image/jpeg")},
+        data={"title": "Grande demais"},
+    )
+    assert too_big.status_code == 413
