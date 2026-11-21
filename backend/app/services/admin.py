@@ -202,12 +202,8 @@ def governance_summary(db: Session) -> dict[str, Any]:
     }
 
 
-def _snapshot_size_bytes(rows_json: Any) -> int:
-    return len(json.dumps(rows_json or [], ensure_ascii=False, default=str).encode("utf-8"))
-
-
 def user_storage_map(db: Session) -> dict[uuid.UUID, int]:
-    """Soma o uso em bytes (arquivos, Cofre, mídias WhatsApp e snapshots CRM)."""
+    """Soma o uso em bytes (arquivos, Cofre e snapshots CRM sem ler rows_json)."""
     stored = dict(
         db.execute(
             select(StoredFile.owner_id, func.coalesce(func.sum(StoredFile.size), 0)).group_by(
@@ -222,17 +218,23 @@ def user_storage_map(db: Session) -> dict[uuid.UUID, int]:
             ).group_by(VaultDocument.user_id)
         ).all()
     )
+    snapshots = dict(
+        db.execute(
+            select(
+                DataSource.user_id,
+                func.coalesce(func.sum(DataSnapshot.size_bytes), 0),
+            )
+            .join(DataSnapshot, DataSnapshot.source_id == DataSource.id)
+            .group_by(DataSource.user_id)
+        ).all()
+    )
     totals: dict[uuid.UUID, int] = {}
     for uid, size in stored.items():
         totals[uid] = totals.get(uid, 0) + int(size or 0)
     for uid, size in vault.items():
         totals[uid] = totals.get(uid, 0) + int(size or 0)
-    for uid, rows_json in db.execute(
-        select(DataSource.user_id, DataSnapshot.rows_json).join(
-            DataSnapshot, DataSnapshot.source_id == DataSource.id
-        )
-    ).all():
-        totals[uid] = totals.get(uid, 0) + _snapshot_size_bytes(rows_json)
+    for uid, size in snapshots.items():
+        totals[uid] = totals.get(uid, 0) + int(size or 0)
     return totals
 
 
@@ -267,12 +269,14 @@ def user_storage_bytes(db: Session, user_id: uuid.UUID) -> int:
         )
         or 0
     )
-    snaps = db.scalars(
-        select(DataSnapshot.rows_json)
-        .join(DataSource, DataSnapshot.source_id == DataSource.id)
-        .where(DataSource.user_id == user_id)
-    ).all()
-    snapshots = sum(_snapshot_size_bytes(r) for r in snaps)
+    snapshots = int(
+        db.scalar(
+            select(func.coalesce(func.sum(DataSnapshot.size_bytes), 0))
+            .join(DataSource, DataSnapshot.source_id == DataSource.id)
+            .where(DataSource.user_id == user_id)
+        )
+        or 0
+    )
     return stored + vault + snapshots
 
 

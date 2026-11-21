@@ -9,6 +9,7 @@ from typing import Any
 
 import pymupdf
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, load_only
 
 from app.core.errors import AppError
@@ -453,21 +454,34 @@ def archive_from_messaging_media(
         or media.file_name
         or (f"Arquivo WhatsApp · {chat_name}" if chat_name else "Mídia WhatsApp")
     )
-    doc = create_document(
-        db,
-        user,
-        raw=media.data,
-        filename=media.file_name or ("arquivo.pdf" if "pdf" in media.mime_type else "imagem.png"),
-        meta={
-            "title": fallback_title[:160],
-            "category": category,
-            "issuer": chat_name,
-            "expires_at": expires_at,
-            "notes": "Arquivado a partir da Mensageria (protegido da limpeza semanal).",
-            "contact_id": contact_id,
-            "messaging_media_id": media.id,
-        },
-    )
+    try:
+        doc = create_document(
+            db,
+            user,
+            raw=media.data,
+            filename=media.file_name
+            or ("arquivo.pdf" if "pdf" in media.mime_type else "imagem.png"),
+            meta={
+                "title": fallback_title[:160],
+                "category": category,
+                "issuer": chat_name,
+                "expires_at": expires_at,
+                "notes": "Arquivado a partir da Mensageria (protegido da limpeza semanal).",
+                "contact_id": contact_id,
+                "messaging_media_id": media.id,
+            },
+        )
+    except IntegrityError:
+        db.rollback()
+        existing = db.scalar(
+            select(VaultDocument).where(
+                VaultDocument.user_id == user.id,
+                VaultDocument.messaging_media_id == media.id,
+            )
+        )
+        if existing is None:
+            raise
+        return {"archived": False, "document": _serialize(existing, today_local())}
     return {"archived": True, "document": doc}
 
 
@@ -497,34 +511,40 @@ def archive_from_proposal(
     )
     if existing is not None:
         return {"archived": False, "document": _serialize(existing, today_local())}
-    if limiter.hit(f"cofre-from-messaging:{user.id}", 5, 60) is not None:
-        raise AppError(
-            429,
-            "rate_limited",
-            "Muitos envios seguidos no Cofre. Tente novamente em um minuto.",
-        )
 
     pdf_bytes, filename = proposals_service.render_document_pdf(db, user, prop.id)
     cat_by_type = {"contract": "contract", "receipt": "receipt"}
     default_cat = cat_by_type.get(prop.doc_type, "other")
-    created = create_document(
-        db,
-        user,
-        raw=pdf_bytes,
-        filename=filename or f"{prop.doc_type}-{prop.number:04d}.pdf",
-        meta={
-            "title": f"#{prop.number:04d} · {prop.title}"[:160],
-            "category": category or default_cat,
-            "issuer": prop.customer_name,
-            "document_number": f"#{prop.number:04d}",
-            "issue_date": prop.created_at.date(),
-            "expires_at": expires_at or prop.valid_until,
-            "notes": f"Cópia arquivada de Propostas & PDFs ({prop.doc_type}).",
-            "contact_id": prop.contact_id,
-            "deal_id": prop.crm_deal_id,
-            "proposal_id": prop.id,
-        },
-    )
+    try:
+        created = create_document(
+            db,
+            user,
+            raw=pdf_bytes,
+            filename=filename or f"{prop.doc_type}-{prop.number:04d}.pdf",
+            meta={
+                "title": f"#{prop.number:04d} · {prop.title}"[:160],
+                "category": category or default_cat,
+                "issuer": prop.customer_name,
+                "document_number": f"#{prop.number:04d}",
+                "issue_date": prop.created_at.date(),
+                "expires_at": expires_at or prop.valid_until,
+                "notes": f"Cópia arquivada de Propostas & PDFs ({prop.doc_type}).",
+                "contact_id": prop.contact_id,
+                "deal_id": prop.crm_deal_id,
+                "proposal_id": prop.id,
+            },
+        )
+    except IntegrityError:
+        db.rollback()
+        existing = db.scalar(
+            select(VaultDocument).where(
+                VaultDocument.user_id == user.id,
+                VaultDocument.proposal_id == prop.id,
+            )
+        )
+        if existing is None:
+            raise
+        return {"archived": False, "document": _serialize(existing, today_local())}
     return {"archived": True, "document": created}
 
 

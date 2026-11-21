@@ -135,7 +135,7 @@ def test_vault_upload_search_expiry_agenda_bridges_and_security(
     arch2 = client.post(f"/api/cofre/from-proposal/{prop_id}")
     assert arch1.status_code == 201
     assert arch1.json()["archived"] is True
-    assert arch2.status_code == 201
+    assert arch2.status_code == 200
     assert arch2.json()["archived"] is False
     assert arch1.json()["document"]["id"] == arch2.json()["document"]["id"]
 
@@ -596,3 +596,88 @@ def test_notebook_list_limit_excerpt_and_get_full_note(
     client.post("/api/auth/logout")
     assert login(client, user_b.email).status_code == 200
     assert client.get(f"/api/caderno/notes/{created_ids[-1]}").status_code == 404
+
+
+def test_vault_double_click_and_unique_index_prevent_duplicates(
+    client: TestClient, db: Session, outbox: list, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from sqlalchemy import func
+
+    from app.services import admin as admin_service
+
+    user = _make_user(client, db, outbox, "cofre_r5@example.com")
+    assert login(client, user.email).status_code == 200
+
+    media = MessagingMedia(
+        user_id=user.id,
+        kind="image",
+        mime_type="image/png",
+        file_name="recibo-wa.png",
+        size_bytes=len(_png_bytes()),
+        data=_png_bytes(),
+    )
+    db.add(media)
+    db.commit()
+
+    # 1) Duas chamadas seguidas em from-messaging resultam em 1 documento e 1 contagem na cota.
+    first = client.post(f"/api/cofre/from-messaging/{media.id}")
+    assert first.status_code == 201, first.text
+    assert first.json()["archived"] is True
+    used_after_first = admin_service.user_storage_bytes(db, user.id)
+
+    second = client.post(f"/api/cofre/from-messaging/{media.id}")
+    assert second.status_code == 200, second.text
+    assert second.json()["archived"] is False
+    assert second.json()["document"]["id"] == first.json()["document"]["id"]
+    assert admin_service.user_storage_bytes(db, user.id) == used_after_first
+    count_wa = db.scalar(
+        select(func.count()).where(
+            VaultDocument.user_id == user.id,
+            VaultDocument.messaging_media_id == media.id,
+        )
+    )
+    assert count_wa == 1
+
+    # 2) Corrida simultânea: pré-checagem passa vazia, índice único barra e retorna 200.
+    prop = client.post(
+        "/api/proposals",
+        json={
+            "doc_type": "proposal",
+            "title": "Proposta Duplo Clique",
+            "customer_name": "Cliente R5",
+            "items": [{"name": "Item", "qty": 1, "unit_price": "100.00"}],
+        },
+    ).json()
+    prop_id = prop["id"]
+    p1 = client.post(f"/api/cofre/from-proposal/{prop_id}")
+    assert p1.status_code == 201
+
+    orig_create = vault_service.create_document
+
+    def race_create(session: Session, owner: User, **kwargs: object) -> dict[str, object]:
+        # Simula que a requisição concorrente passou da pré-checagem antes do primeiro commit.
+        return orig_create(session, owner, **kwargs)  # type: ignore[arg-type]
+
+    orig_scalar = Session.scalar
+    skipped_once = False
+
+    def skip_precheck(self: Session, statement: object, *args: object, **kwargs: object) -> object:
+        nonlocal skipped_once
+        if not skipped_once and "vault_documents.proposal_id" in str(statement):
+            skipped_once = True
+            return None
+        return orig_scalar(self, statement, *args, **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(vault_service, "create_document", race_create)
+    monkeypatch.setattr(Session, "scalar", skip_precheck)
+    p2 = client.post(f"/api/cofre/from-proposal/{prop_id}")
+    assert p2.status_code == 200, p2.text
+    assert p2.json()["archived"] is False
+    assert p2.json()["document"]["id"] == p1.json()["document"]["id"]
+    count_prop = db.scalar(
+        select(func.count()).where(
+            VaultDocument.user_id == user.id,
+            VaultDocument.proposal_id == uuid.UUID(prop_id),
+        )
+    )
+    assert count_prop == 1

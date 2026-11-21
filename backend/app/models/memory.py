@@ -16,6 +16,7 @@ from sqlalchemy import (
     String,
     Text,
     Uuid,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -30,6 +31,22 @@ class VaultDocument(Base):
     __table_args__ = (
         Index("ix_vault_documents_user_expires", "user_id", "expires_at"),
         Index("ix_vault_documents_user_category", "user_id", "category"),
+        Index(
+            "uq_vault_documents_user_messaging_media",
+            "user_id",
+            "messaging_media_id",
+            unique=True,
+            sqlite_where=text("messaging_media_id IS NOT NULL"),
+            postgresql_where=text("messaging_media_id IS NOT NULL"),
+        ),
+        Index(
+            "uq_vault_documents_user_proposal",
+            "user_id",
+            "proposal_id",
+            unique=True,
+            sqlite_where=text("proposal_id IS NOT NULL"),
+            postgresql_where=text("proposal_id IS NOT NULL"),
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)

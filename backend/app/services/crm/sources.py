@@ -35,7 +35,7 @@ NATIVE_SOURCE_RESOURCE = {
 
 
 def _rows_byte_size(rows: list[dict[str, Any]]) -> int:
-    return len(json.dumps(rows, ensure_ascii=False, default=str).encode("utf-8"))
+    return len(json.dumps(rows or [], ensure_ascii=False, default=str).encode("utf-8"))
 
 
 def _check_snapshot_quota(db: Session, user_id: uuid.UUID, rows: list[dict[str, Any]]) -> None:
@@ -245,6 +245,7 @@ def _save_snapshot(db: Session, source: DataSource, rows: list[dict[str, Any]]) 
             source_id=source.id,
             rows_json=rows,
             row_count=len(rows),
+            size_bytes=_rows_byte_size(rows),
             checksum=_checksum(rows),
             created_at=now,
         )

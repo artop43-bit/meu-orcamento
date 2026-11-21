@@ -171,6 +171,7 @@ class DataSnapshot(Base):
     )
     rows_json: Mapped[list] = mapped_column(JSON, default=list)
     row_count: Mapped[int] = mapped_column(Integer, default=0)
+    size_bytes: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     checksum: Mapped[str] = mapped_column(String(64))
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
 

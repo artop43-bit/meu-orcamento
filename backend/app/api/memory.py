@@ -209,10 +209,11 @@ def archive_messaging_media(
     media_id: uuid.UUID,
     user: CurrentUser,
     db: DbSession,
+    response: Response,
     body: ArchiveFromMessagingIn | None = None,
 ) -> dict[str, Any]:
     payload = body or ArchiveFromMessagingIn()
-    return vault_service.archive_from_messaging_media(
+    res = vault_service.archive_from_messaging_media(
         db,
         user,
         media_id,
@@ -220,6 +221,9 @@ def archive_messaging_media(
         category=payload.category,
         expires_at=payload.expires_at,
     )
+    if not res["archived"]:
+        response.status_code = status.HTTP_200_OK
+    return res
 
 
 @vault_router.post("/from-proposal/{doc_id}", status_code=status.HTTP_201_CREATED)
@@ -227,16 +231,20 @@ def archive_proposal_pdf(
     doc_id: uuid.UUID,
     user: CurrentUser,
     db: DbSession,
+    response: Response,
     body: ArchiveFromProposalIn | None = None,
 ) -> dict[str, Any]:
     payload = body or ArchiveFromProposalIn()
-    return vault_service.archive_from_proposal(
+    res = vault_service.archive_from_proposal(
         db,
         user,
         doc_id,
         category=payload.category,
         expires_at=payload.expires_at,
     )
+    if not res["archived"]:
+        response.status_code = status.HTTP_200_OK
+    return res
 
 
 # ---------------------------------------------------------------- Caderno & Base de Conhecimento

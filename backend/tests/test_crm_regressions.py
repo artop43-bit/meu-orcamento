@@ -504,3 +504,59 @@ def test_crm_bridges_and_native_sources_respect_blocked_solutions(client, db, ou
     assert client.get(f"/api/crm/sources/{budget_src['id']}/rows").status_code == 403
     assert client.post(f"/api/crm/deals/{deal['id']}/sync-budget").status_code == 403
     assert client.get("/api/crm/hub/messaging-chats").status_code == 403
+
+
+def test_snapshot_size_bytes_stored_and_admin_storage_avoids_rows_json(client, db, engine, outbox):
+    import json
+
+    from sqlalchemy import event
+
+    from app.models import DataSnapshot, DataSource
+    from app.services import admin as admin_service
+
+    _auth(client, outbox, "crm-r13@example.com")
+    user = db.scalar(select(User).where(User.email == "crm-r13@example.com"))
+    assert user is not None
+
+    rows = [
+        {"cliente": "João Café", "valor": 150.5},
+        {"cliente": "Maria Ação", "valor": 299.9},
+    ]
+    res = client.post(
+        "/api/crm/sources/tabular",
+        json={
+            "name": "Planilha R13",
+            "kind": "csv",
+            "columns": [
+                {"name": "cliente", "label": "Cliente", "type": "text"},
+                {"name": "valor", "label": "Valor", "type": "currency"},
+            ],
+            "rows": rows,
+        },
+    )
+    assert res.status_code == 201, res.text
+    source_id = uuid.UUID(res.json()["source"]["id"])
+    snap = db.scalar(select(DataSnapshot).where(DataSnapshot.source_id == source_id))
+    assert snap is not None
+    raw_json = json.dumps(snap.rows_json, ensure_ascii=False, default=str)
+    expected_bytes = len(raw_json.encode("utf-8"))
+    assert snap.size_bytes == expected_bytes
+    assert snap.size_bytes > 0
+
+    seen_sql: list[str] = []
+
+    def _capture(_conn, _cursor, statement: str, *_args):
+        if statement.lstrip().upper().startswith("SELECT"):
+            seen_sql.append(statement)
+
+    event.listen(engine, "before_cursor_execute", _capture)
+    try:
+        assert admin_service.user_storage_bytes(db, user.id) == expected_bytes
+        assert admin_service.user_storage_map(db)[user.id] == expected_bytes
+    finally:
+        event.remove(engine, "before_cursor_execute", _capture)
+
+    assert seen_sql
+    assert all("rows_json" not in stmt.lower() for stmt in seen_sql)
+    assert any(s["kind"] == "csv" for s in client.get("/api/crm/sources").json())
+    assert db.scalar(select(DataSource.id).where(DataSource.id == source_id)) == source_id
