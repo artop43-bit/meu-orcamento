@@ -38,9 +38,13 @@ export function Privacy() {
       <h2>1. Quem é o responsável pelos dados</h2>
       <p>
         O responsável pelo tratamento dos dados da conta e pela operação do Hub é <Controller />.
-        Para dúvidas ou solicitações sobre privacidade, escreva para <Contact />.
-        Se você usa o Hub para gerir um negócio ou atender clientes, também pode ter responsabilidades
-        sobre os dados de terceiros que cadastrar, inclusive informar essas pessoas quando necessário.
+        Para dúvidas ou solicitações sobre privacidade, escreva para o canal do encarregado (LGPD):{" "}
+        <Contact />.
+      </p>
+      <p>
+        Se você usa o Hub para trabalho ou negócio (conversas, contatos, CRM, propostas, documentos de clientes),
+        você é o responsável por esses dados perante a lei (controlador) e deve ter um motivo legítimo para
+        guardá-los. O Hub apenas os guarda e organiza para você. O uso só pessoal e doméstico fica fora da LGPD.
       </p>
 
       <h2>2. Quais dados usamos e para quê</h2>
@@ -48,7 +52,8 @@ export function Privacy() {
         <li>
           <strong>Conta, segurança e suporte.</strong> Usamos seu e-mail, senha, dados de perfil, preferências
           e o registro da versão dos Termos aceitos. Registramos informações como IP, navegador, data de acesso,
-          ações de segurança e dados técnicos de erros. Tratamos as mensagens e os anexos que você enviar ao suporte.
+          ações de segurança, dados técnicos de erros e estatísticas anônimas de desempenho. Tratamos as
+          mensagens e os anexos que você enviar ao suporte.
         </li>
         <li>
           <strong>Meu Orçamento.</strong> Usamos lançamentos, contas, cartões, metas, investimentos, pessoas
@@ -88,6 +93,10 @@ export function Privacy() {
         </li>
       </ul>
       <p>
+        Evite guardar no Cofre e no Caderno dados sensíveis de outras pessoas (saúde, documentos de menores)
+        sem motivo legítimo.
+      </p>
+      <p>
         Tratamos dados necessários para prestar o serviço e executar as operações que você solicitar. Usamos
         legítimo interesse para segurança, prevenção de abuso e diagnóstico, quando aplicável e respeitando
         seus direitos. Também tratamos dados para cumprir obrigações legais ou exercer direitos. Quando um
@@ -112,29 +121,45 @@ export function Privacy() {
           documentos ou confirmações enviados a partir de outras soluções.
         </li>
         <li>
-          <strong>APIs do CRM.</strong> Quando uma fonte externa é consultada, o serviço escolhido recebe a
-          requisição e as credenciais configuradas, quando exigidas. O Hub pode guardar os dados retornados
-          para usar em painéis ou importações.
+          <strong>APIs do CRM.</strong> As credenciais cadastradas ficam cifradas no Hub. Quando uma fonte
+          externa é consultada, o serviço escolhido recebe a requisição e as credenciais configuradas, quando
+          exigidas. O Hub pode guardar os dados retornados para usar em painéis ou importações.
         </li>
         <li>
           <strong>Avisos e compartilhamento.</strong> Quando habilitados, avisos podem passar pelo serviço de
           notificações do navegador ou pelo webhook que você definir. Quem receber um arquivo ou link de
           compartilhamento pode acessar as informações liberadas nele.
         </li>
+        <li>
+          <strong>Administração do sistema.</strong> Para manter e proteger o serviço, a administração pode
+          liberar, bloquear e excluir contas, bloquear soluções ou recursos e definir a cota de arquivos. Pelo
+          painel administrativo, ela vê apenas dados de cadastro (e-mail, nome e foto de perfil), o último
+          acesso, as sessões ativas (IP e navegador), a contagem numérica de lançamentos (sem valores nem
+          descrições), o uso de espaço em arquivos e mídias, os e-mails enviados pelo sistema e as solicitações
+          enviadas ao suporte (além de erros técnicos mascarados e médias anônimas de velocidade das telas).
+          A administração não vê o conteúdo dos seus lançamentos financeiros, conversas do WhatsApp, dados do
+          CRM, documentos do Cofre nem notas do Caderno.
+        </li>
       </ul>
       <p>
-        Consultamos os índices públicos do Banco Central sem enviar dados da sua conta. Os motores fiscais, a
-        leitura de documentos e o Tire sua dúvida rodam no próprio Hub. Não vendemos dados pessoais nem os usamos
-        para publicidade. Podemos fornecer informações a autoridades quando houver obrigação legal ou ordem válida.
+        Cotações e índices vêm de fontes públicas (Banco Central, brapi.dev, AwesomeAPI e CoinGecko). Elas
+        recebem só o código do ativo, nunca dados da sua conta. Os motores fiscais, a leitura de documentos e o
+        Tire sua dúvida rodam no próprio Hub. O Hub não usa inteligência artificial nem envia seus dados para
+        serviços de IA.
+      </p>
+      <p>
+        Alguns serviços usados (e-mail, notificações do navegador, WhatsApp e fontes de cotação) podem processar
+        dados fora do Brasil. Não vendemos dados pessoais nem os usamos para publicidade. Podemos fornecer
+        informações a autoridades quando houver obrigação legal ou ordem válida.
       </p>
 
       <h2>4. Cookies e armazenamento no navegador</h2>
       <p>
-        O cookie de sessão mantém você conectado. O navegador também pode guardar preferências de interface
-        e arquivos do aplicativo, incluindo cópias de alguns dados já abertos na sua conta, para ajudar
-        quando a conexão estiver lenta ou indisponível. Ao encerrar a sessão, o Hub solicita a limpeza
-        dessas cópias da conta no dispositivo. O Hub não usa cookies de publicidade nem ferramentas de
-        rastreamento publicitário.
+        O cookie de sessão mantém você conectado por até 30 dias, se você não sair antes. O navegador também
+        pode guardar preferências de interface e arquivos do aplicativo, incluindo cópias de alguns dados já
+        abertos na sua conta, para ajudar quando a conexão estiver lenta ou indisponível. Ao encerrar a sessão,
+        o Hub solicita a limpeza dessas cópias da conta no dispositivo. O Hub não usa cookies de publicidade nem
+        ferramentas de rastreamento publicitário.
       </p>
 
       <h2>5. Por quanto tempo guardamos os dados</h2>
@@ -145,19 +170,23 @@ export function Privacy() {
         </li>
         <li>
           O prazo padrão dos registros de segurança é de 180 dias. O histórico de e-mails enviados é
-          removido após 30 dias, e os registros de erros, após 90 dias sem nova ocorrência.
+          removido após 30 dias. As estatísticas de desempenho (médias anônimas de velocidade das telas) são
+          removidas após 90 dias, e os registros de erros, após 90 dias sem nova ocorrência.
         </li>
-        <li>Sessões expiradas e links de acesso usados ou vencidos são removidos na rotina de limpeza.</li>
+        <li>
+          Cada sessão dura até 30 dias, se não for encerrada antes. Sessões expiradas e links de acesso usados
+          ou vencidos são removidos na rotina de limpeza.
+        </li>
         <li>
           O histórico do Tire sua dúvida é removido 30 dias depois da última mensagem. Você pode apagá-lo
           antes ou desligar o histórico nas <Link to="/ajustes/preferencias#privacidade">Preferências do Meu Orçamento</Link>.
         </li>
         <li>
           A rotina da Mensageria remove do Hub mensagens e mídias com mais de sete dias. As mídias de cada
-          conta ocupam no máximo 300 MB: passando disso, as mais antigas saem antes. Conversas fixadas
-          ou com informações de atendimento ou vínculos podem continuar na lista. A cópia do WhatsApp
-          segue as regras do próprio WhatsApp. Se você arquivar uma mídia no Cofre, essa cópia continua
-          guardada até ser excluída ou a conta ser encerrada.
+          conta ocupam no máximo 300 MB: passando disso, as mais antigas saem antes. Conversas fixadas, com
+          etiqueta, nota, retorno ou ligadas ao CRM continuam na lista, sem as mensagens antigas. A cópia do
+          WhatsApp segue as regras do próprio WhatsApp. Se você arquivar uma mídia no Cofre, essa cópia
+          continua guardada até ser excluída ou a conta ser encerrada.
         </li>
         <li>O Hub processa o XML e o PDF do DANFSe durante a solicitação, sem armazenar os arquivos.</li>
         <li>
@@ -177,27 +206,30 @@ export function Privacy() {
           e não reúne todos os dados das outras soluções.
         </li>
         <li>
-          Use <Link to="/seguranca">Segurança → Excluir conta</Link> para encerrar sua conta. Arquivos e
-          mensagens já compartilhados podem continuar com quem os recebeu.
+          Use <Link to="/seguranca">Segurança → Excluir conta</Link> para encerrar sua conta. Antes de excluir
+          a conta, desconecte o WhatsApp na Mensageria. Se não fizer isso, remova o aparelho conectado pelo
+          próprio WhatsApp no celular. Arquivos e mensagens já compartilhados podem continuar com quem os recebeu.
         </li>
       </ul>
       <p>
-        Escreva para <Contact /> para pedir confirmação do tratamento, acesso, correção ou informações sobre
-        compartilhamento e, quando cabível, portabilidade, eliminação, bloqueio ou anonimização. Você também
-        pode se opor a tratamento em desconformidade com a LGPD ou revogar um consentimento que tenha dado.
-        Atendemos nos prazos legais e podemos confirmar sua identidade para proteger seus dados. Você também pode
+        Escreva para o canal do encarregado (LGPD) (<Contact />) para pedir confirmação do tratamento, acesso,
+        correção ou informações sobre compartilhamento e, quando cabível, portabilidade, eliminação, bloqueio ou
+        anonimização. Você também pode se opor a tratamento em desconformidade com a LGPD ou revogar um
+        consentimento que tenha dado. Atendemos nos prazos legais e podemos confirmar sua identidade para
+        proteger seus dados. Você também pode
         <a href="https://www.gov.br/anpd/pt-br/assuntos/titular-de-dados/direito-dos-titulares"> recorrer à ANPD</a>.
       </p>
 
       <h2>7. Segurança, idade e alterações</h2>
       <p>
-        Usamos HTTPS, guardamos senhas como resumos criptográficos e oferecemos verificação em duas etapas.
-        Você pode revisar e encerrar sessões em <Link to="/seguranca">Segurança</Link>. A comunicação de
-        incidentes aos titulares e à ANPD segue os critérios e prazos legais.
+        Usamos criptografia, backups criptografados e verificação em duas etapas, mas nenhum sistema é
+        totalmente seguro. Protegemos o acesso com HTTPS e guardamos senhas como resumos criptográficos. Você
+        pode revisar e encerrar sessões em <Link to="/seguranca">Segurança</Link>. A comunicação de incidentes
+        aos titulares e à ANPD segue os critérios e prazos legais.
       </p>
       <p>
-        O Hub é destinado a maiores de 18 anos. Mudanças relevantes serão comunicadas por e-mail ou no
-        aplicativo antes de entrarem em vigor. A versão e a data estão no topo desta página.
+        O Hub é destinado a maiores de 18 anos. As regras de aviso sobre mudanças relevantes estão nos{" "}
+        <Link to="/termos">Termos de uso</Link>. A versão e a data estão no topo desta página.
       </p>
     </LegalPage>
   );
@@ -219,13 +251,13 @@ export function Terms() {
         pessoais ou comerciais, com integrações que usam dados da sua própria conta.
       </p>
       <p>
-        A administração pode liberar o acesso a cadastros, definir limites de armazenamento e restringir
-        soluções ou recursos para proteger e manter o serviço.
+        A administração pode liberar, bloquear e excluir contas, bloquear soluções ou recursos e definir a cota
+        de arquivos para proteger e manter o serviço.
       </p>
 
       <h2>2. Conta e uso permitido</h2>
       <ul>
-        <li>Para criar uma conta, você precisa ter pelo menos 18 anos e informar um e-mail válido que possa usar.</li>
+        <li>Para criar uma conta, você precisa ter pelo menos 18 anos e informar um e-mail válido que seja seu.</li>
         <li>
           Proteja sua senha, seus códigos de acesso e seus links privados. Se suspeitar de uso indevido,
           avise-nos pelo <Contact />.
@@ -256,8 +288,9 @@ export function Terms() {
       <h2>4. Análises, simulações e documentos</h2>
       <ul>
         <li>
-          Análises, projeções e simulações são informativas e dependem dos dados informados. Elas não
-          substituem orientação financeira, contábil, fiscal ou jurídica quando necessária.
+          Análises, projeções, simulações e acompanhamento de investimentos são informativos e dependem dos
+          dados informados. As cotações podem ter atraso e não são recomendação de investimento. Esses recursos
+          não substituem orientação financeira, contábil, fiscal ou jurídica quando necessária.
         </li>
         <li>
           A Reforma Tributária usa os motores da Receita Federal e a base fiscal instalada. Confira a
@@ -290,9 +323,9 @@ export function Terms() {
 
       <h2>6. Mudanças, lei aplicável e contato</h2>
       <p>
-        Mudanças relevantes serão comunicadas por e-mail ou no aplicativo antes de entrarem em vigor.
-        Estes termos seguem a lei brasileira. Fica eleito o foro de {LEGAL.forumCity}, respeitado o direito
-        do consumidor de recorrer ao foro de seu domicílio. Para falar conosco, escreva para <Contact />.
+        Quando houver mudança relevante, avisaremos por e-mail ou no aplicativo. Estes termos seguem a lei
+        brasileira. Fica eleito o foro de {LEGAL.forumCity}, respeitado o direito do consumidor de recorrer ao
+        foro de seu domicílio. Para falar conosco, escreva para <Contact />.
       </p>
     </LegalPage>
   );
