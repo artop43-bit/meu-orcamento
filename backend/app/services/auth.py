@@ -116,7 +116,7 @@ def register(db: Session, email: str, password: str, mail: Mailer) -> None:
         if existing.email_verified:
             mail(
                 email,
-                "Você já tem uma conta no Meu Orçamento",
+                "Você já tem uma conta no Hub de Soluções",
                 "Alguém (talvez você) tentou criar uma conta com este e-mail, "
                 "mas ele já está cadastrado.\n\n"
                 f"Para entrar: {get_settings().frontend_url}/entrar\n"
@@ -150,7 +150,7 @@ def _send_verification(db: Session, user: User, mail: Mailer) -> None:
     mail(
         user.email,
         "Confirme seu e-mail",
-        "Bem-vindo ao Meu Orçamento!\n\n"
+        "Bem-vindo ao Hub de Soluções!\n\n"
         f"Confirme seu e-mail neste link (válido por 24 horas):\n{_link('/verificar-email', token)}"
         "\n\nSe você não criou esta conta, ignore esta mensagem.",
     )
@@ -415,7 +415,7 @@ def delete_account(db: Session, user: User, password: str, code: str | None, mai
     mail(
         email,
         "Sua conta foi excluída",
-        "Sua conta no Meu Orçamento e todos os dados dela foram excluídos, como você pediu.\n\n"
+        "Sua conta no Hub de Soluções e todos os dados dela foram excluídos, como você pediu.\n\n"
         "Se não foi você, entre em contato pelo e-mail indicado na Política de privacidade: "
         f"{get_settings().frontend_url}/privacidade",
     )
@@ -478,7 +478,7 @@ def _notify_password_changed(user: User, mail: Mailer) -> None:
     mail(
         user.email,
         "Sua senha foi alterada",
-        "A senha da sua conta no Meu Orçamento acabou de ser alterada, "
+        "A senha da sua conta no Hub de Soluções acabou de ser alterada, "
         "e as outras sessões abertas foram encerradas.\n\n"
         "Se não foi você, redefina sua senha imediatamente: "
         f"{get_settings().frontend_url}/esqueci-senha",

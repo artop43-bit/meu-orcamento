@@ -24,6 +24,7 @@ def test_register_verify_and_login(client: TestClient, outbox: Outbox) -> None:
     assert response.status_code == 202
     assert len(outbox) == 1
     assert outbox[0].to == "ana@example.com"
+    assert "Bem-vindo ao Hub de Soluções!" in outbox[0].body
     assert "http://web.local/verificar-email?token=" in outbox[0].body
 
     # Não entra antes de confirmar o e-mail.
@@ -56,6 +57,7 @@ def test_register_existing_email_does_not_reveal_it(
         json={"email": "ana@example.com", "password": "outra-senha-123", "accept_terms": True},
     )
     assert response.status_code == 202
+    assert outbox[0].subject == "Você já tem uma conta no Hub de Soluções"
     assert "já está cadastrado" in outbox[0].body
     assert len(db.scalars(select(User)).all()) == 1
     # A senha original continua valendo.
@@ -161,6 +163,7 @@ def test_reset_password_flow(client: TestClient, outbox: Outbox) -> None:
     )
     assert response.status_code == 200
     assert outbox[-1].subject == "Sua senha foi alterada"
+    assert "conta no Hub de Soluções" in outbox[-1].body
 
     # Todas as sessões foram encerradas.
     assert client.get("/api/auth/me").status_code == 401
@@ -204,6 +207,8 @@ def test_change_password_keeps_current_session(client: TestClient, outbox: Outbo
         json={"current_password": PASSWORD, "new_password": "nova-senha-456"},
     )
     assert response.status_code == 204
+    assert outbox[-1].subject == "Sua senha foi alterada"
+    assert "conta no Hub de Soluções" in outbox[-1].body
     assert client.get("/api/auth/me").status_code == 200
     assert login(client, password="nova-senha-456").status_code == 200
 

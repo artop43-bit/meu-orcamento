@@ -162,6 +162,7 @@ def test_delete_account_removes_everything(client: TestClient, outbox: Outbox, d
     response = client.post("/api/auth/delete-account", json={"password": PASSWORD})
     assert response.status_code == 204
     assert outbox[-1].subject == "Sua conta foi excluída"
+    assert "conta no Hub de Soluções" in outbox[-1].body
 
     assert client.get("/api/auth/me").status_code == 401
     assert login(client).status_code == 401
