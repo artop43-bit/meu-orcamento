@@ -499,12 +499,13 @@ def test_heic_and_avif_uploads_are_photos_even_with_generic_metadata(
 
 
 @pytest.mark.parametrize(
-    "protected", ["tags", "notes", "budget_person", "followup_at", "followup_note", "crm"]
+    "protected",
+    ["tags", "notes", "budget_person", "followup_at", "followup_note", "crm", "caderno"],
 )
 def test_cleanup_preserves_important_contact_but_expires_messages(
     client: TestClient, outbox: list, db: Session, connector: FakeConnector, protected: str
 ) -> None:
-    from app.models import CrmContact
+    from app.models import CrmContact, NotebookNote
 
     auth(client, outbox)
     sid = connect_ready(client, db)
@@ -516,6 +517,8 @@ def test_cleanup_preserves_important_contact_but_expires_messages(
     assert chat is not None
     if protected == "crm":
         db.add(CrmContact(user_id=chat.user_id, name="Cliente CRM", messaging_chat_id=chat.id))
+    elif protected == "caderno":
+        db.add(NotebookNote(user_id=chat.user_id, title="Nota Caderno", messaging_chat_id=chat.id))
     elif protected == "followup_at":
         chat.followup_at = utcnow() + timedelta(days=2)
     else:
@@ -527,6 +530,9 @@ def test_cleanup_preserves_important_contact_but_expires_messages(
     assert result["messages"] == 1
     assert result["chats"] == 0
     assert db.get(MessagingChat, chat.id) is not None
+    if protected == "caderno":
+        note = db.scalar(select(NotebookNote).where(NotebookNote.user_id == chat.user_id))
+        assert note is not None and note.messaging_chat_id == chat.id
 
 
 def test_merge_preserves_crm_tags_status_and_earliest_followup(

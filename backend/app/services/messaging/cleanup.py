@@ -90,6 +90,11 @@ def purge_old(db: Session, *, retention: timedelta = RETENTION) -> dict[str, int
                         CrmContact.messaging_chat_id.is_not(None)
                     )
                 ),
+                ~MessagingChat.id.in_(
+                    select(NotebookNote.messaging_chat_id).where(
+                        NotebookNote.messaging_chat_id.is_not(None)
+                    )
+                ),
                 ~MessagingChat.id.in_(chats_with_messages),
                 or_(
                     MessagingChat.last_message_at < cutoff,
@@ -101,11 +106,6 @@ def purge_old(db: Session, *, retention: timedelta = RETENTION) -> dict[str, int
     )
     removed_chats = 0
     if stale_chat_ids:
-        db.execute(
-            update(NotebookNote)
-            .where(NotebookNote.messaging_chat_id.in_(stale_chat_ids))
-            .values(messaging_chat_id=None, updated_at=now)
-        )
         removed_chats = db.execute(
             delete(MessagingChat).where(MessagingChat.id.in_(stale_chat_ids))
         ).rowcount
