@@ -259,8 +259,16 @@ def list_notebook_notes(
     q: Annotated[str | None, Query(max_length=120)] = None,
     folder: Annotated[str | None, Query(max_length=60)] = None,
     pinned_only: Annotated[bool, Query()] = False,
+    limit: Annotated[int, Query(ge=1, le=50)] = 20,
 ) -> dict[str, Any]:
-    return notebook_service.list_notes(db, user.id, q=q, folder=folder, pinned_only=pinned_only)
+    return notebook_service.list_notes(
+        db, user.id, q=q, folder=folder, pinned_only=pinned_only, limit=limit
+    )
+
+
+@notebook_router.get("/notes/{note_id}")
+def get_notebook_note(note_id: uuid.UUID, user: CurrentUser, db: DbSession) -> dict[str, Any]:
+    return notebook_service.get_note(db, user.id, note_id)
 
 
 @notebook_router.post("/notes", status_code=status.HTTP_201_CREATED)

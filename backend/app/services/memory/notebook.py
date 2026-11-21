@@ -166,12 +166,17 @@ def _clean_tags(raw: Any) -> list[str]:
     return out
 
 
+def _note_excerpt(content: str | None) -> str:
+    return (content or "")[:200]
+
+
 def _serialize_note(
     note: NotebookNote,
     *,
     by_folded_title: dict[str, NotebookNote],
     backlinks_map: dict[uuid.UUID, list[dict[str, Any]]],
     score: float | None = None,
+    include_content: bool = True,
 ) -> dict[str, Any]:
     raw_links = extract_wikilinks(note.content)
     links: list[dict[str, Any]] = []
@@ -184,14 +189,14 @@ def _serialize_note(
                 "target_title": target.title if target else None,
             }
         )
-    return {
+    out: dict[str, Any] = {
         "id": note.id,
         "title": note.title,
         "folder": note.folder,
         "tags": list(note.tags or []),
         "pinned": bool(note.pinned),
         "template_kind": note.template_kind,
-        "content": note.content,
+        "excerpt": _note_excerpt(note.content),
         "links": links,
         "backlinks": backlinks_map.get(note.id, []),
         "score": score,
@@ -204,6 +209,9 @@ def _serialize_note(
         "created_at": note.created_at,
         "updated_at": note.updated_at,
     }
+    if include_content:
+        out["content"] = note.content
+    return out
 
 
 def _graph_maps(
@@ -237,7 +245,9 @@ def list_notes(
     q: str | None = None,
     folder: str | None = None,
     pinned_only: bool = False,
+    limit: int = 20,
 ) -> dict[str, Any]:
+    safe_limit = max(1, min(50, int(limit)))
     all_notes = list(
         db.scalars(
             select(NotebookNote)
@@ -273,8 +283,9 @@ def list_notes(
                 by_folded_title=by_folded_title,
                 backlinks_map=backlinks_map,
                 score=scores.get(n.id) if scores is not None else None,
+                include_content=False,
             )
-            for n in filtered
+            for n in filtered[:safe_limit]
         ],
         "summary": {
             "total_notes": len(all_notes),
@@ -283,6 +294,26 @@ def list_notes(
             "total_links": total_links,
         },
     }
+
+
+def get_note(db: Session, user_id: uuid.UUID, note_id: uuid.UUID) -> dict[str, Any]:
+    note = get_owned(
+        db,
+        NotebookNote,
+        user_id,
+        note_id,
+        error_code="note_not_found",
+        error_msg="Nota não encontrada.",
+    )
+    all_notes = list(db.scalars(select(NotebookNote).where(NotebookNote.user_id == user_id)).all())
+    by_folded_title, backlinks_map = _graph_maps(all_notes)
+    refreshed = next((n for n in all_notes if n.id == note.id), note)
+    return _serialize_note(
+        refreshed,
+        by_folded_title=by_folded_title,
+        backlinks_map=backlinks_map,
+        include_content=True,
+    )
 
 
 def create_note(db: Session, user_id: uuid.UUID, data: dict[str, Any]) -> dict[str, Any]:

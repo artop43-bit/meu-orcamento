@@ -25,6 +25,7 @@ import {
   serviceStatusTone,
 } from "../../lib/messaging";
 import { announce } from "../../lib/announce";
+import { useDebouncedValue } from "../../lib/useDebouncedValue";
 import { Alert, Sheet } from "../ui";
 import { BudgetEntrySheet } from "./BudgetEntrySheet";
 import { ChatAvatar } from "./ChatAvatar";
@@ -65,11 +66,14 @@ export function ChatThread({
   const [workTrigger, setWorkTrigger] = useState<ModalTrigger>(null);
   const [scriptsOpen, setScriptsOpen] = useState(false);
   const [scriptSearch, setScriptSearch] = useState("");
+  const debouncedScriptSearch = useDebouncedValue(scriptSearch, 300);
+  const [loadingScriptId, setLoadingScriptId] = useState<string | null>(null);
+  const [scriptError, setScriptError] = useState<string | null>(null);
   const [bridgeBanner, setBridgeBanner] = useState<{ tone: "info" | "error"; text: string } | null>(null);
 
   const scriptsQuery = useQuery({
-    queryKey: ["caderno", "chat-scripts", scriptSearch],
-    queryFn: () => notebookApi.list({ q: scriptSearch }),
+    queryKey: ["caderno", "chat-scripts", debouncedScriptSearch],
+    queryFn: () => notebookApi.list({ q: debouncedScriptSearch, limit: 20 }),
     enabled: scriptsOpen,
   });
 
@@ -104,8 +108,26 @@ export function ChatThread({
     setBudgetModalOpen(false);
     setWorkModalOpen(false);
     setScriptsOpen(false);
+    setScriptError(null);
+    setLoadingScriptId(null);
     setBridgeBanner(null);
   }, [chat.id]);
+
+  async function handleInsertScript(noteId: string, title: string) {
+    if (loadingScriptId) return;
+    setScriptError(null);
+    setLoadingScriptId(noteId);
+    try {
+      const full = await notebookApi.get(noteId);
+      onInsertDraft?.(full.content.trim());
+      setScriptsOpen(false);
+      announce(`Roteiro "${title}" inserido na caixa de mensagem.`);
+    } catch (e) {
+      setScriptError(errorMessage(e));
+    } finally {
+      setLoadingScriptId(null);
+    }
+  }
 
   function openBudgetLaunch(message?: MessagingMessage) {
     setBudgetTrigger((prev) => ({ seq: (prev?.seq ?? 0) + 1, message }));
@@ -340,6 +362,7 @@ export function ChatThread({
             />
           </label>
           {scriptsQuery.isError && <Alert tone="error">{errorMessage(scriptsQuery.error)}</Alert>}
+          {scriptError && <Alert tone="error">{scriptError}</Alert>}
           {!scriptsQuery.isPending && (scriptsQuery.data?.notes.length ?? 0) === 0 && (
             <p className="muted small">
               Nenhuma nota encontrada no Caderno. Crie roteiros e atas em /caderno pelo Hub.
@@ -351,19 +374,16 @@ export function ChatThread({
                 <span className="item__main">
                   <strong className="item__title">{note.title}</strong>
                   <span className="item__meta">
-                    {note.folder} · {note.content.slice(0, 90).replace(/\s+/g, " ")}
+                    {note.folder} · {note.excerpt.slice(0, 90).replace(/\s+/g, " ")}
                   </span>
                 </span>
                 <button
                   type="button"
                   className="btn btn--secondary btn--sm"
-                  onClick={() => {
-                    onInsertDraft?.(note.content.trim());
-                    setScriptsOpen(false);
-                    announce(`Roteiro "${note.title}" inserido na caixa de mensagem.`);
-                  }}
+                  disabled={loadingScriptId !== null}
+                  onClick={() => void handleInsertScript(note.id, note.title)}
                 >
-                  Inserir
+                  {loadingScriptId === note.id ? "Abrindo…" : "Inserir"}
                 </button>
               </li>
             ))}

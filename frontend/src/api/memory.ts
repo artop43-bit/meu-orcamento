@@ -83,14 +83,14 @@ export interface NotebookLinkRef {
   target_title: string | null;
 }
 
-export interface NotebookNote {
+export interface NotebookNoteSummary {
   id: string;
   title: string;
   folder: string;
   tags: string[];
   pinned: boolean;
   template_kind: NoteTemplateKind;
-  content: string;
+  excerpt: string;
   links: NotebookLinkRef[];
   backlinks: { id: string; title: string }[];
   score: number | null;
@@ -104,8 +104,12 @@ export interface NotebookNote {
   updated_at: string;
 }
 
+export interface NotebookNote extends NotebookNoteSummary {
+  content: string;
+}
+
 export interface NotebookListResponse {
-  notes: NotebookNote[];
+  notes: NotebookNoteSummary[];
   summary: {
     total_notes: number;
     pinned_count: number;
@@ -157,14 +161,16 @@ export const vaultApi = {
 export const notebookApi = {
   templates: () => api.get<NoteTemplateOption[]>("/caderno/templates"),
   bridges: () => api.get<NotebookBridges>("/caderno/hub/bridges"),
-  list: (params: { q?: string; folder?: string; pinned_only?: boolean } = {}) => {
+  list: (params: { q?: string; folder?: string; pinned_only?: boolean; limit?: number } = {}) => {
     const qs = new URLSearchParams();
     if (params.q?.trim()) qs.set("q", params.q.trim());
     if (params.folder && params.folder !== "all") qs.set("folder", params.folder);
     if (params.pinned_only) qs.set("pinned_only", "true");
+    if (params.limit !== undefined) qs.set("limit", String(params.limit));
     const suffix = qs.toString() ? `?${qs}` : "";
     return api.get<NotebookListResponse>(`/caderno/notes${suffix}`);
   },
+  get: (id: string) => api.get<NotebookNote>(`/caderno/notes/${id}`),
   create: (body: {
     title?: string;
     folder?: string;
@@ -199,10 +205,23 @@ export function useVaultBridges(enabled: boolean) {
   });
 }
 
-export function useNotebookNotes(q: string = "", folder: string = "all", pinnedOnly: boolean = false) {
+export function useNotebookNotes(
+  q: string = "",
+  folder: string = "all",
+  pinnedOnly: boolean = false,
+  limit: number = 20,
+) {
   return useQuery({
-    queryKey: ["caderno", "notes", q, folder, pinnedOnly],
-    queryFn: () => notebookApi.list({ q, folder, pinned_only: pinnedOnly }),
+    queryKey: ["caderno", "notes", q, folder, pinnedOnly, limit],
+    queryFn: () => notebookApi.list({ q, folder, pinned_only: pinnedOnly, limit }),
+  });
+}
+
+export function useNotebookNote(id: string | null) {
+  return useQuery({
+    queryKey: ["caderno", "note", id],
+    queryFn: () => notebookApi.get(id!),
+    enabled: Boolean(id),
   });
 }
 

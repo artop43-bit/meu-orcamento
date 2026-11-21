@@ -548,3 +548,51 @@ def test_vault_upload_rate_limit_and_ocr_busy_stops_early(
     )
     assert blocked.status_code == 429
     assert blocked.json()["error"] == "rate_limited"
+
+
+def test_notebook_list_limit_excerpt_and_get_full_note(
+    client: TestClient, db: Session, outbox: list
+) -> None:
+    user_a = _make_user(client, db, outbox, "caderno_r4_a@example.com")
+    user_b = _make_user(client, db, outbox, "caderno_r4_b@example.com")
+    assert login(client, user_a.email).status_code == 200
+
+    long_text = "Linha inicial do roteiro comercial. " + ("detalhe " * 50)
+    assert len(long_text) > 250
+
+    created_ids: list[str] = []
+    for idx in range(25):
+        res = client.post(
+            "/api/caderno/notes",
+            json={
+                "title": f"Nota {idx:02d}",
+                "folder": "Comercial",
+                "content": long_text,
+            },
+        )
+        assert res.status_code == 201, res.text
+        created_ids.append(res.json()["id"])
+
+    # Padrão limit=20 e lista traz só excerpt (<= 200 chars), sem content completo.
+    listed = client.get("/api/caderno/notes")
+    assert listed.status_code == 200
+    data = listed.json()
+    assert len(data["notes"]) == 20
+    assert data["summary"]["total_notes"] == 25
+    for item in data["notes"]:
+        assert "content" not in item
+        assert len(item["excerpt"]) <= 200
+        assert item["excerpt"].startswith("Linha inicial do roteiro")
+
+    assert len(client.get("/api/caderno/notes", params={"limit": 5}).json()["notes"]) == 5
+    assert len(client.get("/api/caderno/notes", params={"limit": 50}).json()["notes"]) == 25
+    assert client.get("/api/caderno/notes", params={"limit": 51}).status_code == 422
+
+    # Rota individual GET /api/caderno/notes/{id} entrega o conteúdo inteiro e isola por dono.
+    full = client.get(f"/api/caderno/notes/{created_ids[-1]}")
+    assert full.status_code == 200
+    assert full.json()["content"] == long_text
+
+    client.post("/api/auth/logout")
+    assert login(client, user_b.email).status_code == 200
+    assert client.get(f"/api/caderno/notes/{created_ids[-1]}").status_code == 404

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   BookOpenText,
@@ -16,6 +16,7 @@ import { errorMessage } from "../../api/client";
 import {
   notebookApi,
   useNotebookBridges,
+  useNotebookNote,
   useNotebookNotes,
   useNotebookTemplates,
   type NotebookNote,
@@ -90,7 +91,7 @@ export default function NotebookPage() {
   const [newContactId, setNewContactId] = useState("");
   const [newProjectId, setNewProjectId] = useState("");
 
-  const notesQuery = useNotebookNotes(search, folderFilter, pinnedOnly);
+  const notesQuery = useNotebookNotes(search, folderFilter, pinnedOnly, 50);
   const templatesQuery = useNotebookTemplates();
   const bridges = useNotebookBridges(newOpen).data;
 
@@ -110,18 +111,25 @@ export default function NotebookPage() {
     }
   }, [notes, selectedId]);
 
-  const activeNote: NotebookNote | null = useMemo(
-    () => notes.find((n) => n.id === selectedId) ?? null,
-    [notes, selectedId],
-  );
+  const activeNoteQuery = useNotebookNote(selectedId);
+  const activeNote: NotebookNote | null = useMemo(() => {
+    if (!selectedId || activeNoteQuery.data?.id !== selectedId) return null;
+    return activeNoteQuery.data;
+  }, [activeNoteQuery.data, selectedId]);
 
+  const syncedNoteIdRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!activeNote) return;
+    if (!selectedId) {
+      syncedNoteIdRef.current = null;
+      return;
+    }
+    if (!activeNote || syncedNoteIdRef.current === activeNote.id) return;
+    syncedNoteIdRef.current = activeNote.id;
     setDraftTitle(activeNote.title);
     setDraftFolder(activeNote.folder);
     setDraftTags(activeNote.tags.join(", "));
     setDraftContent(activeNote.content);
-  }, [activeNote?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [selectedId, activeNote]);
 
   function invalidateAll() {
     void qc.invalidateQueries({ queryKey: ["caderno"] });
@@ -134,6 +142,8 @@ export default function NotebookPage() {
       setFolderFilter("all");
       setPinnedOnly(false);
       setSearch("");
+      qc.setQueryData(["caderno", "note", created.id], created);
+      syncedNoteIdRef.current = null;
       setSelectedId(created.id);
       invalidateAll();
       setFeedback(`Nota "${created.title}" criada.`);
@@ -158,6 +168,7 @@ export default function NotebookPage() {
     },
     onSuccess: (updated) => {
       if (!updated) return;
+      qc.setQueryData(["caderno", "note", updated.id], updated);
       invalidateAll();
       setErrMsg(null);
       setFeedback(`"${updated.title}" salva com links atualizados.`);
@@ -168,7 +179,10 @@ export default function NotebookPage() {
 
   const togglePin = useMutation({
     mutationFn: (note: NotebookNote) => notebookApi.update(note.id, { pinned: !note.pinned }),
-    onSuccess: () => invalidateAll(),
+    onSuccess: (updated) => {
+      qc.setQueryData(["caderno", "note", updated.id], updated);
+      invalidateAll();
+    },
   });
 
   function deleteNoteWithUndo(note: NotebookNote) {
@@ -184,6 +198,13 @@ export default function NotebookPage() {
   }
 
   function handleFollowWikilink(label: string) {
+    const linkedTargetId = activeNote?.links.find(
+      (lk) => lk.label.trim().toLowerCase() === label.trim().toLowerCase(),
+    )?.target_id;
+    if (linkedTargetId) {
+      setSelectedId(linkedTargetId);
+      return;
+    }
     const existing = notes.find(
       (n) => n.title.trim().toLowerCase() === label.trim().toLowerCase(),
     );
@@ -562,6 +583,16 @@ export default function NotebookPage() {
                     )}
                   </div>
                 )}
+              </section>
+            ) : selectedId && activeNoteQuery.isPending ? (
+              <section className="card stack">
+                <LoadingRegion label="Carregando conteúdo da nota">
+                  <Skeleton height={220} />
+                </LoadingRegion>
+              </section>
+            ) : selectedId && activeNoteQuery.isError ? (
+              <section className="card">
+                <Alert tone="error">{errorMessage(activeNoteQuery.error)}</Alert>
               </section>
             ) : (
               <section className="card">

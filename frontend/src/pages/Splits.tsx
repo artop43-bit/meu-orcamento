@@ -43,6 +43,7 @@ import { useMe } from "../api/auth";
 import { Alert, Button, Kpi, LoadingRegion, PageHeader, Sheet, Skeleton } from "../components/ui";
 import { announce } from "../lib/announce";
 import { money, parseMoney, shortDate, todayISO } from "../lib/format";
+import { useDebouncedValue } from "../lib/useDebouncedValue";
 
 // ---------------------------------------------------------------- textos
 
@@ -200,15 +201,6 @@ function PeopleList({ names }: { names: string[] }) {
 
 // ---------------------------------------------------------------- empréstimo com juros
 
-function useDebounced<T>(value: T, delay = 300): T {
-  const [current, setCurrent] = useState(value);
-  useEffect(() => {
-    const timer = window.setTimeout(() => setCurrent(value), delay);
-    return () => window.clearTimeout(timer);
-  }, [value, delay]);
-  return current;
-}
-
 function LoanForm({ names, onDone }: { names: string[]; onDone: () => void }) {
   const queryClient = useQueryClient();
   const [direction, setDirection] = useState<Direction>("owes_me");
@@ -238,7 +230,7 @@ function LoanForm({ names, onDone }: { names: string[]; onDone: () => void }) {
     const wanted = parseMoney(value);
     return wanted ? { ...base, value: wanted } : null;
   }, [principal, count, firstDue, mode, target, frequency, value]);
-  const debounced = useDebounced(input);
+  const debounced = useDebouncedValue(input);
   const simulation = useQuery({
     queryKey: ["friend-loans", "simulate", debounced],
     queryFn: () => sharingApi.simulate(debounced!),
@@ -557,7 +549,7 @@ function ReceiveForm({ loan, onDone }: { loan: FriendLoan; onDone: () => void })
   const parsed = parseMoney(amount);
   const extra = parsed ? Number(parsed) - Number(next.open) : 0;
   const hasExtra = extra > 0.004 && next.number < loan.count;
-  const previewInput = useDebounced(hasExtra ? { amount: parsed!, on, mode, discount } : null);
+  const previewInput = useDebouncedValue(hasExtra ? { amount: parsed!, on, mode, discount } : null);
   const preview = useQuery({
     queryKey: ["friend-loans", "receive-preview", loan.id, next.number, previewInput],
     queryFn: () => sharingApi.receive(loan.id, { number: next.number, ...previewInput!, preview: true }),
@@ -722,7 +714,7 @@ function RescheduleForm({ loan, onDone }: { loan: FriendLoan; onDone: () => void
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const parsed = parseMoney(amount);
-  const wanted = useDebounced(parsed && Number(parsed) > 0 ? parsed : null);
+  const wanted = useDebouncedValue(parsed && Number(parsed) > 0 ? parsed : null);
   const preview = useQuery({
     queryKey: ["friend-loans", "reschedule-preview", loan.id, wanted],
     queryFn: () => sharingApi.reschedule(loan.id, wanted!, true),
