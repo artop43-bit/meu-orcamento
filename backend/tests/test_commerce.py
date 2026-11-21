@@ -2,6 +2,7 @@
 
 import io
 
+import pytest
 from fastapi.testclient import TestClient
 from pypdf import PdfReader
 from sqlalchemy import select
@@ -567,3 +568,104 @@ def test_ensure_month_handles_concurrent_duplicate_and_client_ref_idempotency(
         )
         == 1
     )
+
+
+def test_commerce_sequence_retries_after_integrity_error(
+    client: TestClient, db: Session, outbox: list, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """R9: colisão de número em pedido ou proposta retenta e grava com o próximo sequencial."""
+    from app.models import CommercialDocument, CommercialOrder
+    from app.services.commerce import catalog as catalog_service
+    from app.services.commerce import proposals as proposals_service
+    from app.services.commerce.shared import next_sequence as real_next_sequence
+
+    user = _make_user(client, db, outbox, "seq-retry@example.com")
+    assert login(client, user.email).status_code == 200
+
+    first_order = client.post(
+        "/api/catalog/orders",
+        json={
+            "customer_name": "Cliente 1",
+            "items": [{"name": "Item A", "qty": 1, "unit_price": "10.00"}],
+            "confirm_now": False,
+        },
+    )
+    assert first_order.status_code == 201
+    assert first_order.json()["number"] == 1
+
+    first_doc = client.post(
+        "/api/proposals",
+        json={
+            "doc_type": "proposal",
+            "customer_name": "Cliente 1",
+            "items": [{"name": "Serviço A", "qty": 1, "unit_price": "25.00"}],
+        },
+    )
+    assert first_doc.status_code == 201
+    assert first_doc.json()["number"] == 1
+
+    order_calls = 0
+
+    def fake_order_next_sequence(session: Session, model: type, user_id, **extra) -> int:
+        nonlocal order_calls
+        order_calls += 1
+        if order_calls == 1:
+            return 1
+        return real_next_sequence(session, model, user_id, **extra)
+
+    monkeypatch.setattr(catalog_service, "next_sequence", fake_order_next_sequence)
+    retried_order = client.post(
+        "/api/catalog/orders",
+        json={
+            "customer_name": "Cliente 2",
+            "items": [{"name": "Item B", "qty": 1, "unit_price": "15.00"}],
+            "confirm_now": False,
+        },
+    )
+    assert retried_order.status_code == 201, retried_order.text
+    assert retried_order.json()["number"] == 2
+    assert order_calls == 2
+
+    doc_calls = 0
+
+    def fake_doc_next_sequence(session: Session, model: type, user_id, **extra) -> int:
+        nonlocal doc_calls
+        doc_calls += 1
+        if doc_calls == 1:
+            return 1
+        return real_next_sequence(session, model, user_id, **extra)
+
+    monkeypatch.setattr(proposals_service, "next_sequence", fake_doc_next_sequence)
+    retried_doc = client.post(
+        "/api/proposals",
+        json={
+            "doc_type": "proposal",
+            "customer_name": "Cliente 2",
+            "items": [{"name": "Serviço B", "qty": 1, "unit_price": "40.00"}],
+        },
+    )
+    assert retried_doc.status_code == 201, retried_doc.text
+    doc_payload = retried_doc.json()
+    assert doc_payload["number"] == 2
+    assert "#0002" in doc_payload["title"]
+    assert doc_calls == 2
+
+    order_numbers = list(
+        db.scalars(
+            select(CommercialOrder.number)
+            .where(CommercialOrder.user_id == user.id)
+            .order_by(CommercialOrder.number.asc())
+        ).all()
+    )
+    doc_numbers = list(
+        db.scalars(
+            select(CommercialDocument.number)
+            .where(
+                CommercialDocument.user_id == user.id,
+                CommercialDocument.doc_type == "proposal",
+            )
+            .order_by(CommercialDocument.number.asc())
+        ).all()
+    )
+    assert order_numbers == [1, 2]
+    assert doc_numbers == [1, 2]
