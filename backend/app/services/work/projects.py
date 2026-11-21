@@ -28,6 +28,7 @@ from app.models import (
     WorkProject,
 )
 from app.services import admin as admin_service
+from app.services.common import get_owned
 
 PROJECT_STATUSES = ("planning", "active", "review", "done", "paused")
 TASK_STATUSES = ("todo", "doing", "done")
@@ -237,12 +238,14 @@ def list_projects(
 
 
 def get_project(db: Session, user_id: uuid.UUID, project_id: uuid.UUID) -> WorkProject:
-    project = db.scalar(
-        select(WorkProject).where(WorkProject.id == project_id, WorkProject.user_id == user_id)
+    return get_owned(
+        db,
+        WorkProject,
+        user_id,
+        project_id,
+        error_code="project_not_found",
+        error_msg="Projeto não encontrado.",
     )
-    if project is None:
-        raise AppError(404, "project_not_found", "Projeto não encontrado.")
-    return project
 
 
 def get_project_detail(db: Session, user_id: uuid.UUID, project_id: uuid.UUID) -> dict[str, Any]:
@@ -296,11 +299,14 @@ def create_project(db: Session, user_id: uuid.UUID, data: dict[str, Any]) -> dic
     contact_id = data.get("contact_id")
     contact_name = None
     if contact_id is not None:
-        contact = db.scalar(
-            select(CrmContact).where(CrmContact.id == contact_id, CrmContact.user_id == user_id)
+        contact = get_owned(
+            db,
+            CrmContact,
+            user_id,
+            contact_id,
+            error_code="contact_not_found",
+            error_msg="Contato do CRM não encontrado.",
         )
-        if contact is None:
-            raise AppError(404, "contact_not_found", "Contato do CRM não encontrado.")
         contact_name = contact.name
 
     budget_value = to_dec(data.get("budget_value", 0), field="valor orçado")
@@ -308,32 +314,36 @@ def create_project(db: Session, user_id: uuid.UUID, data: dict[str, Any]) -> dic
 
     crm_deal_id = data.get("crm_deal_id")
     if crm_deal_id is not None:
-        deal = db.scalar(
-            select(CrmDeal).where(CrmDeal.id == crm_deal_id, CrmDeal.user_id == user_id)
+        get_owned(
+            db,
+            CrmDeal,
+            user_id,
+            crm_deal_id,
+            error_code="deal_not_found",
+            error_msg="Negócio do CRM não encontrado.",
         )
-        if deal is None:
-            raise AppError(404, "deal_not_found", "Negócio do CRM não encontrado.")
 
     proposal_id = data.get("proposal_id")
     if proposal_id is not None:
-        doc = db.scalar(
-            select(CommercialDocument).where(
-                CommercialDocument.id == proposal_id,
-                CommercialDocument.user_id == user_id,
-            )
+        get_owned(
+            db,
+            CommercialDocument,
+            user_id,
+            proposal_id,
+            error_code="document_not_found",
+            error_msg="Documento comercial não encontrado.",
         )
-        if doc is None:
-            raise AppError(404, "document_not_found", "Documento comercial não encontrado.")
 
     budget_project_id = data.get("budget_project_id")
     if budget_project_id is not None:
-        existing_tag = db.scalar(
-            select(Project).where(Project.id == budget_project_id, Project.user_id == user_id)
+        get_owned(
+            db,
+            Project,
+            user_id,
+            budget_project_id,
+            error_code="budget_project_not_found",
+            error_msg="Projeto/etiqueta do Orçamento não encontrado.",
         )
-        if existing_tag is None:
-            raise AppError(
-                404, "budget_project_not_found", "Projeto/etiqueta do Orçamento não encontrado."
-            )
     elif data.get("link_budget_tag", True):
         tag = ensure_budget_project_tag(db, user_id, name, budget_value)
         budget_project_id = tag.id
@@ -378,11 +388,14 @@ def update_project(
     if "contact_id" in changes:
         cid = changes["contact_id"]
         if cid is not None:
-            contact = db.scalar(
-                select(CrmContact).where(CrmContact.id == cid, CrmContact.user_id == user_id)
+            get_owned(
+                db,
+                CrmContact,
+                user_id,
+                cid,
+                error_code="contact_not_found",
+                error_msg="Contato do CRM não encontrado.",
             )
-            if contact is None:
-                raise AppError(404, "contact_not_found", "Contato do CRM não encontrado.")
         project.contact_id = cid
     if "budget_value" in changes and changes["budget_value"] is not None:
         project.budget_value = to_dec(changes["budget_value"], field="valor orçado")
@@ -457,11 +470,14 @@ def create_task(
 def update_task(
     db: Session, user_id: uuid.UUID, task_id: uuid.UUID, changes: dict[str, Any]
 ) -> dict[str, Any]:
-    task = db.scalar(
-        select(ProjectTask).where(ProjectTask.id == task_id, ProjectTask.user_id == user_id)
+    task = get_owned(
+        db,
+        ProjectTask,
+        user_id,
+        task_id,
+        error_code="task_not_found",
+        error_msg="Tarefa não encontrada.",
     )
-    if task is None:
-        raise AppError(404, "task_not_found", "Tarefa não encontrada.")
     now = utcnow()
     if "title" in changes and changes["title"] is not None:
         clean = str(changes["title"]).strip()[:160]
@@ -490,11 +506,14 @@ def update_task(
 
 
 def delete_task(db: Session, user_id: uuid.UUID, task_id: uuid.UUID) -> None:
-    task = db.scalar(
-        select(ProjectTask).where(ProjectTask.id == task_id, ProjectTask.user_id == user_id)
+    task = get_owned(
+        db,
+        ProjectTask,
+        user_id,
+        task_id,
+        error_code="task_not_found",
+        error_msg="Tarefa não encontrada.",
     )
-    if task is None:
-        raise AppError(404, "task_not_found", "Tarefa não encontrada.")
     db.delete(task)
     db.commit()
 
@@ -539,13 +558,14 @@ def create_time_entry(
 
 
 def delete_time_entry(db: Session, user_id: uuid.UUID, entry_id: uuid.UUID) -> None:
-    entry = db.scalar(
-        select(ProjectTimeEntry).where(
-            ProjectTimeEntry.id == entry_id, ProjectTimeEntry.user_id == user_id
-        )
+    entry = get_owned(
+        db,
+        ProjectTimeEntry,
+        user_id,
+        entry_id,
+        error_code="time_entry_not_found",
+        error_msg="Apontamento de horas não encontrado.",
     )
-    if entry is None:
-        raise AppError(404, "time_entry_not_found", "Apontamento de horas não encontrado.")
     db.delete(entry)
     db.commit()
 
@@ -556,9 +576,14 @@ def delete_time_entry(db: Session, user_id: uuid.UUID, entry_id: uuid.UUID) -> N
 def create_project_from_crm_deal(db: Session, user: User, deal_id: uuid.UUID) -> dict[str, Any]:
     """Cria um projeto operacional a partir de um negócio do CRM (idempotente)."""
     admin_service.assert_resource_allowed(db, user, "projetos")
-    deal = db.scalar(select(CrmDeal).where(CrmDeal.id == deal_id, CrmDeal.user_id == user.id))
-    if deal is None:
-        raise AppError(404, "deal_not_found", "Negócio do CRM não encontrado.")
+    deal = get_owned(
+        db,
+        CrmDeal,
+        user.id,
+        deal_id,
+        error_code="deal_not_found",
+        error_msg="Negócio do CRM não encontrado.",
+    )
 
     existing = db.scalar(
         select(WorkProject).where(
@@ -628,13 +653,14 @@ def create_project_from_crm_deal(db: Session, user: User, deal_id: uuid.UUID) ->
 def create_project_from_proposal(db: Session, user: User, doc_id: uuid.UUID) -> dict[str, Any]:
     """Cria um projeto com tarefas a partir de uma proposta/OS/contrato em PDF (idempotente)."""
     admin_service.assert_resource_allowed(db, user, "projetos")
-    doc = db.scalar(
-        select(CommercialDocument).where(
-            CommercialDocument.id == doc_id, CommercialDocument.user_id == user.id
-        )
+    doc = get_owned(
+        db,
+        CommercialDocument,
+        user.id,
+        doc_id,
+        error_code="document_not_found",
+        error_msg="Documento comercial não encontrado.",
     )
-    if doc is None:
-        raise AppError(404, "document_not_found", "Documento comercial não encontrado.")
 
     existing = db.scalar(
         select(WorkProject).where(WorkProject.user_id == user.id, WorkProject.proposal_id == doc.id)
@@ -719,11 +745,14 @@ def create_task_from_messaging(
 ) -> dict[str, Any]:
     """Transforma uma mensagem/conversa do WhatsApp em tarefa dentro de um projeto."""
     admin_service.assert_resource_allowed(db, user, "projetos")
-    chat = db.scalar(
-        select(MessagingChat).where(MessagingChat.id == chat_id, MessagingChat.user_id == user.id)
+    chat = get_owned(
+        db,
+        MessagingChat,
+        user.id,
+        chat_id,
+        error_code="chat_not_found",
+        error_msg="Conversa não encontrada.",
     )
-    if chat is None:
-        raise AppError(404, "chat_not_found", "Conversa não encontrada.")
 
     if message_id is not None:
         msg = db.scalar(

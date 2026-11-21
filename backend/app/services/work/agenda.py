@@ -24,6 +24,7 @@ from app.models import (
 )
 from app.services import admin as admin_service
 from app.services import planned as planned_service
+from app.services.common import get_owned
 from app.services.memory import vault as vault_service
 from app.services.messaging import messages as messaging_messages
 from app.services.notify import brl
@@ -75,12 +76,14 @@ def serialize_event(
 
 
 def get_event(db: Session, user_id: uuid.UUID, event_id: uuid.UUID) -> AgendaEvent:
-    event = db.scalar(
-        select(AgendaEvent).where(AgendaEvent.id == event_id, AgendaEvent.user_id == user_id)
+    return get_owned(
+        db,
+        AgendaEvent,
+        user_id,
+        event_id,
+        error_code="event_not_found",
+        error_msg="Compromisso não encontrado.",
     )
-    if event is None:
-        raise AppError(404, "event_not_found", "Compromisso não encontrado.")
-    return event
 
 
 def _enrich_event(db: Session, user_id: uuid.UUID, event: AgendaEvent) -> dict[str, Any]:
@@ -124,29 +127,36 @@ def _validate_event_links(
 ) -> uuid.UUID | None:
     resolved_chat_id = chat_id
     if contact_id is not None:
-        contact = db.scalar(
-            select(CrmContact).where(CrmContact.id == contact_id, CrmContact.user_id == user_id)
+        contact = get_owned(
+            db,
+            CrmContact,
+            user_id,
+            contact_id,
+            error_code="contact_not_found",
+            error_msg="Contato do CRM não encontrado.",
         )
-        if contact is None:
-            raise AppError(404, "contact_not_found", "Contato do CRM não encontrado.")
         if inherit_contact_chat and resolved_chat_id is None:
             resolved_chat_id = contact.messaging_chat_id
 
     if project_id is not None:
-        proj = db.scalar(
-            select(WorkProject).where(WorkProject.id == project_id, WorkProject.user_id == user_id)
+        get_owned(
+            db,
+            WorkProject,
+            user_id,
+            project_id,
+            error_code="project_not_found",
+            error_msg="Projeto não encontrado.",
         )
-        if proj is None:
-            raise AppError(404, "project_not_found", "Projeto não encontrado.")
 
     if resolved_chat_id is not None:
-        chat = db.scalar(
-            select(MessagingChat).where(
-                MessagingChat.id == resolved_chat_id, MessagingChat.user_id == user_id
-            )
+        get_owned(
+            db,
+            MessagingChat,
+            user_id,
+            resolved_chat_id,
+            error_code="chat_not_found",
+            error_msg="Conversa da Mensageria não encontrada.",
         )
-        if chat is None:
-            raise AppError(404, "chat_not_found", "Conversa da Mensageria não encontrada.")
     return resolved_chat_id
 
 
@@ -651,11 +661,14 @@ def create_event_from_messaging(
 ) -> dict[str, Any]:
     """Cria compromisso na Agenda diretamente a partir de uma conversa da Mensageria."""
     admin_service.assert_resource_allowed(db, user, "agenda")
-    chat = db.scalar(
-        select(MessagingChat).where(MessagingChat.id == chat_id, MessagingChat.user_id == user.id)
+    chat = get_owned(
+        db,
+        MessagingChat,
+        user.id,
+        chat_id,
+        error_code="chat_not_found",
+        error_msg="Conversa não encontrada.",
     )
-    if chat is None:
-        raise AppError(404, "chat_not_found", "Conversa não encontrada.")
     contact = db.scalar(
         select(CrmContact).where(
             CrmContact.user_id == user.id, CrmContact.messaging_chat_id == chat.id
