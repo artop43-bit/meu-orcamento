@@ -1,18 +1,400 @@
 /**
- * Histórico de versões para Ajustes › Notas da versão. Linguagem para o usuário (o detalhe
- * técnico fica nos arquivos de changelog/ do repositório). A primeira é a versão atual.
+ * Histórico de versões para Configurações › Notas da versão, separado por solução do Hub.
+ * Cada solução tem a própria numeração e só as próprias notas; versão já publicada não ganha
+ * itens novos. Linguagem para o usuário (o detalhe técnico fica nos arquivos de changelog/).
+ * Em cada solução, a primeira entrada é a versão atual (a mesma de release.ts).
  */
+export type ReleaseSolutionId =
+  | "hub"
+  | "meu-orcamento"
+  | "mensageria"
+  | "dashboard-crm"
+  | "catalogo"
+  | "propostas"
+  | "projetos"
+  | "agenda"
+  | "cofre"
+  | "caderno";
+export type ReleaseSolutionFilter = "all" | ReleaseSolutionId;
+
+export type ReleaseSection = {
+  title: string;
+  items: string[];
+  solution?: ReleaseSolutionId;
+};
+
 export type Release = {
   version: string;
-  date: string; // dd/mm/aaaa às hh:mm
+  /** "dd/mm/aaaa às hh:mm" (Brasília). Sem data = versão em preparação (o horário entra no PR). */
+  date?: string;
   title: string;
-  sections: { title: string; items: string[] }[];
+  /** Sem solução = Meu Orçamento (as versões anteriores ao Hub). */
+  solution?: ReleaseSolutionId;
+  sections: ReleaseSection[];
 };
+
+export const RELEASE_IN_PREPARATION = "Em preparação";
+
+/** Data mostrada na tela: o horário da publicação ou "Em preparação". */
+export function releaseDate(release: Release): string {
+  return release.date ?? RELEASE_IN_PREPARATION;
+}
+
+export function releaseKey(release: Release): string {
+  return `${release.solution ?? "meu-orcamento"}-${release.version}`;
+}
+
+export type ReleaseSolutionMeta = {
+  id: ReleaseSolutionId;
+  label: string;
+  shortLabel: string;
+  description: string;
+};
+
+export const RELEASE_SOLUTIONS: ReleaseSolutionMeta[] = [
+  {
+    id: "hub",
+    label: "Hub de Soluções",
+    shortLabel: "Hub",
+    description: "Conta, segurança, configurações globais, painel de administração e transição entre soluções.",
+  },
+  {
+    id: "meu-orcamento",
+    label: "Meu Orçamento",
+    shortLabel: "Meu Orçamento",
+    description: "Orçamento mensal, cartões, divisões, empréstimos, investimentos, leitor de cupons e Tire sua dúvida.",
+  },
+  {
+    id: "mensageria",
+    label: "Mensageria",
+    shortLabel: "Mensageria",
+    description: "WhatsApp por QR Code, mídias, player de áudio, respostas rápidas com / e CRM 360° na conversa.",
+  },
+  {
+    id: "dashboard-crm",
+    label: "Dashboard & CRM",
+    shortLabel: "Dashboard & CRM",
+    description: "Painéis personalizados, funil de vendas, contatos, leitor universal de PDF/CSV e conectores de API.",
+  },
+  {
+    id: "catalogo",
+    label: "Catálogo & Estoque",
+    shortLabel: "Catálogo",
+    description: "Produtos, serviços, controle de estoque mínimo, margem e pedidos integrados ao Hub.",
+  },
+  {
+    id: "propostas",
+    label: "Propostas & PDFs",
+    shortLabel: "Propostas",
+    description: "Emissão local de propostas, ordens de serviço, contratos e recibos em PDF com envio pela Mensageria.",
+  },
+  {
+    id: "projetos",
+    label: "Projetos & Tarefas",
+    shortLabel: "Projetos",
+    description: "Kanban, checklists, apontamento de horas e cálculo de margem ligado ao Meu Orçamento.",
+  },
+  {
+    id: "agenda",
+    label: "Agenda & Compromissos",
+    shortLabel: "Agenda",
+    description: "Linha do tempo unificada com compromissos, follow-ups, entregas, fechamentos, validades e contas.",
+  },
+  {
+    id: "cofre",
+    label: "Cofre & Garantias",
+    shortLabel: "Cofre",
+    description: "Arquivo permanente de PDFs e fotos com busca por OCR local, validades e proteção do WhatsApp.",
+  },
+  {
+    id: "caderno",
+    label: "Caderno & Conhecimento",
+    shortLabel: "Caderno",
+    description: "Anotações em Markdown com links [[...]], modelos prontos, backlinks e busca BM25.",
+  },
+];
+
+export function releaseSolutionLabel(solution: ReleaseSolutionId | undefined): string {
+  const target = solution ?? "meu-orcamento";
+  return RELEASE_SOLUTIONS.find((s) => s.id === target)?.label ?? "Meu Orçamento";
+}
+
+/**
+ * Filtra a lista de versões pela solução escolhida ("all" devolve todas). Uma seção marcada com
+ * outra solução nunca aparece no filtro da solução da versão.
+ */
+export function filterReleasesBySolution(
+  releases: Release[],
+  filter: ReleaseSolutionFilter,
+): Release[] {
+  if (filter === "all") return releases;
+  const out: Release[] = [];
+  for (const rel of releases) {
+    const relSolution = rel.solution ?? "meu-orcamento";
+    if (relSolution === filter) {
+      const ownSections = rel.sections.filter((sec) => (sec.solution ?? relSolution) === filter);
+      if (ownSections.length === rel.sections.length) out.push(rel);
+      else if (ownSections.length > 0) out.push({ ...rel, sections: ownSections });
+      continue;
+    }
+    const matchingSections = rel.sections.filter((sec) => sec.solution === filter);
+    if (matchingSections.length > 0) {
+      out.push({
+        ...rel,
+        solution: filter,
+        sections: matchingSections,
+      });
+    }
+  }
+  return out;
+}
 
 export const RELEASES: Release[] = [
   {
+    version: "1.0.0",
+    title: "Arquivo permanente, validades e OCR local",
+    solution: "cofre",
+    sections: [
+      {
+        title: "Cofre & Garantias",
+        items: [
+          "Guarde PDFs, notas fiscais, garantias, contratos e fotos com busca pelo texto extraído por OCR local.",
+          "Validades entram automaticamente na Agenda 360° com filtro rápido de itens vencendo.",
+          "Botão Guardar no Cofre na Mensageria e em Propostas & PDFs protege documentos contra a limpeza de 7 dias.",
+        ],
+      },
+    ],
+  },
+  {
+    version: "1.0.0",
+    title: "Notas Markdown, links [[...]] e busca BM25",
+    solution: "caderno",
+    sections: [
+      {
+        title: "Caderno & Conhecimento",
+        items: [
+          "Organize atas, POPs e roteiros em cadernos com tags, fixação no topo e modelos prontos.",
+          "Conecte notas com [[Nome da nota]], veja backlinks e consulte roteiros direto na Mensageria.",
+        ],
+      },
+    ],
+  },
+  {
+    version: "1.0.0",
+    title: "Kanban, checklists, horas trabalhadas e rentabilidade real",
+    solution: "projetos",
+    sections: [
+      { title: "Lista de projetos", items: ["Abra um cartão para editar nome, descrição, prazo e valores ou excluir com a opção de desfazer."] },
+      {
+        title: "Projetos & Tarefas",
+        items: [
+          "Organize entregas em quadros Kanban (A fazer, Fazendo, Concluído) com prioridades, prazos e checklists.",
+          "Aponte horas trabalhadas e acompanhe automaticamente o ganho real por hora comparando o orçado com despesas do Meu Orçamento.",
+          "Crie projetos direto de negócios do CRM ou documentos de Propostas e converta mensagens do WhatsApp em tarefas.",
+        ],
+      },
+    ],
+  },
+  {
+    version: "1.0.0",
+    title: "Linha do tempo 360° e confirmação pelo WhatsApp",
+    solution: "agenda",
+    sections: [
+      { title: "Agenda no celular", items: ["Veja o período em formato curto, escolha a visualização em uma linha e deslize os filtros de camadas. O vermelho identifica contas em atraso."] },
+      {
+        title: "Agenda & Compromissos",
+        items: [
+          "Visão de Dia, Semana, Mês e Próximos compromissos reunindo Agenda própria, follow-ups da Mensageria, fechamentos do CRM, prazos de Projetos e vencimentos do Meu Orçamento.",
+          "Filtre as camadas visíveis e prepare ou envie confirmações de compromisso direto na conversa do WhatsApp.",
+        ],
+      },
+    ],
+  },
+  {
+    version: "1.0.0",
+    title: "Produtos, serviços, estoque mínimo e pedidos integrados",
+    solution: "catalogo",
+    sections: [
+      { title: "Lista de itens", items: ["Os nomes podem ocupar duas linhas. O código aparece em uma linha própria e o preço fica abaixo do item no celular.", "A descrição do pedido se ajusta a nomes longos do Catálogo."] },
+      {
+        title: "Catálogo & Estoque",
+        items: [
+          "Cadastre produtos com controle de saldo e alerta automático de reposição e serviços com custo e margem unitária.",
+          "Registre entradas, saídas e ajustes manuais com histórico completo por item.",
+          "Confirme pedidos dando baixa automática no estoque e lançando a venda no Meu Orçamento e no funil do CRM.",
+          "Fonte nativa ao vivo disponível também nos painéis do Dashboard & CRM.",
+        ],
+      },
+    ],
+  },
+  {
+    version: "1.0.0",
+    title: "Propostas, ordens de serviço, contratos e recibos em PDF",
+    solution: "propostas",
+    sections: [
+      { title: "Lista de documentos", items: ["Os títulos podem ocupar duas linhas e aparecem completos ao abrir o cartão. No celular, o preço fica embaixo.", "Descrições longas ficam legíveis ao editar os itens."] },
+      {
+        title: "Documentos em PDF e integração",
+        items: [
+          "Emita propostas comerciais, ordens de serviço, contratos e recibos A4 em PDF gerados 100% no servidor do Hub.",
+          "Puxe clientes do CRM e itens do Catálogo com cálculo automático de desconto e validade.",
+          "Envie o PDF pronto direto em uma conversa ativa da Mensageria e aprove o documento criando negócio ganho e receita no Orçamento.",
+        ],
+      },
+    ],
+  },
+  {
+    version: "1.0.0",
+    title: "Hub de Soluções: todas as soluções numa conta só",
+    solution: "hub",
+    sections: [
+      {
+        title: "Termos e privacidade",
+        items: [
+          "Os Termos de uso e a Política de privacidade cobrem as nove soluções, incluindo os documentos arquivados no Cofre e as notas do Caderno.",
+          "No cadastro, o aceite dos Termos fica distinto da declaração de leitura da Política de privacidade.",
+        ],
+      },
+      {
+        title: "Hub de Soluções",
+        items: [
+          "Depois de entrar, você escolhe a solução: Meu Orçamento, Mensageria ou Dashboard & CRM.",
+          "Ao abrir uma solução aparece uma animação curta com o nome dela, e a tela já chega pronta, sem aviso de carregamento no meio.",
+          "O botão Sair dentro de uma solução volta ao Hub sem encerrar a sessão. Para trocar de solução, você passa pelo Hub.",
+        ],
+      },
+      {
+        title: "Conta e Configurações",
+        items: [
+          "Perfil, Segurança (verificação em duas etapas e sessões), Preferências de aparência (Padrão ou Liquid glass, claro ou escuro), App e notificações e Notas da versão ficam nas Configurações do Hub e valem para todas as soluções.",
+          "Mensagens da plataforma (recados da administração e as suas solicitações) ficam no Hub, no botão de carta da barra de cima.",
+          "O botão Sair da barra do Hub encerra a sessão da conta.",
+          "Notas da versão separadas por solução, cada uma com o próprio número de versão.",
+        ],
+      },
+      {
+        title: "Administração",
+        items: [
+          "Para contas administradoras, o painel de Administração fica na barra do Hub e nas Configurações: usuários, liberação de acesso, e-mails, solicitações, recados e erros.",
+        ],
+      },
+    ],
+  },
+  {
+    version: "1.0.0",
+    title: "WhatsApp por QR Code, mídias e atendimento na conversa",
+    solution: "mensageria",
+    sections: [
+      { title: "Conexão com acesso restrito", items: ["A instalação pode configurar um acesso dedicado ao banco para o conector do WhatsApp."] },
+      {
+        title: "Conexão com o WhatsApp por QR Code",
+        items: [
+          "Conecte o seu número lendo o QR Code no celular (Aparelhos conectados), como no WhatsApp Web.",
+          "Ao conectar, chegam as conversas recentes. Mensagens novas entram sozinhas, e as enviadas mostram ✓ enviada, ✓✓ entregue e lida.",
+          "O nome salvo na agenda vale mais que o apelido, números escondidos não viram nome e conversas repetidas do mesmo contato são juntadas.",
+          "Fotos de perfil dos contatos. Sem WhatsApp conectado, a caixa de envio fica desligada.",
+          "Só conversas individuais: grupos, status e canais ficam de fora.",
+        ],
+      },
+      {
+        title: "Fotos, áudios, vídeos e documentos",
+        items: [
+          "Receba e envie fotos, áudios, vídeos, figurinhas e documentos de até 8 MB: pelo botão de anexo, colando com Ctrl+V ou arrastando o arquivo para a conversa.",
+          "Grave áudio pelo microfone do aparelho.",
+          "Player de áudio como o do WhatsApp: ouvir e pausar, barra para avançar ou voltar, tempo, velocidade 1x, 1.5x e 2x e botão para baixar.",
+          "Botão Copiar nas fotos e figurinhas, no balão e na foto ampliada.",
+        ],
+      },
+      {
+        title: "Atendimento na conversa (CRM 360°)",
+        items: [
+          "Etiquetas (Lead, Cliente, Orçamento, Cobrança, Urgente, VIP ou as suas), status do atendimento (Em aberto, Aguardando cliente, Resolvido) e lembrete de retorno, com filtros na lista de conversas.",
+          "Respostas rápidas digitando / ou tocando em ⚡ (/pix, /cobranca, /boasvindas, /orcamento, /retorno e as que você criar), que já preenchem o nome, o telefone, a chave Pix e o valor pendente.",
+          "Painel CRM 360° no contato: veja e mude a etapa dos negócios no Funil, crie um negócio, salve o contato no CRM e cobre com Pix em 1 clique.",
+          "Botão Lançar nas mensagens: pega o valor em R$ do texto e registra uma receita ou despesa no mês atual do Meu Orçamento.",
+        ],
+      },
+      {
+        title: "Limpeza automática",
+        items: [
+          "Mensagens e mídias com mais de 7 dias saem da Mensageria para não ocupar espaço. Nada é apagado do celular, e as conversas fixadas ficam.",
+        ],
+      },
+    ],
+  },
+  {
+    version: "1.0.0",
+    title: "Painéis, funil de vendas e leitura de PDF e CSV",
+    solution: "dashboard-crm",
+    sections: [
+      {
+        title: "Painéis e gráficos",
+        items: [
+          "Monte vários painéis com filtro de período e comece por um modelo pronto: Visão CRM, Mensageria · WhatsApp, Meu Orçamento, Fonte importada ou em branco.",
+          "Seis tipos de gráfico: indicador, barras, linha, rosca, funil e tabela.",
+        ],
+      },
+      {
+        title: "Funil de vendas e contatos",
+        items: [
+          "Negócios por etapa (quadro no computador e lista no celular), com o histórico de atividades.",
+          "Traga contatos das conversas da Mensageria.",
+          "Ao marcar um negócio como Ganho, um botão envia a receita para o Meu Orçamento.",
+        ],
+      },
+      {
+        title: "Fontes de dados",
+        items: [
+          "Dados ao vivo do próprio Hub: negócios e contatos do CRM, mensagens da Mensageria e lançamentos do Meu Orçamento.",
+          "Leitura de PDF (tabelas, extratos, fichas e até PDF escaneado) e de CSV no servidor do app, sem serviço externo, com prévia para corrigir antes de importar.",
+          "O que foi lido vira um painel pronto ou entra direto em Contatos ou Negócios.",
+          "Conexão com APIs (endereço https que devolve JSON), com proteção contra endereços internos e a chave de acesso guardada cifrada.",
+        ],
+      },
+    ],
+  },
+  {
+    version: "1.11.0",
+    title: "Reforma Tributária e novo Tire sua dúvida",
+    solution: "meu-orcamento",
+    sections: [
+      { title: "Primeiros passos", items: ["O guia do resumo de Análises exibe os passos em uma coluna no celular."] },
+      {
+        title: "Reforma Tributária",
+        items: [
+          "Simule IBS e CBS no Regime Regular e no Simples Nacional e Imposto Seletivo no Regime Regular, com cálculo por item.",
+          "Consulte códigos fiscais, fundamentação e atividades do Simples na data da operação.",
+          "Gere o PDF DANFSe com o XML de uma nota de serviço já emitida.",
+        ],
+      },
+      {
+        title: "Tire sua dúvida",
+        items: [
+          "Junta vários filtros na mesma pergunta: período, categorias, cartões, contas, projetos, formas de pagamento, pessoas e faixas de valor, e agrupa o resultado de 15 jeitos.",
+          "Acha qualquer lançamento (“onde está o lançamento X?”) em despesas, receitas, notas, recorrências, metas, dívidas, divisões e investimentos.",
+          "Entende saudações sem confundir com categorias e avisa quando a pergunta foge do tema financeiro.",
+          "Continua tudo no servidor do app, sem serviço externo.",
+        ],
+      },
+      {
+        title: "Ajustes e Análises",
+        items: [
+          "Ajustes agora tem só o que é do orçamento. As Preferências reúnem mês financeiro, chave Pix, MEI, avisos financeiros (e-mail, webhook e celular), modo privacidade e atalhos. Perfil, segurança, aparência e app ficam nas Configurações do Hub.",
+          "As médias dos meses fechados, a taxa de poupança e a retrospectiva para compartilhar saíram do Perfil e ficam em Análises › Retrospectiva.",
+          "Começar do zero fica em Ajustes › Importar e exportar.",
+        ],
+      },
+      {
+        title: "Correções",
+        items: [
+          "Notas da versão 1.10.0: horário corrigido para 17/11 às 21:20 e incluída a correção do limite do cartão, que foi publicada junto.",
+        ],
+      },
+    ],
+  },
+  {
     version: "1.10.0",
-    date: "17/11/2026 às 21:45",
+    date: "17/11/2026 às 21:20",
     title: "Leitor de cupons novo",
     sections: [
       {
@@ -26,7 +408,10 @@ export const RELEASES: Release[] = [
       },
       {
         title: "Correções",
-        items: ["Horário da versão 1.9.0.1 corrigido nas notas (16/11 às 00:44)."],
+        items: [
+          "Horário da versão 1.9.0.1 corrigido nas notas (16/11 às 00:44).",
+          "Cartão de crédito: a compra nunca entra como paga e sempre ocupa o limite do cartão.",
+        ],
       },
     ],
   },

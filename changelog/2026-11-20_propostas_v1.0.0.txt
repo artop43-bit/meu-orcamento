@@ -1,0 +1,13 @@
+PROPOSTAS & PDFS · UPDATE LOG
+Versão 1.0.0 · Propostas, ordens de serviço, contratos e recibos em PDF
+Data: a definir (preencher no PR com o horário estimado)
+
+Documentos comerciais em PDF
+- [x] Geração 100% local em A4 (fpdf2 + Inter) de propostas, ordens de serviço, contratos e recibos (sem vínculo Pix/bancário).
+- [x] Numeração sequencial por tipo, desconto, validade e preenchimento rápido com clientes do CRM, itens do Catálogo ou pedidos.
+- [x] Envio direto do PDF na fila da Mensageria (WhatsApp) e aprovação com negócio ganho no CRM e receita no Meu Orçamento.
+- [x] Títulos com duas linhas na lista e completos no cartão aberto, com preço abaixo do título no celular.
+- [x] Descrições longas ficam legíveis ao editar itens de um documento.
+
+Validação
+- Suíte backend (test_commerce.py) e frontend (commerce.test.ts) + download real e envio no WhatsApp via E2E concluídos localmente.

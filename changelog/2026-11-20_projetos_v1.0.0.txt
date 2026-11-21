@@ -1,0 +1,12 @@
+PROJETOS & TAREFAS · UPDATE LOG
+Versão 1.0.0 · Kanban, checklists, horas e rentabilidade
+Data: a definir (preencher no PR com o horário estimado)
+
+Projetos, execução e rentabilidade
+- [x] Quadro Kanban (A fazer, Fazendo, Concluído) com prioridades, prazos e checklists por tarefa.
+- [x] Apontamento de horas e painel de rentabilidade comparando o orçado com despesas reais do Meu Orçamento.
+- [x] Criação em 1 clique a partir de negócios do CRM e documentos de Propostas, e criação de tarefas direto da Mensageria.
+- [x] Cartões expansíveis com edição de dados gerais e exclusão com desfazer.
+
+Validação
+- Suíte backend (test_work.py) e frontend (work.test.ts) + E2E em navegador concluídos localmente.

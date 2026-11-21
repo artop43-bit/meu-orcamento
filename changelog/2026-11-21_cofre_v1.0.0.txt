@@ -1,0 +1,9 @@
+COFRE DE DOCUMENTOS · UPDATE LOG
+Versão 1.0.0 · Arquivo permanente, garantias, validades e OCR local (em preparação)
+Data: Em preparação
+
+Cofre & Garantias
+- [x] Novo endereço `/cofre` integrado ao Hub de Soluções com entrada padronizada.
+- [x] Guarde PDFs, notas fiscais, comprovantes e fotos com leitura local de texto para busca.
+- [x] Controle de validade e garantias integrado automaticamente à Agenda 360° (`/agenda`).
+- [x] Botão "Guardar no Cofre" na Mensageria e em Propostas & PDFs protegendo documentos importantes contra a limpeza semanal de 7 dias.

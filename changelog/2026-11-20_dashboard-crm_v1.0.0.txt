@@ -1,0 +1,19 @@
+DASHBOARD & CRM · UPDATE LOG
+Versão 1.0.0 · Painéis, contatos e negócios
+Data: a definir (preencher no PR com o horário estimado)
+
+Painéis e CRM
+- [x] Painéis com modelos, período e seis tipos de gráfico.
+- [x] Funil de negócios, contatos e histórico de atividades.
+- [x] Contatos da Mensageria e receita no Meu Orçamento para negócio ganho.
+- [x] Fontes internas ao vivo, importação de PDF e CSV com prévia e conectores HTTPS.
+
+Correções
+- [x] Validação de valores, períodos e entradas malformadas.
+- [x] Segurança e prazo total do conector de API.
+- [x] Componentes visuais existentes e confirmação para excluir negócio.
+- [x] Removidos atualização automática sem agendador, rotas sem tela e extração de CPF/CNPJ.
+
+Validação
+- Resultado dos testes registrado em docs/conhecimento/Testes e auditorias.md.
+- Migrações em Postgres e OCR no servidor ARM64 continuam pendentes.

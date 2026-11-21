@@ -1,0 +1,14 @@
+CATÁLOGO & ESTOQUE · UPDATE LOG
+Versão 1.0.0 · Produtos, serviços, estoque mínimo e pedidos
+Data: a definir (preencher no PR com o horário estimado)
+
+Catálogo, estoque e pedidos
+- [x] Cadastro de produtos e serviços com custo, preço de venda e margem unitária automática.
+- [x] Controle de saldo em estoque com movimentações manuais (entrada, saída, ajuste) e alerta de reposição.
+- [x] Pedidos comerciais com baixa automática nos produtos e integração idempotente ao Meu Orçamento e ao CRM.
+- [x] Fonte nativa ao vivo disponível nos painéis do Dashboard & CRM.
+- [x] Nomes em duas linhas, código do item separado e preço abaixo do nome no celular.
+- [x] A descrição do pedido cresce para exibir nomes longos do Catálogo.
+
+Validação
+- Suíte backend (test_commerce.py) e frontend (commerce.test.ts) + teste E2E em navegador concluídos localmente.

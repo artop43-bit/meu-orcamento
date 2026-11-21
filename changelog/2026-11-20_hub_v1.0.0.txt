@@ -1,0 +1,16 @@
+HUB DE SOLUÇÕES · UPDATE LOG
+Versão 1.0.0 · Suas soluções num lugar só
+Data: a definir (preencher no PR com o horário estimado)
+
+Hub e conta
+- [x] Escolha entre Meu Orçamento, Mensageria e Dashboard & CRM após entrar.
+- [x] Perfil, segurança, preferências globais, app e administração centralizados no Hub.
+- [x] Entrada e saída das soluções com transição; Sair dentro da solução volta ao Hub.
+- [x] Notas, número de versão e aviso de Novidades próprios para cada solução.
+- [x] Termos de uso e Política de privacidade atualizados para as soluções do Hub, com a versão registrada no cadastro.
+- [x] Cofre e Caderno incluídos na revisão de 21/11, com esclarecimento sobre cópias arquivadas no Cofre.
+- [x] Limite de 20 MB para o corpo de requisições da API no Caddy.
+
+Validação
+- Resultado dos testes registrado em docs/conhecimento/Testes e auditorias.md.
+- Publicação depende de checklist próprio.

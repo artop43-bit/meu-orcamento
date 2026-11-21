@@ -1,0 +1,12 @@
+AGENDA & COMPROMISSOS · UPDATE LOG
+Versão 1.0.0 · Agenda Unificada 360° e confirmação no WhatsApp
+Data: a definir (preencher no PR com o horário estimado)
+
+Agenda 360° e integrações
+- [x] Visualizações Dia, Semana, Mês e Próximos compromissos com criação rápida vinculada a contato e projeto.
+- [x] Camadas integradas na mesma linha do tempo: Agenda própria, follow-ups da Mensageria, previsões do CRM, prazos de Projetos e contas/cartões do Meu Orçamento.
+- [x] Preparação e envio direto de confirmação de compromisso pela Mensageria (WhatsApp).
+- [x] Período curto e controles em uma linha no celular. Cores das camadas diferenciam contas pagas das atrasadas.
+
+Validação
+- Suíte backend (test_work.py) e frontend (work.test.ts) + E2E em navegador concluídos localmente.

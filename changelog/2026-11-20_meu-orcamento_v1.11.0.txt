@@ -1,0 +1,27 @@
+MEU ORÇAMENTO · UPDATE LOG
+Versão 1.11.0 · Reforma Tributária e novo Tire sua dúvida
+Data: a definir (preencher no PR com o horário estimado)
+
+Reforma Tributária
+- [x] Simulação com motores oficiais do Regime Regular e Simples Nacional, valores por item e memória de cálculo.
+- [x] Busca por código, descrição, vigência e anexo do Simples nas tabelas fiscais.
+- [x] Geração local de DANFSe a partir do XML, sem guardar os arquivos.
+
+Tire sua dúvida
+- [x] Bot local por regras, com filtros combináveis e busca de lançamentos.
+- [x] Cálculos alinhados aos serviços das telas e tratamento de perguntas não entendidas.
+- [x] Vocabulário compartilhado com o Lançamento rápido.
+
+Organização
+- [x] Recursos da conta nas Configurações do Hub; ajustes financeiros no Meu Orçamento.
+- [x] Retrospectiva em Análises.
+- [x] Guia do resumo de Análises em uma coluna para evitar palavras quebradas no celular.
+- [x] Versão, notas e aviso de Novidades próprios do Meu Orçamento.
+
+Correções nas notas anteriores
+- [x] 1.10.0: horário correto de publicação, 17/11 às 21:20.
+- [x] 1.10.0: incluída a correção do cartão publicada junto, no PR #75.
+
+Validação
+- Resultado dos testes registrado em docs/conhecimento/Testes e auditorias.md.
+- Publicação depende de checklist próprio.

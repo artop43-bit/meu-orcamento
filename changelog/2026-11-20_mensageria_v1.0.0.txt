@@ -1,0 +1,19 @@
+MENSAGERIA · UPDATE LOG
+Versão 1.0.0 · WhatsApp e atendimento na conversa
+Data: a definir (preencher no PR com o horário estimado)
+
+Conversas
+- [x] WhatsApp por QR Code, conversas individuais, recebimento e envio de mensagens.
+- [x] Fotos, áudios, vídeos, figurinhas e documentos de até 8 MB; gravação de áudio, colar e arrastar anexos.
+- [x] Etiquetas, status de atendimento, lembretes de retorno e respostas rápidas.
+- [x] Contatos e negócios do CRM e lançamentos reais no Meu Orçamento pela conversa.
+- [x] Opção de acesso dedicado ao PostgreSQL para o conector do WhatsApp.
+
+Correções
+- [x] Valores brasileiros e compras no cartão seguem as regras do orçamento.
+- [x] Anexos e rascunhos ficam na própria conversa.
+- [x] Limpeza preserva conversas com vínculos e informações de atendimento.
+
+Validação
+- Resultado dos testes registrado em docs/conhecimento/Testes e auditorias.md.
+- Pareamento e envio/recebimento com celular real continuam pendentes antes do PR.
